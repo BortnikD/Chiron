@@ -1,3 +1,16 @@
 spring:
   application:
     name: chiron
+  datasource:
+    url: jdbc:postgresql://localhost:5432/chiron
+    username: postgres
+    password: postgres
+
+clinic:
+  zone: Europe/Moscow
+  slot-step-min: 15
+
+cors:
+  allowed-origins:
+    - http://localhost:5173
+    - http://localhost:3000
