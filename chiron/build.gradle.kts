@@ -9,6 +9,8 @@ group = "com.bortnik"
 version = "0.0.1-SNAPSHOT"
 description = "chiron"
 
+val exposedVersion = "1.5.0"
+
 java {
     toolchain {
         languageVersion = JavaLanguageVersion.of(21)
@@ -26,10 +28,14 @@ dependencies {
     implementation("org.springframework.boot:spring-boot-starter-validation")
     implementation("org.springframework.boot:spring-boot-starter-webmvc")
     implementation("org.flywaydb:flyway-database-postgresql")
+    implementation("org.jetbrains.exposed:exposed-core:$exposedVersion")
+    implementation("org.jetbrains.exposed:exposed-jdbc:$exposedVersion")
+    implementation("org.jetbrains.exposed:exposed-java-time:$exposedVersion")
+    implementation("org.jetbrains.exposed:exposed-spring-boot-starter:$exposedVersion")
     implementation("org.jetbrains.kotlin:kotlin-reflect")
     implementation("org.springdoc:springdoc-openapi-starter-webmvc-ui:3.1.0")
     implementation("tools.jackson.module:jackson-module-kotlin")
-    runtimeOnly("org.postgresql:postgresql")
+    implementation("org.postgresql:postgresql")
     testImplementation("org.springframework.boot:spring-boot-starter-flyway-test")
     testImplementation("org.springframework.boot:spring-boot-starter-jdbc-test")
     testImplementation("org.springframework.boot:spring-boot-starter-security-test")
