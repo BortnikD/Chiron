@@ -8,4 +8,5 @@ class AppointmentSlotUnavailableException(
     val veterinarianId: UUID,
     val startAt: Instant,
     val endAt: Instant,
-) : BusinessRuleViolationException("Slot $startAt - $endAt is unavailable for veterinarian $veterinarianId")
+    val reason: String,
+) : BusinessRuleViolationException("Slot $startAt - $endAt is unavailable for veterinarian $veterinarianId: $reason")
