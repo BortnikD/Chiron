@@ -21,7 +21,26 @@ admin:
   first-name: ${ADMIN_FIRST_NAME:Admin}
   last-name: ${ADMIN_LAST_NAME:Admin}
 
+management:
+  endpoints:
+    web:
+      exposure:
+        # Only the health check is published; everything else in actuator stays off the web.
+        include: health
+  endpoint:
+    health:
+      # Public endpoint: status only, no component details (DB version, disk space, etc.).
+      show-details: never
+      probes:
+        enabled: true
+      group:
+        readiness:
+          include:
+            - readinessState
+            - db
+
 springdoc:
+  show-actuator: true
   default-produces-media-type: application/json
   api-docs:
     path: /v3/api-docs

@@ -46,6 +46,7 @@ class SecurityConfig {
         }
         .authorizeHttpRequests {
             it.requestMatchers(*DOCUMENTATION_ENDPOINTS, "/error").permitAll()
+            it.requestMatchers(HttpMethod.GET, "/actuator/health", "/actuator/health/**").permitAll()
             it.requestMatchers(HttpMethod.POST, "/api/v1/auth/register", "/api/v1/auth/login").permitAll()
             it.requestMatchers(HttpMethod.GET, *PUBLIC_READ_ENDPOINTS).permitAll()
             it.requestMatchers("/api/v1/admin/**").hasRole(UserRole.ADMIN.name)

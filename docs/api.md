@@ -16,6 +16,48 @@
 
 Документация (`/scalar.html`, `/swagger-ui.html`, `/v3/api-docs`) доступна без авторизации.
 
+## Проверка состояния (health check)
+
+Эндпоинты Spring Boot Actuator. Доступны **без токена**, только `GET`. В документации они в группе `Actuator`.
+
+| Эндпоинт | Что проверяет | Когда использовать |
+|---|---|---|
+| `GET /actuator/health` | Приложение и подключение к базе данных | Общая проверка «бэкенд работает»: индикатор на фронтенде, мониторинг |
+| `GET /actuator/health/readiness` | Приложение запущено и база данных доступна | Можно ли уже отправлять запросы (используется в healthcheck Docker Compose) |
+| `GET /actuator/health/liveness` | Процесс приложения жив (базу **не** проверяет) | Нужно ли перезапускать контейнер |
+
+Ответ **не** обёрнут в `ApiResponse`. Подробности о компонентах (версия БД, место на диске и т. п.) не
+отдаются, только итоговый статус:
+
+```json
+{ "status": "UP" }
+```
+
+| HTTP-статус | `status` | Значение |
+|---|---|---|
+| `200` | `UP` | Всё работает |
+| `503` | `DOWN` / `OUT_OF_SERVICE` | Бэкенд запущен, но не готов, например недоступна база данных |
+| нет ответа / сетевая ошибка | — | Бэкенд не запущен или недоступен по сети |
+
+Пример проверки на фронтенде:
+
+```ts
+export async function isBackendHealthy(): Promise<boolean> {
+  try {
+    const response = await fetch("http://localhost:8080/actuator/health", {
+      signal: AbortSignal.timeout(3000),
+    });
+    // 503 comes with a JSON body too, so checking response.ok is enough.
+    return response.ok;
+  } catch {
+    // Network error or timeout: the backend is not reachable.
+    return false;
+  }
+}
+```
+
+CORS для этих эндпоинтов настроен так же, как для остального API (origin'ы из `cors.allowed-origins`).
+
 ## Авторизация
 
 API использует JWT-токен. Токен один и живёт 30 дней, refresh-токена нет.
