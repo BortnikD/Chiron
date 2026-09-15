@@ -1,4 +1,4 @@
-package com.bortnik.chiron.presentation.api.http.controllers
+package com.bortnik.chiron.presentation.api.http.controllers.admin
 
 import com.bortnik.chiron.application.usecase.workschedule.CreateWorkScheduleUseCase
 import com.bortnik.chiron.application.usecase.workschedule.DeleteWorkScheduleUseCase
@@ -20,30 +20,24 @@ import org.springframework.web.bind.annotation.PostMapping
 import org.springframework.web.bind.annotation.PutMapping
 import org.springframework.web.bind.annotation.RequestBody
 import org.springframework.web.bind.annotation.RequestMapping
-import org.springframework.web.bind.annotation.RequestParam
 import org.springframework.web.bind.annotation.RestController
 import java.util.UUID
 
 @RestController
-@RequestMapping("/api/v1/work-schedules")
+@RequestMapping("/api/v1/admin/work-schedules")
 @Tag(
-    name = "Work schedules",
+    name = "Admin: Work schedules",
     description = """
         Regular weekly working hours of a veterinarian: at most one entry per day of week, with an optional break.
         Days without an entry are days off. Schedule exceptions take precedence over these hours.
     """,
 )
-class WorkScheduleController(
+class AdminWorkScheduleController(
     private val createWorkScheduleUseCase: CreateWorkScheduleUseCase,
     private val getWorkScheduleUseCase: GetWorkScheduleUseCase,
     private val updateWorkScheduleUseCase: UpdateWorkScheduleUseCase,
     private val deleteWorkScheduleUseCase: DeleteWorkScheduleUseCase,
 ) {
-    @Operation(summary = "List weekly schedule of a veterinarian")
-    @GetMapping
-    fun findAllByVeterinarianId(@RequestParam veterinarianId: UUID): ApiResponse<List<WorkScheduleResponse>> =
-        ApiResponse.success(getWorkScheduleUseCase.findAllByVeterinarianId(veterinarianId).map { it.toResponse() })
-
     @Operation(summary = "Get work schedule entry by id")
     @GetMapping("/{id}")
     fun findById(@PathVariable id: UUID): ApiResponse<WorkScheduleResponse> =

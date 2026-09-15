@@ -1,6 +1,5 @@
-package com.bortnik.chiron.presentation.api.http.controllers
+package com.bortnik.chiron.presentation.api.http.controllers.admin
 
-import com.bortnik.chiron.application.usecase.appointment.CheckAppointmentAvailabilityUseCase
 import com.bortnik.chiron.application.usecase.appointment.CreateAppointmentUseCase
 import com.bortnik.chiron.application.usecase.appointment.DeleteAppointmentUseCase
 import com.bortnik.chiron.application.usecase.appointment.GetAppointmentUseCase
@@ -12,7 +11,6 @@ import com.bortnik.chiron.presentation.api.http.dto.response.AppointmentResponse
 import com.bortnik.chiron.presentation.api.http.mappers.toDto
 import com.bortnik.chiron.presentation.api.http.mappers.toResponse
 import io.swagger.v3.oas.annotations.Operation
-import io.swagger.v3.oas.annotations.Parameter
 import io.swagger.v3.oas.annotations.tags.Tag
 import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.DeleteMapping
@@ -22,20 +20,17 @@ import org.springframework.web.bind.annotation.PostMapping
 import org.springframework.web.bind.annotation.PutMapping
 import org.springframework.web.bind.annotation.RequestBody
 import org.springframework.web.bind.annotation.RequestMapping
-import org.springframework.web.bind.annotation.RequestParam
 import org.springframework.web.bind.annotation.RestController
-import java.time.Instant
 import java.util.UUID
 
 @RestController
-@RequestMapping("/api/v1/appointments")
-@Tag(name = "Appointments")
-class AppointmentController(
+@RequestMapping("/api/v1/admin/appointments")
+@Tag(name = "Admin: Appointments")
+class AdminAppointmentController(
     private val createAppointmentUseCase: CreateAppointmentUseCase,
     private val getAppointmentUseCase: GetAppointmentUseCase,
     private val updateAppointmentUseCase: UpdateAppointmentUseCase,
     private val deleteAppointmentUseCase: DeleteAppointmentUseCase,
-    private val checkAppointmentAvailabilityUseCase: CheckAppointmentAvailabilityUseCase,
 ) {
     @Operation(summary = "Get appointment by id")
     @GetMapping("/{id}")
@@ -51,28 +46,6 @@ class AppointmentController(
     @GetMapping("/by-pet/{petId}")
     fun findAllByPetId(@PathVariable petId: UUID): ApiResponse<List<AppointmentResponse>> =
         ApiResponse.success(getAppointmentUseCase.findAllByPetId(petId).map { it.toResponse() })
-
-    @Operation(
-        summary = "Check slot availability",
-        description = """
-            Returns true when the veterinarian can take the slot.
-            Otherwise responds with AppointmentSlotUnavailableException whose message contains the reason.
-            A slot must start and end on the same day in the clinic time zone, start on the clinic slot grid,
-            fit into the working hours (custom hours of a schedule exception take precedence over the weekly schedule),
-            not overlap the break and not overlap another non-cancelled appointment.
-        """,
-    )
-    @GetMapping("/availability")
-    fun checkAvailability(
-        @RequestParam veterinarianId: UUID,
-        @Parameter(description = "Slot start, ISO-8601 instant") @RequestParam startAt: Instant,
-        @Parameter(description = "Slot end, ISO-8601 instant") @RequestParam endAt: Instant,
-        @Parameter(description = "Appointment ignored in the overlap check, used when rescheduling it")
-        @RequestParam(required = false) excludeAppointmentId: UUID?,
-    ): ApiResponse<Boolean> {
-        checkAppointmentAvailabilityUseCase.check(veterinarianId, startAt, endAt, excludeAppointmentId)
-        return ApiResponse.success(true)
-    }
 
     @Operation(
         summary = "Create appointment",

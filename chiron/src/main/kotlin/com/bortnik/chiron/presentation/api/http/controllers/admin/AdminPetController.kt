@@ -1,4 +1,4 @@
-package com.bortnik.chiron.presentation.api.http.controllers
+package com.bortnik.chiron.presentation.api.http.controllers.admin
 
 import com.bortnik.chiron.application.usecase.pet.CreatePetUseCase
 import com.bortnik.chiron.application.usecase.pet.DeletePetUseCase
@@ -26,9 +26,9 @@ import org.springframework.web.bind.annotation.RestController
 import java.util.UUID
 
 @RestController
-@RequestMapping("/api/v1/pets")
-@Tag(name = "Pets")
-class PetController(
+@RequestMapping("/api/v1/admin/pets")
+@Tag(name = "Admin: Pets")
+class AdminPetController(
     private val createPetUseCase: CreatePetUseCase,
     private val getPetUseCase: GetPetUseCase,
     private val updatePetUseCase: UpdatePetUseCase,
@@ -49,7 +49,7 @@ class PetController(
     fun findById(@PathVariable id: UUID): ApiResponse<PetResponse> =
         ApiResponse.success(getPetUseCase.findById(id).toResponse())
 
-    @Operation(summary = "Create pet")
+    @Operation(summary = "Create pet for any owner")
     @PostMapping
     fun create(@RequestBody request: CreatePetRequest): ResponseEntity<ApiResponse<PetResponse>> =
         ApiResponse.created(createPetUseCase.create(request.toDto()).toResponse())

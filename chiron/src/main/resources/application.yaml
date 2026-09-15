@@ -10,6 +10,17 @@ clinic:
   zone: Europe/Moscow
   slot-step-min: 15
 
+jwt:
+  secret: ${JWT_SECRET}
+  ttl: 30d
+
+admin:
+  email: ${ADMIN_EMAIL}
+  password: ${ADMIN_PASSWORD}
+  phone: ${ADMIN_PHONE}
+  first-name: ${ADMIN_FIRST_NAME:Admin}
+  last-name: ${ADMIN_LAST_NAME:Admin}
+
 springdoc:
   default-produces-media-type: application/json
   api-docs:
@@ -21,5 +32,7 @@ springdoc:
 
 cors:
   allowed-origins:
+    # React (Vite)
     - http://localhost:5173
+    # Next.js
     - http://localhost:3000

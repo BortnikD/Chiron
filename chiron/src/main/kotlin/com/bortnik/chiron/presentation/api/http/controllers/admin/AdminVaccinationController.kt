@@ -1,4 +1,4 @@
-package com.bortnik.chiron.presentation.api.http.controllers
+package com.bortnik.chiron.presentation.api.http.controllers.admin
 
 import com.bortnik.chiron.application.usecase.vaccination.CreateVaccinationUseCase
 import com.bortnik.chiron.application.usecase.vaccination.DeleteVaccinationUseCase
@@ -25,9 +25,9 @@ import org.springframework.web.bind.annotation.RestController
 import java.util.UUID
 
 @RestController
-@RequestMapping("/api/v1/vaccinations")
-@Tag(name = "Vaccinations")
-class VaccinationController(
+@RequestMapping("/api/v1/admin/vaccinations")
+@Tag(name = "Admin: Vaccinations")
+class AdminVaccinationController(
     private val createVaccinationUseCase: CreateVaccinationUseCase,
     private val getVaccinationUseCase: GetVaccinationUseCase,
     private val updateVaccinationUseCase: UpdateVaccinationUseCase,

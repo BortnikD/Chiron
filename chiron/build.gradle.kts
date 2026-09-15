@@ -10,6 +10,7 @@ version = "0.0.1-SNAPSHOT"
 description = "chiron"
 
 val exposedVersion = "1.5.0"
+val jjwtVersion = "0.13.0"
 
 java {
     toolchain {
@@ -34,6 +35,9 @@ dependencies {
     implementation("org.jetbrains.exposed:exposed-spring-boot-starter:$exposedVersion")
     implementation("org.jetbrains.kotlin:kotlin-reflect")
     implementation("org.springdoc:springdoc-openapi-starter-webmvc-ui:3.1.0")
+    implementation("io.jsonwebtoken:jjwt-api:$jjwtVersion")
+    runtimeOnly("io.jsonwebtoken:jjwt-impl:$jjwtVersion")
+    runtimeOnly("io.jsonwebtoken:jjwt-jackson:$jjwtVersion")
     implementation("tools.jackson.module:jackson-module-kotlin")
     implementation("org.postgresql:postgresql")
     testImplementation("org.springframework.boot:spring-boot-starter-flyway-test")

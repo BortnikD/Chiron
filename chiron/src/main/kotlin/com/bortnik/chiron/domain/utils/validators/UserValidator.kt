@@ -1,10 +1,25 @@
 package com.bortnik.chiron.domain.utils.validators
 
 import com.bortnik.chiron.domain.dto.user.CreateUserDto
+import com.bortnik.chiron.domain.dto.user.RegisterUserDto
 import com.bortnik.chiron.domain.dto.user.UpdateUserDto
 import com.bortnik.chiron.domain.utils.ValidationConstants.UserRules
 
 object UserValidator {
+
+    // Only the raw password is checked here; the remaining fields are validated as CreateUserDto.
+    fun validate(dto: RegisterUserDto) = validateAll {
+        ensure(
+            dto.password.length >= UserRules.PASSWORD_MIN_LENGTH,
+            "password",
+            "must be at least ${UserRules.PASSWORD_MIN_LENGTH} characters",
+        )
+        ensure(
+            dto.password.encodeToByteArray().size <= UserRules.PASSWORD_MAX_BYTES,
+            "password",
+            "must be at most ${UserRules.PASSWORD_MAX_BYTES} bytes",
+        )
+    }
 
     fun validate(dto: CreateUserDto) = validateAll {
         user(dto.email, dto.passwordHash, dto.firstName, dto.middleName, dto.lastName, dto.fullName, dto.phone)
@@ -12,6 +27,11 @@ object UserValidator {
 
     fun validate(dto: UpdateUserDto) = validateAll {
         user(dto.email, dto.passwordHash, dto.firstName, dto.middleName, dto.lastName, dto.fullName, dto.phone)
+    }
+
+    fun validateCredentials(email: String, password: String) = validateAll {
+        ensureMaxLength("email", email, UserRules.LOGIN_EMAIL_MAX_LENGTH)
+        ensureMaxLength("password", password, UserRules.LOGIN_PASSWORD_MAX_LENGTH)
     }
 
     private fun ValidationErrorCollector.user(

@@ -1,4 +1,4 @@
-package com.bortnik.chiron.presentation.api.http.controllers
+package com.bortnik.chiron.presentation.api.http.controllers.admin
 
 import com.bortnik.chiron.application.usecase.scheduleexception.CreateScheduleExceptionUseCase
 import com.bortnik.chiron.application.usecase.scheduleexception.DeleteScheduleExceptionUseCase
@@ -20,14 +20,13 @@ import org.springframework.web.bind.annotation.PostMapping
 import org.springframework.web.bind.annotation.PutMapping
 import org.springframework.web.bind.annotation.RequestBody
 import org.springframework.web.bind.annotation.RequestMapping
-import org.springframework.web.bind.annotation.RequestParam
 import org.springframework.web.bind.annotation.RestController
 import java.util.UUID
 
 @RestController
-@RequestMapping("/api/v1/schedule-exceptions")
+@RequestMapping("/api/v1/admin/schedule-exceptions")
 @Tag(
-    name = "Schedule exceptions",
+    name = "Admin: Schedule exceptions",
     description = """
         Deviations from a veterinarian's weekly work schedule for an inclusive date range.
         ABSENCE: the veterinarian is unavailable on every date of the range; startTime and endTime must be empty.
@@ -35,19 +34,12 @@ import java.util.UUID
         the weekly break is not applied on such dates.
     """,
 )
-class ScheduleExceptionController(
+class AdminScheduleExceptionController(
     private val createScheduleExceptionUseCase: CreateScheduleExceptionUseCase,
     private val getScheduleExceptionUseCase: GetScheduleExceptionUseCase,
     private val updateScheduleExceptionUseCase: UpdateScheduleExceptionUseCase,
     private val deleteScheduleExceptionUseCase: DeleteScheduleExceptionUseCase,
 ) {
-    @Operation(summary = "List schedule exceptions of a veterinarian")
-    @GetMapping
-    fun findAllByVeterinarianId(@RequestParam veterinarianId: UUID): ApiResponse<List<ScheduleExceptionResponse>> =
-        ApiResponse.success(
-            getScheduleExceptionUseCase.findAllByVeterinarianId(veterinarianId).map { it.toResponse() },
-        )
-
     @Operation(summary = "Get schedule exception by id")
     @GetMapping("/{id}")
     fun findById(@PathVariable id: UUID): ApiResponse<ScheduleExceptionResponse> =

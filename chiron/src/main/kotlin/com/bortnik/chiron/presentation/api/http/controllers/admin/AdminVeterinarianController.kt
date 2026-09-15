@@ -1,4 +1,4 @@
-package com.bortnik.chiron.presentation.api.http.controllers
+package com.bortnik.chiron.presentation.api.http.controllers.admin
 
 import com.bortnik.chiron.application.usecase.veterinarian.CreateVeterinarianUseCase
 import com.bortnik.chiron.application.usecase.veterinarian.DeleteVeterinarianUseCase
@@ -24,24 +24,14 @@ import org.springframework.web.bind.annotation.RestController
 import java.util.UUID
 
 @RestController
-@RequestMapping("/api/v1/veterinarians")
-@Tag(name = "Veterinarians")
-class VeterinarianController(
+@RequestMapping("/api/v1/admin/veterinarians")
+@Tag(name = "Admin: Veterinarians")
+class AdminVeterinarianController(
     private val createVeterinarianUseCase: CreateVeterinarianUseCase,
     private val getVeterinarianUseCase: GetVeterinarianUseCase,
     private val updateVeterinarianUseCase: UpdateVeterinarianUseCase,
     private val deleteVeterinarianUseCase: DeleteVeterinarianUseCase,
 ) {
-    @Operation(summary = "List all veterinarians")
-    @GetMapping
-    fun findAll(): ApiResponse<List<VeterinarianResponse>> =
-        ApiResponse.success(getVeterinarianUseCase.findAll().map { it.toResponse() })
-
-    @Operation(summary = "Get veterinarian by id")
-    @GetMapping("/{id}")
-    fun findById(@PathVariable id: UUID): ApiResponse<VeterinarianResponse> =
-        ApiResponse.success(getVeterinarianUseCase.findById(id).toResponse())
-
     @Operation(summary = "Get veterinarian profile by user id")
     @GetMapping("/by-user/{userId}")
     fun findByUserId(@PathVariable userId: UUID): ApiResponse<VeterinarianResponse> =

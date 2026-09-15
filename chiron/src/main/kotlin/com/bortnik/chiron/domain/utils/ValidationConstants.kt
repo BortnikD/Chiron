@@ -13,6 +13,12 @@ object ValidationConstants {
         const val EMAIL_MAX_LENGTH = 254
         const val NAME_MAX_LENGTH = 100
         const val FULL_NAME_MAX_LENGTH = 300
+        const val PASSWORD_MIN_LENGTH = 8
+        // BCrypt rejects passwords longer than 72 bytes.
+        const val PASSWORD_MAX_BYTES = 72
+        // Upper bounds for login input, checked before the database lookup and hashing.
+        const val LOGIN_EMAIL_MAX_LENGTH = 256
+        const val LOGIN_PASSWORD_MAX_LENGTH = 512
         val EMAIL_REGEX = Regex("""^[^@\s]+@[^@\s]+\.[^@\s]+$""")
         val PHONE_REGEX = Regex("""^\+?[0-9]{10,15}$""")
     }

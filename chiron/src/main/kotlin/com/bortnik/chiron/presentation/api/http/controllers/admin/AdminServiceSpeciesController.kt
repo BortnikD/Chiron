@@ -1,8 +1,7 @@
-package com.bortnik.chiron.presentation.api.http.controllers
+package com.bortnik.chiron.presentation.api.http.controllers.admin
 
 import com.bortnik.chiron.application.usecase.servicespecies.CreateServiceSpeciesUseCase
 import com.bortnik.chiron.application.usecase.servicespecies.DeleteServiceSpeciesUseCase
-import com.bortnik.chiron.application.usecase.servicespecies.GetServiceSpeciesUseCase
 import com.bortnik.chiron.application.usecase.servicespecies.UpdateServiceSpeciesUseCase
 import com.bortnik.chiron.presentation.api.http.ApiResponse
 import com.bortnik.chiron.presentation.api.http.dto.request.servicespecies.CreateServiceSpeciesRequest
@@ -15,7 +14,6 @@ import io.swagger.v3.oas.annotations.Operation
 import io.swagger.v3.oas.annotations.tags.Tag
 import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.DeleteMapping
-import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PathVariable
 import org.springframework.web.bind.annotation.PostMapping
 import org.springframework.web.bind.annotation.PutMapping
@@ -25,9 +23,9 @@ import org.springframework.web.bind.annotation.RestController
 import java.util.UUID
 
 @RestController
-@RequestMapping("/api/v1/services/{serviceId}/species")
+@RequestMapping("/api/v1/admin/services/{serviceId}/species")
 @Tag(
-    name = "Service species",
+    name = "Admin: Service species",
     description = """
         Links a service to the species it can be provided for.
         An appointment can be created only if the pet's species is linked to the booked service,
@@ -37,22 +35,11 @@ import java.util.UUID
         A null durationMin or price means the service's base value applies.
     """,
 )
-class ServiceSpeciesController(
+class AdminServiceSpeciesController(
     private val createServiceSpeciesUseCase: CreateServiceSpeciesUseCase,
-    private val getServiceSpeciesUseCase: GetServiceSpeciesUseCase,
     private val updateServiceSpeciesUseCase: UpdateServiceSpeciesUseCase,
     private val deleteServiceSpeciesUseCase: DeleteServiceSpeciesUseCase,
 ) {
-    @Operation(summary = "List species the service is available for")
-    @GetMapping
-    fun findAllByServiceId(@PathVariable serviceId: UUID): ApiResponse<List<ServiceSpeciesResponse>> =
-        ApiResponse.success(getServiceSpeciesUseCase.findAllByServiceId(serviceId).map { it.toResponse() })
-
-    @Operation(summary = "Get service-species link")
-    @GetMapping("/{speciesId}")
-    fun findById(@PathVariable serviceId: UUID, @PathVariable speciesId: UUID): ApiResponse<ServiceSpeciesResponse> =
-        ApiResponse.success(getServiceSpeciesUseCase.findById(serviceId, speciesId).toResponse())
-
     @Operation(
         summary = "Make service available for species",
         description = "Optional durationMin and price override the service's base values for this species.",
