@@ -13,6 +13,7 @@ import com.bortnik.chiron.presentation.api.http.mappers.toDto
 import com.bortnik.chiron.presentation.api.http.mappers.toResponse
 import io.swagger.v3.oas.annotations.Operation
 import io.swagger.v3.oas.annotations.tags.Tag
+import jakarta.validation.Valid
 import org.springframework.http.ResponseEntity
 import org.springframework.security.core.annotation.AuthenticationPrincipal
 import org.springframework.web.bind.annotation.DeleteMapping
@@ -49,7 +50,7 @@ class AdminVeterinarianController(
     @PostMapping
     fun create(
         @AuthenticationPrincipal actor: Actor,
-        @RequestBody request: CreateVeterinarianRequest,
+        @Valid @RequestBody request: CreateVeterinarianRequest,
     ): ResponseEntity<ApiResponse<VeterinarianResponse>> =
         ApiResponse.created(createVeterinarianUseCase.create(actor, request.toDto()).toResponse())
 
@@ -58,7 +59,7 @@ class AdminVeterinarianController(
     fun update(
         @AuthenticationPrincipal actor: Actor,
         @PathVariable id: UUID,
-        @RequestBody request: UpdateVeterinarianRequest,
+        @Valid @RequestBody request: UpdateVeterinarianRequest,
     ): ApiResponse<VeterinarianResponse> =
         ApiResponse.success(updateVeterinarianUseCase.update(actor, id, request.toDto()).toResponse())
 

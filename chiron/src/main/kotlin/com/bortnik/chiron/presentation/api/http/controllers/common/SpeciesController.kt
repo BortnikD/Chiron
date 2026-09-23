@@ -1,11 +1,14 @@
 package com.bortnik.chiron.presentation.api.http.controllers.common
 
 import com.bortnik.chiron.application.usecase.common.species.GetSpeciesUseCase
+import com.bortnik.chiron.domain.utils.ValidationConstants.SpeciesRules
 import com.bortnik.chiron.presentation.api.http.ApiResponse
 import com.bortnik.chiron.presentation.api.http.dto.response.SpeciesResponse
 import com.bortnik.chiron.presentation.api.http.mappers.toResponse
 import io.swagger.v3.oas.annotations.Operation
 import io.swagger.v3.oas.annotations.tags.Tag
+import jakarta.validation.constraints.NotBlank
+import jakarta.validation.constraints.Size
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PathVariable
 import org.springframework.web.bind.annotation.RequestMapping
@@ -30,6 +33,10 @@ class SpeciesController(private val getSpeciesUseCase: GetSpeciesUseCase) {
 
     @Operation(summary = "Get species by name")
     @GetMapping("/by-name")
-    fun findByName(@RequestParam name: String): ApiResponse<SpeciesResponse> =
+    fun findByName(
+        @NotBlank(message = "must not be blank")
+        @Size(max = SpeciesRules.NAME_MAX_LENGTH, message = "must be at most ${SpeciesRules.NAME_MAX_LENGTH} characters")
+        @RequestParam name: String,
+    ): ApiResponse<SpeciesResponse> =
         ApiResponse.success(getSpeciesUseCase.findByName(name).toResponse())
 }

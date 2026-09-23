@@ -15,6 +15,7 @@ import com.bortnik.chiron.presentation.api.http.mappers.toDto
 import com.bortnik.chiron.presentation.api.http.mappers.toResponse
 import io.swagger.v3.oas.annotations.Operation
 import io.swagger.v3.oas.annotations.tags.Tag
+import jakarta.validation.Valid
 import org.springframework.http.ResponseEntity
 import org.springframework.security.core.annotation.AuthenticationPrincipal
 import org.springframework.web.bind.annotation.GetMapping
@@ -43,12 +44,12 @@ class AuthController(
         description = "Always creates a CLIENT. Veterinarians and admins are created by an admin.",
     )
     @PostMapping("/register")
-    fun register(@RequestBody request: RegisterRequest): ResponseEntity<ApiResponse<AuthResponse>> =
+    fun register(@Valid @RequestBody request: RegisterRequest): ResponseEntity<ApiResponse<AuthResponse>> =
         ApiResponse.created(registerUserUseCase.register(request.toDto()).toAuthResponse())
 
     @Operation(summary = "Log in with email and password")
     @PostMapping("/login")
-    fun login(@RequestBody request: LoginRequest): ApiResponse<AuthResponse> =
+    fun login(@Valid @RequestBody request: LoginRequest): ApiResponse<AuthResponse> =
         ApiResponse.success(authenticateUserUseCase.authenticate(request.email, request.password).toAuthResponse())
 
     @Operation(summary = "Get current user")

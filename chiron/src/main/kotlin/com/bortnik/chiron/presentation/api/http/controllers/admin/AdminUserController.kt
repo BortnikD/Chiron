@@ -4,6 +4,7 @@ import com.bortnik.chiron.application.security.Actor
 import com.bortnik.chiron.application.usecase.admin.user.AdminCreateUserUseCase
 import com.bortnik.chiron.application.usecase.admin.user.AdminDeleteUserUseCase
 import com.bortnik.chiron.application.usecase.admin.user.AdminGetUserUseCase
+import com.bortnik.chiron.domain.utils.ValidationConstants.UserRules
 import com.bortnik.chiron.presentation.api.http.ApiResponse
 import com.bortnik.chiron.presentation.api.http.dto.request.user.CreateUserRequest
 import com.bortnik.chiron.presentation.api.http.dto.response.UserResponse
@@ -11,6 +12,10 @@ import com.bortnik.chiron.presentation.api.http.mappers.toDto
 import com.bortnik.chiron.presentation.api.http.mappers.toResponse
 import io.swagger.v3.oas.annotations.Operation
 import io.swagger.v3.oas.annotations.tags.Tag
+import jakarta.validation.Valid
+import jakarta.validation.constraints.NotBlank
+import jakarta.validation.constraints.Pattern
+import jakarta.validation.constraints.Size
 import org.springframework.http.ResponseEntity
 import org.springframework.security.core.annotation.AuthenticationPrincipal
 import org.springframework.web.bind.annotation.DeleteMapping
@@ -43,12 +48,22 @@ class AdminUserController(
 
     @Operation(summary = "Get user by email")
     @GetMapping("/by-email")
-    fun findByEmail(@AuthenticationPrincipal actor: Actor, @RequestParam email: String): ApiResponse<UserResponse> =
+    fun findByEmail(
+        @AuthenticationPrincipal actor: Actor,
+        @NotBlank(message = "must not be blank")
+        @Size(max = UserRules.EMAIL_MAX_LENGTH, message = "must be at most ${UserRules.EMAIL_MAX_LENGTH} characters")
+        @Pattern(regexp = UserRules.EMAIL_PATTERN, message = "must be a valid email address")
+        @RequestParam email: String,
+    ): ApiResponse<UserResponse> =
         ApiResponse.success(getUserUseCase.findByEmail(actor, email).toResponse())
 
     @Operation(summary = "Get user by phone")
     @GetMapping("/by-phone")
-    fun findByPhone(@AuthenticationPrincipal actor: Actor, @RequestParam phone: String): ApiResponse<UserResponse> =
+    fun findByPhone(
+        @AuthenticationPrincipal actor: Actor,
+        @Pattern(regexp = UserRules.PHONE_PATTERN, message = "must be a phone number in international format")
+        @RequestParam phone: String,
+    ): ApiResponse<UserResponse> =
         ApiResponse.success(getUserUseCase.findByPhone(actor, phone).toResponse())
 
     @Operation(
@@ -58,7 +73,7 @@ class AdminUserController(
     @PostMapping
     fun create(
         @AuthenticationPrincipal actor: Actor,
-        @RequestBody request: CreateUserRequest,
+        @Valid @RequestBody request: CreateUserRequest,
     ): ResponseEntity<ApiResponse<UserResponse>> =
         ApiResponse.created(createUserUseCase.create(actor, request.toDto()).toResponse())
 

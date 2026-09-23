@@ -19,8 +19,11 @@ object ValidationConstants {
         // Upper bounds for login input, checked before the database lookup and hashing.
         const val LOGIN_EMAIL_MAX_LENGTH = 256
         const val LOGIN_PASSWORD_MAX_LENGTH = 512
-        val EMAIL_REGEX = Regex("""^[^@\s]+@[^@\s]+\.[^@\s]+$""")
-        val PHONE_REGEX = Regex("""^\+?[0-9]{10,15}$""")
+        // Kept as strings so that presentation-layer @Pattern annotations can reuse them.
+        const val EMAIL_PATTERN = """^[^@\s]+@[^@\s]+\.[^@\s]+$"""
+        const val PHONE_PATTERN = """^\+?[0-9]{10,15}$"""
+        val EMAIL_REGEX = Regex(EMAIL_PATTERN)
+        val PHONE_REGEX = Regex(PHONE_PATTERN)
     }
 
     object PetRules {

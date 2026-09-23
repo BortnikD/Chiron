@@ -13,6 +13,7 @@ import com.bortnik.chiron.presentation.api.http.mappers.toDto
 import com.bortnik.chiron.presentation.api.http.mappers.toResponse
 import io.swagger.v3.oas.annotations.Operation
 import io.swagger.v3.oas.annotations.tags.Tag
+import jakarta.validation.Valid
 import org.springframework.http.ResponseEntity
 import org.springframework.security.core.annotation.AuthenticationPrincipal
 import org.springframework.web.bind.annotation.DeleteMapping
@@ -55,7 +56,7 @@ class AdminVaccinationController(
     @PostMapping
     fun create(
         @AuthenticationPrincipal actor: Actor,
-        @RequestBody request: CreateVaccinationRequest,
+        @Valid @RequestBody request: CreateVaccinationRequest,
     ): ResponseEntity<ApiResponse<VaccinationResponse>> =
         ApiResponse.created(createVaccinationUseCase.create(actor, request.toDto()).toResponse())
 
@@ -64,7 +65,7 @@ class AdminVaccinationController(
     fun update(
         @AuthenticationPrincipal actor: Actor,
         @PathVariable id: UUID,
-        @RequestBody request: UpdateVaccinationRequest,
+        @Valid @RequestBody request: UpdateVaccinationRequest,
     ): ApiResponse<VaccinationResponse> =
         ApiResponse.success(updateVaccinationUseCase.update(actor, id, request.toDto()).toResponse())
 

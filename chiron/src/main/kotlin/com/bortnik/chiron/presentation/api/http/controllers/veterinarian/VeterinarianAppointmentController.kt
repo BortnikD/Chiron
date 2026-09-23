@@ -10,6 +10,7 @@ import com.bortnik.chiron.presentation.api.http.mappers.toDto
 import com.bortnik.chiron.presentation.api.http.mappers.toResponse
 import io.swagger.v3.oas.annotations.Operation
 import io.swagger.v3.oas.annotations.tags.Tag
+import jakarta.validation.Valid
 import org.springframework.security.core.annotation.AuthenticationPrincipal
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PathVariable
@@ -52,7 +53,7 @@ class VeterinarianAppointmentController(
     fun update(
         @AuthenticationPrincipal actor: Actor,
         @PathVariable id: UUID,
-        @RequestBody request: VeterinarianUpdateAppointmentRequest,
+        @Valid @RequestBody request: VeterinarianUpdateAppointmentRequest,
     ): ApiResponse<AppointmentResponse> =
         ApiResponse.success(updateAppointmentStatusUseCase.update(actor, id, request.toDto()).toResponse())
 }

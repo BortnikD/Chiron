@@ -12,6 +12,7 @@ import com.bortnik.chiron.presentation.api.http.mappers.toDto
 import com.bortnik.chiron.presentation.api.http.mappers.toResponse
 import io.swagger.v3.oas.annotations.Operation
 import io.swagger.v3.oas.annotations.tags.Tag
+import jakarta.validation.Valid
 import org.springframework.http.ResponseEntity
 import org.springframework.security.core.annotation.AuthenticationPrincipal
 import org.springframework.web.bind.annotation.DeleteMapping
@@ -35,7 +36,7 @@ class AdminServiceController(
     @PostMapping
     fun create(
         @AuthenticationPrincipal actor: Actor,
-        @RequestBody request: CreateServiceRequest,
+        @Valid @RequestBody request: CreateServiceRequest,
     ): ResponseEntity<ApiResponse<ServiceResponse>> =
         ApiResponse.created(createServiceUseCase.create(actor, request.toDto()).toResponse())
 
@@ -44,7 +45,7 @@ class AdminServiceController(
     fun update(
         @AuthenticationPrincipal actor: Actor,
         @PathVariable id: UUID,
-        @RequestBody request: UpdateServiceRequest,
+        @Valid @RequestBody request: UpdateServiceRequest,
     ): ApiResponse<ServiceResponse> =
         ApiResponse.success(updateServiceUseCase.update(actor, id, request.toDto()).toResponse())
 

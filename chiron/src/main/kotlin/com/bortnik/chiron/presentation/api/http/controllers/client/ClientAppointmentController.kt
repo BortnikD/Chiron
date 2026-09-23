@@ -13,6 +13,7 @@ import com.bortnik.chiron.presentation.api.http.mappers.toResponse
 import io.swagger.v3.oas.annotations.Operation
 import io.swagger.v3.oas.annotations.Parameter
 import io.swagger.v3.oas.annotations.tags.Tag
+import jakarta.validation.Valid
 import org.springframework.http.ResponseEntity
 import org.springframework.security.core.annotation.AuthenticationPrincipal
 import org.springframework.web.bind.annotation.GetMapping
@@ -61,7 +62,7 @@ class ClientAppointmentController(
     @PostMapping
     fun create(
         @AuthenticationPrincipal actor: Actor,
-        @RequestBody request: ClientCreateAppointmentRequest,
+        @Valid @RequestBody request: ClientCreateAppointmentRequest,
     ): ResponseEntity<ApiResponse<AppointmentResponse>> =
         ApiResponse.created(bookAppointmentUseCase.book(actor, request.toDto()).toResponse())
 
@@ -73,7 +74,7 @@ class ClientAppointmentController(
     fun cancel(
         @AuthenticationPrincipal actor: Actor,
         @PathVariable id: UUID,
-        @RequestBody(required = false) request: CancelAppointmentRequest?,
+        @Valid @RequestBody(required = false) request: CancelAppointmentRequest?,
     ): ApiResponse<AppointmentResponse> =
         ApiResponse.success(cancelAppointmentUseCase.cancel(actor, id, request?.reason).toResponse())
 }

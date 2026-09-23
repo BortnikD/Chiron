@@ -14,6 +14,7 @@ import com.bortnik.chiron.presentation.api.http.mappers.toResponse
 import io.swagger.v3.oas.annotations.Operation
 import io.swagger.v3.oas.annotations.Parameter
 import io.swagger.v3.oas.annotations.tags.Tag
+import jakarta.validation.Valid
 import org.springframework.http.ResponseEntity
 import org.springframework.security.core.annotation.AuthenticationPrincipal
 import org.springframework.web.bind.annotation.DeleteMapping
@@ -56,7 +57,7 @@ class AdminPetController(
     @PostMapping
     fun create(
         @AuthenticationPrincipal actor: Actor,
-        @RequestBody request: CreatePetRequest,
+        @Valid @RequestBody request: CreatePetRequest,
     ): ResponseEntity<ApiResponse<PetResponse>> =
         ApiResponse.created(createPetUseCase.create(actor, request.toDto()).toResponse())
 
@@ -68,7 +69,7 @@ class AdminPetController(
     fun update(
         @AuthenticationPrincipal actor: Actor,
         @PathVariable id: UUID,
-        @RequestBody request: UpdatePetRequest,
+        @Valid @RequestBody request: UpdatePetRequest,
     ): ApiResponse<PetResponse> =
         ApiResponse.success(updatePetUseCase.update(actor, id, request.toDto()).toResponse())
 

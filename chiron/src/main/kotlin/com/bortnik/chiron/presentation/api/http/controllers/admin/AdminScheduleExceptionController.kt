@@ -13,6 +13,7 @@ import com.bortnik.chiron.presentation.api.http.mappers.toDto
 import com.bortnik.chiron.presentation.api.http.mappers.toResponse
 import io.swagger.v3.oas.annotations.Operation
 import io.swagger.v3.oas.annotations.tags.Tag
+import jakarta.validation.Valid
 import org.springframework.http.ResponseEntity
 import org.springframework.security.core.annotation.AuthenticationPrincipal
 import org.springframework.web.bind.annotation.DeleteMapping
@@ -54,7 +55,7 @@ class AdminScheduleExceptionController(
     @PostMapping
     fun create(
         @AuthenticationPrincipal actor: Actor,
-        @RequestBody request: CreateScheduleExceptionRequest,
+        @Valid @RequestBody request: CreateScheduleExceptionRequest,
     ): ResponseEntity<ApiResponse<ScheduleExceptionResponse>> =
         ApiResponse.created(createScheduleExceptionUseCase.create(actor, request.toDto()).toResponse())
 
@@ -63,7 +64,7 @@ class AdminScheduleExceptionController(
     fun update(
         @AuthenticationPrincipal actor: Actor,
         @PathVariable id: UUID,
-        @RequestBody request: UpdateScheduleExceptionRequest,
+        @Valid @RequestBody request: UpdateScheduleExceptionRequest,
     ): ApiResponse<ScheduleExceptionResponse> =
         ApiResponse.success(updateScheduleExceptionUseCase.update(actor, id, request.toDto()).toResponse())
 
