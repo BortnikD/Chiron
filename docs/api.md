@@ -99,7 +99,9 @@ API использует JWT-токен. Токен один и живёт 30 д
    расписание врача.
 4. `GET /api/v1/appointments/availability` — проверить, свободен ли слот.
 5. `POST /api/v1/client/appointments` — записаться. Запись создаётся в статусе `PENDING`, цену считает сервер.
-6. Врач подтверждает и завершает приём через `PUT /api/v1/veterinarian/appointments/{id}`.
+6. Врач подтверждает и завершает приём через `PATCH /api/v1/veterinarian/appointments/{id}`.
+
+Все обновления — `PATCH`: поля, отсутствующие в теле запроса, не меняются; явный `null` очищает nullable-поле.
 
 Статусы записи: `PENDING → CONFIRMED | CANCELLED`, `CONFIRMED → COMPLETED | CANCELLED | NO_SHOW`.
 `COMPLETED`, `CANCELLED` и `NO_SHOW` — конечные.

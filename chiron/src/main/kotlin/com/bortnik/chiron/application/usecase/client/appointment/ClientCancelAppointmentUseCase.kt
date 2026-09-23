@@ -3,6 +3,7 @@ package com.bortnik.chiron.application.usecase.client.appointment
 import com.bortnik.chiron.application.security.Actor
 import com.bortnik.chiron.application.security.ResourceAccessGuard
 import com.bortnik.chiron.application.usecase.common.appointment.ChangeAppointmentStatusUseCase
+import com.bortnik.chiron.domain.dto.Patch
 import com.bortnik.chiron.domain.entities.Appointment
 import com.bortnik.chiron.domain.entities.enums.AppointmentStatus
 import org.slf4j.LoggerFactory
@@ -25,7 +26,7 @@ class ClientCancelAppointmentUseCase(
             appointment = appointment,
             status = AppointmentStatus.CANCELLED,
             actorId = actor.userId,
-            vetNotes = appointment.vetNotes,
+            vetNotes = Patch.Unchanged,
             cancelReason = reason,
         )
         log.info("Client {} ({}) cancelled appointment {}", actor.userId, actor.fullName, id)

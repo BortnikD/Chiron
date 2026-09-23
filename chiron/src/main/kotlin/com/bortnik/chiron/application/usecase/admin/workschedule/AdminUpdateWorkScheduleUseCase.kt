@@ -18,7 +18,8 @@ class AdminUpdateWorkScheduleUseCase(private val workScheduleRepository: WorkSch
     private val log = LoggerFactory.getLogger(javaClass)
 
     fun update(actor: Actor, id: UUID, dto: UpdateWorkScheduleDto): WorkSchedule {
-        WorkScheduleValidator.validate(dto)
+        val existing = workScheduleRepository.findById(id) ?: throw WorkScheduleNotFoundException(id)
+        WorkScheduleValidator.validate(existing, dto)
         val schedule = workScheduleRepository.update(id, dto) ?: throw WorkScheduleNotFoundException(id)
         log.info(
             "Admin {} ({}) updated work schedule {} for veterinarian {}: {} {}-{}",

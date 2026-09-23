@@ -20,10 +20,14 @@ class AdminUpdateUserUseCase(private val userRepository: UserRepository) {
 
     fun update(actor: Actor, id: UUID, dto: UpdateUserDto): User {
         UserValidator.validate(dto)
-        userRepository.findByEmail(dto.email)?.takeIf { it.id != id }
-            ?.let { throw UserAlreadyExistsException.byEmail(dto.email) }
-        userRepository.findByPhone(dto.phone)?.takeIf { it.id != id }
-            ?.let { throw UserAlreadyExistsException.byPhone(dto.phone) }
+        dto.email?.let { email ->
+            userRepository.findByEmail(email)?.takeIf { it.id != id }
+                ?.let { throw UserAlreadyExistsException.byEmail(email) }
+        }
+        dto.phone?.let { phone ->
+            userRepository.findByPhone(phone)?.takeIf { it.id != id }
+                ?.let { throw UserAlreadyExistsException.byPhone(phone) }
+        }
         val user = userRepository.update(id, dto) ?: throw UserNotFoundException(id)
         log.info(
             "Admin {} ({}) updated user {} ({}), role {}",

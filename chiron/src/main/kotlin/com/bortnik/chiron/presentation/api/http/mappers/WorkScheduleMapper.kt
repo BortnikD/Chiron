@@ -29,6 +29,6 @@ fun CreateWorkScheduleRequest.toDto(): CreateWorkScheduleDto = CreateWorkSchedul
 fun UpdateWorkScheduleRequest.toDto(): UpdateWorkScheduleDto = UpdateWorkScheduleDto(
     startTime = startTime,
     endTime = endTime,
-    breakStart = breakStart,
-    breakEnd = breakEnd,
+    breakStart = breakStart.toPatch(),
+    breakEnd = breakEnd.toPatch(),
 )

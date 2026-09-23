@@ -45,9 +45,9 @@ fun ClientCreatePetRequest.toDto(): CreateOwnPetDto = CreateOwnPetDto(
 fun UpdatePetRequest.toDto(): UpdatePetDto = UpdatePetDto(
     name = name,
     speciesId = speciesId,
-    birthDate = birthDate,
-    weightKg = weightKg,
+    birthDate = birthDate.toPatch(),
+    weightKg = weightKg.toPatch(),
     gender = gender,
-    notes = notes,
+    notes = notes.toPatch(),
     isArchived = isArchived,
 )

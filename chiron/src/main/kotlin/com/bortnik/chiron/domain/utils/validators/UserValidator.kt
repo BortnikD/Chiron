@@ -1,5 +1,6 @@
 package com.bortnik.chiron.domain.utils.validators
 
+import com.bortnik.chiron.domain.dto.orElse
 import com.bortnik.chiron.domain.dto.user.CreateUserDto
 import com.bortnik.chiron.domain.dto.user.RegisterUserDto
 import com.bortnik.chiron.domain.dto.user.UpdateUserDto
@@ -25,8 +26,17 @@ object UserValidator {
         user(dto.email, dto.passwordHash, dto.firstName, dto.middleName, dto.lastName, dto.fullName, dto.phone)
     }
 
+    // Only the fields present in the partial update are checked.
     fun validate(dto: UpdateUserDto) = validateAll {
-        user(dto.email, dto.passwordHash, dto.firstName, dto.middleName, dto.lastName, dto.fullName, dto.phone)
+        user(
+            dto.email,
+            dto.passwordHash,
+            dto.firstName,
+            dto.middleName.orElse(null),
+            dto.lastName,
+            dto.fullName,
+            dto.phone,
+        )
     }
 
     fun validateCredentials(email: String, password: String) = validateAll {
@@ -35,13 +45,13 @@ object UserValidator {
     }
 
     private fun ValidationErrorCollector.user(
-        email: String,
-        passwordHash: String,
-        firstName: String,
+        email: String?,
+        passwordHash: String?,
+        firstName: String?,
         middleName: String?,
-        lastName: String,
-        fullName: String,
-        phone: String,
+        lastName: String?,
+        fullName: String?,
+        phone: String?,
     ) {
         ensureNotBlank("email", email)
         ensureMaxLength("email", email, UserRules.EMAIL_MAX_LENGTH)

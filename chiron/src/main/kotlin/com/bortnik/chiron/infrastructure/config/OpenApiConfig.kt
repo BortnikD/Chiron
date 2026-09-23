@@ -25,6 +25,9 @@ class OpenApiConfig {
                     On failure `error` holds the exception name, message, HTTP status, request path
                     and, for validation errors, the list of field violations.
 
+                    Updates use PATCH: fields missing from the body keep their values,
+                    an explicit `null` clears a nullable field.
+
                     Authentication: obtain a token via `/api/v1/auth/login` or `/api/v1/auth/register`
                     and send it as `Authorization: Bearer <token>`.
                     Endpoints under `/api/v1/admin` require ADMIN, `/api/v1/veterinarian` require VETERINARIAN,

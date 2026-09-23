@@ -1,5 +1,6 @@
 package com.bortnik.chiron.infrastructure.persistence.repositories
 
+import com.bortnik.chiron.domain.dto.ifPresent
 import com.bortnik.chiron.domain.dto.scheduleexception.CreateScheduleExceptionDto
 import com.bortnik.chiron.domain.dto.scheduleexception.UpdateScheduleExceptionDto
 import com.bortnik.chiron.domain.entities.ScheduleException
@@ -48,13 +49,15 @@ class ExposedScheduleExceptionRepository : ScheduleExceptionRepository {
     }
 
     override fun update(id: UUID, dto: UpdateScheduleExceptionDto): ScheduleException? = exposedSql {
+        // Exposed rejects an UPDATE without columns, so an empty patch only reads the row.
+        if (dto == UpdateScheduleExceptionDto()) return@exposedSql findById(id)
         ExposedScheduleExceptionTable.updateReturning(where = { ExposedScheduleExceptionTable.id eq id }) {
-            it[type] = dto.type
-            it[startDate] = dto.startDate
-            it[endDate] = dto.endDate
-            it[startTime] = dto.startTime
-            it[endTime] = dto.endTime
-            it[reason] = dto.reason
+            dto.type?.let { value -> it[type] = value }
+            dto.startDate?.let { value -> it[startDate] = value }
+            dto.endDate?.let { value -> it[endDate] = value }
+            dto.startTime.ifPresent { value -> it[startTime] = value }
+            dto.endTime.ifPresent { value -> it[endTime] = value }
+            dto.reason.ifPresent { value -> it[reason] = value }
         }.singleOrNull()?.toScheduleException()
     }
 

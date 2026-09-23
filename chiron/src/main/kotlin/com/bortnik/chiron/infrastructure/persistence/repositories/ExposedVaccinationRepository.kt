@@ -1,5 +1,6 @@
 package com.bortnik.chiron.infrastructure.persistence.repositories
 
+import com.bortnik.chiron.domain.dto.ifPresent
 import com.bortnik.chiron.domain.dto.vaccination.CreateVaccinationDto
 import com.bortnik.chiron.domain.dto.vaccination.UpdateVaccinationDto
 import com.bortnik.chiron.domain.entities.Vaccination
@@ -46,10 +47,12 @@ class ExposedVaccinationRepository : VaccinationRepository {
     }
 
     override fun update(id: UUID, dto: UpdateVaccinationDto): Vaccination? = exposedSql {
+        // Exposed rejects an UPDATE without columns, so an empty patch only reads the row.
+        if (dto == UpdateVaccinationDto()) return@exposedSql findById(id)
         ExposedVaccinationTable.updateReturning(where = { ExposedVaccinationTable.id eq id }) {
-            it[name] = dto.name
-            it[administeredOn] = dto.administeredOn
-            it[nextDueOn] = dto.nextDueOn
+            dto.name?.let { value -> it[name] = value }
+            dto.administeredOn?.let { value -> it[administeredOn] = value }
+            dto.nextDueOn.ifPresent { value -> it[nextDueOn] = value }
         }.singleOrNull()?.toVaccination()
     }
 

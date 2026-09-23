@@ -144,7 +144,11 @@ Exposed imports.
 
 - `domain/entities` — immutable `data class` entities (`val` only, `id: UUID`, `createdAt` / `updatedAt: Instant`
   where the table has them); enums in `domain/entities/enums`.
-- `domain/dto/<entity>` — `Create<Entity>Dto`, `Update<Entity>Dto`. Update is a full replacement (PUT), not a patch.
+- `domain/dto/<entity>` — `Create<Entity>Dto`, `Update<Entity>Dto`. Update is a partial update (PATCH): non-null
+  columns are `T? = null` (null = keep), nullable columns are `Patch<T?> = Patch.Unchanged` (`Patch.Value(null)`
+  clears). Request DTOs use `JsonNullable<T?>` for nullable columns, mapped with `toPatch()`. Validators check only
+  the present fields, or take `existing` when a rule spans several fields. Repositories write only present fields
+  and return `findById` for an empty patch (Exposed rejects an UPDATE without columns).
 - `domain/repositories` — `<Entity>Repository` interfaces: `create(dto)`, `findById(id): T?`, `findAll...`,
   `update(id, dto): T?` (null = not found), `deleteById(id): Boolean` (false = not found).
 - `domain/exceptions` — hierarchy rooted in `DomainException`:

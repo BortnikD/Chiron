@@ -20,7 +20,9 @@ class AdminUpdateSpeciesUseCase(private val speciesRepository: SpeciesRepository
 
     fun update(actor: Actor, id: UUID, dto: UpdateSpeciesDto): Species {
         SpeciesValidator.validate(dto)
-        speciesRepository.findByName(dto.name)?.takeIf { it.id != id }?.let { throw SpeciesAlreadyExistsException.byName(dto.name) }
+        dto.name?.let { name ->
+            speciesRepository.findByName(name)?.takeIf { it.id != id }?.let { throw SpeciesAlreadyExistsException.byName(name) }
+        }
         val species = speciesRepository.update(id, dto) ?: throw SpeciesNotFoundException(id)
         log.info("Admin {} ({}) updated species {} '{}'", actor.userId, actor.fullName, species.id, species.name)
         return species

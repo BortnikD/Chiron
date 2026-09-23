@@ -13,8 +13,8 @@ import io.swagger.v3.oas.annotations.tags.Tag
 import jakarta.validation.Valid
 import org.springframework.security.core.annotation.AuthenticationPrincipal
 import org.springframework.web.bind.annotation.GetMapping
+import org.springframework.web.bind.annotation.PatchMapping
 import org.springframework.web.bind.annotation.PathVariable
-import org.springframework.web.bind.annotation.PutMapping
 import org.springframework.web.bind.annotation.RequestBody
 import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.RestController
@@ -44,12 +44,13 @@ class VeterinarianAppointmentController(
         summary = "Update status and notes of own appointment",
         description = """
             Allowed status transitions: PENDING -> CONFIRMED | CANCELLED; CONFIRMED -> COMPLETED | CANCELLED | NO_SHOW.
-            vetNotes replaces the current notes. cancelReason is used only when the appointment is being cancelled;
+            Omitted fields are kept; vetNotes: null clears the notes.
+            cancelReason is used only when the appointment is being cancelled;
             the current user and time are recorded as the cancellation author and moment.
             Time, veterinarian and client comment cannot be changed here.
         """,
     )
-    @PutMapping("/{id}")
+    @PatchMapping("/{id}")
     fun update(
         @AuthenticationPrincipal actor: Actor,
         @PathVariable id: UUID,

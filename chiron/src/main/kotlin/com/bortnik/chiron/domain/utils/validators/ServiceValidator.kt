@@ -12,16 +12,17 @@ object ServiceValidator {
         service(dto.name, dto.description, dto.basePrice, dto.baseDurationMin, dto.bufferAfterMin)
     }
 
+    // Only the fields present in the partial update are checked.
     fun validate(dto: UpdateServiceDto) = validateAll {
         service(dto.name, dto.description, dto.basePrice, dto.baseDurationMin, dto.bufferAfterMin)
     }
 
     private fun ValidationErrorCollector.service(
-        name: String,
-        description: String,
-        basePrice: Double,
-        baseDurationMin: Int,
-        bufferAfterMin: Int,
+        name: String?,
+        description: String?,
+        basePrice: Double?,
+        baseDurationMin: Int?,
+        bufferAfterMin: Int?,
     ) {
         ensureNotBlank("name", name)
         ensureMaxLength("name", name, ServiceRules.NAME_MAX_LENGTH)

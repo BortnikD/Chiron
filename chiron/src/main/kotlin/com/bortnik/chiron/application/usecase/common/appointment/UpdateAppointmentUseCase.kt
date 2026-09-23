@@ -29,25 +29,29 @@ class UpdateAppointmentUseCase(
 ) {
 
     fun update(id: UUID, dto: UpdateAppointmentDto): Appointment {
-        AppointmentValidator.validate(dto)
         val existing = appointmentRepository.findById(id) ?: throw AppointmentNotFoundException(id)
+        AppointmentValidator.validate(existing, dto)
 
-        if (!AppointmentStatusRules.canTransition(existing.status, dto.status)) {
-            throw InvalidAppointmentStatusTransitionException(id, existing.status, dto.status)
+        val status = dto.status ?: existing.status
+        if (!AppointmentStatusRules.canTransition(existing.status, status)) {
+            throw InvalidAppointmentStatusTransitionException(id, existing.status, status)
         }
 
-        val rescheduled = dto.veterinarianId != existing.veterinarianId ||
-            dto.startAt != existing.startAt ||
-            dto.endAt != existing.endAt
+        val veterinarianId = dto.veterinarianId ?: existing.veterinarianId
+        val startAt = dto.startAt ?: existing.startAt
+        val endAt = dto.endAt ?: existing.endAt
+        val rescheduled = veterinarianId != existing.veterinarianId ||
+            startAt != existing.startAt ||
+            endAt != existing.endAt
         if (rescheduled) {
-            val veterinarian = veterinarianRepository.findById(dto.veterinarianId)
-                ?: throw VeterinarianNotFoundException(dto.veterinarianId)
+            val veterinarian = veterinarianRepository.findById(veterinarianId)
+                ?: throw VeterinarianNotFoundException(veterinarianId)
             if (!veterinarian.isActive) throw VeterinarianInactiveException(veterinarian.id)
             val pet = petRepository.findById(existing.petId) ?: throw PetNotFoundException(existing.petId)
             if (!permissionRepository.exists(veterinarian.id, pet.speciesId)) {
                 throw VeterinarianNotPermittedForSpeciesException(veterinarian.id, pet.speciesId)
             }
-            checkAvailability.check(veterinarian.id, dto.startAt, dto.endAt, excludeAppointmentId = id)
+            checkAvailability.check(veterinarian.id, startAt, endAt, excludeAppointmentId = id)
         }
 
         return appointmentRepository.update(id, dto) ?: throw AppointmentNotFoundException(id)

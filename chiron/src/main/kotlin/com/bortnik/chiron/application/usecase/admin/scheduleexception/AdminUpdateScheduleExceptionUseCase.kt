@@ -18,7 +18,8 @@ class AdminUpdateScheduleExceptionUseCase(private val scheduleExceptionRepositor
     private val log = LoggerFactory.getLogger(javaClass)
 
     fun update(actor: Actor, id: UUID, dto: UpdateScheduleExceptionDto): ScheduleException {
-        ScheduleExceptionValidator.validate(dto)
+        val existing = scheduleExceptionRepository.findById(id) ?: throw ScheduleExceptionNotFoundException(id)
+        ScheduleExceptionValidator.validate(existing, dto)
         val exception = scheduleExceptionRepository.update(id, dto) ?: throw ScheduleExceptionNotFoundException(id)
         log.info(
             "Admin {} ({}) updated schedule exception {} ({}) for veterinarian {}: {} - {}",

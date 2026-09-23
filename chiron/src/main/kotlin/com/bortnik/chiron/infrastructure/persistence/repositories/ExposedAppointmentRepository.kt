@@ -2,6 +2,7 @@ package com.bortnik.chiron.infrastructure.persistence.repositories
 
 import com.bortnik.chiron.domain.dto.appointment.CreateAppointmentDto
 import com.bortnik.chiron.domain.dto.appointment.UpdateAppointmentDto
+import com.bortnik.chiron.domain.dto.ifPresent
 import com.bortnik.chiron.domain.entities.Appointment
 import com.bortnik.chiron.domain.repositories.AppointmentRepository
 import com.bortnik.chiron.infrastructure.persistence.exposedSql
@@ -60,16 +61,18 @@ class ExposedAppointmentRepository : AppointmentRepository {
     }
 
     override fun update(id: UUID, dto: UpdateAppointmentDto): Appointment? = exposedSql {
+        // An empty patch has nothing to write, so updatedAt is left untouched.
+        if (dto == UpdateAppointmentDto()) return@exposedSql findById(id)
         ExposedAppointmentTable.updateReturning(where = { ExposedAppointmentTable.id eq id }) {
-            it[veterinarianId] = dto.veterinarianId
-            it[startAt] = dto.startAt.toDbTimestamp()
-            it[endAt] = dto.endAt.toDbTimestamp()
-            it[status] = dto.status
-            it[clientComment] = dto.clientComment
-            it[vetNotes] = dto.vetNotes
-            it[cancelledBy] = dto.cancelledBy
-            it[cancelledAt] = dto.cancelledAt?.toDbTimestamp()
-            it[cancelReason] = dto.cancelReason
+            dto.veterinarianId?.let { value -> it[veterinarianId] = value }
+            dto.startAt?.let { value -> it[startAt] = value.toDbTimestamp() }
+            dto.endAt?.let { value -> it[endAt] = value.toDbTimestamp() }
+            dto.status?.let { value -> it[status] = value }
+            dto.clientComment.ifPresent { value -> it[clientComment] = value }
+            dto.vetNotes.ifPresent { value -> it[vetNotes] = value }
+            dto.cancelledBy.ifPresent { value -> it[cancelledBy] = value }
+            dto.cancelledAt.ifPresent { value -> it[cancelledAt] = value?.toDbTimestamp() }
+            dto.cancelReason.ifPresent { value -> it[cancelReason] = value }
             it[updatedAt] = CurrentTimestampWithTimeZone
         }.singleOrNull()?.toAppointment()
     }

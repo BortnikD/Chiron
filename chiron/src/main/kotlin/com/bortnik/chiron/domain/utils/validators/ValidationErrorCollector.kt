@@ -14,14 +14,14 @@ class ValidationErrorCollector {
         if (!condition) error(field, message)
     }
 
-    fun ensureNotBlank(field: String, value: String) =
-        ensure(value.isNotBlank(), field, "must not be blank")
+    fun ensureNotBlank(field: String, value: String?) =
+        ensure(value == null || value.isNotBlank(), field, "must not be blank")
 
     fun ensureMaxLength(field: String, value: String?, max: Int) =
         ensure(value == null || value.length <= max, field, "must be at most $max characters")
 
-    fun ensureMatches(field: String, value: String, regex: Regex, message: String) =
-        ensure(regex.matches(value), field, message)
+    fun ensureMatches(field: String, value: String?, regex: Regex, message: String) =
+        ensure(value == null || regex.matches(value), field, message)
 
     fun ensureInRange(field: String, value: Int?, min: Int, max: Int) =
         ensure(value == null || value in min..max, field, "must be between $min and $max")

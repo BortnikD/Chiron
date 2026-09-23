@@ -32,7 +32,7 @@ fun UpdateScheduleExceptionRequest.toDto(): UpdateScheduleExceptionDto = UpdateS
     type = type,
     startDate = startDate,
     endDate = endDate,
-    startTime = startTime,
-    endTime = endTime,
-    reason = reason,
+    startTime = startTime.toPatch(),
+    endTime = endTime.toPatch(),
+    reason = reason.toPatch(),
 )

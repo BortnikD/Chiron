@@ -11,6 +11,7 @@ description = "chiron"
 
 val exposedVersion = "1.5.0"
 val jjwtVersion = "0.13.0"
+val jacksonDatabindNullableVersion = "0.2.11"
 
 java {
     toolchain {
@@ -40,6 +41,7 @@ dependencies {
     runtimeOnly("io.jsonwebtoken:jjwt-impl:$jjwtVersion")
     runtimeOnly("io.jsonwebtoken:jjwt-jackson:$jjwtVersion")
     implementation("tools.jackson.module:jackson-module-kotlin")
+    implementation("org.openapitools:jackson-databind-nullable:$jacksonDatabindNullableVersion")
     implementation("org.postgresql:postgresql")
     testImplementation("org.springframework.boot:spring-boot-starter-flyway-test")
     testImplementation("org.springframework.boot:spring-boot-starter-jdbc-test")

@@ -1,5 +1,6 @@
 package com.bortnik.chiron.domain.utils.validators
 
+import com.bortnik.chiron.domain.dto.orElse
 import com.bortnik.chiron.domain.dto.servicespecies.UpdateServiceSpeciesDto
 import com.bortnik.chiron.domain.entities.ServiceSpecies
 import com.bortnik.chiron.domain.utils.ValidationConstants.MONEY_MAX
@@ -10,7 +11,9 @@ object ServiceSpeciesValidator {
 
     fun validate(serviceSpecies: ServiceSpecies) = validateAll { overrides(serviceSpecies.durationMin, serviceSpecies.price) }
 
-    fun validate(dto: UpdateServiceSpeciesDto) = validateAll { overrides(dto.durationMin, dto.price) }
+    fun validate(dto: UpdateServiceSpeciesDto) = validateAll {
+        overrides(dto.durationMin.orElse(null), dto.price.orElse(null))
+    }
 
     private fun ValidationErrorCollector.overrides(durationMin: Int?, price: Double?) {
         ensureInRange("durationMin", durationMin, ServiceRules.DURATION_MIN_MINUTES, ServiceRules.DURATION_MAX_MINUTES)

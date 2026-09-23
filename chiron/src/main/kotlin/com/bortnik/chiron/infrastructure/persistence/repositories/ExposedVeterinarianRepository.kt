@@ -1,5 +1,6 @@
 package com.bortnik.chiron.infrastructure.persistence.repositories
 
+import com.bortnik.chiron.domain.dto.ifPresent
 import com.bortnik.chiron.domain.dto.veterinarian.CreateVeterinarianDto
 import com.bortnik.chiron.domain.dto.veterinarian.UpdateVeterinarianDto
 import com.bortnik.chiron.domain.entities.Veterinarian
@@ -54,12 +55,14 @@ class ExposedVeterinarianRepository : VeterinarianRepository {
     }
 
     override fun update(id: UUID, dto: UpdateVeterinarianDto): Veterinarian? = exposedSql {
+        // An empty patch has nothing to write, so updatedAt is left untouched.
+        if (dto == UpdateVeterinarianDto()) return@exposedSql findById(id)
         ExposedVeterinarianTable.updateReturning(where = { ExposedVeterinarianTable.id eq id }) {
-            it[specializationId] = dto.specializationId
-            it[bio] = dto.bio
-            it[photoUrl] = dto.photoUrl
-            it[experienceYears] = dto.experienceYears
-            it[isActive] = dto.isActive
+            dto.specializationId?.let { value -> it[specializationId] = value }
+            dto.bio.ifPresent { value -> it[bio] = value }
+            dto.photoUrl.ifPresent { value -> it[photoUrl] = value }
+            dto.experienceYears?.let { value -> it[experienceYears] = value }
+            dto.isActive?.let { value -> it[isActive] = value }
             it[updatedAt] = CurrentTimestampWithTimeZone
         }.singleOrNull()?.toVeterinarian()
     }

@@ -23,7 +23,7 @@ class VeterinarianUpdateAppointmentStatusUseCase(
         val appointment = accessGuard.requireAssignedAppointment(actor, id)
         val updated = changeAppointmentStatusUseCase.change(
             appointment = appointment,
-            status = dto.status,
+            status = dto.status ?: appointment.status,
             actorId = actor.userId,
             vetNotes = dto.vetNotes,
             cancelReason = dto.cancelReason,

@@ -56,14 +56,16 @@ class ExposedServiceRepository : ServiceRepository {
     }
 
     override fun update(id: UUID, dto: UpdateServiceDto): Service? = exposedSql {
+        // An empty patch has nothing to write, so updatedAt is left untouched.
+        if (dto == UpdateServiceDto()) return@exposedSql findById(id)
         ExposedServiceTable.updateReturning(where = { ExposedServiceTable.id eq id }) {
-            it[specializationId] = dto.specializationId
-            it[name] = dto.name
-            it[description] = dto.description
-            it[basePrice] = dto.basePrice.toDbDecimal()
-            it[baseDurationMin] = dto.baseDurationMin
-            it[bufferAfterMin] = dto.bufferAfterMin
-            it[isActive] = dto.isActive
+            dto.specializationId?.let { value -> it[specializationId] = value }
+            dto.name?.let { value -> it[name] = value }
+            dto.description?.let { value -> it[description] = value }
+            dto.basePrice?.let { value -> it[basePrice] = value.toDbDecimal() }
+            dto.baseDurationMin?.let { value -> it[baseDurationMin] = value }
+            dto.bufferAfterMin?.let { value -> it[bufferAfterMin] = value }
+            dto.isActive?.let { value -> it[isActive] = value }
             it[updatedAt] = CurrentTimestampWithTimeZone
         }.singleOrNull()?.toService()
     }

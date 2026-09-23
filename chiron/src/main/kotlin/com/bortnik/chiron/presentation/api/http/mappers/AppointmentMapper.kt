@@ -56,15 +56,15 @@ fun UpdateAppointmentRequest.toDto(): UpdateAppointmentDto = UpdateAppointmentDt
     startAt = startAt,
     endAt = endAt,
     status = status,
-    clientComment = clientComment,
-    vetNotes = vetNotes,
-    cancelledBy = cancelledBy,
-    cancelledAt = cancelledAt,
-    cancelReason = cancelReason,
+    clientComment = clientComment.toPatch(),
+    vetNotes = vetNotes.toPatch(),
+    cancelledBy = cancelledBy.toPatch(),
+    cancelledAt = cancelledAt.toPatch(),
+    cancelReason = cancelReason.toPatch(),
 )
 
 fun VeterinarianUpdateAppointmentRequest.toDto(): UpdateAppointmentStatusDto = UpdateAppointmentStatusDto(
     status = status,
-    vetNotes = vetNotes,
+    vetNotes = vetNotes.toPatch(),
     cancelReason = cancelReason,
 )

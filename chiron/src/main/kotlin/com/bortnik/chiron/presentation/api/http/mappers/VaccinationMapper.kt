@@ -27,5 +27,5 @@ fun CreateVaccinationRequest.toDto(): CreateVaccinationDto = CreateVaccinationDt
 fun UpdateVaccinationRequest.toDto(): UpdateVaccinationDto = UpdateVaccinationDto(
     name = name,
     administeredOn = administeredOn,
-    nextDueOn = nextDueOn,
+    nextDueOn = nextDueOn.toPatch(),
 )

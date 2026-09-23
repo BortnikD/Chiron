@@ -14,7 +14,8 @@ import java.util.UUID
 class UpdateVaccinationUseCase(private val vaccinationRepository: VaccinationRepository) {
 
     fun update(id: UUID, dto: UpdateVaccinationDto): Vaccination {
-        VaccinationValidator.validate(dto)
+        val existing = vaccinationRepository.findById(id) ?: throw VaccinationNotFoundException(id)
+        VaccinationValidator.validate(existing, dto)
         return vaccinationRepository.update(id, dto) ?: throw VaccinationNotFoundException(id)
     }
 }

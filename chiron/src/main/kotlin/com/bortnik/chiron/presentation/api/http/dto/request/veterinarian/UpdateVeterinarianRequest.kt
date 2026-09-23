@@ -4,20 +4,22 @@ import com.bortnik.chiron.domain.utils.ValidationConstants.VeterinarianRules
 import jakarta.validation.constraints.Max
 import jakarta.validation.constraints.Min
 import jakarta.validation.constraints.Size
+import org.openapitools.jackson.nullable.JsonNullable
 import java.util.UUID
 
+// Partial update: omitted fields keep their values; JsonNullable fields are cleared by an explicit null.
 data class UpdateVeterinarianRequest(
-    val specializationId: UUID,
+    val specializationId: UUID? = null,
     @field:Size(
         max = VeterinarianRules.BIO_MAX_LENGTH,
         message = "must be at most ${VeterinarianRules.BIO_MAX_LENGTH} characters",
     )
-    val bio: String? = null,
+    val bio: JsonNullable<String?> = JsonNullable.undefined(),
     @field:Size(
         max = VeterinarianRules.PHOTO_URL_MAX_LENGTH,
         message = "must be at most ${VeterinarianRules.PHOTO_URL_MAX_LENGTH} characters",
     )
-    val photoUrl: String? = null,
+    val photoUrl: JsonNullable<String?> = JsonNullable.undefined(),
     @field:Min(
         value = VeterinarianRules.EXPERIENCE_YEARS_MIN.toLong(),
         message = "must be between ${VeterinarianRules.EXPERIENCE_YEARS_MIN} and ${VeterinarianRules.EXPERIENCE_YEARS_MAX}",
@@ -26,6 +28,6 @@ data class UpdateVeterinarianRequest(
         value = VeterinarianRules.EXPERIENCE_YEARS_MAX.toLong(),
         message = "must be between ${VeterinarianRules.EXPERIENCE_YEARS_MIN} and ${VeterinarianRules.EXPERIENCE_YEARS_MAX}",
     )
-    val experienceYears: Int,
-    val isActive: Boolean,
+    val experienceYears: Int? = null,
+    val isActive: Boolean? = null,
 )

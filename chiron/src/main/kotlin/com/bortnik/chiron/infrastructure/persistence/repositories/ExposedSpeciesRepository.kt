@@ -48,8 +48,10 @@ class ExposedSpeciesRepository : SpeciesRepository {
     }
 
     override fun update(id: UUID, dto: UpdateSpeciesDto): Species? = exposedSql {
+        // Exposed rejects an UPDATE without columns, so an empty patch only reads the row.
+        if (dto == UpdateSpeciesDto()) return@exposedSql findById(id)
         ExposedSpeciesTable.updateReturning(where = { ExposedSpeciesTable.id eq id }) {
-            it[name] = dto.name
+            dto.name?.let { value -> it[name] = value }
         }.singleOrNull()?.toSpecies()
     }
 

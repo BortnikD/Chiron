@@ -1,5 +1,6 @@
 package com.bortnik.chiron.infrastructure.persistence.repositories
 
+import com.bortnik.chiron.domain.dto.ifPresent
 import com.bortnik.chiron.domain.dto.user.CreateUserDto
 import com.bortnik.chiron.domain.dto.user.UpdateUserDto
 import com.bortnik.chiron.domain.entities.User
@@ -64,15 +65,17 @@ class ExposedUserRepository : UserRepository {
     }
 
     override fun update(id: UUID, dto: UpdateUserDto): User? = exposedSql {
+        // An empty patch has nothing to write, so updatedAt is left untouched.
+        if (dto == UpdateUserDto()) return@exposedSql findById(id)
         ExposedUserTable.updateReturning(where = { ExposedUserTable.id eq id }) {
-            it[email] = dto.email
-            it[passwordHash] = dto.passwordHash
-            it[firstName] = dto.firstName
-            it[middleName] = dto.middleName
-            it[lastName] = dto.lastName
-            it[fullName] = dto.fullName
-            it[phone] = dto.phone
-            it[role] = dto.role
+            dto.email?.let { value -> it[email] = value }
+            dto.passwordHash?.let { value -> it[passwordHash] = value }
+            dto.firstName?.let { value -> it[firstName] = value }
+            dto.middleName.ifPresent { value -> it[middleName] = value }
+            dto.lastName?.let { value -> it[lastName] = value }
+            dto.fullName?.let { value -> it[fullName] = value }
+            dto.phone?.let { value -> it[phone] = value }
+            dto.role?.let { value -> it[role] = value }
             it[updatedAt] = CurrentTimestampWithTimeZone
         }.singleOrNull()?.toUser()
     }

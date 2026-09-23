@@ -1,5 +1,6 @@
 package com.bortnik.chiron.infrastructure.persistence.repositories
 
+import com.bortnik.chiron.domain.dto.ifPresent
 import com.bortnik.chiron.domain.dto.pet.CreatePetDto
 import com.bortnik.chiron.domain.dto.pet.UpdatePetDto
 import com.bortnik.chiron.domain.entities.Pet
@@ -56,14 +57,16 @@ class ExposedPetRepository : PetRepository {
     }
 
     override fun update(id: UUID, dto: UpdatePetDto): Pet? = exposedSql {
+        // An empty patch has nothing to write, so updatedAt is left untouched.
+        if (dto == UpdatePetDto()) return@exposedSql findById(id)
         ExposedPetTable.updateReturning(where = { ExposedPetTable.id eq id }) {
-            it[name] = dto.name
-            it[speciesId] = dto.speciesId
-            it[birthDate] = dto.birthDate
-            it[weightKg] = dto.weightKg?.toDbDecimal()
-            it[gender] = dto.gender
-            it[notes] = dto.notes
-            it[isArchived] = dto.isArchived
+            dto.name?.let { value -> it[name] = value }
+            dto.speciesId?.let { value -> it[speciesId] = value }
+            dto.birthDate.ifPresent { value -> it[birthDate] = value }
+            dto.weightKg.ifPresent { value -> it[weightKg] = value?.toDbDecimal() }
+            dto.gender?.let { value -> it[gender] = value }
+            dto.notes.ifPresent { value -> it[notes] = value }
+            dto.isArchived?.let { value -> it[isArchived] = value }
             it[updatedAt] = CurrentTimestampWithTimeZone
         }.singleOrNull()?.toPet()
     }

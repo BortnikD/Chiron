@@ -30,8 +30,8 @@ fun CreateVeterinarianRequest.toDto(): CreateVeterinarianDto = CreateVeterinaria
 
 fun UpdateVeterinarianRequest.toDto(): UpdateVeterinarianDto = UpdateVeterinarianDto(
     specializationId = specializationId,
-    bio = bio,
-    photoUrl = photoUrl,
+    bio = bio.toPatch(),
+    photoUrl = photoUrl.toPatch(),
     experienceYears = experienceYears,
     isActive = isActive,
 )
