@@ -1,6 +1,6 @@
 package com.bortnik.chiron.presentation.api.http.controllers.common
 
-import com.bortnik.chiron.application.usecase.veterinarian.GetVeterinarianUseCase
+import com.bortnik.chiron.application.usecase.common.veterinarian.GetVeterinarianUseCase
 import com.bortnik.chiron.presentation.api.http.ApiResponse
 import com.bortnik.chiron.presentation.api.http.dto.response.VeterinarianResponse
 import com.bortnik.chiron.presentation.api.http.mappers.toResponse

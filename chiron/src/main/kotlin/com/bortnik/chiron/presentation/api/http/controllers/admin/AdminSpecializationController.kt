@@ -1,8 +1,9 @@
 package com.bortnik.chiron.presentation.api.http.controllers.admin
 
-import com.bortnik.chiron.application.usecase.specialization.CreateSpecializationUseCase
-import com.bortnik.chiron.application.usecase.specialization.DeleteSpecializationUseCase
-import com.bortnik.chiron.application.usecase.specialization.UpdateSpecializationUseCase
+import com.bortnik.chiron.application.security.Actor
+import com.bortnik.chiron.application.usecase.admin.specialization.AdminCreateSpecializationUseCase
+import com.bortnik.chiron.application.usecase.admin.specialization.AdminDeleteSpecializationUseCase
+import com.bortnik.chiron.application.usecase.admin.specialization.AdminUpdateSpecializationUseCase
 import com.bortnik.chiron.presentation.api.http.ApiResponse
 import com.bortnik.chiron.presentation.api.http.dto.request.specialization.CreateSpecializationRequest
 import com.bortnik.chiron.presentation.api.http.dto.request.specialization.UpdateSpecializationRequest
@@ -12,6 +13,7 @@ import com.bortnik.chiron.presentation.api.http.mappers.toResponse
 import io.swagger.v3.oas.annotations.Operation
 import io.swagger.v3.oas.annotations.tags.Tag
 import org.springframework.http.ResponseEntity
+import org.springframework.security.core.annotation.AuthenticationPrincipal
 import org.springframework.web.bind.annotation.DeleteMapping
 import org.springframework.web.bind.annotation.PathVariable
 import org.springframework.web.bind.annotation.PostMapping
@@ -25,29 +27,31 @@ import java.util.UUID
 @RequestMapping("/api/v1/admin/specializations")
 @Tag(name = "Admin: Specializations")
 class AdminSpecializationController(
-    private val createSpecializationUseCase: CreateSpecializationUseCase,
-    private val updateSpecializationUseCase: UpdateSpecializationUseCase,
-    private val deleteSpecializationUseCase: DeleteSpecializationUseCase,
+    private val createSpecializationUseCase: AdminCreateSpecializationUseCase,
+    private val updateSpecializationUseCase: AdminUpdateSpecializationUseCase,
+    private val deleteSpecializationUseCase: AdminDeleteSpecializationUseCase,
 ) {
     @Operation(summary = "Create specialization")
     @PostMapping
     fun create(
+        @AuthenticationPrincipal actor: Actor,
         @RequestBody request: CreateSpecializationRequest,
     ): ResponseEntity<ApiResponse<SpecializationResponse>> =
-        ApiResponse.created(createSpecializationUseCase.create(request.toDto()).toResponse())
+        ApiResponse.created(createSpecializationUseCase.create(actor, request.toDto()).toResponse())
 
     @Operation(summary = "Update specialization")
     @PutMapping("/{id}")
     fun update(
+        @AuthenticationPrincipal actor: Actor,
         @PathVariable id: UUID,
         @RequestBody request: UpdateSpecializationRequest,
     ): ApiResponse<SpecializationResponse> =
-        ApiResponse.success(updateSpecializationUseCase.update(id, request.toDto()).toResponse())
+        ApiResponse.success(updateSpecializationUseCase.update(actor, id, request.toDto()).toResponse())
 
     @Operation(summary = "Delete specialization")
     @DeleteMapping("/{id}")
-    fun delete(@PathVariable id: UUID): ResponseEntity<Nothing> {
-        deleteSpecializationUseCase.delete(id)
+    fun delete(@AuthenticationPrincipal actor: Actor, @PathVariable id: UUID): ResponseEntity<Nothing> {
+        deleteSpecializationUseCase.delete(actor, id)
         return ApiResponse.noContent()
     }
 }

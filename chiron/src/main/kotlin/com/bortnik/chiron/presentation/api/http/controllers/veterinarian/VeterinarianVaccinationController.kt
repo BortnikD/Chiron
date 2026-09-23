@@ -1,11 +1,9 @@
 package com.bortnik.chiron.presentation.api.http.controllers.veterinarian
 
-import com.bortnik.chiron.application.security.ResourceAccessGuard
-import com.bortnik.chiron.application.usecase.vaccination.CreateVaccinationUseCase
-import com.bortnik.chiron.application.usecase.vaccination.GetVaccinationUseCase
-import com.bortnik.chiron.application.usecase.vaccination.UpdateVaccinationUseCase
-import com.bortnik.chiron.application.usecase.veterinarian.GetVeterinarianUseCase
-import com.bortnik.chiron.infrastructure.security.AuthenticatedUser
+import com.bortnik.chiron.application.security.Actor
+import com.bortnik.chiron.application.usecase.veterinarian.vaccination.VeterinarianCreateVaccinationUseCase
+import com.bortnik.chiron.application.usecase.veterinarian.vaccination.VeterinarianGetVaccinationUseCase
+import com.bortnik.chiron.application.usecase.veterinarian.vaccination.VeterinarianUpdateVaccinationUseCase
 import com.bortnik.chiron.presentation.api.http.ApiResponse
 import com.bortnik.chiron.presentation.api.http.dto.request.vaccination.CreateVaccinationRequest
 import com.bortnik.chiron.presentation.api.http.dto.request.vaccination.UpdateVaccinationRequest
@@ -33,21 +31,17 @@ import java.util.UUID
     description = "Vaccinations of the current veterinarian's patients: pets with at least one appointment with them.",
 )
 class VeterinarianVaccinationController(
-    private val getVeterinarianUseCase: GetVeterinarianUseCase,
-    private val createVaccinationUseCase: CreateVaccinationUseCase,
-    private val getVaccinationUseCase: GetVaccinationUseCase,
-    private val updateVaccinationUseCase: UpdateVaccinationUseCase,
-    private val accessGuard: ResourceAccessGuard,
+    private val createVaccinationUseCase: VeterinarianCreateVaccinationUseCase,
+    private val getVaccinationUseCase: VeterinarianGetVaccinationUseCase,
+    private val updateVaccinationUseCase: VeterinarianUpdateVaccinationUseCase,
 ) {
     @Operation(summary = "List vaccinations of a patient")
     @GetMapping
     fun findAllByPetId(
-        @AuthenticationPrincipal user: AuthenticatedUser,
+        @AuthenticationPrincipal actor: Actor,
         @RequestParam petId: UUID,
-    ): ApiResponse<List<VaccinationResponse>> {
-        accessGuard.requirePatient(veterinarianId(user), petId)
-        return ApiResponse.success(getVaccinationUseCase.findAllByPetId(petId).map { it.toResponse() })
-    }
+    ): ApiResponse<List<VaccinationResponse>> =
+        ApiResponse.success(getVaccinationUseCase.findAllByPetId(actor, petId).map { it.toResponse() })
 
     @Operation(
         summary = "Create vaccination for a patient",
@@ -55,23 +49,17 @@ class VeterinarianVaccinationController(
     )
     @PostMapping
     fun create(
-        @AuthenticationPrincipal user: AuthenticatedUser,
+        @AuthenticationPrincipal actor: Actor,
         @RequestBody request: CreateVaccinationRequest,
-    ): ResponseEntity<ApiResponse<VaccinationResponse>> {
-        accessGuard.requirePatient(veterinarianId(user), request.petId)
-        return ApiResponse.created(createVaccinationUseCase.create(request.toDto()).toResponse())
-    }
+    ): ResponseEntity<ApiResponse<VaccinationResponse>> =
+        ApiResponse.created(createVaccinationUseCase.create(actor, request.toDto()).toResponse())
 
     @Operation(summary = "Update vaccination of a patient")
     @PutMapping("/{id}")
     fun update(
-        @AuthenticationPrincipal user: AuthenticatedUser,
+        @AuthenticationPrincipal actor: Actor,
         @PathVariable id: UUID,
         @RequestBody request: UpdateVaccinationRequest,
-    ): ApiResponse<VaccinationResponse> {
-        accessGuard.requirePatientVaccination(veterinarianId(user), id)
-        return ApiResponse.success(updateVaccinationUseCase.update(id, request.toDto()).toResponse())
-    }
-
-    private fun veterinarianId(user: AuthenticatedUser): UUID = getVeterinarianUseCase.findByUserId(user.id).id
+    ): ApiResponse<VaccinationResponse> =
+        ApiResponse.success(updateVaccinationUseCase.update(actor, id, request.toDto()).toResponse())
 }

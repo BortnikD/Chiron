@@ -1,8 +1,9 @@
 package com.bortnik.chiron.presentation.api.http.controllers.admin
 
-import com.bortnik.chiron.application.usecase.service.CreateServiceUseCase
-import com.bortnik.chiron.application.usecase.service.DeleteServiceUseCase
-import com.bortnik.chiron.application.usecase.service.UpdateServiceUseCase
+import com.bortnik.chiron.application.security.Actor
+import com.bortnik.chiron.application.usecase.admin.service.AdminCreateServiceUseCase
+import com.bortnik.chiron.application.usecase.admin.service.AdminDeleteServiceUseCase
+import com.bortnik.chiron.application.usecase.admin.service.AdminUpdateServiceUseCase
 import com.bortnik.chiron.presentation.api.http.ApiResponse
 import com.bortnik.chiron.presentation.api.http.dto.request.service.CreateServiceRequest
 import com.bortnik.chiron.presentation.api.http.dto.request.service.UpdateServiceRequest
@@ -12,6 +13,7 @@ import com.bortnik.chiron.presentation.api.http.mappers.toResponse
 import io.swagger.v3.oas.annotations.Operation
 import io.swagger.v3.oas.annotations.tags.Tag
 import org.springframework.http.ResponseEntity
+import org.springframework.security.core.annotation.AuthenticationPrincipal
 import org.springframework.web.bind.annotation.DeleteMapping
 import org.springframework.web.bind.annotation.PathVariable
 import org.springframework.web.bind.annotation.PostMapping
@@ -25,24 +27,31 @@ import java.util.UUID
 @RequestMapping("/api/v1/admin/services")
 @Tag(name = "Admin: Services")
 class AdminServiceController(
-    private val createServiceUseCase: CreateServiceUseCase,
-    private val updateServiceUseCase: UpdateServiceUseCase,
-    private val deleteServiceUseCase: DeleteServiceUseCase,
+    private val createServiceUseCase: AdminCreateServiceUseCase,
+    private val updateServiceUseCase: AdminUpdateServiceUseCase,
+    private val deleteServiceUseCase: AdminDeleteServiceUseCase,
 ) {
     @Operation(summary = "Create service")
     @PostMapping
-    fun create(@RequestBody request: CreateServiceRequest): ResponseEntity<ApiResponse<ServiceResponse>> =
-        ApiResponse.created(createServiceUseCase.create(request.toDto()).toResponse())
+    fun create(
+        @AuthenticationPrincipal actor: Actor,
+        @RequestBody request: CreateServiceRequest,
+    ): ResponseEntity<ApiResponse<ServiceResponse>> =
+        ApiResponse.created(createServiceUseCase.create(actor, request.toDto()).toResponse())
 
     @Operation(summary = "Update service")
     @PutMapping("/{id}")
-    fun update(@PathVariable id: UUID, @RequestBody request: UpdateServiceRequest): ApiResponse<ServiceResponse> =
-        ApiResponse.success(updateServiceUseCase.update(id, request.toDto()).toResponse())
+    fun update(
+        @AuthenticationPrincipal actor: Actor,
+        @PathVariable id: UUID,
+        @RequestBody request: UpdateServiceRequest,
+    ): ApiResponse<ServiceResponse> =
+        ApiResponse.success(updateServiceUseCase.update(actor, id, request.toDto()).toResponse())
 
     @Operation(summary = "Delete service")
     @DeleteMapping("/{id}")
-    fun delete(@PathVariable id: UUID): ResponseEntity<Nothing> {
-        deleteServiceUseCase.delete(id)
+    fun delete(@AuthenticationPrincipal actor: Actor, @PathVariable id: UUID): ResponseEntity<Nothing> {
+        deleteServiceUseCase.delete(actor, id)
         return ApiResponse.noContent()
     }
 }

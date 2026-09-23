@@ -1,5 +1,6 @@
 package com.bortnik.chiron.presentation.api.http.mappers
 
+import com.bortnik.chiron.domain.dto.pet.CreateOwnPetDto
 import com.bortnik.chiron.domain.dto.pet.CreatePetDto
 import com.bortnik.chiron.domain.dto.pet.UpdatePetDto
 import com.bortnik.chiron.domain.entities.Pet
@@ -7,7 +8,6 @@ import com.bortnik.chiron.presentation.api.http.dto.request.pet.ClientCreatePetR
 import com.bortnik.chiron.presentation.api.http.dto.request.pet.CreatePetRequest
 import com.bortnik.chiron.presentation.api.http.dto.request.pet.UpdatePetRequest
 import com.bortnik.chiron.presentation.api.http.dto.response.PetResponse
-import java.util.UUID
 
 fun Pet.toResponse(): PetResponse = PetResponse(
     id = id,
@@ -33,9 +33,8 @@ fun CreatePetRequest.toDto(): CreatePetDto = CreatePetDto(
     notes = notes,
 )
 
-fun ClientCreatePetRequest.toDto(ownerId: UUID): CreatePetDto = CreatePetDto(
+fun ClientCreatePetRequest.toDto(): CreateOwnPetDto = CreateOwnPetDto(
     name = name,
-    ownerId = ownerId,
     speciesId = speciesId,
     birthDate = birthDate,
     weightKg = weightKg,

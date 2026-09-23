@@ -1,15 +1,13 @@
 package com.bortnik.chiron.presentation.api.http.controllers.veterinarian
 
-import com.bortnik.chiron.application.security.ResourceAccessGuard
-import com.bortnik.chiron.application.usecase.appointment.GetAppointmentUseCase
-import com.bortnik.chiron.application.usecase.appointment.UpdateAppointmentUseCase
-import com.bortnik.chiron.application.usecase.veterinarian.GetVeterinarianUseCase
-import com.bortnik.chiron.infrastructure.security.AuthenticatedUser
+import com.bortnik.chiron.application.security.Actor
+import com.bortnik.chiron.application.usecase.veterinarian.appointment.VeterinarianGetAppointmentUseCase
+import com.bortnik.chiron.application.usecase.veterinarian.appointment.VeterinarianUpdateAppointmentStatusUseCase
 import com.bortnik.chiron.presentation.api.http.ApiResponse
 import com.bortnik.chiron.presentation.api.http.dto.request.appointment.VeterinarianUpdateAppointmentRequest
 import com.bortnik.chiron.presentation.api.http.dto.response.AppointmentResponse
+import com.bortnik.chiron.presentation.api.http.mappers.toDto
 import com.bortnik.chiron.presentation.api.http.mappers.toResponse
-import com.bortnik.chiron.presentation.api.http.mappers.toStatusUpdateDto
 import io.swagger.v3.oas.annotations.Operation
 import io.swagger.v3.oas.annotations.tags.Tag
 import org.springframework.security.core.annotation.AuthenticationPrincipal
@@ -25,23 +23,21 @@ import java.util.UUID
 @RequestMapping("/api/v1/veterinarian/appointments")
 @Tag(name = "Veterinarian: Appointments")
 class VeterinarianAppointmentController(
-    private val getVeterinarianUseCase: GetVeterinarianUseCase,
-    private val getAppointmentUseCase: GetAppointmentUseCase,
-    private val updateAppointmentUseCase: UpdateAppointmentUseCase,
-    private val accessGuard: ResourceAccessGuard,
+    private val getAppointmentUseCase: VeterinarianGetAppointmentUseCase,
+    private val updateAppointmentStatusUseCase: VeterinarianUpdateAppointmentStatusUseCase,
 ) {
     @Operation(summary = "List own appointments")
     @GetMapping
-    fun findAll(@AuthenticationPrincipal user: AuthenticatedUser): ApiResponse<List<AppointmentResponse>> =
-        ApiResponse.success(getAppointmentUseCase.findAllByVeterinarianId(veterinarianId(user)).map { it.toResponse() })
+    fun findAll(@AuthenticationPrincipal actor: Actor): ApiResponse<List<AppointmentResponse>> =
+        ApiResponse.success(getAppointmentUseCase.findAll(actor).map { it.toResponse() })
 
     @Operation(summary = "Get own appointment by id")
     @GetMapping("/{id}")
     fun findById(
-        @AuthenticationPrincipal user: AuthenticatedUser,
+        @AuthenticationPrincipal actor: Actor,
         @PathVariable id: UUID,
     ): ApiResponse<AppointmentResponse> =
-        ApiResponse.success(accessGuard.requireAssignedAppointment(veterinarianId(user), id).toResponse())
+        ApiResponse.success(getAppointmentUseCase.findById(actor, id).toResponse())
 
     @Operation(
         summary = "Update status and notes of own appointment",
@@ -54,15 +50,9 @@ class VeterinarianAppointmentController(
     )
     @PutMapping("/{id}")
     fun update(
-        @AuthenticationPrincipal user: AuthenticatedUser,
+        @AuthenticationPrincipal actor: Actor,
         @PathVariable id: UUID,
         @RequestBody request: VeterinarianUpdateAppointmentRequest,
-    ): ApiResponse<AppointmentResponse> {
-        val appointment = accessGuard.requireAssignedAppointment(veterinarianId(user), id)
-        val dto = appointment.toStatusUpdateDto(request.status, user.id, request.cancelReason)
-            .copy(vetNotes = request.vetNotes)
-        return ApiResponse.success(updateAppointmentUseCase.update(id, dto).toResponse())
-    }
-
-    private fun veterinarianId(user: AuthenticatedUser): UUID = getVeterinarianUseCase.findByUserId(user.id).id
+    ): ApiResponse<AppointmentResponse> =
+        ApiResponse.success(updateAppointmentStatusUseCase.update(actor, id, request.toDto()).toResponse())
 }

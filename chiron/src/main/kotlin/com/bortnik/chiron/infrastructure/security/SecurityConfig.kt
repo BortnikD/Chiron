@@ -1,6 +1,6 @@
 package com.bortnik.chiron.infrastructure.security
 
-import com.bortnik.chiron.application.usecase.user.GetUserUseCase
+import com.bortnik.chiron.application.usecase.common.user.GetUserUseCase
 import com.bortnik.chiron.domain.entities.enums.UserRole
 import com.bortnik.chiron.infrastructure.config.CorsProperties
 import com.bortnik.chiron.infrastructure.security.jwt.JwtTokenProvider

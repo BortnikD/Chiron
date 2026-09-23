@@ -1,6 +1,6 @@
 package com.bortnik.chiron.presentation.api.http.controllers.common
 
-import com.bortnik.chiron.application.usecase.specialization.GetSpecializationUseCase
+import com.bortnik.chiron.application.usecase.common.specialization.GetSpecializationUseCase
 import com.bortnik.chiron.presentation.api.http.ApiResponse
 import com.bortnik.chiron.presentation.api.http.dto.response.SpecializationResponse
 import com.bortnik.chiron.presentation.api.http.mappers.toResponse

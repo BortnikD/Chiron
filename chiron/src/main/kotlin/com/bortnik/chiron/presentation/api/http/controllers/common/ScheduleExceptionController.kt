@@ -1,6 +1,6 @@
 package com.bortnik.chiron.presentation.api.http.controllers.common
 
-import com.bortnik.chiron.application.usecase.scheduleexception.GetScheduleExceptionUseCase
+import com.bortnik.chiron.application.usecase.common.scheduleexception.GetScheduleExceptionUseCase
 import com.bortnik.chiron.presentation.api.http.ApiResponse
 import com.bortnik.chiron.presentation.api.http.dto.response.ScheduleExceptionResponse
 import com.bortnik.chiron.presentation.api.http.mappers.toResponse

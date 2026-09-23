@@ -1,10 +1,10 @@
 package com.bortnik.chiron.presentation.api.http.controllers.auth
 
-import com.bortnik.chiron.application.usecase.auth.AuthenticateUserUseCase
-import com.bortnik.chiron.application.usecase.user.GetUserUseCase
-import com.bortnik.chiron.application.usecase.user.RegisterUserUseCase
+import com.bortnik.chiron.application.security.Actor
+import com.bortnik.chiron.application.usecase.common.auth.AuthenticateUserUseCase
+import com.bortnik.chiron.application.usecase.common.user.GetUserUseCase
+import com.bortnik.chiron.application.usecase.common.user.RegisterUserUseCase
 import com.bortnik.chiron.domain.entities.User
-import com.bortnik.chiron.infrastructure.security.AuthenticatedUser
 import com.bortnik.chiron.infrastructure.security.jwt.JwtTokenProvider
 import com.bortnik.chiron.presentation.api.http.ApiResponse
 import com.bortnik.chiron.presentation.api.http.dto.request.auth.LoginRequest
@@ -53,8 +53,8 @@ class AuthController(
 
     @Operation(summary = "Get current user")
     @GetMapping("/me")
-    fun me(@AuthenticationPrincipal user: AuthenticatedUser): ApiResponse<UserResponse> =
-        ApiResponse.success(getUserUseCase.findById(user.id).toResponse())
+    fun me(@AuthenticationPrincipal actor: Actor): ApiResponse<UserResponse> =
+        ApiResponse.success(getUserUseCase.findById(actor.userId).toResponse())
 
     private fun User.toAuthResponse(): AuthResponse =
         AuthResponse(accessToken = jwtTokenProvider.generate(this), user = toResponse())

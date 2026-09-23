@@ -1,9 +1,10 @@
 package com.bortnik.chiron.presentation.api.http.controllers.admin
 
-import com.bortnik.chiron.application.usecase.vaccination.CreateVaccinationUseCase
-import com.bortnik.chiron.application.usecase.vaccination.DeleteVaccinationUseCase
-import com.bortnik.chiron.application.usecase.vaccination.GetVaccinationUseCase
-import com.bortnik.chiron.application.usecase.vaccination.UpdateVaccinationUseCase
+import com.bortnik.chiron.application.security.Actor
+import com.bortnik.chiron.application.usecase.admin.vaccination.AdminCreateVaccinationUseCase
+import com.bortnik.chiron.application.usecase.admin.vaccination.AdminDeleteVaccinationUseCase
+import com.bortnik.chiron.application.usecase.admin.vaccination.AdminGetVaccinationUseCase
+import com.bortnik.chiron.application.usecase.admin.vaccination.AdminUpdateVaccinationUseCase
 import com.bortnik.chiron.presentation.api.http.ApiResponse
 import com.bortnik.chiron.presentation.api.http.dto.request.vaccination.CreateVaccinationRequest
 import com.bortnik.chiron.presentation.api.http.dto.request.vaccination.UpdateVaccinationRequest
@@ -13,6 +14,7 @@ import com.bortnik.chiron.presentation.api.http.mappers.toResponse
 import io.swagger.v3.oas.annotations.Operation
 import io.swagger.v3.oas.annotations.tags.Tag
 import org.springframework.http.ResponseEntity
+import org.springframework.security.core.annotation.AuthenticationPrincipal
 import org.springframework.web.bind.annotation.DeleteMapping
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PathVariable
@@ -28,41 +30,48 @@ import java.util.UUID
 @RequestMapping("/api/v1/admin/vaccinations")
 @Tag(name = "Admin: Vaccinations")
 class AdminVaccinationController(
-    private val createVaccinationUseCase: CreateVaccinationUseCase,
-    private val getVaccinationUseCase: GetVaccinationUseCase,
-    private val updateVaccinationUseCase: UpdateVaccinationUseCase,
-    private val deleteVaccinationUseCase: DeleteVaccinationUseCase,
+    private val createVaccinationUseCase: AdminCreateVaccinationUseCase,
+    private val getVaccinationUseCase: AdminGetVaccinationUseCase,
+    private val updateVaccinationUseCase: AdminUpdateVaccinationUseCase,
+    private val deleteVaccinationUseCase: AdminDeleteVaccinationUseCase,
 ) {
     @Operation(summary = "List vaccinations of a pet")
     @GetMapping
-    fun findAllByPetId(@RequestParam petId: UUID): ApiResponse<List<VaccinationResponse>> =
-        ApiResponse.success(getVaccinationUseCase.findAllByPetId(petId).map { it.toResponse() })
+    fun findAllByPetId(
+        @AuthenticationPrincipal actor: Actor,
+        @RequestParam petId: UUID,
+    ): ApiResponse<List<VaccinationResponse>> =
+        ApiResponse.success(getVaccinationUseCase.findAllByPetId(actor, petId).map { it.toResponse() })
 
     @Operation(summary = "Get vaccination by id")
     @GetMapping("/{id}")
-    fun findById(@PathVariable id: UUID): ApiResponse<VaccinationResponse> =
-        ApiResponse.success(getVaccinationUseCase.findById(id).toResponse())
+    fun findById(@AuthenticationPrincipal actor: Actor, @PathVariable id: UUID): ApiResponse<VaccinationResponse> =
+        ApiResponse.success(getVaccinationUseCase.findById(actor, id).toResponse())
 
     @Operation(
         summary = "Create vaccination",
         description = "appointmentId is optional; when set, the appointment must belong to the same pet.",
     )
     @PostMapping
-    fun create(@RequestBody request: CreateVaccinationRequest): ResponseEntity<ApiResponse<VaccinationResponse>> =
-        ApiResponse.created(createVaccinationUseCase.create(request.toDto()).toResponse())
+    fun create(
+        @AuthenticationPrincipal actor: Actor,
+        @RequestBody request: CreateVaccinationRequest,
+    ): ResponseEntity<ApiResponse<VaccinationResponse>> =
+        ApiResponse.created(createVaccinationUseCase.create(actor, request.toDto()).toResponse())
 
     @Operation(summary = "Update vaccination")
     @PutMapping("/{id}")
     fun update(
+        @AuthenticationPrincipal actor: Actor,
         @PathVariable id: UUID,
         @RequestBody request: UpdateVaccinationRequest,
     ): ApiResponse<VaccinationResponse> =
-        ApiResponse.success(updateVaccinationUseCase.update(id, request.toDto()).toResponse())
+        ApiResponse.success(updateVaccinationUseCase.update(actor, id, request.toDto()).toResponse())
 
     @Operation(summary = "Delete vaccination")
     @DeleteMapping("/{id}")
-    fun delete(@PathVariable id: UUID): ResponseEntity<Nothing> {
-        deleteVaccinationUseCase.delete(id)
+    fun delete(@AuthenticationPrincipal actor: Actor, @PathVariable id: UUID): ResponseEntity<Nothing> {
+        deleteVaccinationUseCase.delete(actor, id)
         return ApiResponse.noContent()
     }
 }

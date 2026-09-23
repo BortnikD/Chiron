@@ -1,9 +1,10 @@
 package com.bortnik.chiron.presentation.api.http.controllers.admin
 
-import com.bortnik.chiron.application.usecase.workschedule.CreateWorkScheduleUseCase
-import com.bortnik.chiron.application.usecase.workschedule.DeleteWorkScheduleUseCase
-import com.bortnik.chiron.application.usecase.workschedule.GetWorkScheduleUseCase
-import com.bortnik.chiron.application.usecase.workschedule.UpdateWorkScheduleUseCase
+import com.bortnik.chiron.application.security.Actor
+import com.bortnik.chiron.application.usecase.admin.workschedule.AdminCreateWorkScheduleUseCase
+import com.bortnik.chiron.application.usecase.admin.workschedule.AdminDeleteWorkScheduleUseCase
+import com.bortnik.chiron.application.usecase.admin.workschedule.AdminGetWorkScheduleUseCase
+import com.bortnik.chiron.application.usecase.admin.workschedule.AdminUpdateWorkScheduleUseCase
 import com.bortnik.chiron.presentation.api.http.ApiResponse
 import com.bortnik.chiron.presentation.api.http.dto.request.workschedule.CreateWorkScheduleRequest
 import com.bortnik.chiron.presentation.api.http.dto.request.workschedule.UpdateWorkScheduleRequest
@@ -13,6 +14,7 @@ import com.bortnik.chiron.presentation.api.http.mappers.toResponse
 import io.swagger.v3.oas.annotations.Operation
 import io.swagger.v3.oas.annotations.tags.Tag
 import org.springframework.http.ResponseEntity
+import org.springframework.security.core.annotation.AuthenticationPrincipal
 import org.springframework.web.bind.annotation.DeleteMapping
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PathVariable
@@ -33,33 +35,37 @@ import java.util.UUID
     """,
 )
 class AdminWorkScheduleController(
-    private val createWorkScheduleUseCase: CreateWorkScheduleUseCase,
-    private val getWorkScheduleUseCase: GetWorkScheduleUseCase,
-    private val updateWorkScheduleUseCase: UpdateWorkScheduleUseCase,
-    private val deleteWorkScheduleUseCase: DeleteWorkScheduleUseCase,
+    private val createWorkScheduleUseCase: AdminCreateWorkScheduleUseCase,
+    private val getWorkScheduleUseCase: AdminGetWorkScheduleUseCase,
+    private val updateWorkScheduleUseCase: AdminUpdateWorkScheduleUseCase,
+    private val deleteWorkScheduleUseCase: AdminDeleteWorkScheduleUseCase,
 ) {
     @Operation(summary = "Get work schedule entry by id")
     @GetMapping("/{id}")
-    fun findById(@PathVariable id: UUID): ApiResponse<WorkScheduleResponse> =
-        ApiResponse.success(getWorkScheduleUseCase.findById(id).toResponse())
+    fun findById(@AuthenticationPrincipal actor: Actor, @PathVariable id: UUID): ApiResponse<WorkScheduleResponse> =
+        ApiResponse.success(getWorkScheduleUseCase.findById(actor, id).toResponse())
 
     @Operation(summary = "Create work schedule entry")
     @PostMapping
-    fun create(@RequestBody request: CreateWorkScheduleRequest): ResponseEntity<ApiResponse<WorkScheduleResponse>> =
-        ApiResponse.created(createWorkScheduleUseCase.create(request.toDto()).toResponse())
+    fun create(
+        @AuthenticationPrincipal actor: Actor,
+        @RequestBody request: CreateWorkScheduleRequest,
+    ): ResponseEntity<ApiResponse<WorkScheduleResponse>> =
+        ApiResponse.created(createWorkScheduleUseCase.create(actor, request.toDto()).toResponse())
 
     @Operation(summary = "Update work schedule entry")
     @PutMapping("/{id}")
     fun update(
+        @AuthenticationPrincipal actor: Actor,
         @PathVariable id: UUID,
         @RequestBody request: UpdateWorkScheduleRequest,
     ): ApiResponse<WorkScheduleResponse> =
-        ApiResponse.success(updateWorkScheduleUseCase.update(id, request.toDto()).toResponse())
+        ApiResponse.success(updateWorkScheduleUseCase.update(actor, id, request.toDto()).toResponse())
 
     @Operation(summary = "Delete work schedule entry")
     @DeleteMapping("/{id}")
-    fun delete(@PathVariable id: UUID): ResponseEntity<Nothing> {
-        deleteWorkScheduleUseCase.delete(id)
+    fun delete(@AuthenticationPrincipal actor: Actor, @PathVariable id: UUID): ResponseEntity<Nothing> {
+        deleteWorkScheduleUseCase.delete(actor, id)
         return ApiResponse.noContent()
     }
 }

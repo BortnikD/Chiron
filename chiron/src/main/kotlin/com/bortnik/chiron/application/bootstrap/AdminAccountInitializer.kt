@@ -1,7 +1,7 @@
 package com.bortnik.chiron.application.bootstrap
 
 import com.bortnik.chiron.application.config.AdminProperties
-import com.bortnik.chiron.application.usecase.user.RegisterUserUseCase
+import com.bortnik.chiron.application.usecase.common.user.RegisterUserUseCase
 import com.bortnik.chiron.domain.dto.user.RegisterUserDto
 import com.bortnik.chiron.domain.entities.enums.UserRole
 import com.bortnik.chiron.domain.repositories.UserRepository

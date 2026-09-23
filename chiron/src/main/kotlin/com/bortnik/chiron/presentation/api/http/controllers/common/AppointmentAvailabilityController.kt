@@ -1,6 +1,6 @@
 package com.bortnik.chiron.presentation.api.http.controllers.common
 
-import com.bortnik.chiron.application.usecase.appointment.CheckAppointmentAvailabilityUseCase
+import com.bortnik.chiron.application.usecase.common.appointment.CheckAppointmentAvailabilityUseCase
 import com.bortnik.chiron.presentation.api.http.ApiResponse
 import io.swagger.v3.oas.annotations.Operation
 import io.swagger.v3.oas.annotations.Parameter

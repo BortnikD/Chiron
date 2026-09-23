@@ -1,19 +1,15 @@
 package com.bortnik.chiron.presentation.api.http.controllers.client
 
-import com.bortnik.chiron.application.security.ResourceAccessGuard
-import com.bortnik.chiron.application.usecase.appointment.CreateAppointmentUseCase
-import com.bortnik.chiron.application.usecase.appointment.GetAppointmentUseCase
-import com.bortnik.chiron.application.usecase.appointment.UpdateAppointmentUseCase
-import com.bortnik.chiron.application.usecase.service.GetServiceUseCase
-import com.bortnik.chiron.domain.entities.enums.AppointmentStatus
-import com.bortnik.chiron.infrastructure.security.AuthenticatedUser
+import com.bortnik.chiron.application.security.Actor
+import com.bortnik.chiron.application.usecase.client.appointment.ClientBookAppointmentUseCase
+import com.bortnik.chiron.application.usecase.client.appointment.ClientCancelAppointmentUseCase
+import com.bortnik.chiron.application.usecase.client.appointment.ClientGetAppointmentUseCase
 import com.bortnik.chiron.presentation.api.http.ApiResponse
 import com.bortnik.chiron.presentation.api.http.dto.request.appointment.CancelAppointmentRequest
 import com.bortnik.chiron.presentation.api.http.dto.request.appointment.ClientCreateAppointmentRequest
 import com.bortnik.chiron.presentation.api.http.dto.response.AppointmentResponse
 import com.bortnik.chiron.presentation.api.http.mappers.toDto
 import com.bortnik.chiron.presentation.api.http.mappers.toResponse
-import com.bortnik.chiron.presentation.api.http.mappers.toStatusUpdateDto
 import io.swagger.v3.oas.annotations.Operation
 import io.swagger.v3.oas.annotations.Parameter
 import io.swagger.v3.oas.annotations.tags.Tag
@@ -32,35 +28,26 @@ import java.util.UUID
 @RequestMapping("/api/v1/client/appointments")
 @Tag(name = "Client: Appointments")
 class ClientAppointmentController(
-    private val createAppointmentUseCase: CreateAppointmentUseCase,
-    private val getAppointmentUseCase: GetAppointmentUseCase,
-    private val updateAppointmentUseCase: UpdateAppointmentUseCase,
-    private val getServiceUseCase: GetServiceUseCase,
-    private val accessGuard: ResourceAccessGuard,
+    private val bookAppointmentUseCase: ClientBookAppointmentUseCase,
+    private val getAppointmentUseCase: ClientGetAppointmentUseCase,
+    private val cancelAppointmentUseCase: ClientCancelAppointmentUseCase,
 ) {
     @Operation(summary = "List appointments of own pets")
     @GetMapping
     fun findAll(
-        @AuthenticationPrincipal user: AuthenticatedUser,
+        @AuthenticationPrincipal actor: Actor,
         @Parameter(description = "Return only appointments of this pet")
         @RequestParam(required = false) petId: UUID?,
-    ): ApiResponse<List<AppointmentResponse>> {
-        val appointments = if (petId != null) {
-            accessGuard.requireOwnedPet(user.id, petId)
-            getAppointmentUseCase.findAllByPetId(petId)
-        } else {
-            getAppointmentUseCase.findAllByOwnerId(user.id)
-        }
-        return ApiResponse.success(appointments.map { it.toResponse() })
-    }
+    ): ApiResponse<List<AppointmentResponse>> =
+        ApiResponse.success(getAppointmentUseCase.findAll(actor, petId).map { it.toResponse() })
 
     @Operation(summary = "Get appointment of own pet by id")
     @GetMapping("/{id}")
     fun findById(
-        @AuthenticationPrincipal user: AuthenticatedUser,
+        @AuthenticationPrincipal actor: Actor,
         @PathVariable id: UUID,
     ): ApiResponse<AppointmentResponse> =
-        ApiResponse.success(accessGuard.requireOwnedAppointment(user.id, id).toResponse())
+        ApiResponse.success(getAppointmentUseCase.findById(actor, id).toResponse())
 
     @Operation(
         summary = "Book appointment for own pet",
@@ -73,13 +60,10 @@ class ClientAppointmentController(
     )
     @PostMapping
     fun create(
-        @AuthenticationPrincipal user: AuthenticatedUser,
+        @AuthenticationPrincipal actor: Actor,
         @RequestBody request: ClientCreateAppointmentRequest,
-    ): ResponseEntity<ApiResponse<AppointmentResponse>> {
-        val pet = accessGuard.requireOwnedPet(user.id, request.petId)
-        val price = getServiceUseCase.findPriceForSpecies(request.serviceId, pet.speciesId)
-        return ApiResponse.created(createAppointmentUseCase.create(request.toDto(priceSnapshot = price)).toResponse())
-    }
+    ): ResponseEntity<ApiResponse<AppointmentResponse>> =
+        ApiResponse.created(bookAppointmentUseCase.book(actor, request.toDto()).toResponse())
 
     @Operation(
         summary = "Cancel appointment of own pet",
@@ -87,12 +71,9 @@ class ClientAppointmentController(
     )
     @PostMapping("/{id}/cancel")
     fun cancel(
-        @AuthenticationPrincipal user: AuthenticatedUser,
+        @AuthenticationPrincipal actor: Actor,
         @PathVariable id: UUID,
         @RequestBody(required = false) request: CancelAppointmentRequest?,
-    ): ApiResponse<AppointmentResponse> {
-        val appointment = accessGuard.requireOwnedAppointment(user.id, id)
-        val dto = appointment.toStatusUpdateDto(AppointmentStatus.CANCELLED, user.id, request?.reason)
-        return ApiResponse.success(updateAppointmentUseCase.update(id, dto).toResponse())
-    }
+    ): ApiResponse<AppointmentResponse> =
+        ApiResponse.success(cancelAppointmentUseCase.cancel(actor, id, request?.reason).toResponse())
 }

@@ -1,8 +1,7 @@
 package com.bortnik.chiron.presentation.api.http.controllers.client
 
-import com.bortnik.chiron.application.security.ResourceAccessGuard
-import com.bortnik.chiron.application.usecase.vaccination.GetVaccinationUseCase
-import com.bortnik.chiron.infrastructure.security.AuthenticatedUser
+import com.bortnik.chiron.application.security.Actor
+import com.bortnik.chiron.application.usecase.client.vaccination.ClientGetVaccinationUseCase
 import com.bortnik.chiron.presentation.api.http.ApiResponse
 import com.bortnik.chiron.presentation.api.http.dto.response.VaccinationResponse
 import com.bortnik.chiron.presentation.api.http.mappers.toResponse
@@ -19,25 +18,21 @@ import java.util.UUID
 @RestController
 @RequestMapping("/api/v1/client/vaccinations")
 @Tag(name = "Client: Vaccinations")
-class ClientVaccinationController(
-    private val getVaccinationUseCase: GetVaccinationUseCase,
-    private val accessGuard: ResourceAccessGuard,
-) {
+class ClientVaccinationController(private val getVaccinationUseCase: ClientGetVaccinationUseCase) {
+
     @Operation(summary = "List vaccinations of own pet")
     @GetMapping
     fun findAllByPetId(
-        @AuthenticationPrincipal user: AuthenticatedUser,
+        @AuthenticationPrincipal actor: Actor,
         @RequestParam petId: UUID,
-    ): ApiResponse<List<VaccinationResponse>> {
-        accessGuard.requireOwnedPet(user.id, petId)
-        return ApiResponse.success(getVaccinationUseCase.findAllByPetId(petId).map { it.toResponse() })
-    }
+    ): ApiResponse<List<VaccinationResponse>> =
+        ApiResponse.success(getVaccinationUseCase.findAllByPetId(actor, petId).map { it.toResponse() })
 
     @Operation(summary = "Get vaccination of own pet by id")
     @GetMapping("/{id}")
     fun findById(
-        @AuthenticationPrincipal user: AuthenticatedUser,
+        @AuthenticationPrincipal actor: Actor,
         @PathVariable id: UUID,
     ): ApiResponse<VaccinationResponse> =
-        ApiResponse.success(accessGuard.requireOwnedVaccination(user.id, id).toResponse())
+        ApiResponse.success(getVaccinationUseCase.findById(actor, id).toResponse())
 }

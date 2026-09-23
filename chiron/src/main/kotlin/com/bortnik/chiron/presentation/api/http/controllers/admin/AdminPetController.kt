@@ -1,9 +1,10 @@
 package com.bortnik.chiron.presentation.api.http.controllers.admin
 
-import com.bortnik.chiron.application.usecase.pet.CreatePetUseCase
-import com.bortnik.chiron.application.usecase.pet.DeletePetUseCase
-import com.bortnik.chiron.application.usecase.pet.GetPetUseCase
-import com.bortnik.chiron.application.usecase.pet.UpdatePetUseCase
+import com.bortnik.chiron.application.security.Actor
+import com.bortnik.chiron.application.usecase.admin.pet.AdminCreatePetUseCase
+import com.bortnik.chiron.application.usecase.admin.pet.AdminDeletePetUseCase
+import com.bortnik.chiron.application.usecase.admin.pet.AdminGetPetUseCase
+import com.bortnik.chiron.application.usecase.admin.pet.AdminUpdatePetUseCase
 import com.bortnik.chiron.presentation.api.http.ApiResponse
 import com.bortnik.chiron.presentation.api.http.dto.request.pet.CreatePetRequest
 import com.bortnik.chiron.presentation.api.http.dto.request.pet.UpdatePetRequest
@@ -14,6 +15,7 @@ import io.swagger.v3.oas.annotations.Operation
 import io.swagger.v3.oas.annotations.Parameter
 import io.swagger.v3.oas.annotations.tags.Tag
 import org.springframework.http.ResponseEntity
+import org.springframework.security.core.annotation.AuthenticationPrincipal
 import org.springframework.web.bind.annotation.DeleteMapping
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PathVariable
@@ -29,43 +31,51 @@ import java.util.UUID
 @RequestMapping("/api/v1/admin/pets")
 @Tag(name = "Admin: Pets")
 class AdminPetController(
-    private val createPetUseCase: CreatePetUseCase,
-    private val getPetUseCase: GetPetUseCase,
-    private val updatePetUseCase: UpdatePetUseCase,
-    private val deletePetUseCase: DeletePetUseCase,
+    private val createPetUseCase: AdminCreatePetUseCase,
+    private val getPetUseCase: AdminGetPetUseCase,
+    private val updatePetUseCase: AdminUpdatePetUseCase,
+    private val deletePetUseCase: AdminDeletePetUseCase,
 ) {
     @Operation(summary = "List pets")
     @GetMapping
     fun findAll(
+        @AuthenticationPrincipal actor: Actor,
         @Parameter(description = "Return only pets of this owner")
         @RequestParam(required = false) ownerId: UUID?,
     ): ApiResponse<List<PetResponse>> {
-        val pets = ownerId?.let { getPetUseCase.findAllByOwnerId(it) } ?: getPetUseCase.findAll()
+        val pets = ownerId?.let { getPetUseCase.findAllByOwnerId(actor, it) } ?: getPetUseCase.findAll(actor)
         return ApiResponse.success(pets.map { it.toResponse() })
     }
 
     @Operation(summary = "Get pet by id")
     @GetMapping("/{id}")
-    fun findById(@PathVariable id: UUID): ApiResponse<PetResponse> =
-        ApiResponse.success(getPetUseCase.findById(id).toResponse())
+    fun findById(@AuthenticationPrincipal actor: Actor, @PathVariable id: UUID): ApiResponse<PetResponse> =
+        ApiResponse.success(getPetUseCase.findById(actor, id).toResponse())
 
     @Operation(summary = "Create pet for any owner")
     @PostMapping
-    fun create(@RequestBody request: CreatePetRequest): ResponseEntity<ApiResponse<PetResponse>> =
-        ApiResponse.created(createPetUseCase.create(request.toDto()).toResponse())
+    fun create(
+        @AuthenticationPrincipal actor: Actor,
+        @RequestBody request: CreatePetRequest,
+    ): ResponseEntity<ApiResponse<PetResponse>> =
+        ApiResponse.created(createPetUseCase.create(actor, request.toDto()).toResponse())
 
     @Operation(
         summary = "Update pet",
         description = "Setting isArchived to true keeps the pet's history but forbids booking new appointments for it.",
     )
     @PutMapping("/{id}")
-    fun update(@PathVariable id: UUID, @RequestBody request: UpdatePetRequest): ApiResponse<PetResponse> =
-        ApiResponse.success(updatePetUseCase.update(id, request.toDto()).toResponse())
+    fun update(
+        @AuthenticationPrincipal actor: Actor,
+        @PathVariable id: UUID,
+        @RequestBody request: UpdatePetRequest,
+    ): ApiResponse<PetResponse> =
+        ApiResponse.success(updatePetUseCase.update(actor, id, request.toDto()).toResponse())
 
     @Operation(summary = "Delete pet")
     @DeleteMapping("/{id}")
-    fun delete(@PathVariable id: UUID): ResponseEntity<Nothing> {
-        deletePetUseCase.delete(id)
+    fun delete(@AuthenticationPrincipal actor: Actor, @PathVariable id: UUID): ResponseEntity<Nothing> {
+        deletePetUseCase.delete(actor, id)
         return ApiResponse.noContent()
     }
 }

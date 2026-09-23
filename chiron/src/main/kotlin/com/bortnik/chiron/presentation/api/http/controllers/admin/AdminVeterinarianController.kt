@@ -1,9 +1,10 @@
 package com.bortnik.chiron.presentation.api.http.controllers.admin
 
-import com.bortnik.chiron.application.usecase.veterinarian.CreateVeterinarianUseCase
-import com.bortnik.chiron.application.usecase.veterinarian.DeleteVeterinarianUseCase
-import com.bortnik.chiron.application.usecase.veterinarian.GetVeterinarianUseCase
-import com.bortnik.chiron.application.usecase.veterinarian.UpdateVeterinarianUseCase
+import com.bortnik.chiron.application.security.Actor
+import com.bortnik.chiron.application.usecase.admin.veterinarian.AdminCreateVeterinarianUseCase
+import com.bortnik.chiron.application.usecase.admin.veterinarian.AdminDeleteVeterinarianUseCase
+import com.bortnik.chiron.application.usecase.admin.veterinarian.AdminGetVeterinarianUseCase
+import com.bortnik.chiron.application.usecase.admin.veterinarian.AdminUpdateVeterinarianUseCase
 import com.bortnik.chiron.presentation.api.http.ApiResponse
 import com.bortnik.chiron.presentation.api.http.dto.request.veterinarian.CreateVeterinarianRequest
 import com.bortnik.chiron.presentation.api.http.dto.request.veterinarian.UpdateVeterinarianRequest
@@ -13,6 +14,7 @@ import com.bortnik.chiron.presentation.api.http.mappers.toResponse
 import io.swagger.v3.oas.annotations.Operation
 import io.swagger.v3.oas.annotations.tags.Tag
 import org.springframework.http.ResponseEntity
+import org.springframework.security.core.annotation.AuthenticationPrincipal
 import org.springframework.web.bind.annotation.DeleteMapping
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PathVariable
@@ -27,36 +29,43 @@ import java.util.UUID
 @RequestMapping("/api/v1/admin/veterinarians")
 @Tag(name = "Admin: Veterinarians")
 class AdminVeterinarianController(
-    private val createVeterinarianUseCase: CreateVeterinarianUseCase,
-    private val getVeterinarianUseCase: GetVeterinarianUseCase,
-    private val updateVeterinarianUseCase: UpdateVeterinarianUseCase,
-    private val deleteVeterinarianUseCase: DeleteVeterinarianUseCase,
+    private val createVeterinarianUseCase: AdminCreateVeterinarianUseCase,
+    private val getVeterinarianUseCase: AdminGetVeterinarianUseCase,
+    private val updateVeterinarianUseCase: AdminUpdateVeterinarianUseCase,
+    private val deleteVeterinarianUseCase: AdminDeleteVeterinarianUseCase,
 ) {
     @Operation(summary = "Get veterinarian profile by user id")
     @GetMapping("/by-user/{userId}")
-    fun findByUserId(@PathVariable userId: UUID): ApiResponse<VeterinarianResponse> =
-        ApiResponse.success(getVeterinarianUseCase.findByUserId(userId).toResponse())
+    fun findByUserId(
+        @AuthenticationPrincipal actor: Actor,
+        @PathVariable userId: UUID,
+    ): ApiResponse<VeterinarianResponse> =
+        ApiResponse.success(getVeterinarianUseCase.findByUserId(actor, userId).toResponse())
 
     @Operation(
         summary = "Create veterinarian profile",
         description = "The referenced user must have the VETERINARIAN role and may own only one veterinarian profile.",
     )
     @PostMapping
-    fun create(@RequestBody request: CreateVeterinarianRequest): ResponseEntity<ApiResponse<VeterinarianResponse>> =
-        ApiResponse.created(createVeterinarianUseCase.create(request.toDto()).toResponse())
+    fun create(
+        @AuthenticationPrincipal actor: Actor,
+        @RequestBody request: CreateVeterinarianRequest,
+    ): ResponseEntity<ApiResponse<VeterinarianResponse>> =
+        ApiResponse.created(createVeterinarianUseCase.create(actor, request.toDto()).toResponse())
 
     @Operation(summary = "Update veterinarian profile")
     @PutMapping("/{id}")
     fun update(
+        @AuthenticationPrincipal actor: Actor,
         @PathVariable id: UUID,
         @RequestBody request: UpdateVeterinarianRequest,
     ): ApiResponse<VeterinarianResponse> =
-        ApiResponse.success(updateVeterinarianUseCase.update(id, request.toDto()).toResponse())
+        ApiResponse.success(updateVeterinarianUseCase.update(actor, id, request.toDto()).toResponse())
 
     @Operation(summary = "Delete veterinarian profile")
     @DeleteMapping("/{id}")
-    fun delete(@PathVariable id: UUID): ResponseEntity<Nothing> {
-        deleteVeterinarianUseCase.delete(id)
+    fun delete(@AuthenticationPrincipal actor: Actor, @PathVariable id: UUID): ResponseEntity<Nothing> {
+        deleteVeterinarianUseCase.delete(actor, id)
         return ApiResponse.noContent()
     }
 }

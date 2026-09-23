@@ -3,64 +3,75 @@ package com.bortnik.chiron.application.security
 import com.bortnik.chiron.domain.entities.Appointment
 import com.bortnik.chiron.domain.entities.Pet
 import com.bortnik.chiron.domain.entities.Vaccination
+import com.bortnik.chiron.domain.entities.Veterinarian
 import com.bortnik.chiron.domain.exceptions.AccessDeniedException
 import com.bortnik.chiron.domain.exceptions.notfound.AppointmentNotFoundException
 import com.bortnik.chiron.domain.exceptions.notfound.PetNotFoundException
 import com.bortnik.chiron.domain.exceptions.notfound.VaccinationNotFoundException
+import com.bortnik.chiron.domain.exceptions.notfound.VeterinarianNotFoundException
 import com.bortnik.chiron.domain.repositories.AppointmentRepository
 import com.bortnik.chiron.domain.repositories.PetRepository
 import com.bortnik.chiron.domain.repositories.VaccinationRepository
+import com.bortnik.chiron.domain.repositories.VeterinarianRepository
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import java.util.UUID
 
-// Ownership checks for client and veterinarian endpoints; admin endpoints do not use it.
+// Ownership checks for client and veterinarian use cases; admin use cases do not use it.
 @Service
 @Transactional(readOnly = true)
 class ResourceAccessGuard(
     private val petRepository: PetRepository,
     private val appointmentRepository: AppointmentRepository,
     private val vaccinationRepository: VaccinationRepository,
+    private val veterinarianRepository: VeterinarianRepository,
 ) {
 
-    fun requireOwnedPet(ownerId: UUID, petId: UUID): Pet {
+    fun requireOwnedPet(actor: Actor, petId: UUID): Pet {
         val pet = findPet(petId)
-        if (pet.ownerId != ownerId) throw AccessDeniedException("Pet $petId does not belong to the current user")
+        if (pet.ownerId != actor.userId)
+            throw AccessDeniedException("Pet $petId does not belong to the current user")
         return pet
     }
 
-    fun requireOwnedAppointment(ownerId: UUID, appointmentId: UUID): Appointment {
+    fun requireOwnedAppointment(actor: Actor, appointmentId: UUID): Appointment {
         val appointment = findAppointment(appointmentId)
-        requireOwnedPet(ownerId, appointment.petId)
+        requireOwnedPet(actor, appointment.petId)
         return appointment
     }
 
-    fun requireOwnedVaccination(ownerId: UUID, vaccinationId: UUID): Vaccination {
+    fun requireOwnedVaccination(actor: Actor, vaccinationId: UUID): Vaccination {
         val vaccination = findVaccination(vaccinationId)
-        requireOwnedPet(ownerId, vaccination.petId)
+        requireOwnedPet(actor, vaccination.petId)
         return vaccination
     }
 
-    fun requireAssignedAppointment(veterinarianId: UUID, appointmentId: UUID): Appointment {
+    // Veterinarian endpoints are scoped by the veterinarian profile, which is a separate entity from the user.
+    fun requireVeterinarian(actor: Actor): Veterinarian =
+        veterinarianRepository.findByUserId(actor.userId)
+            ?: throw VeterinarianNotFoundException("userId", actor.userId)
+
+    fun requireAssignedAppointment(actor: Actor, appointmentId: UUID): Appointment {
         val appointment = findAppointment(appointmentId)
-        if (appointment.veterinarianId != veterinarianId) {
+        if (appointment.veterinarianId != requireVeterinarian(actor).id) {
             throw AccessDeniedException("Appointment $appointmentId is not assigned to the current veterinarian")
         }
         return appointment
     }
 
     // A pet is a patient of a veterinarian once it has at least one appointment with them.
-    fun requirePatient(veterinarianId: UUID, petId: UUID): Pet {
+    fun requirePatient(actor: Actor, petId: UUID): Pet {
         val pet = findPet(petId)
+        val veterinarianId = requireVeterinarian(actor).id
         if (appointmentRepository.findAllByPetId(petId).none { it.veterinarianId == veterinarianId }) {
             throw AccessDeniedException("Pet $petId is not a patient of the current veterinarian")
         }
         return pet
     }
 
-    fun requirePatientVaccination(veterinarianId: UUID, vaccinationId: UUID): Vaccination {
+    fun requirePatientVaccination(actor: Actor, vaccinationId: UUID): Vaccination {
         val vaccination = findVaccination(vaccinationId)
-        requirePatient(veterinarianId, vaccination.petId)
+        requirePatient(actor, vaccination.petId)
         return vaccination
     }
 

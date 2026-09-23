@@ -158,12 +158,26 @@ Exposed imports.
   `validateAll { ensure...(field, value, ...) }` (`ValidationErrorCollector`); collects all errors, then throws.
   Messages are lowercase phrases like `"must not be blank"`. Limits live in `ValidationConstants.<Entity>Rules` and
   mirror SQL constraints (keep the `// CHECK (...)` / `// NUMERIC(p, s)` comments in sync).
-- `application/usecase/<entity>/` — one class per operation: `Create/Get/Update/Delete<Entity>UseCase`, annotated
-  `@Service` + `@Transactional` (`@Transactional(readOnly = true)` for `Get...`). Constructor injection of repository
-  interfaces. Pattern: validate → check referenced entities and business rules (throw domain exceptions) → call the
-  repository → convert `null` / `false` into `<Entity>NotFoundException`.
-- `application/security/ResourceAccessGuard` — ownership checks (`requireOwned...`, `requirePatient...`) for client and
-  veterinarian endpoints; admin endpoints do not use it.
+- `application/usecase/<role>/<entity>/` — one class per operation, annotated `@Service` + `@Transactional`
+  (`@Transactional(readOnly = true)` for reads). Constructor injection of repository interfaces and other use cases.
+  Roles mirror the controller packages:
+  - `common/` — no access scoping: operations behind public or shared endpoints, plus the shared rules that several
+    roles reuse (`pet`, `appointment`, `vaccination`, `user`, `auth`). Classes keep plain names
+    (`CreateAppointmentUseCase`). These take no `Actor`.
+  - `admin/`, `client/`, `veterinarian/` — entry points for the matching controllers. Class names carry the role
+    prefix (`AdminCreatePetUseCase`, `ClientBookAppointmentUseCase`, `VeterinarianGetPatientUseCase`) and every
+    public method takes `actor: Actor` first. They perform the access check, add the role-specific part of the
+    scenario, and delegate the shared rules to `common/`. The outer transaction covers both, so a check and the
+    write it guards are atomic.
+- Pattern inside a `common/` use case: validate → check referenced entities and business rules (throw domain
+  exceptions) → call the repository → convert `null` / `false` into `<Entity>NotFoundException`.
+- **Access control lives in `application`, never in `presentation`.** Controllers pass the `Actor` on; they never
+  decide who may touch a resource.
+- `application/security/Actor` — the current user (`userId`, `role`, `fullName`), built from `User` by `toActor()`.
+  Use cases that a request can reach while authenticated take it; `RegisterUserUseCase`, `AuthenticateUserUseCase`
+  and the startup initializer have no actor.
+- `application/security/ResourceAccessGuard` — ownership checks (`requireOwned...`, `requirePatient...`,
+  `requireVeterinarian`) called by `client/` and `veterinarian/` use cases; `admin/` use cases do not use it.
 - `application/config` — `@ConfigurationProperties` classes; `application/bootstrap` — startup initializers.
 - `infrastructure/persistence`:
   - `models/Exposed<Entity>Table` — `object : UUIDTable("<sql_table>")`; composite-key tables use plain `Table`.
@@ -174,7 +188,8 @@ Exposed imports.
   - `repositories/Exposed<Entity>Repository` — `@Repository` + `@Transactional`, every method body wrapped in
     `exposedSql { ... }` (maps `SQLException` to typed `PersistenceException`). Use `insertReturning` /
     `updateReturning`, set `updatedAt = CurrentTimestampWithTimeZone` on update, order lists by `createdAt ASC`.
-- `infrastructure/security` — JWT filter, `SecurityConfig` (URL-based role rules), `AuthenticatedUser` principal.
+- `infrastructure/security` — JWT filter (puts an `Actor` into the security context and derives the authorities from
+  its role), `SecurityConfig` (URL-based role rules, the coarse first line of defence).
 - `presentation/api/http`:
   - `controllers/{admin,veterinarian,client,common,auth}/<Role><Entity>Controller` — base paths
     `/api/v1/admin/...`, `/api/v1/veterinarian/...`, `/api/v1/client/...` (role enforced in `SecurityConfig`),
@@ -182,20 +197,22 @@ Exposed imports.
     (`/work-schedules`). Class annotated `@RestController`, `@RequestMapping`, `@Tag(name = "<Role>: <Entities>")`;
     every endpoint has `@Operation(summary = ...)`. Controllers only map and delegate to use cases; no business logic.
   - Responses: `ApiResponse.success(result)`, `ApiResponse.created(result)` (201), `ApiResponse.noContent()` (204).
-    Current user via `@AuthenticationPrincipal user: AuthenticatedUser`.
+    Current user via `@AuthenticationPrincipal actor: Actor`, passed straight into the use case.
   - `dto/request/<entity>/` — `Create/Update<Entity>Request`, role-specific variants prefixed with the role
     (`ClientCreatePetRequest`); `dto/response/<Entity>Response`.
-  - `mappers/<Entity>Mapper.kt` — top-level extension functions `Entity.toResponse()`, `Request.toDto()`; extra values
-    taken from the security context are passed as parameters (`toDto(ownerId = user.id)`).
+  - `mappers/<Entity>Mapper.kt` — top-level extension functions `Entity.toResponse()`, `Request.toDto()`. Mappers
+    only move fields around: values that depend on the current user or on business rules (owner, price snapshot,
+    cancellation metadata) are filled in by the use case, which is why role-specific requests map to their own
+    domain DTO (`CreateOwnPetDto`, `BookAppointmentDto`, `UpdateAppointmentStatusDto`).
   - `exceptions/` — `DomainExceptionHandler` (highest precedence) and `GlobalExceptionHandler`; new domain exception
     types must extend an existing base class so they map to the right HTTP status automatically.
 
 ### Adding a new entity / feature — checklist
 
 Migration → domain entity + DTOs → repository interface → validator + `ValidationConstants` rules → not-found /
-already-exists / rule exceptions → Exposed table + mapper + repository → use cases → request / response DTOs +
-presentation mapper → controllers per role → `SecurityConfig` if a path is public → `docs/api.md` if the API usage
-changes.
+already-exists / rule exceptions → Exposed table + mapper + repository → `common/` use cases with the shared rules →
+role use cases (`admin/`, `client/`, `veterinarian/`) with the access checks → request / response DTOs + presentation
+mapper → controllers per role → `SecurityConfig` if a path is public → `docs/api.md` if the API usage changes.
 
 ### Database
 
