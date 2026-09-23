@@ -10,6 +10,7 @@ import com.bortnik.chiron.domain.exceptions.rules.UserRoleMismatchException
 import com.bortnik.chiron.domain.repositories.UserRepository
 import com.bortnik.chiron.domain.repositories.VeterinarianRepository
 import com.bortnik.chiron.domain.utils.validators.VeterinarianValidator
+import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 
@@ -19,6 +20,8 @@ class AdminCreateVeterinarianUseCase(
     private val veterinarianRepository: VeterinarianRepository,
     private val userRepository: UserRepository,
 ) {
+
+    private val log = LoggerFactory.getLogger(javaClass)
 
     fun create(actor: Actor, dto: CreateVeterinarianDto): Veterinarian {
         VeterinarianValidator.validate(dto)
@@ -31,6 +34,15 @@ class AdminCreateVeterinarianUseCase(
         if (veterinarianRepository.findByUserId(dto.userId) != null) {
             throw VeterinarianAlreadyExistsException.byUserId(dto.userId)
         }
-        return veterinarianRepository.create(dto)
+        val veterinarian = veterinarianRepository.create(dto)
+        log.info(
+            "Admin {} ({}) created veterinarian profile {} for user {} ({})",
+            actor.userId,
+            actor.fullName,
+            veterinarian.id,
+            user.id,
+            user.fullName,
+        )
+        return veterinarian
     }
 }

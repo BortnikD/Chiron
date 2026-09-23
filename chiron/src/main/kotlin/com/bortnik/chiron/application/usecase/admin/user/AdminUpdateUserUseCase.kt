@@ -7,6 +7,7 @@ import com.bortnik.chiron.domain.exceptions.alreadyexists.UserAlreadyExistsExcep
 import com.bortnik.chiron.domain.exceptions.notfound.UserNotFoundException
 import com.bortnik.chiron.domain.repositories.UserRepository
 import com.bortnik.chiron.domain.utils.validators.UserValidator
+import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import java.util.UUID
@@ -15,12 +16,23 @@ import java.util.UUID
 @Transactional
 class AdminUpdateUserUseCase(private val userRepository: UserRepository) {
 
+    private val log = LoggerFactory.getLogger(javaClass)
+
     fun update(actor: Actor, id: UUID, dto: UpdateUserDto): User {
         UserValidator.validate(dto)
         userRepository.findByEmail(dto.email)?.takeIf { it.id != id }
             ?.let { throw UserAlreadyExistsException.byEmail(dto.email) }
         userRepository.findByPhone(dto.phone)?.takeIf { it.id != id }
             ?.let { throw UserAlreadyExistsException.byPhone(dto.phone) }
-        return userRepository.update(id, dto) ?: throw UserNotFoundException(id)
+        val user = userRepository.update(id, dto) ?: throw UserNotFoundException(id)
+        log.info(
+            "Admin {} ({}) updated user {} ({}), role {}",
+            actor.userId,
+            actor.fullName,
+            user.id,
+            user.fullName,
+            user.role,
+        )
+        return user
     }
 }

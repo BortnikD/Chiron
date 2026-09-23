@@ -4,6 +4,7 @@ import com.bortnik.chiron.domain.dto.user.CreateUserDto
 import com.bortnik.chiron.domain.dto.user.RegisterUserDto
 import com.bortnik.chiron.domain.entities.User
 import com.bortnik.chiron.domain.utils.validators.UserValidator
+import org.slf4j.LoggerFactory
 import org.springframework.security.crypto.password.PasswordEncoder
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
@@ -15,9 +16,11 @@ class RegisterUserUseCase(
     private val passwordEncoder: PasswordEncoder,
 ) {
 
+    private val log = LoggerFactory.getLogger(javaClass)
+
     fun register(dto: RegisterUserDto): User {
         UserValidator.validate(dto)
-        return createUserUseCase.create(
+        val user = createUserUseCase.create(
             CreateUserDto(
                 email = dto.email,
                 passwordHash = requireNotNull(passwordEncoder.encode(dto.password)),
@@ -29,5 +32,7 @@ class RegisterUserUseCase(
                 role = dto.role,
             ),
         )
+        log.info("User {} ({}) registered with role {}", user.id, user.fullName, user.role)
+        return user
     }
 }

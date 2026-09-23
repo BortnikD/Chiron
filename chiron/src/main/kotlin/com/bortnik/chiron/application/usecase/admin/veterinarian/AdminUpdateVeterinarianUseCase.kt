@@ -6,6 +6,7 @@ import com.bortnik.chiron.domain.entities.Veterinarian
 import com.bortnik.chiron.domain.exceptions.notfound.VeterinarianNotFoundException
 import com.bortnik.chiron.domain.repositories.VeterinarianRepository
 import com.bortnik.chiron.domain.utils.validators.VeterinarianValidator
+import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import java.util.UUID
@@ -14,8 +15,19 @@ import java.util.UUID
 @Transactional
 class AdminUpdateVeterinarianUseCase(private val veterinarianRepository: VeterinarianRepository) {
 
+    private val log = LoggerFactory.getLogger(javaClass)
+
     fun update(actor: Actor, id: UUID, dto: UpdateVeterinarianDto): Veterinarian {
         VeterinarianValidator.validate(dto)
-        return veterinarianRepository.update(id, dto) ?: throw VeterinarianNotFoundException(id)
+        val veterinarian = veterinarianRepository.update(id, dto) ?: throw VeterinarianNotFoundException(id)
+        log.info(
+            "Admin {} ({}) updated veterinarian {}: specialization {}, active {}",
+            actor.userId,
+            actor.fullName,
+            veterinarian.id,
+            veterinarian.specializationId,
+            veterinarian.isActive,
+        )
+        return veterinarian
     }
 }

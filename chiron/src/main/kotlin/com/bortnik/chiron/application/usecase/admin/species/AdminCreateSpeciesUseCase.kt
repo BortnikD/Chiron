@@ -6,6 +6,7 @@ import com.bortnik.chiron.domain.entities.Species
 import com.bortnik.chiron.domain.exceptions.alreadyexists.SpeciesAlreadyExistsException
 import com.bortnik.chiron.domain.repositories.SpeciesRepository
 import com.bortnik.chiron.domain.utils.validators.SpeciesValidator
+import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 
@@ -13,9 +14,13 @@ import org.springframework.transaction.annotation.Transactional
 @Transactional
 class AdminCreateSpeciesUseCase(private val speciesRepository: SpeciesRepository) {
 
+    private val log = LoggerFactory.getLogger(javaClass)
+
     fun create(actor: Actor, dto: CreateSpeciesDto): Species {
         SpeciesValidator.validate(dto)
         if (speciesRepository.findByName(dto.name) != null) throw SpeciesAlreadyExistsException.byName(dto.name)
-        return speciesRepository.create(dto)
+        val species = speciesRepository.create(dto)
+        log.info("Admin {} ({}) created species {} '{}'", actor.userId, actor.fullName, species.id, species.name)
+        return species
     }
 }

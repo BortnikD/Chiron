@@ -4,6 +4,7 @@ import com.bortnik.chiron.application.security.Actor
 import com.bortnik.chiron.application.usecase.common.user.RegisterUserUseCase
 import com.bortnik.chiron.domain.dto.user.RegisterUserDto
 import com.bortnik.chiron.domain.entities.User
+import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 
@@ -11,5 +12,18 @@ import org.springframework.transaction.annotation.Transactional
 @Transactional
 class AdminCreateUserUseCase(private val registerUserUseCase: RegisterUserUseCase) {
 
-    fun create(actor: Actor, dto: RegisterUserDto): User = registerUserUseCase.register(dto)
+    private val log = LoggerFactory.getLogger(javaClass)
+
+    fun create(actor: Actor, dto: RegisterUserDto): User {
+        val user = registerUserUseCase.register(dto)
+        log.info(
+            "Admin {} ({}) created user {} ({}) with role {}",
+            actor.userId,
+            actor.fullName,
+            user.id,
+            user.fullName,
+            user.role,
+        )
+        return user
+    }
 }

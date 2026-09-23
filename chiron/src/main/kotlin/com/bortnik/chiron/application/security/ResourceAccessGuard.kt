@@ -13,6 +13,7 @@ import com.bortnik.chiron.domain.repositories.AppointmentRepository
 import com.bortnik.chiron.domain.repositories.PetRepository
 import com.bortnik.chiron.domain.repositories.VaccinationRepository
 import com.bortnik.chiron.domain.repositories.VeterinarianRepository
+import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import java.util.UUID
@@ -27,10 +28,12 @@ class ResourceAccessGuard(
     private val veterinarianRepository: VeterinarianRepository,
 ) {
 
+    private val log = LoggerFactory.getLogger(javaClass)
+
     fun requireOwnedPet(actor: Actor, petId: UUID): Pet {
         val pet = findPet(petId)
         if (pet.ownerId != actor.userId)
-            throw AccessDeniedException("Pet $petId does not belong to the current user")
+            deny(actor, "Pet $petId does not belong to the current user")
         return pet
     }
 
@@ -54,7 +57,7 @@ class ResourceAccessGuard(
     fun requireAssignedAppointment(actor: Actor, appointmentId: UUID): Appointment {
         val appointment = findAppointment(appointmentId)
         if (appointment.veterinarianId != requireVeterinarian(actor).id) {
-            throw AccessDeniedException("Appointment $appointmentId is not assigned to the current veterinarian")
+            deny(actor, "Appointment $appointmentId is not assigned to the current veterinarian")
         }
         return appointment
     }
@@ -64,7 +67,7 @@ class ResourceAccessGuard(
         val pet = findPet(petId)
         val veterinarianId = requireVeterinarian(actor).id
         if (appointmentRepository.findAllByPetId(petId).none { it.veterinarianId == veterinarianId }) {
-            throw AccessDeniedException("Pet $petId is not a patient of the current veterinarian")
+            deny(actor, "Pet $petId is not a patient of the current veterinarian")
         }
         return pet
     }
@@ -73,6 +76,12 @@ class ResourceAccessGuard(
         val vaccination = findVaccination(vaccinationId)
         requirePatient(actor, vaccination.petId)
         return vaccination
+    }
+
+    // The exception handler logs the request but not who made it, so the actor is recorded here.
+    private fun deny(actor: Actor, message: String): Nothing {
+        log.warn("Access denied for {} {} ({}): {}", actor.role, actor.userId, actor.fullName, message)
+        throw AccessDeniedException(message)
     }
 
     private fun findPet(id: UUID): Pet = petRepository.findById(id) ?: throw PetNotFoundException(id)
