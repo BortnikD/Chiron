@@ -43,18 +43,16 @@ class AdminVeterinarianController(
     )
     @GetMapping
     fun findAll(
-        @AuthenticationPrincipal actor: Actor,
         @ParameterObject filter: VeterinarianFilterRequest,
     ): ApiResponse<List<VeterinarianResponse>> =
-        ApiResponse.success(getVeterinarianUseCase.findAll(actor, filter.toDto()).map { it.toResponse() })
+        ApiResponse.success(getVeterinarianUseCase.findAll(filter.toDto()).map { it.toResponse() })
 
     @Operation(summary = "Get veterinarian profile by user id")
     @GetMapping("/by-user/{userId}")
     fun findByUserId(
-        @AuthenticationPrincipal actor: Actor,
         @PathVariable userId: UUID,
     ): ApiResponse<VeterinarianResponse> =
-        ApiResponse.success(getVeterinarianUseCase.findByUserId(actor, userId).toResponse())
+        ApiResponse.success(getVeterinarianUseCase.findByUserId(userId).toResponse())
 
     @Operation(
         summary = "Create veterinarian profile",

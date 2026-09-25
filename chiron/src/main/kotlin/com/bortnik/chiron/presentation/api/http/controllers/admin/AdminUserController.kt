@@ -41,18 +41,17 @@ class AdminUserController(
     )
     @GetMapping
     fun findAll(
-        @AuthenticationPrincipal actor: Actor,
         @Valid @ParameterObject filter: UserFilterRequest,
         @Valid @ParameterObject pagination: PaginationRequest,
     ): ApiResponse<PageResponse<UserResponse>> =
         ApiResponse.success(
-            getUserUseCase.findAll(actor, filter.toDto(), pagination.toDto()).toResponse { it.toResponse() },
+            getUserUseCase.findAll(filter.toDto(), pagination.toDto()).toResponse { it.toResponse() },
         )
 
     @Operation(summary = "Get user by id")
     @GetMapping("/{id}")
-    fun findById(@AuthenticationPrincipal actor: Actor, @PathVariable id: UUID): ApiResponse<UserResponse> =
-        ApiResponse.success(getUserUseCase.findById(actor, id).toResponse())
+    fun findById(@PathVariable id: UUID): ApiResponse<UserResponse> =
+        ApiResponse.success(getUserUseCase.findById(id).toResponse())
 
     @Operation(
         summary = "Create user with any role",

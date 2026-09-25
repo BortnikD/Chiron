@@ -43,8 +43,8 @@ class AdminWorkScheduleController(
 ) {
     @Operation(summary = "Get work schedule entry by id")
     @GetMapping("/{id}")
-    fun findById(@AuthenticationPrincipal actor: Actor, @PathVariable id: UUID): ApiResponse<WorkScheduleResponse> =
-        ApiResponse.success(getWorkScheduleUseCase.findById(actor, id).toResponse())
+    fun findById(@PathVariable id: UUID): ApiResponse<WorkScheduleResponse> =
+        ApiResponse.success(getWorkScheduleUseCase.findById(id).toResponse())
 
     @Operation(summary = "Create work schedule entry")
     @PostMapping

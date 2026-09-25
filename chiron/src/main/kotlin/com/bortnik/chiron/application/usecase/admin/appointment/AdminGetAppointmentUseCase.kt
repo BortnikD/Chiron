@@ -1,6 +1,5 @@
 package com.bortnik.chiron.application.usecase.admin.appointment
 
-import com.bortnik.chiron.application.security.Actor
 import com.bortnik.chiron.application.usecase.common.appointment.GetAppointmentUseCase
 import com.bortnik.chiron.domain.dto.appointment.AppointmentFilter
 import com.bortnik.chiron.domain.dto.pagination.Page
@@ -14,8 +13,8 @@ import java.util.UUID
 @Transactional(readOnly = true)
 class AdminGetAppointmentUseCase(private val getAppointmentUseCase: GetAppointmentUseCase) {
 
-    fun findById(actor: Actor, id: UUID): Appointment = getAppointmentUseCase.findById(id)
+    fun findById(id: UUID): Appointment = getAppointmentUseCase.findById(id)
 
-    fun findAll(actor: Actor, filter: AppointmentFilter, pageRequest: PageRequest): Page<Appointment> =
+    fun findAll(filter: AppointmentFilter, pageRequest: PageRequest): Page<Appointment> =
         getAppointmentUseCase.findAll(filter, pageRequest)
 }

@@ -1,6 +1,5 @@
 package com.bortnik.chiron.application.usecase.admin.user
 
-import com.bortnik.chiron.application.security.Actor
 import com.bortnik.chiron.application.usecase.common.user.GetUserUseCase
 import com.bortnik.chiron.domain.dto.pagination.Page
 import com.bortnik.chiron.domain.dto.pagination.PageRequest
@@ -14,8 +13,8 @@ import java.util.UUID
 @Transactional(readOnly = true)
 class AdminGetUserUseCase(private val getUserUseCase: GetUserUseCase) {
 
-    fun findById(actor: Actor, id: UUID): User = getUserUseCase.findById(id)
+    fun findById(id: UUID): User = getUserUseCase.findById(id)
 
-    fun findAll(actor: Actor, filter: UserFilter, pageRequest: PageRequest): Page<User> =
+    fun findAll(filter: UserFilter, pageRequest: PageRequest): Page<User> =
         getUserUseCase.findAll(filter, pageRequest)
 }

@@ -43,10 +43,9 @@ class AdminServiceController(
     )
     @GetMapping
     fun findAll(
-        @AuthenticationPrincipal actor: Actor,
         @ParameterObject filter: ServiceFilterRequest,
     ): ApiResponse<List<ServiceResponse>> =
-        ApiResponse.success(getServiceUseCase.findAll(actor, filter.toDto()).map { it.toResponse() })
+        ApiResponse.success(getServiceUseCase.findAll(filter.toDto()).map { it.toResponse() })
 
     @Operation(summary = "Create service")
     @PostMapping

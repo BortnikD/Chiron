@@ -45,18 +45,17 @@ class AdminAppointmentController(
     )
     @GetMapping
     fun findAll(
-        @AuthenticationPrincipal actor: Actor,
         @Valid @ParameterObject filter: AppointmentFilterRequest,
         @Valid @ParameterObject pagination: PaginationRequest,
     ): ApiResponse<PageResponse<AppointmentResponse>> =
         ApiResponse.success(
-            getAppointmentUseCase.findAll(actor, filter.toDto(), pagination.toDto()).toResponse { it.toResponse() },
+            getAppointmentUseCase.findAll(filter.toDto(), pagination.toDto()).toResponse { it.toResponse() },
         )
 
     @Operation(summary = "Get appointment by id")
     @GetMapping("/{id}")
-    fun findById(@AuthenticationPrincipal actor: Actor, @PathVariable id: UUID): ApiResponse<AppointmentResponse> =
-        ApiResponse.success(getAppointmentUseCase.findById(actor, id).toResponse())
+    fun findById(@PathVariable id: UUID): ApiResponse<AppointmentResponse> =
+        ApiResponse.success(getAppointmentUseCase.findById(id).toResponse())
 
     @Operation(
         summary = "Create appointment",

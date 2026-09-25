@@ -1,6 +1,5 @@
 package com.bortnik.chiron.application.usecase.admin.pet
 
-import com.bortnik.chiron.application.security.Actor
 import com.bortnik.chiron.application.usecase.common.pet.GetPetUseCase
 import com.bortnik.chiron.domain.dto.pagination.Page
 import com.bortnik.chiron.domain.dto.pagination.PageRequest
@@ -14,8 +13,8 @@ import java.util.UUID
 @Transactional(readOnly = true)
 class AdminGetPetUseCase(private val getPetUseCase: GetPetUseCase) {
 
-    fun findById(actor: Actor, id: UUID): Pet = getPetUseCase.findById(id)
+    fun findById(id: UUID): Pet = getPetUseCase.findById(id)
 
-    fun findAll(actor: Actor, filter: PetFilter, pageRequest: PageRequest): Page<Pet> =
+    fun findAll(filter: PetFilter, pageRequest: PageRequest): Page<Pet> =
         getPetUseCase.findAll(filter, pageRequest)
 }

@@ -53,22 +53,20 @@ class AdminScheduleExceptionController(
     )
     @GetMapping
     fun findAll(
-        @AuthenticationPrincipal actor: Actor,
         @Valid @ParameterObject filter: ScheduleExceptionFilterRequest,
         @Valid @ParameterObject pagination: PaginationRequest,
     ): ApiResponse<PageResponse<ScheduleExceptionResponse>> =
         ApiResponse.success(
-            getScheduleExceptionUseCase.findAll(actor, filter.toDto(), pagination.toDto())
+            getScheduleExceptionUseCase.findAll(filter.toDto(), pagination.toDto())
                 .toResponse { it.toResponse() },
         )
 
     @Operation(summary = "Get schedule exception by id")
     @GetMapping("/{id}")
     fun findById(
-        @AuthenticationPrincipal actor: Actor,
         @PathVariable id: UUID,
     ): ApiResponse<ScheduleExceptionResponse> =
-        ApiResponse.success(getScheduleExceptionUseCase.findById(actor, id).toResponse())
+        ApiResponse.success(getScheduleExceptionUseCase.findById(id).toResponse())
 
     @Operation(summary = "Create schedule exception")
     @PostMapping

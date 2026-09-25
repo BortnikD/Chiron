@@ -45,18 +45,17 @@ class AdminPetController(
     )
     @GetMapping
     fun findAll(
-        @AuthenticationPrincipal actor: Actor,
         @Valid @ParameterObject filter: PetFilterRequest,
         @Valid @ParameterObject pagination: PaginationRequest,
     ): ApiResponse<PageResponse<PetResponse>> =
         ApiResponse.success(
-            getPetUseCase.findAll(actor, filter.toDto(), pagination.toDto()).toResponse { it.toResponse() },
+            getPetUseCase.findAll(filter.toDto(), pagination.toDto()).toResponse { it.toResponse() },
         )
 
     @Operation(summary = "Get pet by id")
     @GetMapping("/{id}")
-    fun findById(@AuthenticationPrincipal actor: Actor, @PathVariable id: UUID): ApiResponse<PetResponse> =
-        ApiResponse.success(getPetUseCase.findById(actor, id).toResponse())
+    fun findById(@PathVariable id: UUID): ApiResponse<PetResponse> =
+        ApiResponse.success(getPetUseCase.findById(id).toResponse())
 
     @Operation(summary = "Create pet for any owner")
     @PostMapping

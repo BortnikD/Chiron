@@ -48,18 +48,17 @@ class AdminVaccinationController(
     )
     @GetMapping
     fun findAll(
-        @AuthenticationPrincipal actor: Actor,
         @Valid @ParameterObject filter: VaccinationFilterRequest,
         @Valid @ParameterObject pagination: PaginationRequest,
     ): ApiResponse<PageResponse<VaccinationResponse>> =
         ApiResponse.success(
-            getVaccinationUseCase.findAll(actor, filter.toDto(), pagination.toDto()).toResponse { it.toResponse() },
+            getVaccinationUseCase.findAll(filter.toDto(), pagination.toDto()).toResponse { it.toResponse() },
         )
 
     @Operation(summary = "Get vaccination by id")
     @GetMapping("/{id}")
-    fun findById(@AuthenticationPrincipal actor: Actor, @PathVariable id: UUID): ApiResponse<VaccinationResponse> =
-        ApiResponse.success(getVaccinationUseCase.findById(actor, id).toResponse())
+    fun findById(@PathVariable id: UUID): ApiResponse<VaccinationResponse> =
+        ApiResponse.success(getVaccinationUseCase.findById(id).toResponse())
 
     @Operation(
         summary = "Create vaccination",

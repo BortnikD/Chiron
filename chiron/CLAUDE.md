@@ -169,17 +169,18 @@ Exposed imports.
     roles reuse (`pet`, `appointment`, `vaccination`, `user`, `auth`). Classes keep plain names
     (`CreateAppointmentUseCase`). These take no `Actor`.
   - `admin/`, `client/`, `veterinarian/` — entry points for the matching controllers. Class names carry the role
-    prefix (`AdminCreatePetUseCase`, `ClientBookAppointmentUseCase`, `VeterinarianGetPatientUseCase`) and every
-    public method takes `actor: Actor` first. They perform the access check, add the role-specific part of the
-    scenario, and delegate the shared rules to `common/`. The outer transaction covers both, so a check and the
+    prefix (`AdminCreatePetUseCase`, `ClientBookAppointmentUseCase`, `VeterinarianGetPatientUseCase`). A public
+    method takes `actor: Actor` first only when it uses it: for an access check, for scoping (owner / veterinarian),
+    or for audit logging; `admin/` reads therefore take no actor. They perform the access check, add the
+    role-specific part of the scenario, and delegate the shared rules to `common/`. The outer transaction covers both, so a check and the
     write it guards are atomic.
 - Pattern inside a `common/` use case: validate → check referenced entities and business rules (throw domain
   exceptions) → call the repository → convert `null` / `false` into `<Entity>NotFoundException`.
 - **Access control lives in `application`, never in `presentation`.** Controllers pass the `Actor` on; they never
   decide who may touch a resource.
 - `application/security/Actor` — the current user (`userId`, `role`, `fullName`), built from `User` by `toActor()`.
-  Use cases that a request can reach while authenticated take it; `RegisterUserUseCase`, `AuthenticateUserUseCase`
-  and the startup initializer have no actor.
+  Role use cases take it when they use it (see above); `RegisterUserUseCase`, `AuthenticateUserUseCase` and the
+  startup initializer have no actor.
 - `application/security/ResourceAccessGuard` — ownership checks (`requireOwned...`, `requirePatient...`,
   `requireVeterinarian`) called by `client/` and `veterinarian/` use cases; `admin/` use cases do not use it.
 - `application/config` — `@ConfigurationProperties` classes; `application/bootstrap` — startup initializers.
@@ -201,7 +202,8 @@ Exposed imports.
     (`/work-schedules`). Class annotated `@RestController`, `@RequestMapping`, `@Tag(name = "<Role>: <Entities>")`;
     every endpoint has `@Operation(summary = ...)`. Controllers only map and delegate to use cases; no business logic.
   - Responses: `ApiResponse.success(result)`, `ApiResponse.created(result)` (201), `ApiResponse.noContent()` (204).
-    Current user via `@AuthenticationPrincipal actor: Actor`, passed straight into the use case.
+    Current user via `@AuthenticationPrincipal actor: Actor`, passed straight into the use case; endpoints whose
+    use case takes no actor do not declare it.
   - `dto/request/<entity>/` — `Create/Update<Entity>Request`, role-specific variants prefixed with the role
     (`ClientCreatePetRequest`); `dto/response/<Entity>Response`.
   - `mappers/<Entity>Mapper.kt` — top-level extension functions `Entity.toResponse()`, `Request.toDto()`. Mappers

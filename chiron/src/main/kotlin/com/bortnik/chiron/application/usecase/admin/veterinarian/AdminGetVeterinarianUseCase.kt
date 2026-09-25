@@ -1,6 +1,5 @@
 package com.bortnik.chiron.application.usecase.admin.veterinarian
 
-import com.bortnik.chiron.application.security.Actor
 import com.bortnik.chiron.application.usecase.common.veterinarian.GetVeterinarianUseCase
 import com.bortnik.chiron.domain.dto.veterinarian.VeterinarianFilter
 import com.bortnik.chiron.domain.entities.Veterinarian
@@ -12,7 +11,7 @@ import java.util.UUID
 @Transactional(readOnly = true)
 class AdminGetVeterinarianUseCase(private val getVeterinarianUseCase: GetVeterinarianUseCase) {
 
-    fun findByUserId(actor: Actor, userId: UUID): Veterinarian = getVeterinarianUseCase.findByUserId(userId)
+    fun findByUserId(userId: UUID): Veterinarian = getVeterinarianUseCase.findByUserId(userId)
 
-    fun findAll(actor: Actor, filter: VeterinarianFilter): List<Veterinarian> = getVeterinarianUseCase.findAll(filter)
+    fun findAll(filter: VeterinarianFilter): List<Veterinarian> = getVeterinarianUseCase.findAll(filter)
 }

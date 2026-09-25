@@ -1,6 +1,5 @@
 package com.bortnik.chiron.application.usecase.admin.workschedule
 
-import com.bortnik.chiron.application.security.Actor
 import com.bortnik.chiron.application.usecase.common.workschedule.GetWorkScheduleUseCase
 import com.bortnik.chiron.domain.entities.WorkSchedule
 import org.springframework.stereotype.Service
@@ -11,5 +10,5 @@ import java.util.UUID
 @Transactional(readOnly = true)
 class AdminGetWorkScheduleUseCase(private val getWorkScheduleUseCase: GetWorkScheduleUseCase) {
 
-    fun findById(actor: Actor, id: UUID): WorkSchedule = getWorkScheduleUseCase.findById(id)
+    fun findById(id: UUID): WorkSchedule = getWorkScheduleUseCase.findById(id)
 }
