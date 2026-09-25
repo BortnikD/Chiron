@@ -1,5 +1,6 @@
 package com.bortnik.chiron.domain.utils.validators
 
+import com.bortnik.chiron.domain.dto.appointment.AppointmentFilter
 import com.bortnik.chiron.domain.dto.appointment.CreateAppointmentDto
 import com.bortnik.chiron.domain.dto.appointment.UpdateAppointmentDto
 import com.bortnik.chiron.domain.dto.orElse
@@ -38,6 +39,10 @@ object AppointmentValidator {
                 "cancellation fields are allowed only when status is CANCELLED",
             )
         }
+    }
+
+    fun validate(filter: AppointmentFilter) = validateAll {
+        ensureAfter("to", filter.to, "from", filter.from)
     }
 
     private fun ValidationErrorCollector.timeRange(startAt: Instant, endAt: Instant) {

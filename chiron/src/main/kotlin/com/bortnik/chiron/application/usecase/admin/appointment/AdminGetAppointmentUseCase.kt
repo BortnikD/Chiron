@@ -2,6 +2,9 @@ package com.bortnik.chiron.application.usecase.admin.appointment
 
 import com.bortnik.chiron.application.security.Actor
 import com.bortnik.chiron.application.usecase.common.appointment.GetAppointmentUseCase
+import com.bortnik.chiron.domain.dto.appointment.AppointmentFilter
+import com.bortnik.chiron.domain.dto.pagination.Page
+import com.bortnik.chiron.domain.dto.pagination.PageRequest
 import com.bortnik.chiron.domain.entities.Appointment
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
@@ -13,8 +16,6 @@ class AdminGetAppointmentUseCase(private val getAppointmentUseCase: GetAppointme
 
     fun findById(actor: Actor, id: UUID): Appointment = getAppointmentUseCase.findById(id)
 
-    fun findAllByVeterinarianId(actor: Actor, veterinarianId: UUID): List<Appointment> =
-        getAppointmentUseCase.findAllByVeterinarianId(veterinarianId)
-
-    fun findAllByPetId(actor: Actor, petId: UUID): List<Appointment> = getAppointmentUseCase.findAllByPetId(petId)
+    fun findAll(actor: Actor, filter: AppointmentFilter, pageRequest: PageRequest): Page<Appointment> =
+        getAppointmentUseCase.findAll(filter, pageRequest)
 }

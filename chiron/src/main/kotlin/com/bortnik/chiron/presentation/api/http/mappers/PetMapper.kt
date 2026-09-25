@@ -2,10 +2,12 @@ package com.bortnik.chiron.presentation.api.http.mappers
 
 import com.bortnik.chiron.domain.dto.pet.CreateOwnPetDto
 import com.bortnik.chiron.domain.dto.pet.CreatePetDto
+import com.bortnik.chiron.domain.dto.pet.PetFilter
 import com.bortnik.chiron.domain.dto.pet.UpdatePetDto
 import com.bortnik.chiron.domain.entities.Pet
 import com.bortnik.chiron.presentation.api.http.dto.request.pet.ClientCreatePetRequest
 import com.bortnik.chiron.presentation.api.http.dto.request.pet.CreatePetRequest
+import com.bortnik.chiron.presentation.api.http.dto.request.pet.PetFilterRequest
 import com.bortnik.chiron.presentation.api.http.dto.request.pet.UpdatePetRequest
 import com.bortnik.chiron.presentation.api.http.dto.response.PetResponse
 
@@ -50,4 +52,12 @@ fun UpdatePetRequest.toDto(): UpdatePetDto = UpdatePetDto(
     gender = gender,
     notes = notes.toPatch(),
     isArchived = isArchived,
+)
+
+fun PetFilterRequest.toDto(): PetFilter = PetFilter(
+    ownerId = ownerId,
+    speciesId = speciesId,
+    gender = gender,
+    isArchived = isArchived,
+    name = name?.trim()?.takeIf { it.isNotEmpty() },
 )

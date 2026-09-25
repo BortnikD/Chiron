@@ -2,11 +2,17 @@ package com.bortnik.chiron.domain.utils.validators
 
 import com.bortnik.chiron.domain.dto.orElse
 import com.bortnik.chiron.domain.dto.pet.CreatePetDto
+import com.bortnik.chiron.domain.dto.pet.PetFilter
 import com.bortnik.chiron.domain.dto.pet.UpdatePetDto
 import com.bortnik.chiron.domain.utils.ValidationConstants.PetRules
+import com.bortnik.chiron.domain.utils.ValidationConstants.SEARCH_MAX_LENGTH
 import java.time.LocalDate
 
 object PetValidator {
+
+    fun validate(filter: PetFilter) = validateAll {
+        ensureMaxLength("name", filter.name, SEARCH_MAX_LENGTH)
+    }
 
     fun validate(dto: CreatePetDto) = validateAll {
         pet(dto.name, dto.birthDate, dto.weightKg, dto.notes)

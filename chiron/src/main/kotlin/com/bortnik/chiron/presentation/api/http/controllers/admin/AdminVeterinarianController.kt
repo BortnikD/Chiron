@@ -8,12 +8,14 @@ import com.bortnik.chiron.application.usecase.admin.veterinarian.AdminUpdateVete
 import com.bortnik.chiron.presentation.api.http.ApiResponse
 import com.bortnik.chiron.presentation.api.http.dto.request.veterinarian.CreateVeterinarianRequest
 import com.bortnik.chiron.presentation.api.http.dto.request.veterinarian.UpdateVeterinarianRequest
+import com.bortnik.chiron.presentation.api.http.dto.request.veterinarian.VeterinarianFilterRequest
 import com.bortnik.chiron.presentation.api.http.dto.response.VeterinarianResponse
 import com.bortnik.chiron.presentation.api.http.mappers.toDto
 import com.bortnik.chiron.presentation.api.http.mappers.toResponse
 import io.swagger.v3.oas.annotations.Operation
 import io.swagger.v3.oas.annotations.tags.Tag
 import jakarta.validation.Valid
+import org.springdoc.core.annotations.ParameterObject
 import org.springframework.http.ResponseEntity
 import org.springframework.security.core.annotation.AuthenticationPrincipal
 import org.springframework.web.bind.annotation.DeleteMapping
@@ -35,6 +37,17 @@ class AdminVeterinarianController(
     private val updateVeterinarianUseCase: AdminUpdateVeterinarianUseCase,
     private val deleteVeterinarianUseCase: AdminDeleteVeterinarianUseCase,
 ) {
+    @Operation(
+        summary = "List veterinarians, including inactive ones",
+        description = "All filters are optional and combined with AND. Sorted by creation time ascending.",
+    )
+    @GetMapping
+    fun findAll(
+        @AuthenticationPrincipal actor: Actor,
+        @ParameterObject filter: VeterinarianFilterRequest,
+    ): ApiResponse<List<VeterinarianResponse>> =
+        ApiResponse.success(getVeterinarianUseCase.findAll(actor, filter.toDto()).map { it.toResponse() })
+
     @Operation(summary = "Get veterinarian profile by user id")
     @GetMapping("/by-user/{userId}")
     fun findByUserId(

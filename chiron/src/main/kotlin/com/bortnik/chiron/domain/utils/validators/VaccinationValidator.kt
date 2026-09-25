@@ -3,11 +3,18 @@ package com.bortnik.chiron.domain.utils.validators
 import com.bortnik.chiron.domain.dto.orElse
 import com.bortnik.chiron.domain.dto.vaccination.CreateVaccinationDto
 import com.bortnik.chiron.domain.dto.vaccination.UpdateVaccinationDto
+import com.bortnik.chiron.domain.dto.vaccination.VaccinationFilter
 import com.bortnik.chiron.domain.entities.Vaccination
+import com.bortnik.chiron.domain.utils.ValidationConstants.SEARCH_MAX_LENGTH
 import com.bortnik.chiron.domain.utils.ValidationConstants.VaccinationRules
 import java.time.LocalDate
 
 object VaccinationValidator {
+
+    fun validate(filter: VaccinationFilter) = validateAll {
+        ensureMaxLength("name", filter.name, SEARCH_MAX_LENGTH)
+        ensureNotBefore("nextDueTo", filter.nextDueTo, "nextDueFrom", filter.nextDueFrom)
+    }
 
     fun validate(dto: CreateVaccinationDto) = validateAll { vaccination(dto.name, dto.administeredOn, dto.nextDueOn) }
 

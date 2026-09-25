@@ -6,14 +6,18 @@ import com.bortnik.chiron.application.usecase.admin.appointment.AdminDeleteAppoi
 import com.bortnik.chiron.application.usecase.admin.appointment.AdminGetAppointmentUseCase
 import com.bortnik.chiron.application.usecase.admin.appointment.AdminUpdateAppointmentUseCase
 import com.bortnik.chiron.presentation.api.http.ApiResponse
+import com.bortnik.chiron.presentation.api.http.dto.request.appointment.AppointmentFilterRequest
 import com.bortnik.chiron.presentation.api.http.dto.request.appointment.CreateAppointmentRequest
 import com.bortnik.chiron.presentation.api.http.dto.request.appointment.UpdateAppointmentRequest
+import com.bortnik.chiron.presentation.api.http.dto.request.pagination.PaginationRequest
 import com.bortnik.chiron.presentation.api.http.dto.response.AppointmentResponse
+import com.bortnik.chiron.presentation.api.http.dto.response.PageResponse
 import com.bortnik.chiron.presentation.api.http.mappers.toDto
 import com.bortnik.chiron.presentation.api.http.mappers.toResponse
 import io.swagger.v3.oas.annotations.Operation
 import io.swagger.v3.oas.annotations.tags.Tag
 import jakarta.validation.Valid
+import org.springdoc.core.annotations.ParameterObject
 import org.springframework.http.ResponseEntity
 import org.springframework.security.core.annotation.AuthenticationPrincipal
 import org.springframework.web.bind.annotation.DeleteMapping
@@ -35,27 +39,24 @@ class AdminAppointmentController(
     private val updateAppointmentUseCase: AdminUpdateAppointmentUseCase,
     private val deleteAppointmentUseCase: AdminDeleteAppointmentUseCase,
 ) {
+    @Operation(
+        summary = "List appointments",
+        description = "All filters are optional and combined with AND. Sorted by start time ascending.",
+    )
+    @GetMapping
+    fun findAll(
+        @AuthenticationPrincipal actor: Actor,
+        @Valid @ParameterObject filter: AppointmentFilterRequest,
+        @Valid @ParameterObject pagination: PaginationRequest,
+    ): ApiResponse<PageResponse<AppointmentResponse>> =
+        ApiResponse.success(
+            getAppointmentUseCase.findAll(actor, filter.toDto(), pagination.toDto()).toResponse { it.toResponse() },
+        )
+
     @Operation(summary = "Get appointment by id")
     @GetMapping("/{id}")
     fun findById(@AuthenticationPrincipal actor: Actor, @PathVariable id: UUID): ApiResponse<AppointmentResponse> =
         ApiResponse.success(getAppointmentUseCase.findById(actor, id).toResponse())
-
-    @Operation(summary = "List appointments of a veterinarian")
-    @GetMapping("/by-veterinarian/{veterinarianId}")
-    fun findAllByVeterinarianId(
-        @AuthenticationPrincipal actor: Actor,
-        @PathVariable veterinarianId: UUID,
-    ): ApiResponse<List<AppointmentResponse>> =
-        ApiResponse.success(
-            getAppointmentUseCase.findAllByVeterinarianId(actor, veterinarianId).map { it.toResponse() })
-
-    @Operation(summary = "List appointments of a pet")
-    @GetMapping("/by-pet/{petId}")
-    fun findAllByPetId(
-        @AuthenticationPrincipal actor: Actor,
-        @PathVariable petId: UUID,
-    ): ApiResponse<List<AppointmentResponse>> =
-        ApiResponse.success(getAppointmentUseCase.findAllByPetId(actor, petId).map { it.toResponse() })
 
     @Operation(
         summary = "Create appointment",

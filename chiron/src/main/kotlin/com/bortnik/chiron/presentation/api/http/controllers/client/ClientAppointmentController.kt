@@ -6,14 +6,17 @@ import com.bortnik.chiron.application.usecase.client.appointment.ClientCancelApp
 import com.bortnik.chiron.application.usecase.client.appointment.ClientGetAppointmentUseCase
 import com.bortnik.chiron.presentation.api.http.ApiResponse
 import com.bortnik.chiron.presentation.api.http.dto.request.appointment.CancelAppointmentRequest
+import com.bortnik.chiron.presentation.api.http.dto.request.appointment.ClientAppointmentFilterRequest
 import com.bortnik.chiron.presentation.api.http.dto.request.appointment.ClientCreateAppointmentRequest
+import com.bortnik.chiron.presentation.api.http.dto.request.pagination.PaginationRequest
 import com.bortnik.chiron.presentation.api.http.dto.response.AppointmentResponse
+import com.bortnik.chiron.presentation.api.http.dto.response.PageResponse
 import com.bortnik.chiron.presentation.api.http.mappers.toDto
 import com.bortnik.chiron.presentation.api.http.mappers.toResponse
 import io.swagger.v3.oas.annotations.Operation
-import io.swagger.v3.oas.annotations.Parameter
 import io.swagger.v3.oas.annotations.tags.Tag
 import jakarta.validation.Valid
+import org.springdoc.core.annotations.ParameterObject
 import org.springframework.http.ResponseEntity
 import org.springframework.security.core.annotation.AuthenticationPrincipal
 import org.springframework.web.bind.annotation.GetMapping
@@ -21,7 +24,6 @@ import org.springframework.web.bind.annotation.PathVariable
 import org.springframework.web.bind.annotation.PostMapping
 import org.springframework.web.bind.annotation.RequestBody
 import org.springframework.web.bind.annotation.RequestMapping
-import org.springframework.web.bind.annotation.RequestParam
 import org.springframework.web.bind.annotation.RestController
 import java.util.UUID
 
@@ -33,14 +35,19 @@ class ClientAppointmentController(
     private val getAppointmentUseCase: ClientGetAppointmentUseCase,
     private val cancelAppointmentUseCase: ClientCancelAppointmentUseCase,
 ) {
-    @Operation(summary = "List appointments of own pets")
+    @Operation(
+        summary = "List appointments of own pets",
+        description = "All filters are optional and combined with AND. Sorted by start time ascending.",
+    )
     @GetMapping
     fun findAll(
         @AuthenticationPrincipal actor: Actor,
-        @Parameter(description = "Return only appointments of this pet")
-        @RequestParam(required = false) petId: UUID?,
-    ): ApiResponse<List<AppointmentResponse>> =
-        ApiResponse.success(getAppointmentUseCase.findAll(actor, petId).map { it.toResponse() })
+        @Valid @ParameterObject filter: ClientAppointmentFilterRequest,
+        @Valid @ParameterObject pagination: PaginationRequest,
+    ): ApiResponse<PageResponse<AppointmentResponse>> =
+        ApiResponse.success(
+            getAppointmentUseCase.findAll(actor, filter.toDto(), pagination.toDto()).toResponse { it.toResponse() },
+        )
 
     @Operation(summary = "Get appointment of own pet by id")
     @GetMapping("/{id}")

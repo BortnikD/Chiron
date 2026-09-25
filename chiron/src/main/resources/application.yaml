@@ -49,6 +49,12 @@ springdoc:
     operations-sorter: method
     tags-sorter: alpha
 
+logging:
+  level:
+    # springdoc 3.1.0 fails to clone the item schema of collection query parameters (Set<AppointmentStatus>)
+    # and logs a harmless WARN on every /v3/api-docs build; the original schema is used as a fallback.
+    org.springdoc.core.utils.SpringDocUtils: error
+
 cors:
   allowed-origins:
     # React (Vite)

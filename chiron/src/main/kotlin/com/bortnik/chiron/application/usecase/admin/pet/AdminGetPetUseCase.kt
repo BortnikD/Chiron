@@ -2,6 +2,9 @@ package com.bortnik.chiron.application.usecase.admin.pet
 
 import com.bortnik.chiron.application.security.Actor
 import com.bortnik.chiron.application.usecase.common.pet.GetPetUseCase
+import com.bortnik.chiron.domain.dto.pagination.Page
+import com.bortnik.chiron.domain.dto.pagination.PageRequest
+import com.bortnik.chiron.domain.dto.pet.PetFilter
 import com.bortnik.chiron.domain.entities.Pet
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
@@ -13,7 +16,6 @@ class AdminGetPetUseCase(private val getPetUseCase: GetPetUseCase) {
 
     fun findById(actor: Actor, id: UUID): Pet = getPetUseCase.findById(id)
 
-    fun findAllByOwnerId(actor: Actor, ownerId: UUID): List<Pet> = getPetUseCase.findAllByOwnerId(ownerId)
-
-    fun findAll(actor: Actor): List<Pet> = getPetUseCase.findAll()
+    fun findAll(actor: Actor, filter: PetFilter, pageRequest: PageRequest): Page<Pet> =
+        getPetUseCase.findAll(filter, pageRequest)
 }

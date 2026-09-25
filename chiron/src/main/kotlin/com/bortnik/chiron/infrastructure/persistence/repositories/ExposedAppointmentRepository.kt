@@ -1,20 +1,32 @@
 package com.bortnik.chiron.infrastructure.persistence.repositories
 
+import com.bortnik.chiron.domain.dto.appointment.AppointmentFilter
 import com.bortnik.chiron.domain.dto.appointment.CreateAppointmentDto
 import com.bortnik.chiron.domain.dto.appointment.UpdateAppointmentDto
 import com.bortnik.chiron.domain.dto.ifPresent
+import com.bortnik.chiron.domain.dto.pagination.Page
+import com.bortnik.chiron.domain.dto.pagination.PageRequest
 import com.bortnik.chiron.domain.entities.Appointment
 import com.bortnik.chiron.domain.repositories.AppointmentRepository
 import com.bortnik.chiron.infrastructure.persistence.exposedSql
+import com.bortnik.chiron.infrastructure.persistence.toPage
 import com.bortnik.chiron.infrastructure.persistence.mappers.toAppointment
 import com.bortnik.chiron.infrastructure.persistence.mappers.toDbDecimal
 import com.bortnik.chiron.infrastructure.persistence.mappers.toDbTimestamp
 import com.bortnik.chiron.infrastructure.persistence.models.ExposedAppointmentTable
+import com.bortnik.chiron.infrastructure.persistence.models.ExposedPetTable
+import org.jetbrains.exposed.v1.core.Op
 import org.jetbrains.exposed.v1.core.SortOrder
+import org.jetbrains.exposed.v1.core.andIfNotNull
 import org.jetbrains.exposed.v1.core.eq
+import org.jetbrains.exposed.v1.core.greaterEq
+import org.jetbrains.exposed.v1.core.inList
+import org.jetbrains.exposed.v1.core.inSubQuery
+import org.jetbrains.exposed.v1.core.less
 import org.jetbrains.exposed.v1.javatime.CurrentTimestampWithTimeZone
 import org.jetbrains.exposed.v1.jdbc.deleteWhere
 import org.jetbrains.exposed.v1.jdbc.insertReturning
+import org.jetbrains.exposed.v1.jdbc.select
 import org.jetbrains.exposed.v1.jdbc.selectAll
 import org.jetbrains.exposed.v1.jdbc.updateReturning
 import org.springframework.stereotype.Repository
@@ -44,6 +56,16 @@ class ExposedAppointmentRepository : AppointmentRepository {
             .where { ExposedAppointmentTable.id eq id }
             .singleOrNull()
             ?.toAppointment()
+    }
+
+    override fun findAll(filter: AppointmentFilter, pageRequest: PageRequest): Page<Appointment> = exposedSql {
+        ExposedAppointmentTable.selectAll()
+            .where { filter.toCondition() }
+            .toPage(
+                pageRequest,
+                ExposedAppointmentTable.startAt to SortOrder.ASC,
+                ExposedAppointmentTable.id to SortOrder.ASC,
+            ) { it.toAppointment() }
     }
 
     override fun findAllByVeterinarianId(veterinarianId: UUID): List<Appointment> = exposedSql {
@@ -80,4 +102,18 @@ class ExposedAppointmentRepository : AppointmentRepository {
     override fun deleteById(id: UUID): Boolean = exposedSql {
         ExposedAppointmentTable.deleteWhere { ExposedAppointmentTable.id eq id } > 0
     }
+
+    private fun AppointmentFilter.toCondition(): Op<Boolean> = Op.TRUE
+        .andIfNotNull(veterinarianId?.let { ExposedAppointmentTable.veterinarianId eq it })
+        .andIfNotNull(petId?.let { ExposedAppointmentTable.petId eq it })
+        .andIfNotNull(serviceId?.let { ExposedAppointmentTable.serviceId eq it })
+        .andIfNotNull(
+            ownerId?.let {
+                ExposedAppointmentTable.petId inSubQuery
+                    ExposedPetTable.select(ExposedPetTable.id).where { ExposedPetTable.ownerId eq it }
+            },
+        )
+        .andIfNotNull(statuses?.let { ExposedAppointmentTable.status inList it })
+        .andIfNotNull(from?.let { ExposedAppointmentTable.startAt greaterEq it.toDbTimestamp() })
+        .andIfNotNull(to?.let { ExposedAppointmentTable.startAt less it.toDbTimestamp() })
 }

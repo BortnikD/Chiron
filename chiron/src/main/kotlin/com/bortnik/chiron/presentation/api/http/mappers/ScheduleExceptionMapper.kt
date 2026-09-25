@@ -1,9 +1,11 @@
 package com.bortnik.chiron.presentation.api.http.mappers
 
 import com.bortnik.chiron.domain.dto.scheduleexception.CreateScheduleExceptionDto
+import com.bortnik.chiron.domain.dto.scheduleexception.ScheduleExceptionFilter
 import com.bortnik.chiron.domain.dto.scheduleexception.UpdateScheduleExceptionDto
 import com.bortnik.chiron.domain.entities.ScheduleException
 import com.bortnik.chiron.presentation.api.http.dto.request.scheduleexception.CreateScheduleExceptionRequest
+import com.bortnik.chiron.presentation.api.http.dto.request.scheduleexception.ScheduleExceptionFilterRequest
 import com.bortnik.chiron.presentation.api.http.dto.request.scheduleexception.UpdateScheduleExceptionRequest
 import com.bortnik.chiron.presentation.api.http.dto.response.ScheduleExceptionResponse
 
@@ -35,4 +37,11 @@ fun UpdateScheduleExceptionRequest.toDto(): UpdateScheduleExceptionDto = UpdateS
     startTime = startTime.toPatch(),
     endTime = endTime.toPatch(),
     reason = reason.toPatch(),
+)
+
+fun ScheduleExceptionFilterRequest.toDto(): ScheduleExceptionFilter = ScheduleExceptionFilter(
+    veterinarianId = veterinarianId,
+    type = type,
+    from = from,
+    to = to,
 )

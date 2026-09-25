@@ -4,18 +4,18 @@ import com.bortnik.chiron.application.security.Actor
 import com.bortnik.chiron.application.usecase.admin.user.AdminCreateUserUseCase
 import com.bortnik.chiron.application.usecase.admin.user.AdminDeleteUserUseCase
 import com.bortnik.chiron.application.usecase.admin.user.AdminGetUserUseCase
-import com.bortnik.chiron.domain.utils.ValidationConstants.UserRules
 import com.bortnik.chiron.presentation.api.http.ApiResponse
+import com.bortnik.chiron.presentation.api.http.dto.request.pagination.PaginationRequest
 import com.bortnik.chiron.presentation.api.http.dto.request.user.CreateUserRequest
+import com.bortnik.chiron.presentation.api.http.dto.request.user.UserFilterRequest
+import com.bortnik.chiron.presentation.api.http.dto.response.PageResponse
 import com.bortnik.chiron.presentation.api.http.dto.response.UserResponse
 import com.bortnik.chiron.presentation.api.http.mappers.toDto
 import com.bortnik.chiron.presentation.api.http.mappers.toResponse
 import io.swagger.v3.oas.annotations.Operation
 import io.swagger.v3.oas.annotations.tags.Tag
 import jakarta.validation.Valid
-import jakarta.validation.constraints.NotBlank
-import jakarta.validation.constraints.Pattern
-import jakarta.validation.constraints.Size
+import org.springdoc.core.annotations.ParameterObject
 import org.springframework.http.ResponseEntity
 import org.springframework.security.core.annotation.AuthenticationPrincipal
 import org.springframework.web.bind.annotation.DeleteMapping
@@ -24,7 +24,6 @@ import org.springframework.web.bind.annotation.PathVariable
 import org.springframework.web.bind.annotation.PostMapping
 import org.springframework.web.bind.annotation.RequestBody
 import org.springframework.web.bind.annotation.RequestMapping
-import org.springframework.web.bind.annotation.RequestParam
 import org.springframework.web.bind.annotation.RestController
 import java.util.UUID
 
@@ -36,35 +35,24 @@ class AdminUserController(
     private val getUserUseCase: AdminGetUserUseCase,
     private val deleteUserUseCase: AdminDeleteUserUseCase,
 ) {
-    @Operation(summary = "List all users")
+    @Operation(
+        summary = "List users",
+        description = "All filters are optional and combined with AND. Sorted by registration time ascending.",
+    )
     @GetMapping
-    fun findAll(@AuthenticationPrincipal actor: Actor): ApiResponse<List<UserResponse>> =
-        ApiResponse.success(getUserUseCase.findAll(actor).map { it.toResponse() })
+    fun findAll(
+        @AuthenticationPrincipal actor: Actor,
+        @Valid @ParameterObject filter: UserFilterRequest,
+        @Valid @ParameterObject pagination: PaginationRequest,
+    ): ApiResponse<PageResponse<UserResponse>> =
+        ApiResponse.success(
+            getUserUseCase.findAll(actor, filter.toDto(), pagination.toDto()).toResponse { it.toResponse() },
+        )
 
     @Operation(summary = "Get user by id")
     @GetMapping("/{id}")
     fun findById(@AuthenticationPrincipal actor: Actor, @PathVariable id: UUID): ApiResponse<UserResponse> =
         ApiResponse.success(getUserUseCase.findById(actor, id).toResponse())
-
-    @Operation(summary = "Get user by email")
-    @GetMapping("/by-email")
-    fun findByEmail(
-        @AuthenticationPrincipal actor: Actor,
-        @NotBlank(message = "must not be blank")
-        @Size(max = UserRules.EMAIL_MAX_LENGTH, message = "must be at most ${UserRules.EMAIL_MAX_LENGTH} characters")
-        @Pattern(regexp = UserRules.EMAIL_PATTERN, message = "must be a valid email address")
-        @RequestParam email: String,
-    ): ApiResponse<UserResponse> =
-        ApiResponse.success(getUserUseCase.findByEmail(actor, email).toResponse())
-
-    @Operation(summary = "Get user by phone")
-    @GetMapping("/by-phone")
-    fun findByPhone(
-        @AuthenticationPrincipal actor: Actor,
-        @Pattern(regexp = UserRules.PHONE_PATTERN, message = "must be a phone number in international format")
-        @RequestParam phone: String,
-    ): ApiResponse<UserResponse> =
-        ApiResponse.success(getUserUseCase.findByPhone(actor, phone).toResponse())
 
     @Operation(
         summary = "Create user with any role",

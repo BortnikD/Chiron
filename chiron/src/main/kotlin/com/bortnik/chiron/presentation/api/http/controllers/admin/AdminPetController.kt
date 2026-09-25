@@ -6,15 +6,18 @@ import com.bortnik.chiron.application.usecase.admin.pet.AdminDeletePetUseCase
 import com.bortnik.chiron.application.usecase.admin.pet.AdminGetPetUseCase
 import com.bortnik.chiron.application.usecase.admin.pet.AdminUpdatePetUseCase
 import com.bortnik.chiron.presentation.api.http.ApiResponse
+import com.bortnik.chiron.presentation.api.http.dto.request.pagination.PaginationRequest
 import com.bortnik.chiron.presentation.api.http.dto.request.pet.CreatePetRequest
+import com.bortnik.chiron.presentation.api.http.dto.request.pet.PetFilterRequest
 import com.bortnik.chiron.presentation.api.http.dto.request.pet.UpdatePetRequest
+import com.bortnik.chiron.presentation.api.http.dto.response.PageResponse
 import com.bortnik.chiron.presentation.api.http.dto.response.PetResponse
 import com.bortnik.chiron.presentation.api.http.mappers.toDto
 import com.bortnik.chiron.presentation.api.http.mappers.toResponse
 import io.swagger.v3.oas.annotations.Operation
-import io.swagger.v3.oas.annotations.Parameter
 import io.swagger.v3.oas.annotations.tags.Tag
 import jakarta.validation.Valid
+import org.springdoc.core.annotations.ParameterObject
 import org.springframework.http.ResponseEntity
 import org.springframework.security.core.annotation.AuthenticationPrincipal
 import org.springframework.web.bind.annotation.DeleteMapping
@@ -24,7 +27,6 @@ import org.springframework.web.bind.annotation.PathVariable
 import org.springframework.web.bind.annotation.PostMapping
 import org.springframework.web.bind.annotation.RequestBody
 import org.springframework.web.bind.annotation.RequestMapping
-import org.springframework.web.bind.annotation.RequestParam
 import org.springframework.web.bind.annotation.RestController
 import java.util.UUID
 
@@ -37,16 +39,19 @@ class AdminPetController(
     private val updatePetUseCase: AdminUpdatePetUseCase,
     private val deletePetUseCase: AdminDeletePetUseCase,
 ) {
-    @Operation(summary = "List pets")
+    @Operation(
+        summary = "List pets",
+        description = "All filters are optional and combined with AND. Sorted by creation time ascending.",
+    )
     @GetMapping
     fun findAll(
         @AuthenticationPrincipal actor: Actor,
-        @Parameter(description = "Return only pets of this owner")
-        @RequestParam(required = false) ownerId: UUID?,
-    ): ApiResponse<List<PetResponse>> {
-        val pets = ownerId?.let { getPetUseCase.findAllByOwnerId(actor, it) } ?: getPetUseCase.findAll(actor)
-        return ApiResponse.success(pets.map { it.toResponse() })
-    }
+        @Valid @ParameterObject filter: PetFilterRequest,
+        @Valid @ParameterObject pagination: PaginationRequest,
+    ): ApiResponse<PageResponse<PetResponse>> =
+        ApiResponse.success(
+            getPetUseCase.findAll(actor, filter.toDto(), pagination.toDto()).toResponse { it.toResponse() },
+        )
 
     @Operation(summary = "Get pet by id")
     @GetMapping("/{id}")

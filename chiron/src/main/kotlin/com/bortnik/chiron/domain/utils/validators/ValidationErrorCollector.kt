@@ -29,6 +29,14 @@ class ValidationErrorCollector {
     fun ensureInRange(field: String, value: Double?, min: Double, max: Double) =
         ensure(value == null || (value in min..max), field, "must be between $min and $max")
 
+    // Half-open range [from, to): an empty range is rejected.
+    fun <T : Comparable<T>> ensureAfter(field: String, value: T?, lowerField: String, lower: T?) =
+        ensure(value == null || lower == null || value > lower, field, "must be after $lowerField")
+
+    // Inclusive range [from, to]: a single-point range is allowed.
+    fun <T : Comparable<T>> ensureNotBefore(field: String, value: T?, lowerField: String, lower: T?) =
+        ensure(value == null || lower == null || value >= lower, field, "must not be before $lowerField")
+
     fun throwIfAny() {
         if (errors.isNotEmpty()) throw ValidationException(errors.toList())
     }

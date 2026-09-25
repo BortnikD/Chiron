@@ -4,6 +4,8 @@ import com.bortnik.chiron.domain.dto.orElse
 import com.bortnik.chiron.domain.dto.user.CreateUserDto
 import com.bortnik.chiron.domain.dto.user.RegisterUserDto
 import com.bortnik.chiron.domain.dto.user.UpdateUserDto
+import com.bortnik.chiron.domain.dto.user.UserFilter
+import com.bortnik.chiron.domain.utils.ValidationConstants.SEARCH_MAX_LENGTH
 import com.bortnik.chiron.domain.utils.ValidationConstants.UserRules
 
 object UserValidator {
@@ -37,6 +39,11 @@ object UserValidator {
             dto.fullName,
             dto.phone,
         )
+    }
+
+    fun validate(filter: UserFilter) = validateAll {
+        ensureMaxLength("search", filter.search, SEARCH_MAX_LENGTH)
+        ensureAfter("createdTo", filter.createdTo, "createdFrom", filter.createdFrom)
     }
 
     fun validateCredentials(email: String, password: String) = validateAll {

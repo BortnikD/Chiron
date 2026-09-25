@@ -122,6 +122,26 @@ API использует JWT-токен. Токен один и живёт 30 д
 При ошибке `success = false`, `result = null`, а в `error` лежат имя исключения, сообщение, HTTP-статус, путь запроса
 и, для ошибок валидации, список нарушений по полям (`violations`).
 
+Постраничные списки — `GET /api/v1/admin/{appointments,users,pets,vaccinations,schedule-exceptions}`,
+`GET /api/v1/client/appointments`, `GET /api/v1/veterinarian/{appointments,vaccinations}` — принимают `page`
+(с 0, по умолчанию 0) и `size` (1–100, по умолчанию 20), а в `result` возвращают страницу:
+
+```json
+{
+  "items": [ ],
+  "page": 0,
+  "size": 20,
+  "totalElements": 41,
+  "totalPages": 3
+}
+```
+
+`totalElements` — сколько записей подходит под фильтр всего, а не на текущей странице. Фильтры необязательны
+и объединяются через AND; несколько статусов передаются повтором параметра: `?status=PENDING&status=CONFIRMED`.
+Текстовые фильтры (`search`, `name`) ищут подстроку без учёта регистра. Публичные `GET /api/v1/services`
+и `GET /api/v1/veterinarians` отдают только активные записи; все записи, включая неактивные, — в
+`GET /api/v1/admin/services` и `GET /api/v1/admin/veterinarians`.
+
 | Статус | Когда |
 |---|---|
 | `200` / `201` / `204` | Успех; `201` — при создании, `204` — при удалении (без тела) |

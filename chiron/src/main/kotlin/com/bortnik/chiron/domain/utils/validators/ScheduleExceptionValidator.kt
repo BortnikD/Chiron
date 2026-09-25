@@ -2,6 +2,7 @@ package com.bortnik.chiron.domain.utils.validators
 
 import com.bortnik.chiron.domain.dto.orElse
 import com.bortnik.chiron.domain.dto.scheduleexception.CreateScheduleExceptionDto
+import com.bortnik.chiron.domain.dto.scheduleexception.ScheduleExceptionFilter
 import com.bortnik.chiron.domain.dto.scheduleexception.UpdateScheduleExceptionDto
 import com.bortnik.chiron.domain.entities.ScheduleException
 import com.bortnik.chiron.domain.entities.enums.ScheduleExceptionType
@@ -10,6 +11,10 @@ import java.time.LocalDate
 import java.time.LocalTime
 
 object ScheduleExceptionValidator {
+
+    fun validate(filter: ScheduleExceptionFilter) = validateAll {
+        ensureNotBefore("to", filter.to, "from", filter.from)
+    }
 
     fun validate(dto: CreateScheduleExceptionDto) = validateAll {
         scheduleException(dto.type, dto.startDate, dto.endDate, dto.startTime, dto.endTime, dto.reason)

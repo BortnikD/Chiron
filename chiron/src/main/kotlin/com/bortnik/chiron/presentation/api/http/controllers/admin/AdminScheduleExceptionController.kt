@@ -6,14 +6,18 @@ import com.bortnik.chiron.application.usecase.admin.scheduleexception.AdminDelet
 import com.bortnik.chiron.application.usecase.admin.scheduleexception.AdminGetScheduleExceptionUseCase
 import com.bortnik.chiron.application.usecase.admin.scheduleexception.AdminUpdateScheduleExceptionUseCase
 import com.bortnik.chiron.presentation.api.http.ApiResponse
+import com.bortnik.chiron.presentation.api.http.dto.request.pagination.PaginationRequest
 import com.bortnik.chiron.presentation.api.http.dto.request.scheduleexception.CreateScheduleExceptionRequest
+import com.bortnik.chiron.presentation.api.http.dto.request.scheduleexception.ScheduleExceptionFilterRequest
 import com.bortnik.chiron.presentation.api.http.dto.request.scheduleexception.UpdateScheduleExceptionRequest
+import com.bortnik.chiron.presentation.api.http.dto.response.PageResponse
 import com.bortnik.chiron.presentation.api.http.dto.response.ScheduleExceptionResponse
 import com.bortnik.chiron.presentation.api.http.mappers.toDto
 import com.bortnik.chiron.presentation.api.http.mappers.toResponse
 import io.swagger.v3.oas.annotations.Operation
 import io.swagger.v3.oas.annotations.tags.Tag
 import jakarta.validation.Valid
+import org.springdoc.core.annotations.ParameterObject
 import org.springframework.http.ResponseEntity
 import org.springframework.security.core.annotation.AuthenticationPrincipal
 import org.springframework.web.bind.annotation.DeleteMapping
@@ -43,6 +47,21 @@ class AdminScheduleExceptionController(
     private val updateScheduleExceptionUseCase: AdminUpdateScheduleExceptionUseCase,
     private val deleteScheduleExceptionUseCase: AdminDeleteScheduleExceptionUseCase,
 ) {
+    @Operation(
+        summary = "List schedule exceptions",
+        description = "All filters are optional and combined with AND. Sorted by start date ascending.",
+    )
+    @GetMapping
+    fun findAll(
+        @AuthenticationPrincipal actor: Actor,
+        @Valid @ParameterObject filter: ScheduleExceptionFilterRequest,
+        @Valid @ParameterObject pagination: PaginationRequest,
+    ): ApiResponse<PageResponse<ScheduleExceptionResponse>> =
+        ApiResponse.success(
+            getScheduleExceptionUseCase.findAll(actor, filter.toDto(), pagination.toDto())
+                .toResponse { it.toResponse() },
+        )
+
     @Operation(summary = "Get schedule exception by id")
     @GetMapping("/{id}")
     fun findById(

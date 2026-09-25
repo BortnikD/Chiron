@@ -6,14 +6,18 @@ import com.bortnik.chiron.application.usecase.admin.vaccination.AdminDeleteVacci
 import com.bortnik.chiron.application.usecase.admin.vaccination.AdminGetVaccinationUseCase
 import com.bortnik.chiron.application.usecase.admin.vaccination.AdminUpdateVaccinationUseCase
 import com.bortnik.chiron.presentation.api.http.ApiResponse
+import com.bortnik.chiron.presentation.api.http.dto.request.pagination.PaginationRequest
 import com.bortnik.chiron.presentation.api.http.dto.request.vaccination.CreateVaccinationRequest
 import com.bortnik.chiron.presentation.api.http.dto.request.vaccination.UpdateVaccinationRequest
+import com.bortnik.chiron.presentation.api.http.dto.request.vaccination.VaccinationFilterRequest
+import com.bortnik.chiron.presentation.api.http.dto.response.PageResponse
 import com.bortnik.chiron.presentation.api.http.dto.response.VaccinationResponse
 import com.bortnik.chiron.presentation.api.http.mappers.toDto
 import com.bortnik.chiron.presentation.api.http.mappers.toResponse
 import io.swagger.v3.oas.annotations.Operation
 import io.swagger.v3.oas.annotations.tags.Tag
 import jakarta.validation.Valid
+import org.springdoc.core.annotations.ParameterObject
 import org.springframework.http.ResponseEntity
 import org.springframework.security.core.annotation.AuthenticationPrincipal
 import org.springframework.web.bind.annotation.DeleteMapping
@@ -23,7 +27,6 @@ import org.springframework.web.bind.annotation.PathVariable
 import org.springframework.web.bind.annotation.PostMapping
 import org.springframework.web.bind.annotation.RequestBody
 import org.springframework.web.bind.annotation.RequestMapping
-import org.springframework.web.bind.annotation.RequestParam
 import org.springframework.web.bind.annotation.RestController
 import java.util.UUID
 
@@ -36,13 +39,22 @@ class AdminVaccinationController(
     private val updateVaccinationUseCase: AdminUpdateVaccinationUseCase,
     private val deleteVaccinationUseCase: AdminDeleteVaccinationUseCase,
 ) {
-    @Operation(summary = "List vaccinations of a pet")
+    @Operation(
+        summary = "List vaccinations",
+        description = """
+            All filters are optional and combined with AND; a nextDue bound excludes vaccinations without a next due
+            date. Sorted by administration date descending.
+        """,
+    )
     @GetMapping
-    fun findAllByPetId(
+    fun findAll(
         @AuthenticationPrincipal actor: Actor,
-        @RequestParam petId: UUID,
-    ): ApiResponse<List<VaccinationResponse>> =
-        ApiResponse.success(getVaccinationUseCase.findAllByPetId(actor, petId).map { it.toResponse() })
+        @Valid @ParameterObject filter: VaccinationFilterRequest,
+        @Valid @ParameterObject pagination: PaginationRequest,
+    ): ApiResponse<PageResponse<VaccinationResponse>> =
+        ApiResponse.success(
+            getVaccinationUseCase.findAll(actor, filter.toDto(), pagination.toDto()).toResponse { it.toResponse() },
+        )
 
     @Operation(summary = "Get vaccination by id")
     @GetMapping("/{id}")

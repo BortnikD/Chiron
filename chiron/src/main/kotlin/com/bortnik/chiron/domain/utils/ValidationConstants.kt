@@ -9,6 +9,8 @@ object ValidationConstants {
 
     const val MINUTES_PER_DAY = 24 * 60
 
+    const val SEARCH_MAX_LENGTH = 100
+
     object UserRules {
         const val EMAIL_MAX_LENGTH = 254
         const val NAME_MAX_LENGTH = 100
@@ -75,5 +77,11 @@ object ValidationConstants {
 
     object VaccinationRules {
         const val NAME_MAX_LENGTH = 150
+    }
+
+    object PaginationRules {
+        const val DEFAULT_SIZE = 20
+        const val SIZE_MIN = 1
+        const val SIZE_MAX = 100
     }
 }

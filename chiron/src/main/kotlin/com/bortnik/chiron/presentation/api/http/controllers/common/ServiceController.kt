@@ -1,6 +1,7 @@
 package com.bortnik.chiron.presentation.api.http.controllers.common
 
 import com.bortnik.chiron.application.usecase.common.service.GetServiceUseCase
+import com.bortnik.chiron.domain.dto.service.ServiceFilter
 import com.bortnik.chiron.presentation.api.http.ApiResponse
 import com.bortnik.chiron.presentation.api.http.dto.response.ServiceResponse
 import com.bortnik.chiron.presentation.api.http.mappers.toResponse
@@ -19,16 +20,16 @@ import java.util.UUID
 @Tag(name = "Services")
 class ServiceController(private val getServiceUseCase: GetServiceUseCase) {
 
-    @Operation(summary = "List services")
+    @Operation(summary = "List active services")
     @GetMapping
     fun findAll(
         @Parameter(description = "Return only services of this specialization")
         @RequestParam(required = false) specializationId: UUID?,
+        @Parameter(description = "Return only services offered for this species")
+        @RequestParam(required = false) speciesId: UUID?,
     ): ApiResponse<List<ServiceResponse>> {
-        val services = specializationId
-            ?.let { getServiceUseCase.findAllBySpecializationId(it) }
-            ?: getServiceUseCase.findAll()
-        return ApiResponse.success(services.map { it.toResponse() })
+        val filter = ServiceFilter(specializationId = specializationId, speciesId = speciesId)
+        return ApiResponse.success(getServiceUseCase.findAllActive(filter).map { it.toResponse() })
     }
 
     @Operation(summary = "Get service by id")

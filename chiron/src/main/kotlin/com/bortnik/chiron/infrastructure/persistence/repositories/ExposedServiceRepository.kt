@@ -1,18 +1,24 @@
 package com.bortnik.chiron.infrastructure.persistence.repositories
 
 import com.bortnik.chiron.domain.dto.service.CreateServiceDto
+import com.bortnik.chiron.domain.dto.service.ServiceFilter
 import com.bortnik.chiron.domain.dto.service.UpdateServiceDto
 import com.bortnik.chiron.domain.entities.Service
 import com.bortnik.chiron.domain.repositories.ServiceRepository
 import com.bortnik.chiron.infrastructure.persistence.exposedSql
 import com.bortnik.chiron.infrastructure.persistence.mappers.toDbDecimal
 import com.bortnik.chiron.infrastructure.persistence.mappers.toService
+import com.bortnik.chiron.infrastructure.persistence.models.ExposedServiceSpeciesTable
 import com.bortnik.chiron.infrastructure.persistence.models.ExposedServiceTable
+import org.jetbrains.exposed.v1.core.Op
 import org.jetbrains.exposed.v1.core.SortOrder
+import org.jetbrains.exposed.v1.core.andIfNotNull
 import org.jetbrains.exposed.v1.core.eq
+import org.jetbrains.exposed.v1.core.inSubQuery
 import org.jetbrains.exposed.v1.javatime.CurrentTimestampWithTimeZone
 import org.jetbrains.exposed.v1.jdbc.deleteWhere
 import org.jetbrains.exposed.v1.jdbc.insertReturning
+import org.jetbrains.exposed.v1.jdbc.select
 import org.jetbrains.exposed.v1.jdbc.selectAll
 import org.jetbrains.exposed.v1.jdbc.updateReturning
 import org.springframework.stereotype.Repository
@@ -42,16 +48,10 @@ class ExposedServiceRepository : ServiceRepository {
             ?.toService()
     }
 
-    override fun findAllBySpecializationId(specializationId: UUID): List<Service> = exposedSql {
+    override fun findAll(filter: ServiceFilter): List<Service> = exposedSql {
         ExposedServiceTable.selectAll()
-            .where { ExposedServiceTable.specializationId eq specializationId }
-            .orderBy(ExposedServiceTable.name, SortOrder.ASC)
-            .map { it.toService() }
-    }
-
-    override fun findAll(): List<Service> = exposedSql {
-        ExposedServiceTable.selectAll()
-            .orderBy(ExposedServiceTable.name, SortOrder.ASC)
+            .where { filter.toCondition() }
+            .orderBy(ExposedServiceTable.name to SortOrder.ASC, ExposedServiceTable.id to SortOrder.ASC)
             .map { it.toService() }
     }
 
@@ -73,4 +73,15 @@ class ExposedServiceRepository : ServiceRepository {
     override fun deleteById(id: UUID): Boolean = exposedSql {
         ExposedServiceTable.deleteWhere { ExposedServiceTable.id eq id } > 0
     }
+
+    private fun ServiceFilter.toCondition(): Op<Boolean> = Op.TRUE
+        .andIfNotNull(specializationId?.let { ExposedServiceTable.specializationId eq it })
+        .andIfNotNull(
+            speciesId?.let {
+                ExposedServiceTable.id inSubQuery
+                    ExposedServiceSpeciesTable.select(ExposedServiceSpeciesTable.serviceId)
+                        .where { ExposedServiceSpeciesTable.speciesId eq it }
+            },
+        )
+        .andIfNotNull(isActive?.let { ExposedServiceTable.isActive eq it })
 }

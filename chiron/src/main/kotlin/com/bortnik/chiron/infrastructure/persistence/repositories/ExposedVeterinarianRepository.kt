@@ -3,16 +3,22 @@ package com.bortnik.chiron.infrastructure.persistence.repositories
 import com.bortnik.chiron.domain.dto.ifPresent
 import com.bortnik.chiron.domain.dto.veterinarian.CreateVeterinarianDto
 import com.bortnik.chiron.domain.dto.veterinarian.UpdateVeterinarianDto
+import com.bortnik.chiron.domain.dto.veterinarian.VeterinarianFilter
 import com.bortnik.chiron.domain.entities.Veterinarian
 import com.bortnik.chiron.domain.repositories.VeterinarianRepository
 import com.bortnik.chiron.infrastructure.persistence.exposedSql
 import com.bortnik.chiron.infrastructure.persistence.mappers.toVeterinarian
+import com.bortnik.chiron.infrastructure.persistence.models.ExposedVeterinarianSpeciesPermissionTable
 import com.bortnik.chiron.infrastructure.persistence.models.ExposedVeterinarianTable
+import org.jetbrains.exposed.v1.core.Op
 import org.jetbrains.exposed.v1.core.SortOrder
+import org.jetbrains.exposed.v1.core.andIfNotNull
 import org.jetbrains.exposed.v1.core.eq
+import org.jetbrains.exposed.v1.core.inSubQuery
 import org.jetbrains.exposed.v1.javatime.CurrentTimestampWithTimeZone
 import org.jetbrains.exposed.v1.jdbc.deleteWhere
 import org.jetbrains.exposed.v1.jdbc.insertReturning
+import org.jetbrains.exposed.v1.jdbc.select
 import org.jetbrains.exposed.v1.jdbc.selectAll
 import org.jetbrains.exposed.v1.jdbc.updateReturning
 import org.springframework.stereotype.Repository
@@ -48,9 +54,10 @@ class ExposedVeterinarianRepository : VeterinarianRepository {
             ?.toVeterinarian()
     }
 
-    override fun findAll(): List<Veterinarian> = exposedSql {
+    override fun findAll(filter: VeterinarianFilter): List<Veterinarian> = exposedSql {
         ExposedVeterinarianTable.selectAll()
-            .orderBy(ExposedVeterinarianTable.createdAt, SortOrder.ASC)
+            .where { filter.toCondition() }
+            .orderBy(ExposedVeterinarianTable.createdAt to SortOrder.ASC, ExposedVeterinarianTable.id to SortOrder.ASC)
             .map { it.toVeterinarian() }
     }
 
@@ -70,4 +77,16 @@ class ExposedVeterinarianRepository : VeterinarianRepository {
     override fun deleteById(id: UUID): Boolean = exposedSql {
         ExposedVeterinarianTable.deleteWhere { ExposedVeterinarianTable.id eq id } > 0
     }
+
+    private fun VeterinarianFilter.toCondition(): Op<Boolean> = Op.TRUE
+        .andIfNotNull(specializationId?.let { ExposedVeterinarianTable.specializationId eq it })
+        .andIfNotNull(
+            speciesId?.let {
+                ExposedVeterinarianTable.id inSubQuery
+                    ExposedVeterinarianSpeciesPermissionTable.select(
+                        ExposedVeterinarianSpeciesPermissionTable.veterinarianId,
+                    ).where { ExposedVeterinarianSpeciesPermissionTable.speciesId eq it }
+            },
+        )
+        .andIfNotNull(isActive?.let { ExposedVeterinarianTable.isActive eq it })
 }
