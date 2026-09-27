@@ -84,13 +84,11 @@ class ExposedUserRepository : UserRepository {
         if (dto == UpdateUserDto()) return@exposedSql findById(id)
         ExposedUserTable.updateReturning(where = { ExposedUserTable.id eq id }) {
             dto.email?.let { value -> it[email] = value }
-            dto.passwordHash?.let { value -> it[passwordHash] = value }
             dto.firstName?.let { value -> it[firstName] = value }
             dto.middleName.ifPresent { value -> it[middleName] = value }
             dto.lastName?.let { value -> it[lastName] = value }
             dto.fullName?.let { value -> it[fullName] = value }
             dto.phone?.let { value -> it[phone] = value }
-            dto.role?.let { value -> it[role] = value }
             it[updatedAt] = CurrentTimestampWithTimeZone
         }.singleOrNull()?.toUser()
     }
@@ -104,6 +102,8 @@ class ExposedUserRepository : UserRepository {
         .andIfNotNull(
             search?.let {
                 ExposedUserTable.fullName.containsIgnoreCase(it) or
+                    ExposedUserTable.firstName.containsIgnoreCase(it) or
+                    ExposedUserTable.middleName.containsIgnoreCase(it) or
                     ExposedUserTable.email.containsIgnoreCase(it) or
                     ExposedUserTable.phone.containsIgnoreCase(it)
             },

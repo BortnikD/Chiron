@@ -3,7 +3,7 @@ package com.bortnik.chiron.domain.utils.validators
 import com.bortnik.chiron.domain.dto.orElse
 import com.bortnik.chiron.domain.dto.user.CreateUserDto
 import com.bortnik.chiron.domain.dto.user.RegisterUserDto
-import com.bortnik.chiron.domain.dto.user.UpdateUserDto
+import com.bortnik.chiron.domain.dto.user.UpdateProfileDto
 import com.bortnik.chiron.domain.dto.user.UserFilter
 import com.bortnik.chiron.domain.utils.ValidationConstants.SEARCH_MAX_LENGTH
 import com.bortnik.chiron.domain.utils.ValidationConstants.UserRules
@@ -29,15 +29,15 @@ object UserValidator {
     }
 
     // Only the fields present in the partial update are checked.
-    fun validate(dto: UpdateUserDto) = validateAll {
+    fun validate(dto: UpdateProfileDto) = validateAll {
         user(
-            dto.email,
-            dto.passwordHash,
-            dto.firstName,
-            dto.middleName.orElse(null),
-            dto.lastName,
-            dto.fullName,
-            dto.phone,
+            email = dto.email,
+            passwordHash = null,
+            firstName = dto.firstName,
+            middleName = dto.middleName.orElse(null),
+            lastName = dto.lastName,
+            fullName = null,
+            phone = dto.phone,
         )
     }
 

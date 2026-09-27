@@ -27,7 +27,7 @@ fun <T> Query.toPage(
 }
 
 // Case-insensitive substring match; % and _ in the text are matched literally.
-fun Expression<String>.containsIgnoreCase(text: String): Op<Boolean> {
+fun <T : String?> Expression<T>.containsIgnoreCase(text: String): Op<Boolean> {
     val literal = LikePattern.ofLiteral(text.lowercase())
     return lowerCase() like LikePattern("%${literal.pattern}%", literal.escapeChar)
 }

@@ -1,8 +1,6 @@
 package com.bortnik.chiron.presentation.api.http.controllers.auth
 
-import com.bortnik.chiron.application.security.Actor
 import com.bortnik.chiron.application.usecase.common.auth.AuthenticateUserUseCase
-import com.bortnik.chiron.application.usecase.common.user.GetUserUseCase
 import com.bortnik.chiron.application.usecase.common.user.RegisterUserUseCase
 import com.bortnik.chiron.domain.entities.User
 import com.bortnik.chiron.infrastructure.security.jwt.JwtTokenProvider
@@ -10,15 +8,12 @@ import com.bortnik.chiron.presentation.api.http.ApiResponse
 import com.bortnik.chiron.presentation.api.http.dto.request.auth.LoginRequest
 import com.bortnik.chiron.presentation.api.http.dto.request.auth.RegisterRequest
 import com.bortnik.chiron.presentation.api.http.dto.response.AuthResponse
-import com.bortnik.chiron.presentation.api.http.dto.response.UserResponse
 import com.bortnik.chiron.presentation.api.http.mappers.toDto
 import com.bortnik.chiron.presentation.api.http.mappers.toResponse
 import io.swagger.v3.oas.annotations.Operation
 import io.swagger.v3.oas.annotations.tags.Tag
 import jakarta.validation.Valid
 import org.springframework.http.ResponseEntity
-import org.springframework.security.core.annotation.AuthenticationPrincipal
-import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PostMapping
 import org.springframework.web.bind.annotation.RequestBody
 import org.springframework.web.bind.annotation.RequestMapping
@@ -36,7 +31,6 @@ import org.springframework.web.bind.annotation.RestController
 class AuthController(
     private val registerUserUseCase: RegisterUserUseCase,
     private val authenticateUserUseCase: AuthenticateUserUseCase,
-    private val getUserUseCase: GetUserUseCase,
     private val jwtTokenProvider: JwtTokenProvider,
 ) {
     @Operation(
@@ -51,11 +45,6 @@ class AuthController(
     @PostMapping("/login")
     fun login(@Valid @RequestBody request: LoginRequest): ApiResponse<AuthResponse> =
         ApiResponse.success(authenticateUserUseCase.authenticate(request.email, request.password).toAuthResponse())
-
-    @Operation(summary = "Get current user")
-    @GetMapping("/me")
-    fun me(@AuthenticationPrincipal actor: Actor): ApiResponse<UserResponse> =
-        ApiResponse.success(getUserUseCase.findById(actor.userId).toResponse())
 
     private fun User.toAuthResponse(): AuthResponse =
         AuthResponse(accessToken = jwtTokenProvider.generate(this), user = toResponse())

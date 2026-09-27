@@ -3,6 +3,7 @@ package com.bortnik.chiron.application.usecase.common.user
 import com.bortnik.chiron.domain.dto.user.CreateUserDto
 import com.bortnik.chiron.domain.dto.user.RegisterUserDto
 import com.bortnik.chiron.domain.entities.User
+import com.bortnik.chiron.domain.utils.FullNameFormatter
 import com.bortnik.chiron.domain.utils.validators.UserValidator
 import org.slf4j.LoggerFactory
 import org.springframework.security.crypto.password.PasswordEncoder
@@ -27,7 +28,7 @@ class RegisterUserUseCase(
                 firstName = dto.firstName,
                 middleName = dto.middleName,
                 lastName = dto.lastName,
-                fullName = listOfNotNull(dto.lastName, dto.firstName, dto.middleName).joinToString(" "),
+                fullName = FullNameFormatter.format(dto.firstName, dto.middleName, dto.lastName),
                 phone = dto.phone,
                 role = dto.role,
             ),

@@ -4,9 +4,11 @@ import com.bortnik.chiron.application.security.Actor
 import com.bortnik.chiron.application.usecase.admin.user.AdminCreateUserUseCase
 import com.bortnik.chiron.application.usecase.admin.user.AdminDeleteUserUseCase
 import com.bortnik.chiron.application.usecase.admin.user.AdminGetUserUseCase
+import com.bortnik.chiron.application.usecase.admin.user.AdminUpdateUserUseCase
 import com.bortnik.chiron.presentation.api.http.ApiResponse
 import com.bortnik.chiron.presentation.api.http.dto.request.pagination.PaginationRequest
 import com.bortnik.chiron.presentation.api.http.dto.request.user.CreateUserRequest
+import com.bortnik.chiron.presentation.api.http.dto.request.user.UpdateUserRequest
 import com.bortnik.chiron.presentation.api.http.dto.request.user.UserFilterRequest
 import com.bortnik.chiron.presentation.api.http.dto.response.PageResponse
 import com.bortnik.chiron.presentation.api.http.dto.response.UserResponse
@@ -20,6 +22,7 @@ import org.springframework.http.ResponseEntity
 import org.springframework.security.core.annotation.AuthenticationPrincipal
 import org.springframework.web.bind.annotation.DeleteMapping
 import org.springframework.web.bind.annotation.GetMapping
+import org.springframework.web.bind.annotation.PatchMapping
 import org.springframework.web.bind.annotation.PathVariable
 import org.springframework.web.bind.annotation.PostMapping
 import org.springframework.web.bind.annotation.RequestBody
@@ -33,6 +36,7 @@ import java.util.UUID
 class AdminUserController(
     private val createUserUseCase: AdminCreateUserUseCase,
     private val getUserUseCase: AdminGetUserUseCase,
+    private val updateUserUseCase: AdminUpdateUserUseCase,
     private val deleteUserUseCase: AdminDeleteUserUseCase,
 ) {
     @Operation(
@@ -63,6 +67,18 @@ class AdminUserController(
         @Valid @RequestBody request: CreateUserRequest,
     ): ResponseEntity<ApiResponse<UserResponse>> =
         ApiResponse.created(createUserUseCase.create(actor, request.toDto()).toResponse())
+
+    @Operation(
+        summary = "Update user",
+        description = "Personal data of any user. fullName is rebuilt by the server as \"I. M. Lastname\".",
+    )
+    @PatchMapping("/{id}")
+    fun update(
+        @AuthenticationPrincipal actor: Actor,
+        @PathVariable id: UUID,
+        @Valid @RequestBody request: UpdateUserRequest,
+    ): ApiResponse<UserResponse> =
+        ApiResponse.success(updateUserUseCase.update(actor, id, request.toDto()).toResponse())
 
     @Operation(summary = "Delete user")
     @DeleteMapping("/{id}")
