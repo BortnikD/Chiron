@@ -86,6 +86,7 @@ class SecurityConfig {
             "/api/v1/work-schedules",
             "/api/v1/schedule-exceptions",
             "/api/v1/appointments/availability",
+            "/api/v1/appointments/slots",
         )
     }
 }

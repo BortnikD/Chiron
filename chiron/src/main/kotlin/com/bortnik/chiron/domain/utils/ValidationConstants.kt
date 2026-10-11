@@ -73,6 +73,8 @@ object ValidationConstants {
         const val VET_NOTES_MAX_LENGTH = 4000
         const val CANCEL_REASON_MAX_LENGTH = 1000
         const val MAX_DURATION_MINUTES = MINUTES_PER_DAY
+        // Bounds the work of a single slot search, which walks every grid step of every veterinarian.
+        const val SLOT_SEARCH_MAX_DAYS = 14
     }
 
     object VaccinationRules {

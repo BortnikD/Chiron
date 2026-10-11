@@ -1,6 +1,7 @@
 package com.bortnik.chiron.presentation.api.http.mappers
 
 import com.bortnik.chiron.domain.dto.appointment.AppointmentFilter
+import com.bortnik.chiron.domain.dto.appointment.AvailableSlot
 import com.bortnik.chiron.domain.dto.appointment.BookAppointmentDto
 import com.bortnik.chiron.domain.dto.appointment.ClientAppointmentFilter
 import com.bortnik.chiron.domain.dto.appointment.CreateAppointmentDto
@@ -18,6 +19,7 @@ import com.bortnik.chiron.presentation.api.http.dto.request.appointment.Veterina
 import com.bortnik.chiron.presentation.api.http.dto.request.appointment.VeterinarianCreateFollowUpRequest
 import com.bortnik.chiron.presentation.api.http.dto.request.appointment.VeterinarianUpdateAppointmentRequest
 import com.bortnik.chiron.presentation.api.http.dto.response.AppointmentResponse
+import com.bortnik.chiron.presentation.api.http.dto.response.AvailableSlotResponse
 
 fun Appointment.toResponse(): AppointmentResponse = AppointmentResponse(
     id = id,
@@ -36,6 +38,12 @@ fun Appointment.toResponse(): AppointmentResponse = AppointmentResponse(
     cancelReason = cancelReason,
     createdAt = createdAt,
     updatedAt = updatedAt,
+)
+
+fun AvailableSlot.toResponse(): AvailableSlotResponse = AvailableSlotResponse(
+    startAt = startAt,
+    endAt = endAt,
+    veterinarianIds = veterinarianIds,
 )
 
 fun CreateAppointmentRequest.toDto(): CreateAppointmentDto = CreateAppointmentDto(

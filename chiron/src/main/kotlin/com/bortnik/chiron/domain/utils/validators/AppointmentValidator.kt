@@ -1,6 +1,7 @@
 package com.bortnik.chiron.domain.utils.validators
 
 import com.bortnik.chiron.domain.dto.appointment.AppointmentFilter
+import com.bortnik.chiron.domain.dto.appointment.AvailableSlotFilter
 import com.bortnik.chiron.domain.dto.appointment.CreateAppointmentDto
 import com.bortnik.chiron.domain.dto.appointment.UpdateAppointmentDto
 import com.bortnik.chiron.domain.dto.orElse
@@ -11,6 +12,7 @@ import com.bortnik.chiron.domain.utils.ValidationConstants.MONEY_MAX
 import com.bortnik.chiron.domain.utils.ValidationConstants.MONEY_MIN
 import java.time.Duration
 import java.time.Instant
+import java.time.temporal.ChronoUnit
 
 object AppointmentValidator {
 
@@ -43,6 +45,15 @@ object AppointmentValidator {
 
     fun validate(filter: AppointmentFilter) = validateAll {
         ensureAfter("to", filter.to, "from", filter.from)
+    }
+
+    fun validate(filter: AvailableSlotFilter) = validateAll {
+        ensureNotBefore("to", filter.to, "from", filter.from)
+        ensure(
+            ChronoUnit.DAYS.between(filter.from, filter.to) < AppointmentRules.SLOT_SEARCH_MAX_DAYS,
+            "to",
+            "period must not be longer than ${AppointmentRules.SLOT_SEARCH_MAX_DAYS} days",
+        )
     }
 
     private fun ValidationErrorCollector.timeRange(startAt: Instant, endAt: Instant) {
