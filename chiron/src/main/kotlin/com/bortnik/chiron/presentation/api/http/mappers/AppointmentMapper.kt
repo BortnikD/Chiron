@@ -4,6 +4,7 @@ import com.bortnik.chiron.domain.dto.appointment.AppointmentFilter
 import com.bortnik.chiron.domain.dto.appointment.BookAppointmentDto
 import com.bortnik.chiron.domain.dto.appointment.ClientAppointmentFilter
 import com.bortnik.chiron.domain.dto.appointment.CreateAppointmentDto
+import com.bortnik.chiron.domain.dto.appointment.ScheduleFollowUpDto
 import com.bortnik.chiron.domain.dto.appointment.UpdateAppointmentDto
 import com.bortnik.chiron.domain.dto.appointment.UpdateAppointmentStatusDto
 import com.bortnik.chiron.domain.dto.appointment.VeterinarianAppointmentFilter
@@ -14,6 +15,7 @@ import com.bortnik.chiron.presentation.api.http.dto.request.appointment.ClientCr
 import com.bortnik.chiron.presentation.api.http.dto.request.appointment.CreateAppointmentRequest
 import com.bortnik.chiron.presentation.api.http.dto.request.appointment.UpdateAppointmentRequest
 import com.bortnik.chiron.presentation.api.http.dto.request.appointment.VeterinarianAppointmentFilterRequest
+import com.bortnik.chiron.presentation.api.http.dto.request.appointment.VeterinarianCreateFollowUpRequest
 import com.bortnik.chiron.presentation.api.http.dto.request.appointment.VeterinarianUpdateAppointmentRequest
 import com.bortnik.chiron.presentation.api.http.dto.response.AppointmentResponse
 
@@ -73,6 +75,12 @@ fun VeterinarianUpdateAppointmentRequest.toDto(): UpdateAppointmentStatusDto = U
     status = status,
     vetNotes = vetNotes.toPatch(),
     cancelReason = cancelReason,
+)
+
+fun VeterinarianCreateFollowUpRequest.toDto(): ScheduleFollowUpDto = ScheduleFollowUpDto(
+    serviceId = serviceId,
+    startAt = startAt,
+    endAt = endAt,
 )
 
 fun AppointmentFilterRequest.toDto(): AppointmentFilter = AppointmentFilter(

@@ -2,9 +2,11 @@ package com.bortnik.chiron.presentation.api.http.controllers.veterinarian
 
 import com.bortnik.chiron.application.security.Actor
 import com.bortnik.chiron.application.usecase.veterinarian.appointment.VeterinarianGetAppointmentUseCase
+import com.bortnik.chiron.application.usecase.veterinarian.appointment.VeterinarianScheduleFollowUpUseCase
 import com.bortnik.chiron.application.usecase.veterinarian.appointment.VeterinarianUpdateAppointmentStatusUseCase
 import com.bortnik.chiron.presentation.api.http.ApiResponse
 import com.bortnik.chiron.presentation.api.http.dto.request.appointment.VeterinarianAppointmentFilterRequest
+import com.bortnik.chiron.presentation.api.http.dto.request.appointment.VeterinarianCreateFollowUpRequest
 import com.bortnik.chiron.presentation.api.http.dto.request.appointment.VeterinarianUpdateAppointmentRequest
 import com.bortnik.chiron.presentation.api.http.dto.request.pagination.PaginationRequest
 import com.bortnik.chiron.presentation.api.http.dto.response.AppointmentResponse
@@ -15,10 +17,12 @@ import io.swagger.v3.oas.annotations.Operation
 import io.swagger.v3.oas.annotations.tags.Tag
 import jakarta.validation.Valid
 import org.springdoc.core.annotations.ParameterObject
+import org.springframework.http.ResponseEntity
 import org.springframework.security.core.annotation.AuthenticationPrincipal
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PatchMapping
 import org.springframework.web.bind.annotation.PathVariable
+import org.springframework.web.bind.annotation.PostMapping
 import org.springframework.web.bind.annotation.RequestBody
 import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.RestController
@@ -30,6 +34,7 @@ import java.util.UUID
 class VeterinarianAppointmentController(
     private val getAppointmentUseCase: VeterinarianGetAppointmentUseCase,
     private val updateAppointmentStatusUseCase: VeterinarianUpdateAppointmentStatusUseCase,
+    private val scheduleFollowUpUseCase: VeterinarianScheduleFollowUpUseCase,
 ) {
     @Operation(
         summary = "List own appointments",
@@ -70,4 +75,22 @@ class VeterinarianAppointmentController(
         @Valid @RequestBody request: VeterinarianUpdateAppointmentRequest,
     ): ApiResponse<AppointmentResponse> =
         ApiResponse.success(updateAppointmentStatusUseCase.update(actor, id, request.toDto()).toResponse())
+
+    @Operation(
+        summary = "Schedule follow-up of own appointment",
+        description = """
+            Creates a CONFIRMED appointment with the current veterinarian for the same pet, linked to the original one
+            via followUpOf. The original appointment must be CONFIRMED or COMPLETED, and the follow-up must start
+            after it ends. serviceId defaults to the service of the original appointment. The price is taken from
+            the service, using the species-specific override when one exists. The pet must not be archived,
+            the service must be active and available for the species, and the slot must be available.
+        """,
+    )
+    @PostMapping("/{id}/follow-ups")
+    fun scheduleFollowUp(
+        @AuthenticationPrincipal actor: Actor,
+        @PathVariable id: UUID,
+        @Valid @RequestBody request: VeterinarianCreateFollowUpRequest,
+    ): ResponseEntity<ApiResponse<AppointmentResponse>> =
+        ApiResponse.created(scheduleFollowUpUseCase.schedule(actor, id, request.toDto()).toResponse())
 }
