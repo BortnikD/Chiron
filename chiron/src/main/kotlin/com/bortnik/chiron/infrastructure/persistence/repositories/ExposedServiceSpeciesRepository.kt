@@ -1,5 +1,6 @@
 package com.bortnik.chiron.infrastructure.persistence.repositories
 
+import com.bortnik.chiron.domain.dto.ifPresent
 import com.bortnik.chiron.domain.dto.servicespecies.UpdateServiceSpeciesDto
 import com.bortnik.chiron.domain.entities.ServiceSpecies
 import com.bortnik.chiron.domain.repositories.ServiceSpeciesRepository
@@ -45,9 +46,11 @@ class ExposedServiceSpeciesRepository : ServiceSpeciesRepository {
     }
 
     override fun update(serviceId: UUID, speciesId: UUID, dto: UpdateServiceSpeciesDto): ServiceSpecies? = exposedSql {
+        // Exposed rejects an UPDATE without columns, so an empty patch only reads the row.
+        if (dto == UpdateServiceSpeciesDto()) return@exposedSql findById(serviceId, speciesId)
         ExposedServiceSpeciesTable.updateReturning(where = { byKey(serviceId, speciesId) }) {
-            it[durationMin] = dto.durationMin
-            it[price] = dto.price?.toDbDecimal()
+            dto.durationMin.ifPresent { value -> it[durationMin] = value }
+            dto.price.ifPresent { value -> it[price] = value?.toDbDecimal() }
         }.singleOrNull()?.toServiceSpecies()
     }
 

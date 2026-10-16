@@ -1,7 +1,10 @@
 package com.bortnik.chiron.domain.repositories
 
+import com.bortnik.chiron.domain.dto.pagination.Page
+import com.bortnik.chiron.domain.dto.pagination.PageRequest
 import com.bortnik.chiron.domain.dto.vaccination.CreateVaccinationDto
 import com.bortnik.chiron.domain.dto.vaccination.UpdateVaccinationDto
+import com.bortnik.chiron.domain.dto.vaccination.VaccinationFilter
 import com.bortnik.chiron.domain.entities.Vaccination
 import java.util.UUID
 
@@ -11,6 +14,8 @@ interface VaccinationRepository {
     fun findById(id: UUID): Vaccination?
 
     fun findAllByPetId(petId: UUID): List<Vaccination>
+
+    fun findAll(filter: VaccinationFilter, pageRequest: PageRequest): Page<Vaccination>
 
     fun update(id: UUID, dto: UpdateVaccinationDto): Vaccination?
 

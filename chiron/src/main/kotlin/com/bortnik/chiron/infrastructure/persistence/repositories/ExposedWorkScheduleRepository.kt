@@ -1,5 +1,6 @@
 package com.bortnik.chiron.infrastructure.persistence.repositories
 
+import com.bortnik.chiron.domain.dto.ifPresent
 import com.bortnik.chiron.domain.dto.workschedule.CreateWorkScheduleDto
 import com.bortnik.chiron.domain.dto.workschedule.UpdateWorkScheduleDto
 import com.bortnik.chiron.domain.entities.WorkSchedule
@@ -47,11 +48,13 @@ class ExposedWorkScheduleRepository : WorkScheduleRepository {
     }
 
     override fun update(id: UUID, dto: UpdateWorkScheduleDto): WorkSchedule? = exposedSql {
+        // Exposed rejects an UPDATE without columns, so an empty patch only reads the row.
+        if (dto == UpdateWorkScheduleDto()) return@exposedSql findById(id)
         ExposedWorkScheduleTable.updateReturning(where = { ExposedWorkScheduleTable.id eq id }) {
-            it[startTime] = dto.startTime
-            it[endTime] = dto.endTime
-            it[breakStart] = dto.breakStart
-            it[breakEnd] = dto.breakEnd
+            dto.startTime?.let { value -> it[startTime] = value }
+            dto.endTime?.let { value -> it[endTime] = value }
+            dto.breakStart.ifPresent { value -> it[breakStart] = value }
+            dto.breakEnd.ifPresent { value -> it[breakEnd] = value }
         }.singleOrNull()?.toWorkSchedule()
     }
 

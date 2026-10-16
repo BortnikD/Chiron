@@ -1,10 +1,14 @@
 package com.bortnik.chiron.presentation.api.http.mappers
 
 import com.bortnik.chiron.domain.dto.veterinarian.CreateVeterinarianDto
+import com.bortnik.chiron.domain.dto.veterinarian.UpdateOwnVeterinarianDto
 import com.bortnik.chiron.domain.dto.veterinarian.UpdateVeterinarianDto
+import com.bortnik.chiron.domain.dto.veterinarian.VeterinarianFilter
 import com.bortnik.chiron.domain.entities.Veterinarian
 import com.bortnik.chiron.presentation.api.http.dto.request.veterinarian.CreateVeterinarianRequest
 import com.bortnik.chiron.presentation.api.http.dto.request.veterinarian.UpdateVeterinarianRequest
+import com.bortnik.chiron.presentation.api.http.dto.request.veterinarian.VeterinarianFilterRequest
+import com.bortnik.chiron.presentation.api.http.dto.request.veterinarian.VeterinarianUpdateProfileRequest
 import com.bortnik.chiron.presentation.api.http.dto.response.VeterinarianResponse
 
 fun Veterinarian.toResponse(): VeterinarianResponse = VeterinarianResponse(
@@ -30,8 +34,20 @@ fun CreateVeterinarianRequest.toDto(): CreateVeterinarianDto = CreateVeterinaria
 
 fun UpdateVeterinarianRequest.toDto(): UpdateVeterinarianDto = UpdateVeterinarianDto(
     specializationId = specializationId,
-    bio = bio,
-    photoUrl = photoUrl,
+    bio = bio.toPatch(),
+    photoUrl = photoUrl.toPatch(),
     experienceYears = experienceYears,
+    isActive = isActive,
+)
+
+fun VeterinarianUpdateProfileRequest.toDto(): UpdateOwnVeterinarianDto = UpdateOwnVeterinarianDto(
+    bio = bio.toPatch(),
+    photoUrl = photoUrl.toPatch(),
+    experienceYears = experienceYears,
+)
+
+fun VeterinarianFilterRequest.toDto(): VeterinarianFilter = VeterinarianFilter(
+    specializationId = specializationId,
+    speciesId = speciesId,
     isActive = isActive,
 )

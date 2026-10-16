@@ -22,6 +22,6 @@ fun CreateServiceSpeciesRequest.toDomain(serviceId: UUID): ServiceSpecies = Serv
 )
 
 fun UpdateServiceSpeciesRequest.toDto(): UpdateServiceSpeciesDto = UpdateServiceSpeciesDto(
-    durationMin = durationMin,
-    price = price,
+    durationMin = durationMin.toPatch(),
+    price = price.toPatch(),
 )

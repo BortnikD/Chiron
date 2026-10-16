@@ -9,6 +9,8 @@ object ValidationConstants {
 
     const val MINUTES_PER_DAY = 24 * 60
 
+    const val SEARCH_MAX_LENGTH = 100
+
     object UserRules {
         const val EMAIL_MAX_LENGTH = 254
         const val NAME_MAX_LENGTH = 100
@@ -19,8 +21,11 @@ object ValidationConstants {
         // Upper bounds for login input, checked before the database lookup and hashing.
         const val LOGIN_EMAIL_MAX_LENGTH = 256
         const val LOGIN_PASSWORD_MAX_LENGTH = 512
-        val EMAIL_REGEX = Regex("""^[^@\s]+@[^@\s]+\.[^@\s]+$""")
-        val PHONE_REGEX = Regex("""^\+?[0-9]{10,15}$""")
+        // Kept as strings so that presentation-layer @Pattern annotations can reuse them.
+        const val EMAIL_PATTERN = """^[^@\s]+@[^@\s]+\.[^@\s]+$"""
+        const val PHONE_PATTERN = """^\+?[0-9]{10,15}$"""
+        val EMAIL_REGEX = Regex(EMAIL_PATTERN)
+        val PHONE_REGEX = Regex(PHONE_PATTERN)
     }
 
     object PetRules {
@@ -68,9 +73,17 @@ object ValidationConstants {
         const val VET_NOTES_MAX_LENGTH = 4000
         const val CANCEL_REASON_MAX_LENGTH = 1000
         const val MAX_DURATION_MINUTES = MINUTES_PER_DAY
+        // Bounds the work of a single slot search, which walks every grid step of every veterinarian.
+        const val SLOT_SEARCH_MAX_DAYS = 14
     }
 
     object VaccinationRules {
         const val NAME_MAX_LENGTH = 150
+    }
+
+    object PaginationRules {
+        const val DEFAULT_SIZE = 20
+        const val SIZE_MIN = 1
+        const val SIZE_MAX = 100
     }
 }

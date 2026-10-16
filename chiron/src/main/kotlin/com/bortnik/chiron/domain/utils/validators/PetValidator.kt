@@ -1,21 +1,29 @@
 package com.bortnik.chiron.domain.utils.validators
 
+import com.bortnik.chiron.domain.dto.orElse
 import com.bortnik.chiron.domain.dto.pet.CreatePetDto
+import com.bortnik.chiron.domain.dto.pet.PetFilter
 import com.bortnik.chiron.domain.dto.pet.UpdatePetDto
 import com.bortnik.chiron.domain.utils.ValidationConstants.PetRules
+import com.bortnik.chiron.domain.utils.ValidationConstants.SEARCH_MAX_LENGTH
 import java.time.LocalDate
 
 object PetValidator {
+
+    fun validate(filter: PetFilter) = validateAll {
+        ensureMaxLength("name", filter.name, SEARCH_MAX_LENGTH)
+    }
 
     fun validate(dto: CreatePetDto) = validateAll {
         pet(dto.name, dto.birthDate, dto.weightKg, dto.notes)
     }
 
+    // Only the fields present in the partial update are checked.
     fun validate(dto: UpdatePetDto) = validateAll {
-        pet(dto.name, dto.birthDate, dto.weightKg, dto.notes)
+        pet(dto.name, dto.birthDate.orElse(null), dto.weightKg.orElse(null), dto.notes.orElse(null))
     }
 
-    private fun ValidationErrorCollector.pet(name: String, birthDate: LocalDate?, weightKg: Double?, notes: String?) {
+    private fun ValidationErrorCollector.pet(name: String?, birthDate: LocalDate?, weightKg: Double?, notes: String?) {
         ensureNotBlank("name", name)
         ensureMaxLength("name", name, PetRules.NAME_MAX_LENGTH)
         ensure(birthDate == null || !birthDate.isAfter(LocalDate.now()), "birthDate", "must not be in the future")

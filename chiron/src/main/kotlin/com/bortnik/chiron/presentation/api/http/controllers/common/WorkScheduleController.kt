@@ -1,6 +1,6 @@
 package com.bortnik.chiron.presentation.api.http.controllers.common
 
-import com.bortnik.chiron.application.usecase.workschedule.GetWorkScheduleUseCase
+import com.bortnik.chiron.application.usecase.common.workschedule.GetWorkScheduleUseCase
 import com.bortnik.chiron.presentation.api.http.ApiResponse
 import com.bortnik.chiron.presentation.api.http.dto.response.WorkScheduleResponse
 import com.bortnik.chiron.presentation.api.http.mappers.toResponse

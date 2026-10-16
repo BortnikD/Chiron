@@ -16,6 +16,48 @@
 
 Документация (`/scalar.html`, `/swagger-ui.html`, `/v3/api-docs`) доступна без авторизации.
 
+## Проверка состояния (health check)
+
+Эндпоинты Spring Boot Actuator. Доступны **без токена**, только `GET`. В документации они в группе `Actuator`.
+
+| Эндпоинт | Что проверяет | Когда использовать |
+|---|---|---|
+| `GET /actuator/health` | Приложение и подключение к базе данных | Общая проверка «бэкенд работает»: индикатор на фронтенде, мониторинг |
+| `GET /actuator/health/readiness` | Приложение запущено и база данных доступна | Можно ли уже отправлять запросы (используется в healthcheck Docker Compose) |
+| `GET /actuator/health/liveness` | Процесс приложения жив (базу **не** проверяет) | Нужно ли перезапускать контейнер |
+
+Ответ **не** обёрнут в `ApiResponse`. Подробности о компонентах (версия БД, место на диске и т. п.) не
+отдаются, только итоговый статус:
+
+```json
+{ "status": "UP" }
+```
+
+| HTTP-статус | `status` | Значение |
+|---|---|---|
+| `200` | `UP` | Всё работает |
+| `503` | `DOWN` / `OUT_OF_SERVICE` | Бэкенд запущен, но не готов, например недоступна база данных |
+| нет ответа / сетевая ошибка | — | Бэкенд не запущен или недоступен по сети |
+
+Пример проверки на фронтенде:
+
+```ts
+export async function isBackendHealthy(): Promise<boolean> {
+  try {
+    const response = await fetch("http://localhost:8080/actuator/health", {
+      signal: AbortSignal.timeout(3000),
+    });
+    // 503 comes with a JSON body too, so checking response.ok is enough.
+    return response.ok;
+  } catch {
+    // Network error or timeout: the backend is not reachable.
+    return false;
+  }
+}
+```
+
+CORS для этих эндпоинтов настроен так же, как для остального API (origin'ы из `cors.allowed-origins`).
+
 ## Авторизация
 
 API использует JWT-токен. Токен один и живёт 30 дней, refresh-токена нет.
@@ -27,7 +69,8 @@ API использует JWT-токен. Токен один и живёт 30 д
 3. Передавайте его в заголовке `Authorization: Bearer <token>`.
    - В Scalar: блок **Authentication** → `bearerAuth` → вставить токен.
    - В Swagger UI: кнопка **Authorize** → вставить токен (без слова `Bearer`).
-4. `GET /api/v1/auth/me` — проверить, под кем вы авторизованы.
+4. `GET /api/v1/users/me` — проверить, под кем вы авторизованы; `PATCH /api/v1/users/me` — изменить свои данные
+   (имя, отчество, фамилию, email, телефон). `fullName` сервер собирает сам в формате `И. О. Фамилия`.
 
 Первый администратор создаётся при старте приложения из переменных `ADMIN_*` в файле `chiron/.env`
 (шаблон — `chiron/.env.example`). Ветеринаров и других администраторов создаёт администратор через
@@ -40,10 +83,11 @@ API использует JWT-токен. Токен один и живёт 30 д
 
 | Префикс | Доступ | Группы в документации | Что внутри |
 |---|---|---|---|
-| `/api/v1/auth` | регистрация и вход — всем, `/me` — с токеном | `Auth` | Регистрация, вход, текущий пользователь |
+| `/api/v1/auth` | всем | `Auth` | Регистрация и вход |
+| `/api/v1/users/me` | любая роль, с токеном | `Users` | Просмотр и изменение своих данных |
 | `/api/v1/...` (GET) | всем, без токена | `Species`, `Specializations`, `Services`, `Service species`, `Veterinarians`, `Veterinarian species permissions`, `Work schedules`, `Schedule exceptions`, `Appointments` | Справочники клиники: виды животных, специализации, услуги и их цены по видам, врачи и какие виды они лечат, расписание врачей, проверка свободного слота |
 | `/api/v1/client/...` | `CLIENT` | `Client: Pets`, `Client: Appointments`, `Client: Vaccinations` | Свои питомцы; запись на приём, список и отмена своих записей; прививки своих питомцев |
-| `/api/v1/veterinarian/...` | `VETERINARIAN` | `Veterinarian: Profile`, `Veterinarian: Appointments`, `Veterinarian: Pets`, `Veterinarian: Vaccinations` | Свой профиль; свои записи — смена статуса и заметки врача; пациенты (питомцы, у которых была запись к этому врачу) и их прививки |
+| `/api/v1/veterinarian/...` | `VETERINARIAN` | `Veterinarian: Profile`, `Veterinarian: Appointments`, `Veterinarian: Pets`, `Veterinarian: Vaccinations` | Свой профиль врача (просмотр, изменение описания, фото и стажа); свои записи — смена статуса, заметки врача и назначение повторного приёма; пациенты (питомцы, у которых была запись к этому врачу) и их прививки |
 | `/api/v1/admin/...` | `ADMIN` | `Admin: *` | Полное управление: пользователи, питомцы, записи, прививки, врачи и их допуски к видам, расписания и исключения из расписания, справочники |
 
 Клиент и ветеринар видят только свои данные. Попытка обратиться к чужому ресурсу возвращает `403`.
@@ -57,7 +101,14 @@ API использует JWT-токен. Токен один и живёт 30 д
    расписание врача.
 4. `GET /api/v1/appointments/availability` — проверить, свободен ли слот.
 5. `POST /api/v1/client/appointments` — записаться. Запись создаётся в статусе `PENDING`, цену считает сервер.
-6. Врач подтверждает и завершает приём через `PUT /api/v1/veterinarian/appointments/{id}`.
+6. Врач подтверждает и завершает приём через `PATCH /api/v1/veterinarian/appointments/{id}`.
+7. При необходимости врач назначает повторный приём через `POST /api/v1/veterinarian/appointments/{id}/follow-ups`
+   (тело: `startAt`, `endAt` и необязательный `serviceId` — по умолчанию услуга исходного приёма). Повторный приём
+   создаётся к этому же врачу для того же питомца сразу в статусе `CONFIRMED`, ссылается на исходный через
+   `followUpOf`, цену считает сервер. Исходный приём должен быть в статусе `CONFIRMED` или `COMPLETED`, а повторный —
+   начинаться после его окончания.
+
+Все обновления — `PATCH`: поля, отсутствующие в теле запроса, не меняются; явный `null` очищает nullable-поле.
 
 Статусы записи: `PENDING → CONFIRMED | CANCELLED`, `CONFIRMED → COMPLETED | CANCELLED | NO_SHOW`.
 `COMPLETED`, `CANCELLED` и `NO_SHOW` — конечные.
@@ -77,6 +128,26 @@ API использует JWT-токен. Токен один и живёт 30 д
 
 При ошибке `success = false`, `result = null`, а в `error` лежат имя исключения, сообщение, HTTP-статус, путь запроса
 и, для ошибок валидации, список нарушений по полям (`violations`).
+
+Постраничные списки — `GET /api/v1/admin/{appointments,users,pets,vaccinations,schedule-exceptions}`,
+`GET /api/v1/client/appointments`, `GET /api/v1/veterinarian/{appointments,vaccinations}` — принимают `page`
+(с 0, по умолчанию 0) и `size` (1–100, по умолчанию 20), а в `result` возвращают страницу:
+
+```json
+{
+  "items": [ ],
+  "page": 0,
+  "size": 20,
+  "totalElements": 41,
+  "totalPages": 3
+}
+```
+
+`totalElements` — сколько записей подходит под фильтр всего, а не на текущей странице. Фильтры необязательны
+и объединяются через AND; несколько статусов передаются повтором параметра: `?status=PENDING&status=CONFIRMED`.
+Текстовые фильтры (`search`, `name`) ищут подстроку без учёта регистра. Публичные `GET /api/v1/services`
+и `GET /api/v1/veterinarians` отдают только активные записи; все записи, включая неактивные, — в
+`GET /api/v1/admin/services` и `GET /api/v1/admin/veterinarians`.
 
 | Статус | Когда |
 |---|---|

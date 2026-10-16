@@ -42,9 +42,11 @@ class ExposedSpecializationRepository : SpecializationRepository {
     }
 
     override fun update(id: UUID, dto: UpdateSpecializationDto): Specialization? = exposedSql {
+        // Exposed rejects an UPDATE without columns, so an empty patch only reads the row.
+        if (dto == UpdateSpecializationDto()) return@exposedSql findById(id)
         ExposedSpecializationTable.updateReturning(where = { ExposedSpecializationTable.id eq id }) {
-            it[name] = dto.name
-            it[description] = dto.description
+            dto.name?.let { value -> it[name] = value }
+            dto.description?.let { value -> it[description] = value }
         }.singleOrNull()?.toSpecialization()
     }
 

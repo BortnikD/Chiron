@@ -21,7 +21,26 @@ admin:
   first-name: ${ADMIN_FIRST_NAME:Admin}
   last-name: ${ADMIN_LAST_NAME:Admin}
 
+management:
+  endpoints:
+    web:
+      exposure:
+        # Only the health check is published; everything else in actuator stays off the web.
+        include: health
+  endpoint:
+    health:
+      # Public endpoint: status only, no component details (DB version, disk space, etc.).
+      show-details: never
+      probes:
+        enabled: true
+      group:
+        readiness:
+          include:
+            - readinessState
+            - db
+
 springdoc:
+  show-actuator: true
   default-produces-media-type: application/json
   api-docs:
     path: /v3/api-docs
@@ -29,6 +48,12 @@ springdoc:
     path: /swagger-ui.html
     operations-sorter: method
     tags-sorter: alpha
+
+logging:
+  level:
+    # springdoc 3.1.0 fails to clone the item schema of collection query parameters (Set<AppointmentStatus>)
+    # and logs a harmless WARN on every /v3/api-docs build; the original schema is used as a fallback.
+    org.springdoc.core.utils.SpringDocUtils: error
 
 cors:
   allowed-origins:

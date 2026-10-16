@@ -1,6 +1,6 @@
 package com.bortnik.chiron.infrastructure.security
 
-import com.bortnik.chiron.application.usecase.user.GetUserUseCase
+import com.bortnik.chiron.application.usecase.common.user.GetUserUseCase
 import com.bortnik.chiron.domain.entities.enums.UserRole
 import com.bortnik.chiron.infrastructure.config.CorsProperties
 import com.bortnik.chiron.infrastructure.security.jwt.JwtTokenProvider
@@ -46,6 +46,7 @@ class SecurityConfig {
         }
         .authorizeHttpRequests {
             it.requestMatchers(*DOCUMENTATION_ENDPOINTS, "/error").permitAll()
+            it.requestMatchers(HttpMethod.GET, "/actuator/health", "/actuator/health/**").permitAll()
             it.requestMatchers(HttpMethod.POST, "/api/v1/auth/register", "/api/v1/auth/login").permitAll()
             it.requestMatchers(HttpMethod.GET, *PUBLIC_READ_ENDPOINTS).permitAll()
             it.requestMatchers("/api/v1/admin/**").hasRole(UserRole.ADMIN.name)
@@ -85,6 +86,7 @@ class SecurityConfig {
             "/api/v1/work-schedules",
             "/api/v1/schedule-exceptions",
             "/api/v1/appointments/availability",
+            "/api/v1/appointments/slots",
         )
     }
 }

@@ -1,28 +1,30 @@
 package com.bortnik.chiron.presentation.api.http.controllers.veterinarian
 
-import com.bortnik.chiron.application.security.ResourceAccessGuard
-import com.bortnik.chiron.application.usecase.vaccination.CreateVaccinationUseCase
-import com.bortnik.chiron.application.usecase.vaccination.GetVaccinationUseCase
-import com.bortnik.chiron.application.usecase.vaccination.UpdateVaccinationUseCase
-import com.bortnik.chiron.application.usecase.veterinarian.GetVeterinarianUseCase
-import com.bortnik.chiron.infrastructure.security.AuthenticatedUser
+import com.bortnik.chiron.application.security.Actor
+import com.bortnik.chiron.application.usecase.veterinarian.vaccination.VeterinarianCreateVaccinationUseCase
+import com.bortnik.chiron.application.usecase.veterinarian.vaccination.VeterinarianGetVaccinationUseCase
+import com.bortnik.chiron.application.usecase.veterinarian.vaccination.VeterinarianUpdateVaccinationUseCase
 import com.bortnik.chiron.presentation.api.http.ApiResponse
+import com.bortnik.chiron.presentation.api.http.dto.request.pagination.PaginationRequest
 import com.bortnik.chiron.presentation.api.http.dto.request.vaccination.CreateVaccinationRequest
 import com.bortnik.chiron.presentation.api.http.dto.request.vaccination.UpdateVaccinationRequest
+import com.bortnik.chiron.presentation.api.http.dto.request.vaccination.VeterinarianVaccinationFilterRequest
+import com.bortnik.chiron.presentation.api.http.dto.response.PageResponse
 import com.bortnik.chiron.presentation.api.http.dto.response.VaccinationResponse
 import com.bortnik.chiron.presentation.api.http.mappers.toDto
 import com.bortnik.chiron.presentation.api.http.mappers.toResponse
 import io.swagger.v3.oas.annotations.Operation
 import io.swagger.v3.oas.annotations.tags.Tag
+import jakarta.validation.Valid
+import org.springdoc.core.annotations.ParameterObject
 import org.springframework.http.ResponseEntity
 import org.springframework.security.core.annotation.AuthenticationPrincipal
 import org.springframework.web.bind.annotation.GetMapping
+import org.springframework.web.bind.annotation.PatchMapping
 import org.springframework.web.bind.annotation.PathVariable
 import org.springframework.web.bind.annotation.PostMapping
-import org.springframework.web.bind.annotation.PutMapping
 import org.springframework.web.bind.annotation.RequestBody
 import org.springframework.web.bind.annotation.RequestMapping
-import org.springframework.web.bind.annotation.RequestParam
 import org.springframework.web.bind.annotation.RestController
 import java.util.UUID
 
@@ -33,21 +35,26 @@ import java.util.UUID
     description = "Vaccinations of the current veterinarian's patients: pets with at least one appointment with them.",
 )
 class VeterinarianVaccinationController(
-    private val getVeterinarianUseCase: GetVeterinarianUseCase,
-    private val createVaccinationUseCase: CreateVaccinationUseCase,
-    private val getVaccinationUseCase: GetVaccinationUseCase,
-    private val updateVaccinationUseCase: UpdateVaccinationUseCase,
-    private val accessGuard: ResourceAccessGuard,
+    private val createVaccinationUseCase: VeterinarianCreateVaccinationUseCase,
+    private val getVaccinationUseCase: VeterinarianGetVaccinationUseCase,
+    private val updateVaccinationUseCase: VeterinarianUpdateVaccinationUseCase,
 ) {
-    @Operation(summary = "List vaccinations of a patient")
+    @Operation(
+        summary = "List vaccinations of patients",
+        description = """
+            All filters are optional and combined with AND; a nextDue bound excludes vaccinations without a next due
+            date. Sorted by administration date descending.
+        """,
+    )
     @GetMapping
-    fun findAllByPetId(
-        @AuthenticationPrincipal user: AuthenticatedUser,
-        @RequestParam petId: UUID,
-    ): ApiResponse<List<VaccinationResponse>> {
-        accessGuard.requirePatient(veterinarianId(user), petId)
-        return ApiResponse.success(getVaccinationUseCase.findAllByPetId(petId).map { it.toResponse() })
-    }
+    fun findAll(
+        @AuthenticationPrincipal actor: Actor,
+        @Valid @ParameterObject filter: VeterinarianVaccinationFilterRequest,
+        @Valid @ParameterObject pagination: PaginationRequest,
+    ): ApiResponse<PageResponse<VaccinationResponse>> =
+        ApiResponse.success(
+            getVaccinationUseCase.findAll(actor, filter.toDto(), pagination.toDto()).toResponse { it.toResponse() },
+        )
 
     @Operation(
         summary = "Create vaccination for a patient",
@@ -55,23 +62,17 @@ class VeterinarianVaccinationController(
     )
     @PostMapping
     fun create(
-        @AuthenticationPrincipal user: AuthenticatedUser,
-        @RequestBody request: CreateVaccinationRequest,
-    ): ResponseEntity<ApiResponse<VaccinationResponse>> {
-        accessGuard.requirePatient(veterinarianId(user), request.petId)
-        return ApiResponse.created(createVaccinationUseCase.create(request.toDto()).toResponse())
-    }
+        @AuthenticationPrincipal actor: Actor,
+        @Valid @RequestBody request: CreateVaccinationRequest,
+    ): ResponseEntity<ApiResponse<VaccinationResponse>> =
+        ApiResponse.created(createVaccinationUseCase.create(actor, request.toDto()).toResponse())
 
     @Operation(summary = "Update vaccination of a patient")
-    @PutMapping("/{id}")
+    @PatchMapping("/{id}")
     fun update(
-        @AuthenticationPrincipal user: AuthenticatedUser,
+        @AuthenticationPrincipal actor: Actor,
         @PathVariable id: UUID,
-        @RequestBody request: UpdateVaccinationRequest,
-    ): ApiResponse<VaccinationResponse> {
-        accessGuard.requirePatientVaccination(veterinarianId(user), id)
-        return ApiResponse.success(updateVaccinationUseCase.update(id, request.toDto()).toResponse())
-    }
-
-    private fun veterinarianId(user: AuthenticatedUser): UUID = getVeterinarianUseCase.findByUserId(user.id).id
+        @Valid @RequestBody request: UpdateVaccinationRequest,
+    ): ApiResponse<VaccinationResponse> =
+        ApiResponse.success(updateVaccinationUseCase.update(actor, id, request.toDto()).toResponse())
 }

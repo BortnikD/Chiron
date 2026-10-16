@@ -1,9 +1,11 @@
 package com.bortnik.chiron.presentation.api.http.mappers
 
 import com.bortnik.chiron.domain.dto.service.CreateServiceDto
+import com.bortnik.chiron.domain.dto.service.ServiceFilter
 import com.bortnik.chiron.domain.dto.service.UpdateServiceDto
 import com.bortnik.chiron.domain.entities.Service as ServiceEntity
 import com.bortnik.chiron.presentation.api.http.dto.request.service.CreateServiceRequest
+import com.bortnik.chiron.presentation.api.http.dto.request.service.ServiceFilterRequest
 import com.bortnik.chiron.presentation.api.http.dto.request.service.UpdateServiceRequest
 import com.bortnik.chiron.presentation.api.http.dto.response.ServiceResponse
 
@@ -37,5 +39,11 @@ fun UpdateServiceRequest.toDto(): UpdateServiceDto = UpdateServiceDto(
     basePrice = basePrice,
     baseDurationMin = baseDurationMin,
     bufferAfterMin = bufferAfterMin,
+    isActive = isActive,
+)
+
+fun ServiceFilterRequest.toDto(): ServiceFilter = ServiceFilter(
+    specializationId = specializationId,
+    speciesId = speciesId,
     isActive = isActive,
 )

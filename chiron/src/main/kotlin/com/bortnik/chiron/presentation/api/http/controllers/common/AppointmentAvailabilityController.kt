@@ -1,7 +1,11 @@
 package com.bortnik.chiron.presentation.api.http.controllers.common
 
-import com.bortnik.chiron.application.usecase.appointment.CheckAppointmentAvailabilityUseCase
+import com.bortnik.chiron.application.usecase.common.appointment.CheckAppointmentAvailabilityUseCase
+import com.bortnik.chiron.application.usecase.common.appointment.FindAvailableSlotsUseCase
+import com.bortnik.chiron.domain.dto.appointment.AvailableSlotFilter
 import com.bortnik.chiron.presentation.api.http.ApiResponse
+import com.bortnik.chiron.presentation.api.http.dto.response.AvailableSlotResponse
+import com.bortnik.chiron.presentation.api.http.mappers.toResponse
 import io.swagger.v3.oas.annotations.Operation
 import io.swagger.v3.oas.annotations.Parameter
 import io.swagger.v3.oas.annotations.tags.Tag
@@ -10,6 +14,7 @@ import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.RequestParam
 import org.springframework.web.bind.annotation.RestController
 import java.time.Instant
+import java.time.LocalDate
 import java.util.UUID
 
 @RestController
@@ -17,6 +22,7 @@ import java.util.UUID
 @Tag(name = "Appointments")
 class AppointmentAvailabilityController(
     private val checkAppointmentAvailabilityUseCase: CheckAppointmentAvailabilityUseCase,
+    private val findAvailableSlotsUseCase: FindAvailableSlotsUseCase,
 ) {
     @Operation(
         summary = "Check slot availability",
@@ -39,4 +45,36 @@ class AppointmentAvailabilityController(
         checkAppointmentAvailabilityUseCase.check(veterinarianId, startAt, endAt, excludeAppointmentId)
         return ApiResponse.success(true)
     }
+
+    @Operation(
+        summary = "Find available slots",
+        description = """
+            Returns free slots in the period, sorted by start time, each with the veterinarians who can take it.
+            Without veterinarianId all active veterinarians permitted to treat the species are searched;
+            with it the veterinarian must be active and permitted to treat the species.
+            A slot lasts as long as the service takes for the species plus the service buffer, starts on the clinic
+            slot grid and satisfies the same rules as the slot availability check; slots in the past are omitted.
+            The service must be active and available for the species.
+            The period is given in clinic-local dates, both inclusive, and must not exceed 14 days.
+        """,
+    )
+    @GetMapping("/slots")
+    fun findAvailableSlots(
+        @RequestParam speciesId: UUID,
+        @RequestParam serviceId: UUID,
+        @RequestParam(required = false) veterinarianId: UUID?,
+        @Parameter(description = "First date of the period, ISO-8601 date") @RequestParam from: LocalDate,
+        @Parameter(description = "Last date of the period, ISO-8601 date") @RequestParam to: LocalDate,
+    ): ApiResponse<List<AvailableSlotResponse>> =
+        ApiResponse.success(
+            findAvailableSlotsUseCase.find(
+                AvailableSlotFilter(
+                    speciesId = speciesId,
+                    serviceId = serviceId,
+                    veterinarianId = veterinarianId,
+                    from = from,
+                    to = to,
+                ),
+            ).map { it.toResponse() },
+        )
 }

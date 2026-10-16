@@ -183,7 +183,7 @@ class GlobalExceptionHandler {
                 ex
             )
         } else {
-            log.error(
+            log.warn(
                 "{} {} -> {} {}: {}",
                 request.method,
                 request.requestURI,

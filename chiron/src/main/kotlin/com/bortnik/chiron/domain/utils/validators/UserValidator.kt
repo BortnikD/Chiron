@@ -1,8 +1,11 @@
 package com.bortnik.chiron.domain.utils.validators
 
+import com.bortnik.chiron.domain.dto.orElse
 import com.bortnik.chiron.domain.dto.user.CreateUserDto
 import com.bortnik.chiron.domain.dto.user.RegisterUserDto
-import com.bortnik.chiron.domain.dto.user.UpdateUserDto
+import com.bortnik.chiron.domain.dto.user.UpdateProfileDto
+import com.bortnik.chiron.domain.dto.user.UserFilter
+import com.bortnik.chiron.domain.utils.ValidationConstants.SEARCH_MAX_LENGTH
 import com.bortnik.chiron.domain.utils.ValidationConstants.UserRules
 
 object UserValidator {
@@ -25,8 +28,22 @@ object UserValidator {
         user(dto.email, dto.passwordHash, dto.firstName, dto.middleName, dto.lastName, dto.fullName, dto.phone)
     }
 
-    fun validate(dto: UpdateUserDto) = validateAll {
-        user(dto.email, dto.passwordHash, dto.firstName, dto.middleName, dto.lastName, dto.fullName, dto.phone)
+    // Only the fields present in the partial update are checked.
+    fun validate(dto: UpdateProfileDto) = validateAll {
+        user(
+            email = dto.email,
+            passwordHash = null,
+            firstName = dto.firstName,
+            middleName = dto.middleName.orElse(null),
+            lastName = dto.lastName,
+            fullName = null,
+            phone = dto.phone,
+        )
+    }
+
+    fun validate(filter: UserFilter) = validateAll {
+        ensureMaxLength("search", filter.search, SEARCH_MAX_LENGTH)
+        ensureAfter("createdTo", filter.createdTo, "createdFrom", filter.createdFrom)
     }
 
     fun validateCredentials(email: String, password: String) = validateAll {
@@ -35,13 +52,13 @@ object UserValidator {
     }
 
     private fun ValidationErrorCollector.user(
-        email: String,
-        passwordHash: String,
-        firstName: String,
+        email: String?,
+        passwordHash: String?,
+        firstName: String?,
         middleName: String?,
-        lastName: String,
-        fullName: String,
-        phone: String,
+        lastName: String?,
+        fullName: String?,
+        phone: String?,
     ) {
         ensureNotBlank("email", email)
         ensureMaxLength("email", email, UserRules.EMAIL_MAX_LENGTH)

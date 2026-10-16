@@ -1,14 +1,22 @@
 package com.bortnik.chiron.infrastructure.persistence.repositories
 
+import com.bortnik.chiron.domain.dto.ifPresent
+import com.bortnik.chiron.domain.dto.pagination.Page
+import com.bortnik.chiron.domain.dto.pagination.PageRequest
 import com.bortnik.chiron.domain.dto.pet.CreatePetDto
+import com.bortnik.chiron.domain.dto.pet.PetFilter
 import com.bortnik.chiron.domain.dto.pet.UpdatePetDto
 import com.bortnik.chiron.domain.entities.Pet
 import com.bortnik.chiron.domain.repositories.PetRepository
+import com.bortnik.chiron.infrastructure.persistence.containsIgnoreCase
 import com.bortnik.chiron.infrastructure.persistence.exposedSql
 import com.bortnik.chiron.infrastructure.persistence.mappers.toDbDecimal
 import com.bortnik.chiron.infrastructure.persistence.mappers.toPet
 import com.bortnik.chiron.infrastructure.persistence.models.ExposedPetTable
+import com.bortnik.chiron.infrastructure.persistence.toPage
+import org.jetbrains.exposed.v1.core.Op
 import org.jetbrains.exposed.v1.core.SortOrder
+import org.jetbrains.exposed.v1.core.andIfNotNull
 import org.jetbrains.exposed.v1.core.eq
 import org.jetbrains.exposed.v1.javatime.CurrentTimestampWithTimeZone
 import org.jetbrains.exposed.v1.jdbc.deleteWhere
@@ -42,28 +50,34 @@ class ExposedPetRepository : PetRepository {
             ?.toPet()
     }
 
-    override fun findAllByOwnerId(ownerId: UUID): List<Pet> = exposedSql {
+    override fun findAll(filter: PetFilter): List<Pet> = exposedSql {
         ExposedPetTable.selectAll()
-            .where { ExposedPetTable.ownerId eq ownerId }
-            .orderBy(ExposedPetTable.createdAt, SortOrder.ASC)
+            .where { filter.toCondition() }
+            .orderBy(ExposedPetTable.createdAt to SortOrder.ASC, ExposedPetTable.id to SortOrder.ASC)
             .map { it.toPet() }
     }
 
-    override fun findAll(): List<Pet> = exposedSql {
+    override fun findAll(filter: PetFilter, pageRequest: PageRequest): Page<Pet> = exposedSql {
         ExposedPetTable.selectAll()
-            .orderBy(ExposedPetTable.createdAt, SortOrder.ASC)
-            .map { it.toPet() }
+            .where { filter.toCondition() }
+            .toPage(
+                pageRequest,
+                ExposedPetTable.createdAt to SortOrder.ASC,
+                ExposedPetTable.id to SortOrder.ASC,
+            ) { it.toPet() }
     }
 
     override fun update(id: UUID, dto: UpdatePetDto): Pet? = exposedSql {
+        // An empty patch has nothing to write, so updatedAt is left untouched.
+        if (dto == UpdatePetDto()) return@exposedSql findById(id)
         ExposedPetTable.updateReturning(where = { ExposedPetTable.id eq id }) {
-            it[name] = dto.name
-            it[speciesId] = dto.speciesId
-            it[birthDate] = dto.birthDate
-            it[weightKg] = dto.weightKg?.toDbDecimal()
-            it[gender] = dto.gender
-            it[notes] = dto.notes
-            it[isArchived] = dto.isArchived
+            dto.name?.let { value -> it[name] = value }
+            dto.speciesId?.let { value -> it[speciesId] = value }
+            dto.birthDate.ifPresent { value -> it[birthDate] = value }
+            dto.weightKg.ifPresent { value -> it[weightKg] = value?.toDbDecimal() }
+            dto.gender?.let { value -> it[gender] = value }
+            dto.notes.ifPresent { value -> it[notes] = value }
+            dto.isArchived?.let { value -> it[isArchived] = value }
             it[updatedAt] = CurrentTimestampWithTimeZone
         }.singleOrNull()?.toPet()
     }
@@ -71,4 +85,11 @@ class ExposedPetRepository : PetRepository {
     override fun deleteById(id: UUID): Boolean = exposedSql {
         ExposedPetTable.deleteWhere { ExposedPetTable.id eq id } > 0
     }
+
+    private fun PetFilter.toCondition(): Op<Boolean> = Op.TRUE
+        .andIfNotNull(ownerId?.let { ExposedPetTable.ownerId eq it })
+        .andIfNotNull(speciesId?.let { ExposedPetTable.speciesId eq it })
+        .andIfNotNull(gender?.let { ExposedPetTable.gender eq it })
+        .andIfNotNull(isArchived?.let { ExposedPetTable.isArchived eq it })
+        .andIfNotNull(name?.let { ExposedPetTable.name.containsIgnoreCase(it) })
 }

@@ -1,7 +1,9 @@
 package com.bortnik.chiron.domain.utils.validators
 
+import com.bortnik.chiron.domain.dto.orElse
 import com.bortnik.chiron.domain.dto.workschedule.CreateWorkScheduleDto
 import com.bortnik.chiron.domain.dto.workschedule.UpdateWorkScheduleDto
+import com.bortnik.chiron.domain.entities.WorkSchedule
 import java.time.LocalTime
 
 object WorkScheduleValidator {
@@ -10,8 +12,14 @@ object WorkScheduleValidator {
         workingHours(dto.startTime, dto.endTime, dto.breakStart, dto.breakEnd)
     }
 
-    fun validate(dto: UpdateWorkScheduleDto) = validateAll {
-        workingHours(dto.startTime, dto.endTime, dto.breakStart, dto.breakEnd)
+    // Validates the state the schedule will have once the partial update is applied.
+    fun validate(existing: WorkSchedule, dto: UpdateWorkScheduleDto) = validateAll {
+        workingHours(
+            dto.startTime ?: existing.startTime,
+            dto.endTime ?: existing.endTime,
+            dto.breakStart.orElse(existing.breakStart),
+            dto.breakEnd.orElse(existing.breakEnd),
+        )
     }
 
     private fun ValidationErrorCollector.workingHours(
