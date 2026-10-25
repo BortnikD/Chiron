@@ -10,6 +10,18 @@ clinic:
   zone: Europe/Moscow
   slot-step-min: 15
 
+notification:
+  reminder:
+    # Pending and confirmed appointments starting within this time get a reminder for the owner.
+    lead-time: 24h
+    # How often the scheduler looks for appointments that entered the reminder window.
+    check-interval: 5m
+  vaccination-due:
+    # Vaccinations whose next due date is within this many days get a reminder for the owner.
+    lead-days: 7
+    # Daily at 09:00 in the clinic time zone.
+    cron: "0 0 9 * * *"
+
 jwt:
   secret: ${JWT_SECRET}
   ttl: 30d

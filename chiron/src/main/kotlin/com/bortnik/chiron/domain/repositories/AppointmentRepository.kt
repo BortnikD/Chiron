@@ -13,6 +13,8 @@ interface AppointmentRepository {
 
     fun findById(id: UUID): Appointment?
 
+    fun findAll(filter: AppointmentFilter): List<Appointment>
+
     fun findAll(filter: AppointmentFilter, pageRequest: PageRequest): Page<Appointment>
 
     fun findAllByVeterinarianId(veterinarianId: UUID): List<Appointment>

@@ -3,6 +3,7 @@ package com.bortnik.chiron.application.usecase.client.appointment
 import com.bortnik.chiron.application.security.Actor
 import com.bortnik.chiron.application.security.ResourceAccessGuard
 import com.bortnik.chiron.application.usecase.common.appointment.CreateAppointmentUseCase
+import com.bortnik.chiron.application.usecase.common.notification.NotifyAppointmentUseCase
 import com.bortnik.chiron.application.usecase.common.service.GetServiceUseCase
 import com.bortnik.chiron.domain.dto.appointment.BookAppointmentDto
 import com.bortnik.chiron.domain.dto.appointment.CreateAppointmentDto
@@ -17,6 +18,7 @@ class ClientBookAppointmentUseCase(
     private val createAppointmentUseCase: CreateAppointmentUseCase,
     private val getServiceUseCase: GetServiceUseCase,
     private val accessGuard: ResourceAccessGuard,
+    private val notifyAppointmentUseCase: NotifyAppointmentUseCase,
 ) {
 
     private val log = LoggerFactory.getLogger(javaClass)
@@ -36,6 +38,7 @@ class ClientBookAppointmentUseCase(
                 clientComment = dto.clientComment,
             ),
         )
+        notifyAppointmentUseCase.notifyChange(actor.userId, before = null, after = appointment)
         log.info(
             "Client {} ({}) booked appointment {} for pet {} with veterinarian {} at {}, price {}",
             actor.userId,

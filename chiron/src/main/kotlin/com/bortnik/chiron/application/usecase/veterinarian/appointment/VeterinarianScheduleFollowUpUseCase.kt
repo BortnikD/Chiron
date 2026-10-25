@@ -3,6 +3,7 @@ package com.bortnik.chiron.application.usecase.veterinarian.appointment
 import com.bortnik.chiron.application.security.Actor
 import com.bortnik.chiron.application.security.ResourceAccessGuard
 import com.bortnik.chiron.application.usecase.common.appointment.CreateAppointmentUseCase
+import com.bortnik.chiron.application.usecase.common.notification.NotifyAppointmentUseCase
 import com.bortnik.chiron.application.usecase.common.pet.GetPetUseCase
 import com.bortnik.chiron.application.usecase.common.service.GetServiceUseCase
 import com.bortnik.chiron.domain.dto.appointment.CreateAppointmentDto
@@ -21,6 +22,7 @@ class VeterinarianScheduleFollowUpUseCase(
     private val getPetUseCase: GetPetUseCase,
     private val getServiceUseCase: GetServiceUseCase,
     private val accessGuard: ResourceAccessGuard,
+    private val notifyAppointmentUseCase: NotifyAppointmentUseCase,
 ) {
 
     private val log = LoggerFactory.getLogger(javaClass)
@@ -43,6 +45,7 @@ class VeterinarianScheduleFollowUpUseCase(
                 priceSnapshot = getServiceUseCase.findPriceForSpecies(serviceId, pet.speciesId),
             ),
         )
+        notifyAppointmentUseCase.notifyChange(actor.userId, before = null, after = appointment)
         log.info(
             "Veterinarian {} ({}) scheduled follow-up {} of appointment {} for pet {} at {}, price {}",
             actor.userId,

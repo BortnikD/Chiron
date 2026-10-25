@@ -1,9 +1,8 @@
 package com.bortnik.chiron.infrastructure.security
 
-import com.bortnik.chiron.application.usecase.common.user.GetUserUseCase
 import com.bortnik.chiron.domain.entities.enums.UserRole
 import com.bortnik.chiron.infrastructure.config.CorsProperties
-import com.bortnik.chiron.infrastructure.security.jwt.JwtTokenProvider
+import com.bortnik.chiron.infrastructure.websocket.WebSocketConfig
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
 import org.springframework.http.HttpHeaders
@@ -29,8 +28,7 @@ class SecurityConfig {
     @Bean
     fun securityFilterChain(
         http: HttpSecurity,
-        jwtTokenProvider: JwtTokenProvider,
-        getUserUseCase: GetUserUseCase,
+        jwtActorResolver: JwtActorResolver,
         authenticationEntryPoint: AuthenticationEntryPoint,
         accessDeniedHandler: AccessDeniedHandler,
     ): SecurityFilterChain = http
@@ -49,13 +47,16 @@ class SecurityConfig {
             it.requestMatchers(HttpMethod.GET, "/actuator/health", "/actuator/health/**").permitAll()
             it.requestMatchers(HttpMethod.POST, "/api/v1/auth/register", "/api/v1/auth/login").permitAll()
             it.requestMatchers(HttpMethod.GET, *PUBLIC_READ_ENDPOINTS).permitAll()
+            // Browsers cannot send headers with the WebSocket handshake; the token comes in the STOMP CONNECT frame
+            // and is checked by StompAuthenticationInterceptor.
+            it.requestMatchers(WebSocketConfig.ENDPOINT).permitAll()
             it.requestMatchers("/api/v1/admin/**").hasRole(UserRole.ADMIN.name)
             it.requestMatchers("/api/v1/veterinarian/**").hasRole(UserRole.VETERINARIAN.name)
             it.requestMatchers("/api/v1/client/**").hasRole(UserRole.CLIENT.name)
             it.anyRequest().authenticated()
         }
         .addFilterBefore(
-            JwtAuthenticationFilter(jwtTokenProvider, getUserUseCase),
+            JwtAuthenticationFilter(jwtActorResolver),
             UsernamePasswordAuthenticationFilter::class.java,
         )
         .build()

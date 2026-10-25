@@ -58,6 +58,13 @@ class ExposedVaccinationRepository : VaccinationRepository {
             .map { it.toVaccination() }
     }
 
+    override fun findAll(filter: VaccinationFilter): List<Vaccination> = exposedSql {
+        ExposedVaccinationTable.selectAll()
+            .where { filter.toCondition() }
+            .orderBy(ExposedVaccinationTable.administeredOn, SortOrder.DESC)
+            .map { it.toVaccination() }
+    }
+
     override fun findAll(filter: VaccinationFilter, pageRequest: PageRequest): Page<Vaccination> = exposedSql {
         ExposedVaccinationTable.selectAll()
             .where { filter.toCondition() }

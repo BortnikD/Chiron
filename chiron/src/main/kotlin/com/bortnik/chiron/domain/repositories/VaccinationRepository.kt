@@ -15,6 +15,8 @@ interface VaccinationRepository {
 
     fun findAllByPetId(petId: UUID): List<Vaccination>
 
+    fun findAll(filter: VaccinationFilter): List<Vaccination>
+
     fun findAll(filter: VaccinationFilter, pageRequest: PageRequest): Page<Vaccination>
 
     fun update(id: UUID, dto: UpdateVaccinationDto): Vaccination?

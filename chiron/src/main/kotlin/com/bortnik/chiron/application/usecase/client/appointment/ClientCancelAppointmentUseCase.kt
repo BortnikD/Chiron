@@ -3,6 +3,7 @@ package com.bortnik.chiron.application.usecase.client.appointment
 import com.bortnik.chiron.application.security.Actor
 import com.bortnik.chiron.application.security.ResourceAccessGuard
 import com.bortnik.chiron.application.usecase.common.appointment.ChangeAppointmentStatusUseCase
+import com.bortnik.chiron.application.usecase.common.notification.NotifyAppointmentUseCase
 import com.bortnik.chiron.domain.dto.Patch
 import com.bortnik.chiron.domain.entities.Appointment
 import com.bortnik.chiron.domain.entities.enums.AppointmentStatus
@@ -16,6 +17,7 @@ import java.util.UUID
 class ClientCancelAppointmentUseCase(
     private val changeAppointmentStatusUseCase: ChangeAppointmentStatusUseCase,
     private val accessGuard: ResourceAccessGuard,
+    private val notifyAppointmentUseCase: NotifyAppointmentUseCase,
 ) {
 
     private val log = LoggerFactory.getLogger(javaClass)
@@ -29,6 +31,7 @@ class ClientCancelAppointmentUseCase(
             vetNotes = Patch.Unchanged,
             cancelReason = reason,
         )
+        notifyAppointmentUseCase.notifyChange(actor.userId, before = appointment, after = cancelled)
         log.info("Client {} ({}) cancelled appointment {}", actor.userId, actor.fullName, id)
         return cancelled
     }

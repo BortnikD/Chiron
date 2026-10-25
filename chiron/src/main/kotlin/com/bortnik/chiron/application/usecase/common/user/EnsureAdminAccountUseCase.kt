@@ -1,25 +1,25 @@
-package com.bortnik.chiron.application.bootstrap
+package com.bortnik.chiron.application.usecase.common.user
 
 import com.bortnik.chiron.application.config.AdminProperties
-import com.bortnik.chiron.application.usecase.common.user.RegisterUserUseCase
 import com.bortnik.chiron.domain.dto.user.RegisterUserDto
 import com.bortnik.chiron.domain.entities.enums.UserRole
 import com.bortnik.chiron.domain.repositories.UserRepository
 import org.slf4j.LoggerFactory
-import org.springframework.boot.CommandLineRunner
-import org.springframework.stereotype.Component
+import org.springframework.stereotype.Service
+import org.springframework.transaction.annotation.Transactional
 
-// Creates the admin account on the first startup; later startups leave an existing account untouched.
-@Component
-class AdminAccountInitializer(
+// Creates the configured admin account if it does not exist yet; an existing account is left untouched.
+@Service
+@Transactional
+class EnsureAdminAccountUseCase(
     private val adminProperties: AdminProperties,
     private val userRepository: UserRepository,
     private val registerUserUseCase: RegisterUserUseCase,
-) : CommandLineRunner {
+) {
 
     private val log = LoggerFactory.getLogger(javaClass)
 
-    override fun run(vararg args: String) {
+    fun ensure() {
         val existing = userRepository.findByEmail(adminProperties.email)
         if (existing != null) {
             if (existing.role != UserRole.ADMIN) {
