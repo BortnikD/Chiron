@@ -85,10 +85,10 @@ API использует JWT-токен. Токен один и живёт 30 д
 |---|---|---|---|
 | `/api/v1/auth` | всем | `Auth` | Регистрация и вход |
 | `/api/v1/users/me` | любая роль, с токеном | `Users` | Просмотр и изменение своих данных |
-| `/api/v1/...` (GET) | всем, без токена | `Species`, `Specializations`, `Services`, `Service species`, `Veterinarians`, `Veterinarian species permissions`, `Work schedules`, `Schedule exceptions`, `Appointments` | Справочники клиники: виды животных, специализации, услуги и их цены по видам, врачи и какие виды они лечат, расписание врачей, проверка свободного слота |
+| `/api/v1/...` (GET) | всем, без токена | `Species`, `Specializations`, `Services`, `Service species`, `Veterinarians`, `Veterinarian species permissions`, `Work schedules`, `Schedule exceptions`, `Appointments` | Справочники клиники: виды животных, специализации, услуги и их цены по видам, врачи и какие виды они лечат, расписание врачей, поиск свободных слотов и проверка слота |
 | `/api/v1/client/...` | `CLIENT` | `Client: Pets`, `Client: Appointments`, `Client: Vaccinations` | Свои питомцы; запись на приём, список и отмена своих записей; прививки своих питомцев |
 | `/api/v1/veterinarian/...` | `VETERINARIAN` | `Veterinarian: Profile`, `Veterinarian: Appointments`, `Veterinarian: Pets`, `Veterinarian: Vaccinations` | Свой профиль врача (просмотр, изменение описания, фото и стажа); свои записи — смена статуса, заметки врача и назначение повторного приёма; пациенты (питомцы, у которых была запись к этому врачу) и их прививки |
-| `/api/v1/admin/...` | `ADMIN` | `Admin: *` | Полное управление: пользователи, питомцы, записи, прививки, врачи и их допуски к видам, расписания и исключения из расписания, справочники |
+| `/api/v1/admin/...` | `ADMIN` | `Admin: *` | Полное управление: пользователи, питомцы, записи, прививки, врачи и их допуски к видам, расписания и исключения из расписания, справочники; статистика клиники |
 
 Клиент и ветеринар видят только свои данные. Попытка обратиться к чужому ресурсу возвращает `403`.
 Администратор работает с данными любых пользователей.
@@ -99,7 +99,11 @@ API использует JWT-токен. Токен один и живёт 30 д
 2. `GET /api/v1/veterinarians` и `GET /api/v1/veterinarians/{id}/species` — выбрать врача, который лечит этот вид.
 3. `GET /api/v1/work-schedules?veterinarianId=...` и `GET /api/v1/schedule-exceptions?veterinarianId=...` — посмотреть
    расписание врача.
-4. `GET /api/v1/appointments/availability` — проверить, свободен ли слот.
+4. `GET /api/v1/appointments/slots?speciesId=...&serviceId=...&from=...&to=...` — найти свободные слоты за период
+   (даты клиники `from`–`to` включительно, не больше 14 дней). Каждый слот — `{startAt, endAt, veterinarianIds}`:
+   какие врачи свободны в это время. С параметром `veterinarianId` ищутся слоты только этого врача. Длина слота равна
+   длительности услуги для вида плюс буфер услуги, поэтому слот можно сразу передать в запись. Вместо поиска можно
+   проверить конкретный слот через `GET /api/v1/appointments/availability`.
 5. `POST /api/v1/client/appointments` — записаться. Запись создаётся в статусе `PENDING`, цену считает сервер.
 6. Врач подтверждает и завершает приём через `PATCH /api/v1/veterinarian/appointments/{id}`.
 7. При необходимости врач назначает повторный приём через `POST /api/v1/veterinarian/appointments/{id}/follow-ups`
@@ -112,6 +116,26 @@ API использует JWT-токен. Токен один и живёт 30 д
 
 Статусы записи: `PENDING → CONFIRMED | CANCELLED`, `CONFIRMED → COMPLETED | CANCELLED | NO_SHOW`.
 `COMPLETED`, `CANCELLED` и `NO_SHOW` — конечные.
+
+## Статистика (администратор)
+
+Все эндпоинты — `GET /api/v1/admin/statistics/...` (группа `Admin: Statistics`) — принимают необязательные `from`
+и `to`: даты клиники (ISO-8601, `2026-10-01`), обе включительно. Без дат берётся текущий месяц; если указана только
+одна дата, вторая берётся из её месяца (`from=2026-11-15` → по `2026-11-30`). `from` не может быть позже `to`.
+Запись попадает в период по времени начала приёма (`startAt`).
+
+Выручка (`revenue`) — сумма цен записей в статусе `COMPLETED`; ожидаемая выручка (`expectedRevenue`) — `PENDING`
+и `CONFIRMED`.
+
+| Эндпоинт | Что возвращает |
+|---|---|
+| `/overview` | Сводка: `totalAppointments`, `appointmentsByStatus` (все статусы, включая нулевые), `revenue`, `expectedRevenue`, `averageCheck` (выручка / число завершённых), `cancellationRate` (`CANCELLED` / все), `noShowRate` (`NO_SHOW` / (`COMPLETED` + `NO_SHOW`)), `followUps` (повторные приёмы), `newClients`, `newPets` (созданы за период). Доли — от 0 до 1; `averageCheck` и доли равны `null`, если делить не на что |
+| `/timeline?granularity=DAY\|WEEK\|MONTH` | Точки `{periodStart, appointments, completed, revenue}` по дням (по умолчанию), неделям (с понедельника) или месяцам, включая пустые. Считаются только записи внутри периода, поэтому первая и последняя неделя или месяц могут быть неполными |
+| `/veterinarians` | По врачам, у которых есть записи за период: `{veterinarianId, fullName, appointments, completed, cancelled, noShows, revenue}` |
+| `/services` | По услугам, у которых есть записи за период: `{serviceId, name, specializationName, appointments, completed, revenue}` |
+| `/species` | По всем видам: `{speciesId, name, activePets, appointments, revenue}`; `activePets` — текущее число неархивных питомцев, от периода не зависит |
+
+Списки отсортированы по выручке по убыванию, затем по имени.
 
 ## Формат ответа
 
