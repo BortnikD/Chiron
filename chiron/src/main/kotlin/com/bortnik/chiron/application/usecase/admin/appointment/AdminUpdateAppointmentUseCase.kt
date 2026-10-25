@@ -1,7 +1,9 @@
 package com.bortnik.chiron.application.usecase.admin.appointment
 
 import com.bortnik.chiron.application.security.Actor
+import com.bortnik.chiron.application.usecase.common.appointment.GetAppointmentUseCase
 import com.bortnik.chiron.application.usecase.common.appointment.UpdateAppointmentUseCase
+import com.bortnik.chiron.application.usecase.common.notification.NotifyAppointmentUseCase
 import com.bortnik.chiron.domain.dto.appointment.UpdateAppointmentDto
 import com.bortnik.chiron.domain.entities.Appointment
 import org.slf4j.LoggerFactory
@@ -11,12 +13,18 @@ import java.util.UUID
 
 @Service
 @Transactional
-class AdminUpdateAppointmentUseCase(private val updateAppointmentUseCase: UpdateAppointmentUseCase) {
+class AdminUpdateAppointmentUseCase(
+    private val getAppointmentUseCase: GetAppointmentUseCase,
+    private val updateAppointmentUseCase: UpdateAppointmentUseCase,
+    private val notifyAppointmentUseCase: NotifyAppointmentUseCase,
+) {
 
     private val log = LoggerFactory.getLogger(javaClass)
 
     fun update(actor: Actor, id: UUID, dto: UpdateAppointmentDto): Appointment {
+        val before = getAppointmentUseCase.findById(id)
         val appointment = updateAppointmentUseCase.update(id, dto)
+        notifyAppointmentUseCase.notifyChange(actor.userId, before = before, after = appointment)
         log.info(
             "Admin {} ({}) updated appointment {}: veterinarian {}, {} - {}, status {}",
             actor.userId,

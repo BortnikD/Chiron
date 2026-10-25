@@ -3,6 +3,7 @@ package com.bortnik.chiron.application.usecase.veterinarian.appointment
 import com.bortnik.chiron.application.security.Actor
 import com.bortnik.chiron.application.security.ResourceAccessGuard
 import com.bortnik.chiron.application.usecase.common.appointment.ChangeAppointmentStatusUseCase
+import com.bortnik.chiron.application.usecase.common.notification.NotifyAppointmentUseCase
 import com.bortnik.chiron.domain.dto.appointment.UpdateAppointmentStatusDto
 import com.bortnik.chiron.domain.entities.Appointment
 import org.slf4j.LoggerFactory
@@ -15,6 +16,7 @@ import java.util.UUID
 class VeterinarianUpdateAppointmentStatusUseCase(
     private val changeAppointmentStatusUseCase: ChangeAppointmentStatusUseCase,
     private val accessGuard: ResourceAccessGuard,
+    private val notifyAppointmentUseCase: NotifyAppointmentUseCase,
 ) {
 
     private val log = LoggerFactory.getLogger(javaClass)
@@ -28,6 +30,7 @@ class VeterinarianUpdateAppointmentStatusUseCase(
             vetNotes = dto.vetNotes,
             cancelReason = dto.cancelReason,
         )
+        notifyAppointmentUseCase.notifyChange(actor.userId, before = appointment, after = updated)
         log.info(
             "Veterinarian {} ({}) changed status of appointment {}: {} -> {}",
             actor.userId,

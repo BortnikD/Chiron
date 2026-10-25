@@ -1,0 +1,12 @@
+package com.bortnik.chiron.domain.entities.enums
+
+enum class NotificationType {
+    APPOINTMENT_BOOKED,
+    APPOINTMENT_CONFIRMED,
+    APPOINTMENT_CANCELLED,
+    APPOINTMENT_RESCHEDULED,
+    APPOINTMENT_NO_SHOW,
+    FOLLOW_UP_SCHEDULED,
+    APPOINTMENT_REMINDER,
+    VACCINATION_DUE,
+}

@@ -80,6 +80,8 @@ clarifying questions come before implementation rather than after mistakes.
   `description`, test names) and identifiers are written **in English only**.
 - This applies to new code only; do not translate existing Russian text (e.g. comments in `V01__init_tables.sql`,
   `README.md`, `docs/api.md`) unless asked.
+- Exception: user-facing notification texts (`application/notification/NotificationMessages`) are in Russian, because
+  they are stored and shown to the clinic users as is.
 
 ## 6. Git
 
@@ -182,11 +184,15 @@ Exposed imports.
 - **Access control lives in `application`, never in `presentation`.** Controllers pass the `Actor` on; they never
   decide who may touch a resource.
 - `application/security/Actor` — the current user (`userId`, `role`, `fullName`), built from `User` by `toActor()`.
-  Role use cases take it when they use it (see above); `RegisterUserUseCase`, `AuthenticateUserUseCase` and the
-  startup initializer have no actor.
+  Role use cases take it when they use it (see above); `RegisterUserUseCase`, `AuthenticateUserUseCase` and use cases
+  run without a request (`EnsureAdminAccountUseCase` on startup, the reminder use cases on schedule) have no actor.
 - `application/security/ResourceAccessGuard` — ownership checks (`requireOwned...`, `requirePatient...`,
   `requireVeterinarian`) called by `client/` and `veterinarian/` use cases; `admin/` use cases do not use it.
-- `application/config` — `@ConfigurationProperties` classes; `application/bootstrap` — startup initializers.
+- `application/config` — `@ConfigurationProperties` classes.
+- `application/notification` — `NotificationChannel` (port for delivery channels: every implementing bean gets every
+  new notification after commit via `NotificationDispatcher`), `NotificationMessages` (texts). Who is notified of an
+  appointment change is decided by `domain/utils/NotificationRules`; use cases store notifications through
+  `common/notification/CreateNotificationUseCase`, never write to a channel directly.
 - `infrastructure/persistence`:
     - `models/Exposed<Entity>Table` — `object : UUIDTable("<sql_table>")`; composite-key tables use plain `Table`.
       Enums via `enumerationByName`, money / weight via `decimal(DECIMAL_PRECISION, DECIMAL_SCALE)`, timestamps via
@@ -197,7 +203,14 @@ Exposed imports.
       `exposedSql { ... }` (maps `SQLException` to typed `PersistenceException`). Use `insertReturning` /
       `updateReturning`, set `updatedAt = CurrentTimestampWithTimeZone` on update, order lists by `createdAt ASC`.
 - `infrastructure/security` — JWT filter (puts an `Actor` into the security context and derives the authorities from
-  its role), `SecurityConfig` (URL-based role rules, the coarse first line of defence).
+  its role), `SecurityConfig` (URL-based role rules, the coarse first line of defence); `JwtActorResolver` turns a
+  bearer token into an `Actor` for both the filter and STOMP.
+- `infrastructure/websocket` — STOMP config (`/ws`, in-memory broker), `StompAuthenticationInterceptor` (token in the
+  `CONNECT` frame, subscriptions only to `/user/queue/...`, no `SEND`).
+- `infrastructure/bootstrap` (startup `CommandLineRunner`s) and `infrastructure/scheduling` (`@Scheduled` jobs) are
+  entry points like controllers: they only trigger a use case and hold no business logic (`AdminAccountInitializer` →
+  `EnsureAdminAccountUseCase`, `NotificationScheduler` → `Send...RemindersUseCase`).
+  Schedules are read from `application.yaml` placeholders.
 - `presentation/api/http`:
     - `controllers/{admin,veterinarian,client,common,auth}/<Role><Entity>Controller` — base paths
       `/api/v1/admin/...`, `/api/v1/veterinarian/...`, `/api/v1/client/...` (role enforced in `SecurityConfig`),
@@ -215,6 +228,8 @@ Exposed imports.
       domain DTO (`CreateOwnPetDto`, `BookAppointmentDto`, `UpdateAppointmentStatusDto`).
     - `exceptions/` — `DomainExceptionHandler` (highest precedence) and `GlobalExceptionHandler`; new domain exception
       types must extend an existing base class so they map to the right HTTP status automatically.
+- `presentation/api/websocket` — `NotificationChannel` implementations that push to clients
+  (`StompNotificationChannel` → `/user/queue/notifications`, payload = `NotificationResponse`).
 
 ### Adding a new entity / feature — checklist
 
@@ -241,6 +256,8 @@ mapper → controllers per role → `SecurityConfig` if a path is public → `do
   Single-line `//` comments above the declaration.
 - Config values come from `application.yaml` via `@ConfigurationProperties`; secrets via environment variables
   (`${JWT_SECRET}`), documented in `../.env.example`.
+- Spring property placeholders in Kotlin strings use multi-dollar interpolation instead of escaping:
+  `@Scheduled(cron = $$"${notification.vaccination-due.cron}")`, not `"\${...}"`.
 
 ### Tests
 

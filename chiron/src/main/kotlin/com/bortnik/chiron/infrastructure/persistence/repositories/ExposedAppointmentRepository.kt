@@ -58,6 +58,13 @@ class ExposedAppointmentRepository : AppointmentRepository {
             ?.toAppointment()
     }
 
+    override fun findAll(filter: AppointmentFilter): List<Appointment> = exposedSql {
+        ExposedAppointmentTable.selectAll()
+            .where { filter.toCondition() }
+            .orderBy(ExposedAppointmentTable.startAt, SortOrder.ASC)
+            .map { it.toAppointment() }
+    }
+
     override fun findAll(filter: AppointmentFilter, pageRequest: PageRequest): Page<Appointment> = exposedSql {
         ExposedAppointmentTable.selectAll()
             .where { filter.toCondition() }
