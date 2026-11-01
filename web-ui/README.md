@@ -1,36 +1,70 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Chiron Web UI
 
-## Getting Started
+Современный веб-интерфейс для системы ветеринарной клиники **Chiron**.
 
-First, run the development server:
+## Технологический стек
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+* **Фреймворк:** [Next.js](https://nextjs.org/) 15 (App Router)
+* **Библиотека интерфейса:** [React](https://react.dev/) 19
+* **Язык:** [TypeScript](https://www.typescriptlang.org/)
+* **Стилизация:** [Tailwind CSS](https://tailwindcss.com/) v4
+* **Иконки (строго SVG, без эмодзи):** [Lucide React](https://lucide.dev/)
+* **Сетевой слой:** Нативный Fetch с автоматической подстановкой Bearer-токена и обработкой `ApiResponse<T>` / ошибок валидации Spring Boot.
+
+---
+
+## Архитектура проекта
+
+```
+web-ui/
+├── src/
+│   ├── api/                 # Типизированный клиент и сервисы эндпоинтов (auth, client, vet, admin)
+│   ├── app/                 # Next.js App Router (страницы и макеты)
+│   │   ├── layout.tsx       # Корневой макет с AuthProvider, Navbar и Footer
+│   │   ├── page.tsx         # Главная витрина клиники
+│   │   ├── services/        # Каталог услуг и цен с фильтрами
+│   │   ├── veterinarians/   # Список врачей и стажа
+│   │   ├── login/           # Авторизация (клиенты, врачи, админы)
+│   │   ├── register/        # Регистрация нового владельца
+│   │   ├── client/          # Личный кабинет клиента (питомцы, записи, онлайн-визард записи)
+│   │   ├── vet/             # Кабинет врача (очередь приемов, пациенты, прививки, профиль)
+│   │   └── admin/           # Консоль администратора (пользователи, прейскурант, клиника)
+│   ├── components/
+│   │   ├── layout/          # Navbar, Footer, ProtectedRoute
+│   │   └── ui/              # Базовые UI-компоненты (Button, Input, Select, Badge, Modal, Card, EmptyState)
+│   ├── context/             # AuthContext (управление JWT сессией и ролями)
+│   └── types/               # Модели данных TypeScript (зеркало DTO бэкенда)
+└── next.config.ts           # Проксирование /api и /actuator на http://localhost:8080
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+---
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Интеграция с бэкендом (Docker)
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+Бэкенд в Docker слушает порт `8080`. 
+В файле `next.config.ts` настроен автоматический прокси (`rewrites`):
+* Все запросы вида `/api/*` прозрачно перенаправляются на `http://localhost:8080/api/*`.
+* Проверка состояния `/actuator/*` перенаправляется на `http://localhost:8080/actuator/*`.
+* Это полностью устраняет любые проблемы с CORS при локальной разработке.
 
-## Learn More
+---
 
-To learn more about Next.js, take a look at the following resources:
+## Запуск приложения
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+1. Убедитесь, что бэкенд запущен в Docker:
+```bash
+docker compose -f docker-compose.local.yaml ps
+```
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+2. Перейдите в каталог фронтенда и установите зависимости (если еще не установлены):
+```bash
+cd web-ui
+npm install
+```
 
-## Deploy on Vercel
+3. Запустите сервер разработки:
+```bash
+npm run dev
+```
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Приложение будет доступно по адресу: **http://localhost:3000**
