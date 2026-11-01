@@ -9,18 +9,15 @@ import com.bortnik.chiron.infrastructure.persistence.mappers.toDbTimestamp
 import com.bortnik.chiron.infrastructure.persistence.models.ExposedAppointmentTable
 import com.bortnik.chiron.infrastructure.persistence.models.ExposedPetTable
 import com.bortnik.chiron.infrastructure.persistence.models.ExposedVaccinationTable
+import com.bortnik.chiron.infrastructure.persistence.utils.withoutNewerVaccination
 import org.jetbrains.exposed.v1.core.SortOrder
-import org.jetbrains.exposed.v1.core.alias
 import org.jetbrains.exposed.v1.core.and
 import org.jetbrains.exposed.v1.core.count
 import org.jetbrains.exposed.v1.core.eq
-import org.jetbrains.exposed.v1.core.greater
 import org.jetbrains.exposed.v1.core.greaterEq
 import org.jetbrains.exposed.v1.core.inList
 import org.jetbrains.exposed.v1.core.inSubQuery
-import org.jetbrains.exposed.v1.core.lowerCase
 import org.jetbrains.exposed.v1.core.min
-import org.jetbrains.exposed.v1.core.notExists
 import org.jetbrains.exposed.v1.jdbc.select
 import org.springframework.stereotype.Repository
 import org.springframework.transaction.annotation.Transactional
@@ -70,16 +67,10 @@ class ExposedPetSummaryRepository : PetSummaryRepository {
             .where { ExposedVaccinationTable.petId inSubQuery ownedPets }
             .groupBy(ExposedVaccinationTable.petId)
             .associate { it[ExposedVaccinationTable.petId].value to it[vaccinationCount] }
-        val newer = ExposedVaccinationTable.alias("newer_vaccination")
-        val newerVaccination = newer.select(newer[ExposedVaccinationTable.id]).where {
-            (newer[ExposedVaccinationTable.petId] eq ExposedVaccinationTable.petId) and
-                    (newer[ExposedVaccinationTable.name].lowerCase() eq ExposedVaccinationTable.name.lowerCase()) and
-                    (newer[ExposedVaccinationTable.administeredOn] greater ExposedVaccinationTable.administeredOn)
-        }
         val nextDueOn = ExposedVaccinationTable.nextDueOn.min()
         val dueDates = ExposedVaccinationTable
             .select(ExposedVaccinationTable.petId, nextDueOn)
-            .where { (ExposedVaccinationTable.petId inSubQuery ownedPets) and notExists(newerVaccination) }
+            .where { (ExposedVaccinationTable.petId inSubQuery ownedPets) and withoutNewerVaccination() }
             .groupBy(ExposedVaccinationTable.petId)
             .associate { it[ExposedVaccinationTable.petId].value to it[nextDueOn] }
         (counts.keys + vaccinationCounts.keys).associateWith { petId ->
