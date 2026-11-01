@@ -37,7 +37,9 @@ class ClientAppointmentController(
 ) {
     @Operation(
         summary = "List appointments of own pets",
-        description = "All filters are optional and combined with AND. Sorted by start time ascending.",
+        description = "All filters are optional and combined with AND. " +
+            "Sorted by start time and then id; direction is ASC by default or DESC for newest first. " +
+            "Sorting is applied before pagination.",
     )
     @GetMapping
     fun findAll(

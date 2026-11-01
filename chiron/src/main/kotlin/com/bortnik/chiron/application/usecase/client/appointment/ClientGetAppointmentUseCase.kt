@@ -27,6 +27,7 @@ class ClientGetAppointmentUseCase(
             statuses = filter.statuses,
             from = filter.from,
             to = filter.to,
+            direction = filter.direction,
         )
         return getAppointmentUseCase.findAll(scoped, pageRequest)
     }

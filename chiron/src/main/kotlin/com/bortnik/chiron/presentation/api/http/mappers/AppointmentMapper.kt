@@ -106,6 +106,7 @@ fun ClientAppointmentFilterRequest.toDto(): ClientAppointmentFilter = ClientAppo
     statuses = status?.takeIf { it.isNotEmpty() },
     from = from,
     to = to,
+    direction = direction,
 )
 
 fun VeterinarianAppointmentFilterRequest.toDto(): VeterinarianAppointmentFilter = VeterinarianAppointmentFilter(

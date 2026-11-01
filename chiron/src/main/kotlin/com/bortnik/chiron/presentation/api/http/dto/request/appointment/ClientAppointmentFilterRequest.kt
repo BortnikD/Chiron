@@ -1,5 +1,6 @@
 package com.bortnik.chiron.presentation.api.http.dto.request.appointment
 
+import com.bortnik.chiron.domain.dto.appointment.AppointmentSortDirection
 import com.bortnik.chiron.domain.entities.enums.AppointmentStatus
 import io.swagger.v3.oas.annotations.Parameter
 import java.time.Instant
@@ -14,4 +15,6 @@ data class ClientAppointmentFilterRequest(
     val from: Instant? = null,
     @field:Parameter(description = "Appointments starting before this ISO-8601 instant")
     val to: Instant? = null,
+    @field:Parameter(description = "Sort by start time and then id: ASC (default) or DESC")
+    val direction: AppointmentSortDirection = AppointmentSortDirection.ASC,
 )

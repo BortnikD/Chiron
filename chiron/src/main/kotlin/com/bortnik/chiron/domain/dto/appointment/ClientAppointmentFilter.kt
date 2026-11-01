@@ -10,4 +10,5 @@ data class ClientAppointmentFilter(
     val statuses: Set<AppointmentStatus>? = null,
     val from: Instant? = null,
     val to: Instant? = null,
+    val direction: AppointmentSortDirection = AppointmentSortDirection.ASC,
 )

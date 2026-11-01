@@ -1,6 +1,7 @@
 package com.bortnik.chiron.infrastructure.persistence.repositories
 
 import com.bortnik.chiron.domain.dto.appointment.AppointmentFilter
+import com.bortnik.chiron.domain.dto.appointment.AppointmentSortDirection
 import com.bortnik.chiron.domain.dto.appointment.CreateAppointmentDto
 import com.bortnik.chiron.domain.dto.appointment.UpdateAppointmentDto
 import com.bortnik.chiron.domain.dto.ifPresent
@@ -59,19 +60,21 @@ class ExposedAppointmentRepository : AppointmentRepository {
     }
 
     override fun findAll(filter: AppointmentFilter): List<Appointment> = exposedSql {
+        val sortOrder = if (filter.direction == AppointmentSortDirection.DESC) SortOrder.DESC else SortOrder.ASC
         ExposedAppointmentTable.selectAll()
             .where { filter.toCondition() }
-            .orderBy(ExposedAppointmentTable.startAt, SortOrder.ASC)
+            .orderBy(ExposedAppointmentTable.startAt to sortOrder, ExposedAppointmentTable.id to sortOrder)
             .map { it.toAppointment() }
     }
 
     override fun findAll(filter: AppointmentFilter, pageRequest: PageRequest): Page<Appointment> = exposedSql {
+        val sortOrder = if (filter.direction == AppointmentSortDirection.DESC) SortOrder.DESC else SortOrder.ASC
         ExposedAppointmentTable.selectAll()
             .where { filter.toCondition() }
             .toPage(
                 pageRequest,
-                ExposedAppointmentTable.startAt to SortOrder.ASC,
-                ExposedAppointmentTable.id to SortOrder.ASC,
+                ExposedAppointmentTable.startAt to sortOrder,
+                ExposedAppointmentTable.id to sortOrder,
             ) { it.toAppointment() }
     }
 
