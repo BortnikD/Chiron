@@ -1,6 +1,7 @@
 package com.bortnik.chiron.domain.utils.validators
 
 import com.bortnik.chiron.domain.dto.orElse
+import com.bortnik.chiron.domain.dto.user.ChangePasswordDto
 import com.bortnik.chiron.domain.dto.user.CreateUserDto
 import com.bortnik.chiron.domain.dto.user.RegisterUserDto
 import com.bortnik.chiron.domain.dto.user.UpdateProfileDto
@@ -9,6 +10,20 @@ import com.bortnik.chiron.domain.utils.ValidationConstants.SEARCH_MAX_LENGTH
 import com.bortnik.chiron.domain.utils.ValidationConstants.UserRules
 
 object UserValidator {
+
+    fun validate(dto: ChangePasswordDto) = validateAll {
+        ensureMaxLength("currentPassword", dto.currentPassword, UserRules.LOGIN_PASSWORD_MAX_LENGTH)
+        ensure(
+            dto.newPassword.length >= UserRules.PASSWORD_MIN_LENGTH,
+            "newPassword",
+            "must be at least ${UserRules.PASSWORD_MIN_LENGTH} characters",
+        )
+        ensure(
+            dto.newPassword.encodeToByteArray().size <= UserRules.PASSWORD_MAX_BYTES,
+            "newPassword",
+            "must be at most ${UserRules.PASSWORD_MAX_BYTES} bytes",
+        )
+    }
 
     // Only the raw password is checked here; the remaining fields are validated as CreateUserDto.
     fun validate(dto: RegisterUserDto) = validateAll {

@@ -10,4 +10,5 @@ data class UpdateUserDto(
     val lastName: String? = null,
     val fullName: String? = null,
     val phone: String? = null,
+    val passwordHash: String? = null,
 )
