@@ -1,0 +1,16 @@
+# Template only: replace the placeholders or supply environment variables before use.
+spring:
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://db.example.invalid:5432/chiron}
+    username: ${SPRING_DATASOURCE_USERNAME:CHANGE_ME}
+    password: ${SPRING_DATASOURCE_PASSWORD:CHANGE_ME}
+
+springdoc:
+  api-docs:
+    enabled: false
+  swagger-ui:
+    enabled: false
+
+cors:
+  allowed-origins:
+    - ${FRONTEND_ORIGIN:https://frontend.example.invalid}

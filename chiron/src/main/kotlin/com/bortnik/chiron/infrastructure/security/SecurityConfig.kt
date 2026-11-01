@@ -5,6 +5,8 @@ import com.bortnik.chiron.infrastructure.config.CorsProperties
 import com.bortnik.chiron.infrastructure.websocket.WebSocketConfig
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
+import org.springframework.core.env.Environment
+import org.springframework.core.env.Profiles
 import org.springframework.http.HttpHeaders
 import org.springframework.http.HttpMethod
 import org.springframework.security.config.annotation.web.builders.HttpSecurity
@@ -31,6 +33,7 @@ class SecurityConfig {
         jwtActorResolver: JwtActorResolver,
         authenticationEntryPoint: AuthenticationEntryPoint,
         accessDeniedHandler: AccessDeniedHandler,
+        environment: Environment,
     ): SecurityFilterChain = http
         .cors { }
         .csrf { it.disable() }
@@ -43,7 +46,12 @@ class SecurityConfig {
             it.accessDeniedHandler(accessDeniedHandler)
         }
         .authorizeHttpRequests {
-            it.requestMatchers(*DOCUMENTATION_ENDPOINTS, "/error").permitAll()
+            if (environment.acceptsProfiles(Profiles.of("local & !production"))) {
+                it.requestMatchers(*DOCUMENTATION_ENDPOINTS).permitAll()
+            } else {
+                it.requestMatchers(*DOCUMENTATION_ENDPOINTS).denyAll()
+            }
+            it.requestMatchers("/error").permitAll()
             it.requestMatchers(HttpMethod.GET, "/actuator/health", "/actuator/health/**").permitAll()
             it.requestMatchers(HttpMethod.POST, "/api/v1/auth/register", "/api/v1/auth/login").permitAll()
             it.requestMatchers(HttpMethod.GET, *PUBLIC_READ_ENDPOINTS).permitAll()
@@ -76,7 +84,9 @@ class SecurityConfig {
     fun passwordEncoder(): PasswordEncoder = BCryptPasswordEncoder()
 
     private companion object {
-        val DOCUMENTATION_ENDPOINTS = arrayOf("/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html", "/scalar.html")
+        val DOCUMENTATION_ENDPOINTS = arrayOf(
+            "/v3/api-docs/**", "/v3/api-docs.yaml", "/swagger-ui/**", "/swagger-ui.html", "/scalar.html",
+        )
 
         // Clinic catalog and veterinarian availability, browsable before signing in.
         val PUBLIC_READ_ENDPOINTS = arrayOf(

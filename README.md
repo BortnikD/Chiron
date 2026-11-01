@@ -36,7 +36,7 @@ Copy-Item .env.example .env
 | `JWT_SECRET` | Секрет для подписи JWT. **Сгенерируйте свой** — команды есть в комментарии в `.env.example`. При смене секрета все выданные токены станут недействительными |
 | `ADMIN_EMAIL`, `ADMIN_PASSWORD`, `ADMIN_PHONE`, `ADMIN_FIRST_NAME`, `ADMIN_LAST_NAME` | Первый администратор. Создаётся при старте, если пользователя с таким email ещё нет. **Смените пароль** |
 | `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_DB` | Учётные данные и имя базы. Используются и контейнером PostgreSQL, и бэкендом |
-| `SPRING_PROFILES_ACTIVE` | Необязательно. Активные Spring-профили через запятую |
+| `SPRING_PROFILES_ACTIVE` | Для запуска из IDE / Java: `local` или `production`. Локальный Compose всегда задаёт `local` |
 
 Адрес базы для бэкенда (`SPRING_DATASOURCE_URL`) задаётся в `docker-compose.local.yaml` автоматически —
 внутри сети compose база доступна по имени сервиса `postgres`, а не по `localhost`.
@@ -84,12 +84,28 @@ docker compose -f docker-compose.local.yaml logs -f backend
 Если порт `5432` или `8080` уже занят на вашей машине, поменяйте левую часть в секции `ports`
 в `docker-compose.local.yaml` (например, `"5433:5432"`).
 
+## Окружения
+
+Общие настройки находятся в `chiron/src/main/resources/application.yaml`, различия — в
+`application-local.yaml` и `application-production.yaml` рядом с ним.
+
+- `local`: локальная БД, CORS для localhost:3000 и localhost:5173, открытая документация API.
+- `production`: шаблон с плейсхолдерами БД и фронтенда, документация отключена и заблокирована.
+  Реального production-развёртывания нет. Для использования шаблона замените плейсхолдеры или задайте
+  `SPRING_DATASOURCE_URL`, `SPRING_DATASOURCE_USERNAME`, `SPRING_DATASOURCE_PASSWORD`, `FRONTEND_ORIGIN`.
+  `JWT_SECRET` и `ADMIN_*` передаются через окружение, как и в local; значения из `.env.example` — только примеры.
+
+При запуске из IDE задайте `SPRING_PROFILES_ACTIVE=local` и переменные JWT / администратора в окружении
+конфигурации запуска. Spring Boot сам не загружает `.env`; в Docker это делает `env_file`.
+Для шаблона production используйте `SPRING_PROFILES_ACTIVE=production`. Выбирайте один профиль.
+Без профиля локальные настройки БД не подставляются, документация закрыта.
+
 ## Документация
 
 Подробное описание API: где открыть документацию, как авторизоваться и какие эндпоинты за что отвечают —
 в [`docs/api.md`](docs/api.md).
 
-После запуска бэкенда документация доступна по адресам:
+После запуска бэкенда с профилем `local` документация доступна по адресам:
 
 | Что | Адрес |
 |---|---|

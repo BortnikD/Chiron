@@ -5,7 +5,7 @@
 
 ## Как открыть
 
-Сначала запустите бэкенд (`chiron`). По умолчанию он слушает порт `8080`.
+Сначала запустите бэкенд (`chiron`) с профилем `local`. По умолчанию он слушает порт `8080`.
 
 | Вариант | Адрес | Когда использовать |
 |---|---|---|
@@ -14,7 +14,8 @@
 | **OpenAPI JSON** | http://localhost:8080/v3/api-docs | Сырая спецификация: импорт в Postman / Insomnia / Bruno, генерация клиента для фронтенда |
 | **Use case диаграмма** | [`docs/usecase.excalidraw`](./usecase.excalidraw) | Открыть на https://excalidraw.com (Open → выбрать файл) или в VS Code с расширением Excalidraw |
 
-Документация (`/scalar.html`, `/swagger-ui.html`, `/v3/api-docs`) доступна без авторизации.
+Документация (`/scalar.html`, `/swagger-ui.html`, `/v3/api-docs`, `/v3/api-docs.yaml`) доступна без авторизации только в `local`.
+В `production` и без активного профиля доступ запрещён, в том числе авторизованным пользователям.
 
 ## Проверка состояния (health check)
 
