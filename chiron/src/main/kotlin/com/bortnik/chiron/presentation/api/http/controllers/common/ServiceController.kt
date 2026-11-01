@@ -20,7 +20,11 @@ import java.util.UUID
 @Tag(name = "Services")
 class ServiceController(private val getServiceUseCase: GetServiceUseCase) {
 
-    @Operation(summary = "List active services")
+    @Operation(
+        summary = "List active services",
+        description = "With speciesId, returns effectivePrice and effectiveDurationMin using species-specific " +
+            "overrides or the base values when an override is null. Without speciesId, both fields are null.",
+    )
     @GetMapping
     fun findAll(
         @Parameter(description = "Return only services of this specialization")
