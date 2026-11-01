@@ -1,7 +1,7 @@
 package com.bortnik.chiron.application.usecase.common.veterinarian
 
 import com.bortnik.chiron.domain.dto.veterinarian.VeterinarianFilter
-import com.bortnik.chiron.domain.entities.Veterinarian
+import com.bortnik.chiron.domain.dto.veterinarian.VeterinarianDetailsDto
 import com.bortnik.chiron.domain.exceptions.notfound.VeterinarianNotFoundException
 import com.bortnik.chiron.domain.repositories.VeterinarianRepository
 import org.springframework.stereotype.Service
@@ -12,14 +12,14 @@ import java.util.UUID
 @Transactional(readOnly = true)
 class GetVeterinarianUseCase(private val veterinarianRepository: VeterinarianRepository) {
 
-    fun findById(id: UUID): Veterinarian =
-        veterinarianRepository.findById(id) ?: throw VeterinarianNotFoundException(id)
+    fun findById(id: UUID): VeterinarianDetailsDto =
+        veterinarianRepository.findDetailsById(id) ?: throw VeterinarianNotFoundException(id)
 
-    fun findByUserId(userId: UUID): Veterinarian =
-        veterinarianRepository.findByUserId(userId) ?: throw VeterinarianNotFoundException("userId", userId)
+    fun findByUserId(userId: UUID): VeterinarianDetailsDto =
+        veterinarianRepository.findDetailsByUserId(userId) ?: throw VeterinarianNotFoundException("userId", userId)
 
-    fun findAll(filter: VeterinarianFilter): List<Veterinarian> = veterinarianRepository.findAll(filter)
+    fun findAll(filter: VeterinarianFilter): List<VeterinarianDetailsDto> = veterinarianRepository.findAllDetails(filter)
 
     // Inactive veterinarians cannot be booked, so the public list does not show them.
-    fun findAllActive(filter: VeterinarianFilter): List<Veterinarian> = findAll(filter.copy(isActive = true))
+    fun findAllActive(filter: VeterinarianFilter): List<VeterinarianDetailsDto> = findAll(filter.copy(isActive = true))
 }
