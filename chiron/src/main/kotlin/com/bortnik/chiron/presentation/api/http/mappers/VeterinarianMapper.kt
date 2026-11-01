@@ -25,6 +25,7 @@ fun VeterinarianDetailsDto.toResponse(): VeterinarianResponse = VeterinarianResp
     isActive = veterinarian.isActive,
     createdAt = veterinarian.createdAt,
     updatedAt = veterinarian.updatedAt,
+    speciesIds = speciesIds,
 )
 
 fun CreateVeterinarianRequest.toDto(): CreateVeterinarianDto = CreateVeterinarianDto(

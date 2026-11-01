@@ -8,6 +8,7 @@ import com.bortnik.chiron.infrastructure.persistence.models.ExposedVeterinarianS
 import org.jetbrains.exposed.v1.core.Op
 import org.jetbrains.exposed.v1.core.and
 import org.jetbrains.exposed.v1.core.eq
+import org.jetbrains.exposed.v1.core.inList
 import org.jetbrains.exposed.v1.jdbc.deleteWhere
 import org.jetbrains.exposed.v1.jdbc.insertReturning
 import org.jetbrains.exposed.v1.jdbc.selectAll
@@ -38,11 +39,18 @@ class ExposedVeterinarianSpeciesPermissionRepository : VeterinarianSpeciesPermis
             .map { it.toVeterinarianSpeciesPermission() }
     }
 
+    override fun findAllByVeterinarianIds(veterinarianIds: List<UUID>): List<VeterinarianSpeciesPermission> =
+        exposedSql {
+            ExposedVeterinarianSpeciesPermissionTable.selectAll()
+                .where { ExposedVeterinarianSpeciesPermissionTable.veterinarianId inList veterinarianIds }
+                .map { it.toVeterinarianSpeciesPermission() }
+        }
+
     override fun delete(veterinarianId: UUID, speciesId: UUID): Boolean = exposedSql {
         ExposedVeterinarianSpeciesPermissionTable.deleteWhere { byKey(veterinarianId, speciesId) } > 0
     }
 
     private fun byKey(veterinarianId: UUID, speciesId: UUID): Op<Boolean> =
         (ExposedVeterinarianSpeciesPermissionTable.veterinarianId eq veterinarianId) and
-            (ExposedVeterinarianSpeciesPermissionTable.speciesId eq speciesId)
+                (ExposedVeterinarianSpeciesPermissionTable.speciesId eq speciesId)
 }

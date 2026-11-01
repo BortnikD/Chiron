@@ -17,4 +17,5 @@ data class VeterinarianResponse(
     val isActive: Boolean,
     val createdAt: Instant,
     val updatedAt: Instant,
+    val speciesIds: List<UUID> = emptyList(),
 )
