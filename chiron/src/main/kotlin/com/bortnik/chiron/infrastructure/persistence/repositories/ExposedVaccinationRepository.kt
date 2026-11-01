@@ -12,10 +12,12 @@ import com.bortnik.chiron.infrastructure.persistence.containsIgnoreCase
 import com.bortnik.chiron.infrastructure.persistence.exposedSql
 import com.bortnik.chiron.infrastructure.persistence.mappers.toVaccination
 import com.bortnik.chiron.infrastructure.persistence.models.ExposedAppointmentTable
+import com.bortnik.chiron.infrastructure.persistence.models.ExposedPetTable
 import com.bortnik.chiron.infrastructure.persistence.models.ExposedVaccinationTable
 import com.bortnik.chiron.infrastructure.persistence.toPage
 import org.jetbrains.exposed.v1.core.Op
 import org.jetbrains.exposed.v1.core.SortOrder
+import org.jetbrains.exposed.v1.core.and
 import org.jetbrains.exposed.v1.core.andIfNotNull
 import org.jetbrains.exposed.v1.core.eq
 import org.jetbrains.exposed.v1.core.greaterEq
@@ -65,6 +67,21 @@ class ExposedVaccinationRepository : VaccinationRepository {
             .map { it.toVaccination() }
     }
 
+    override fun findAllByOwnerId(ownerId: UUID, filter: VaccinationFilter): List<Vaccination> = exposedSql {
+        ExposedVaccinationTable.selectAll()
+            .where {
+                filter.toCondition() and (
+                        ExposedVaccinationTable.petId inSubQuery ExposedPetTable.select(ExposedPetTable.id)
+                            .where { ExposedPetTable.ownerId eq ownerId }
+                        )
+            }
+            .orderBy(
+                ExposedVaccinationTable.nextDueOn to SortOrder.ASC_NULLS_LAST,
+                ExposedVaccinationTable.id to SortOrder.ASC,
+            )
+            .map { it.toVaccination() }
+    }
+
     override fun findAll(filter: VaccinationFilter, pageRequest: PageRequest): Page<Vaccination> = exposedSql {
         ExposedVaccinationTable.selectAll()
             .where { filter.toCondition() }
@@ -94,8 +111,8 @@ class ExposedVaccinationRepository : VaccinationRepository {
         .andIfNotNull(
             patientOfVeterinarianId?.let {
                 ExposedVaccinationTable.petId inSubQuery
-                    ExposedAppointmentTable.select(ExposedAppointmentTable.petId)
-                        .where { ExposedAppointmentTable.veterinarianId eq it }
+                        ExposedAppointmentTable.select(ExposedAppointmentTable.petId)
+                            .where { ExposedAppointmentTable.veterinarianId eq it }
             },
         )
         .andIfNotNull(name?.let { ExposedVaccinationTable.name.containsIgnoreCase(it) })
