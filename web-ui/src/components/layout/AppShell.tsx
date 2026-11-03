@@ -4,9 +4,11 @@ import React, { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useAuth } from '../../context/AuthContext';
+import { useTheme } from '../../context/ThemeContext';
 import { ChironLogo } from '../ui/ChironLogo';
 import { ThemeToggle } from '../ui/ThemeToggle';
 import { notificationsApi } from '../../api';
+import { tokenStorage } from '../../api/client';
 import { AppNotification } from '../../types';
 import {
   Home,
@@ -28,6 +30,10 @@ import {
   User as UserIcon,
   Bell,
   Check,
+  Search,
+  Settings,
+  Syringe,
+  Info,
 } from 'lucide-react';
 
 interface NavItem {
@@ -47,6 +53,7 @@ interface AppShellProps {
   title?: string;
   subtitle?: string;
   actions?: React.ReactNode;
+  currentSection?: string;
 }
 
 export const AppShell: React.FC<AppShellProps> = ({
@@ -54,10 +61,65 @@ export const AppShell: React.FC<AppShellProps> = ({
   title,
   subtitle,
   actions,
+  currentSection,
 }) => {
-  const { user, role, logout } = useAuth();
+  const { user, role, isAuthenticated, isLoading, logout } = useAuth();
+  const { resolvedTheme } = useTheme();
   const pathname = usePathname();
   const router = useRouter();
+
+  // BFCache (Back/Forward Cache) защита: при нажатии кнопки «Назад» в браузере после логаута
+  useEffect(() => {
+    const handleAuthCheck = () => {
+      const token = tokenStorage.get();
+      if (!token) {
+        logout();
+        window.location.replace('/login');
+      }
+    };
+
+    window.addEventListener('pageshow', handleAuthCheck);
+    window.addEventListener('storage', handleAuthCheck);
+    return () => {
+      window.removeEventListener('pageshow', handleAuthCheck);
+      window.removeEventListener('storage', handleAuthCheck);
+    };
+  }, [logout]);
+
+  // Автоматический редирект неавторизованных или несоответствующих роли пользователей
+  useEffect(() => {
+    const token = tokenStorage.get();
+    if (!token) {
+      if (isAuthenticated) logout();
+      router.replace('/login');
+      return;
+    }
+
+    if (!isLoading && !isAuthenticated) {
+      router.replace('/login');
+      return;
+    }
+
+    if (!isLoading && role) {
+      if (pathname.startsWith('/admin') && role !== 'ADMIN') {
+        router.replace(role === 'VETERINARIAN' ? '/vet/dashboard' : '/client/dashboard');
+      } else if (pathname.startsWith('/vet') && role !== 'VETERINARIAN') {
+        router.replace(role === 'ADMIN' ? '/admin/dashboard' : '/client/dashboard');
+      } else if (pathname.startsWith('/client') && role !== 'CLIENT') {
+        router.replace(role === 'ADMIN' ? '/admin/dashboard' : '/vet/dashboard');
+      }
+    }
+  }, [isLoading, isAuthenticated, role, pathname, router, logout]);
+
+  // Проверка прав для текущего раздела
+  const isAuthorized = React.useMemo(() => {
+    if (isLoading) return false;
+    if (!isAuthenticated || !tokenStorage.get()) return false;
+    if (pathname.startsWith('/admin')) return role === 'ADMIN';
+    if (pathname.startsWith('/vet')) return role === 'VETERINARIAN';
+    if (pathname.startsWith('/client')) return role === 'CLIENT';
+    return true;
+  }, [isLoading, isAuthenticated, role, pathname]);
 
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -132,20 +194,42 @@ export const AppShell: React.FC<AppShellProps> = ({
     if (role === 'ADMIN') {
       return [
         {
-          label: 'Клиника',
+          label: 'Обзор',
           items: [
-            { href: '/admin/dashboard', label: 'Обзор', icon: <BarChart2 className="ic" /> },
-            { href: '/admin/appointments', label: 'Записи', icon: <Calendar className="ic" /> },
-            { href: '/admin/pets', label: 'Пациенты', icon: <PawPrint className="ic" /> },
-            { href: '/admin/users', label: 'Пользователи', icon: <Users className="ic" /> },
-            { href: '/admin/statistics', label: 'Статистика', icon: <TrendingUp className="ic" /> },
+            { href: '/admin/dashboard', label: 'Дашборд', icon: <BarChart2 className="ic" /> },
           ],
         },
         {
-          label: 'Персонал и справочники',
+          label: 'Клиника',
           items: [
-            { href: '/admin/veterinarians', label: 'Врачи и графики', icon: <Stethoscope className="ic" /> },
-            { href: '/admin/services', label: 'Услуги и цены', icon: <ClipboardList className="ic" /> },
+            { href: '/admin/appointments', label: 'Записи', icon: <Calendar className="ic" /> },
+            { href: '/admin/pets', label: 'Питомцы', icon: <PawPrint className="ic" /> },
+            { href: '/admin/appointments?tab=VACC', label: 'Прививки', icon: <Syringe className="ic" /> },
+            { href: '/admin/users', label: 'Пользователи', icon: <Users className="ic" /> },
+          ],
+        },
+        {
+          label: 'Персонал',
+          items: [
+            { href: '/admin/veterinarians', label: 'Врачи', icon: <Stethoscope className="ic" /> },
+            { href: '/admin/veterinarians?tab=sched', label: 'Расписания', icon: <Clock className="ic" /> },
+            { href: '/admin/veterinarians?tab=exc', label: 'Исключения', icon: <CalendarPlus className="ic" /> },
+          ],
+        },
+        {
+          label: 'Справочники',
+          items: [
+            { href: '/admin/services', label: 'Услуги', icon: <ClipboardList className="ic" /> },
+            { href: '/admin/services?tab=species', label: 'Виды животных', icon: <PawPrint className="ic" /> },
+            { href: '/admin/services?tab=specs', label: 'Специализации', icon: <Stethoscope className="ic" /> },
+          ],
+        },
+        {
+          label: 'Личное',
+          items: [
+            { href: '/admin/dashboard#notifs', label: 'Уведомления', icon: <Bell className="ic" />, badge: unreadCount > 0 ? unreadCount : undefined },
+            { href: '/admin/dashboard#profile', label: 'Профиль', icon: <UserIcon className="ic" /> },
+            { href: '/admin/dashboard#settings', label: 'Настройки', icon: <Settings className="ic" /> },
           ],
         },
       ];
@@ -170,11 +254,12 @@ export const AppShell: React.FC<AppShellProps> = ({
       {
         items: [
           { href: '/client/dashboard', label: 'Главная', icon: <Home className="ic" /> },
-          { href: '/client/pets', label: 'Мои питомцы', icon: <PawPrint className="ic" /> },
-          { href: '/client/appointments', label: 'Мои записи', icon: <Calendar className="ic" /> },
-          { href: '/client/book', label: 'Записаться', icon: <CalendarPlus className="ic text-[var(--primary-text)]" /> },
-          { href: '/services', label: 'Услуги и цены', icon: <ClipboardList className="ic" /> },
-          { href: '/veterinarians', label: 'Врачи клиники', icon: <Stethoscope className="ic" /> },
+          { href: '/client/pets', label: 'Питомцы', icon: <PawPrint className="ic" /> },
+          { href: '/client/appointments', label: 'Записи', icon: <Calendar className="ic" /> },
+          { href: '/client/appointments?tab=VACC', label: 'Прививки', icon: <Syringe className="ic" /> },
+          { href: '/services', label: 'Услуги', icon: <ClipboardList className="ic" /> },
+          { href: '/veterinarians', label: 'Врачи', icon: <Stethoscope className="ic" /> },
+          { href: '/client/dashboard#notifs', label: 'Уведомления', icon: <Bell className="ic" />, badge: unreadCount > 0 ? unreadCount : undefined },
         ],
       },
     ];
@@ -188,27 +273,44 @@ export const AppShell: React.FC<AppShellProps> = ({
     : 'CH';
 
   const roleLabel =
-    role === 'ADMIN' ? 'Администратор' : role === 'VETERINARIAN' ? 'Ветеринар' : 'Клиент';
+    role === 'ADMIN' ? 'Администратор' : role === 'VETERINARIAN' ? 'Кабинет врача' : 'Кабинет клиента';
+
+  if (!isAuthorized) {
+    return (
+      <div
+        className="app"
+        data-theme={resolvedTheme}
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          height: '100vh',
+          width: '100vw',
+        }}
+      >
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px' }}>
+          <div className="spinner" style={{ width: '32px', height: '32px' }} />
+          <span className="small muted">Проверка прав доступа...</span>
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <div className="flex w-full h-screen overflow-hidden p-2 gap-2 bg-[var(--background)] text-[var(--foreground)]">
+    <div className="app" data-theme={resolvedTheme}>
       {/* Затемнение фона мобильного меню */}
       {mobileOpen && (
         <div
-          className="fixed inset-0 bg-black/60 z-40 lg:hidden backdrop-blur-xs"
+          className="fixed inset-0 bg-black/60 z-40 mobile-only backdrop-blur-xs"
           onClick={() => setMobileOpen(false)}
         />
       )}
 
       {/* Боковая панель навигации */}
       <aside
-        className={`island sidebar flex flex-col justify-between shrink-0 z-50 transition-all duration-200 ${
+        className={`island sidebar flex flex-col justify-between shrink-0 transition-all duration-200 ${
           collapsed ? 'collapsed' : ''
-        } ${
-          mobileOpen
-            ? 'fixed inset-y-2 left-2 z-50 shadow-2xl flex!'
-            : 'hidden lg:flex'
-        }`}
+        } ${mobileOpen ? 'open' : ''}`}
       >
         <div className="flex flex-col gap-1 min-h-0">
           {/* Логотип клиники */}
@@ -228,7 +330,7 @@ export const AppShell: React.FC<AppShellProps> = ({
             {/* Кнопка закрытия мобильного меню */}
             <button
               type="button"
-              className="lg:hidden btn btn-ghost btn-icon h-7 w-7"
+              className="mobile-only btn btn-ghost btn-icon h-7 w-7"
               onClick={() => setMobileOpen(false)}
             >
               <X className="w-4 h-4" />
@@ -250,13 +352,13 @@ export const AppShell: React.FC<AppShellProps> = ({
                     <Link
                       key={item.href}
                       href={item.href}
-                      className={`nav-item ${isActive ? 'on font-semibold' : ''}`}
+                      className={`nav-item ${isActive ? 'active' : ''}`}
                       title={collapsed ? item.label : undefined}
                     >
                       {item.icon}
                       {!collapsed && <span className="label flex-1 truncate text-xs">{item.label}</span>}
                       {!collapsed && item.badge !== undefined && (
-                        <span className="nav-count text-[10px] px-1.5 py-0.2 rounded-full bg-[var(--muted)] text-[var(--muted-foreground)]">
+                        <span className="nav-count">
                           {item.badge}
                         </span>
                       )}
@@ -268,23 +370,13 @@ export const AppShell: React.FC<AppShellProps> = ({
           </div>
         </div>
 
-        {/* Подвал боковой панели */}
-        <div className="pt-2 border-t border-[var(--border)] flex flex-col gap-1 shrink-0">
-          <a
-            href="tel:+78632001000"
-            className="nav-item call-nav text-xs text-[var(--muted-foreground)] hover:text-[var(--primary-text)]"
-            title="Позвонить в приёмную: +7 863 200-10-00"
-          >
-            <Phone className="ic shrink-0 text-emerald-500" />
-            {!collapsed && (
-              <div className="flex flex-col truncate">
-                <span className="text-[11px] font-medium leading-none">Приёмная</span>
-                <span className="text-[10px] opacity-75 font-mono leading-tight">+7 863 200-10-00</span>
-              </div>
-            )}
-          </a>
+        {/* Подвал боковой панели согласно прототипу */}
+        <div className="sidebar-foot shrink-0">
+          <div className="health" title="GET /actuator/health → UP">
+            <span className="dot" />
+            {!collapsed && <span className="label text-xs">Сервер доступен</span>}
+          </div>
 
-          {/* Кнопка сворачивания панели (десктоп) */}
           <button
             type="button"
             className="nav-item hidden lg:flex items-center text-xs text-[var(--muted-foreground)]"
@@ -292,7 +384,7 @@ export const AppShell: React.FC<AppShellProps> = ({
             title={collapsed ? 'Развернуть меню' : 'Свернуть меню'}
           >
             {collapsed ? <ChevronRight className="ic" /> : <ChevronLeft className="ic" />}
-            {!collapsed && <span className="text-xs">Свернуть</span>}
+            {!collapsed && <span className="label text-xs">Свернуть</span>}
           </button>
         </div>
       </aside>
@@ -305,40 +397,51 @@ export const AppShell: React.FC<AppShellProps> = ({
             {/* Кнопка мобильного меню */}
             <button
               type="button"
-              className="lg:hidden btn btn-ghost btn-icon h-8 w-8 shrink-0"
+              className="mobile-only btn btn-ghost btn-icon h-8 w-8 shrink-0"
               onClick={() => setMobileOpen(true)}
               aria-label="Открыть меню"
             >
               <Menu className="w-4 h-4" />
             </button>
 
-            <div className="flex flex-col min-w-0">
-              <h1 className="text-sm font-semibold truncate leading-tight text-[var(--foreground)]">
-                {title || 'Chiron'}
-              </h1>
-              {subtitle && (
-                <span className="text-[11px] text-[var(--muted-foreground)] truncate leading-tight">
-                  {subtitle}
-                </span>
-              )}
-            </div>
+            {/* Хлебные крошки согласно прототипу */}
+            <nav className="crumbs" aria-label="Хлебные крошки">
+              <span>{role === 'ADMIN' ? 'Обзор' : 'Кабинет'}</span>
+              <ChevronRight className="ic" style={{ width: '14px', height: '14px' }} />
+              <span className="cur">{currentSection || title || (role === 'ADMIN' ? 'Дашборд' : 'Главная')}</span>
+            </nav>
           </div>
 
+          <div className="spacer" />
+
           {/* Панель действий справа */}
-          <div className="flex items-center gap-1.5 shrink-0">
+          <div className="flex items-center gap-2 shrink-0">
             {actions}
 
+            {/* Быстрый поиск согласно прототипу */}
+            <button
+              type="button"
+              className="search-trigger hidden md:inline-flex"
+              onClick={() => router.push(role === 'ADMIN' ? '/admin/appointments' : '/services')}
+              aria-label="Поиск (Ctrl+K)"
+            >
+              <Search className="ic" />
+              <span>{role === 'ADMIN' ? 'Разделы, пользователи, пит...' : 'Разделы, питомцы, записи'}</span>
+              <span className="kbd">Ctrl K</span>
+            </button>
+
             {/* Колокольчик уведомлений */}
-            <div className="relative" ref={bellMenuRef}>
+            <div className="rel" ref={bellMenuRef} style={{ position: 'relative' }}>
               <button
                 type="button"
-                className="btn btn-ghost btn-icon h-8 w-8 relative"
+                className="btn btn-ghost btn-icon h-8 w-8"
                 onClick={() => setBellDropdown(!bellDropdown)}
+                aria-label="Уведомления"
                 title="Уведомления"
               >
                 <Bell className="w-4 h-4" />
                 {unreadCount > 0 && (
-                  <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-[var(--primary)]" />
+                  <span className="bell-badge">{unreadCount}</span>
                 )}
               </button>
 
@@ -348,12 +451,13 @@ export const AppShell: React.FC<AppShellProps> = ({
                   style={{
                     position: 'absolute',
                     right: 0,
-                    left: 'auto',
                     top: 'calc(100% + 6px)',
-                    width: '320px',
-                    maxWidth: 'calc(100vw - 24px)',
+                    width: '360px',
+                    maxWidth: 'calc(100vw - 32px)',
                     zIndex: 100,
                   }}
+                  role="dialog"
+                  aria-label="Уведомления"
                 >
                   <div className="flex items-center justify-between pb-1.5 border-b border-[var(--border)]">
                     <div className="flex items-center gap-1.5">
@@ -420,63 +524,81 @@ export const AppShell: React.FC<AppShellProps> = ({
               )}
             </div>
 
-            {/* Переключатель темы оформления */}
-            <ThemeToggle />
-
-            {/* Меню профиля пользователя */}
-            <div className="relative" ref={userMenuRef}>
+            {/* Меню профиля пользователя (аватар) */}
+            <div className="rel" ref={userMenuRef} style={{ position: 'relative' }}>
               <button
                 type="button"
-                className="flex items-center gap-2 p-1 rounded-lg hover:bg-[var(--accent)] transition-colors"
+                className="btn btn-ghost"
+                style={{ padding: '0 4px' }}
                 onClick={() => setUserDropdown(!userDropdown)}
+                aria-label="Меню профиля"
               >
-                <span className="avatar w-7 h-7 text-[11px] font-bold">
+                <span className="avatar sm font-bold">
                   {initials}
-                </span>
-                <span className="text-xs font-medium hidden sm:inline-block max-w-[120px] truncate">
-                  {user?.firstName ? `${user.firstName} ${user.lastName?.charAt(0) || ''}.` : 'Мой аккаунт'}
                 </span>
               </button>
 
               {userDropdown && (
                 <div
-                  className="popover shadow-xl flex flex-col gap-0.5 p-1.5"
+                  className="popover menu shadow-xl flex flex-col p-1.5"
                   style={{
                     position: 'absolute',
                     right: 0,
                     left: 'auto',
                     top: 'calc(100% + 6px)',
-                    width: '200px',
+                    width: '220px',
                     maxWidth: 'calc(100vw - 24px)',
                     zIndex: 100,
                   }}
                 >
-                  <div className="px-2 py-1.5 border-b border-[var(--border)] mb-1">
-                    <div className="font-semibold text-xs truncate">
-                      {user?.fullName || `${user?.firstName || ''} ${user?.lastName || ''}`.trim() || 'Пользователь'}
-                    </div>
-                    <div className="text-[10px] text-[var(--muted-foreground)] truncate">{user?.email}</div>
+                  <div className="menu-label">
+                    {user?.fullName || `${user?.firstName || ''} ${user?.lastName || ''}`.trim() || 'Пользователь'} · {roleLabel}
                   </div>
 
                   <Link
-                    href={role === 'VETERINARIAN' ? '/vet/profile' : '/client/dashboard'}
-                    className="menu-item flex items-center gap-2 px-2 py-1.5 text-xs rounded hover:bg-[var(--accent)] text-inherit no-underline"
+                    href={role === 'VETERINARIAN' ? '/vet/profile' : '/client/profile'}
+                    className="menu-item flex items-center gap-2"
                     onClick={() => setUserDropdown(false)}
                   >
-                    <UserIcon className="w-3.5 h-3.5 text-[var(--muted-foreground)]" />
+                    <UserIcon className="ic text-[var(--muted-foreground)]" />
                     <span>Профиль</span>
                   </Link>
 
+                  <Link
+                    href="/client/settings"
+                    className="menu-item flex items-center gap-2"
+                    onClick={() => setUserDropdown(false)}
+                  >
+                    <Settings className="ic text-[var(--muted-foreground)]" />
+                    <span>Настройки</span>
+                  </Link>
+
+                  <Link
+                    href="/services"
+                    className="menu-item flex items-center gap-2"
+                    onClick={() => setUserDropdown(false)}
+                  >
+                    <Info className="ic text-[var(--muted-foreground)]" />
+                    <span>О клинике</span>
+                  </Link>
+
+                  <div className="menu-sep" />
+                  <div className="px-2 py-1 flex items-center justify-between">
+                    <span className="text-xs text-[var(--muted-foreground)]">Тема</span>
+                    <ThemeToggle />
+                  </div>
+                  <div className="menu-sep" />
+
                   <button
                     type="button"
-                    className="menu-item flex items-center gap-2 px-2 py-1.5 text-xs rounded hover:bg-rose-50 hover:text-rose-600 dark:hover:bg-rose-950/40 text-[var(--destructive)] w-full text-left"
+                    className="menu-item flex items-center gap-2 text-[var(--destructive)] w-full text-left"
                     onClick={() => {
                       setUserDropdown(false);
                       logout();
-                      router.push('/login');
+                      router.replace('/login');
                     }}
                   >
-                    <LogOut className="w-3.5 h-3.5" />
+                    <LogOut className="ic" />
                     <span>Выйти</span>
                   </button>
                 </div>
@@ -486,10 +608,134 @@ export const AppShell: React.FC<AppShellProps> = ({
         </header>
 
         {/* Прокручиваемая область страницы */}
-        <main className="flex-1 overflow-y-auto min-h-0 flex flex-col">
+        <main className="flex-1 flex flex-col min-h-0 min-w-0 w-full" style={{ minHeight: 0 }}>
           {children}
         </main>
       </div>
+
+      {/* Нижняя панель навигации для мобильных устройств (< 768px) согласно прототипу */}
+      <nav className="mobile-nav" aria-label="Нижняя навигация">
+        {role === 'CLIENT' && (
+          <>
+            <Link
+              href="/client/dashboard"
+              className={`btn btn-icon ${pathname === '/client/dashboard' ? 'btn-secondary' : 'btn-ghost'}`}
+              title="Главная"
+            >
+              <Home className="ic" />
+            </Link>
+            <Link
+              href="/client/pets"
+              className={`btn btn-icon ${pathname === '/client/pets' ? 'btn-secondary' : 'btn-ghost'}`}
+              title="Питомцы"
+            >
+              <PawPrint className="ic" />
+            </Link>
+            <Link
+              href="/client/appointments"
+              className={`btn btn-icon ${pathname === '/client/appointments' ? 'btn-secondary' : 'btn-ghost'}`}
+              title="Записи"
+            >
+              <Calendar className="ic" />
+            </Link>
+            <Link
+              href="/client/book"
+              className={`btn btn-icon ${pathname === '/client/book' ? 'btn-secondary' : 'btn-ghost'}`}
+              title="Записаться"
+            >
+              <CalendarPlus className="ic" />
+            </Link>
+            <button
+              type="button"
+              className={`btn btn-icon ${bellDropdown ? 'btn-secondary' : 'btn-ghost'} relative`}
+              onClick={() => setBellDropdown(!bellDropdown)}
+              title="Уведомления"
+            >
+              <Bell className="ic" />
+              {unreadCount > 0 && (
+                <span className="dot dot-danger" style={{ position: 'absolute', top: '8px', right: '8px' }} />
+              )}
+            </button>
+          </>
+        )}
+
+        {role === 'VETERINARIAN' && (
+          <>
+            <Link
+              href="/vet/dashboard"
+              className={`btn btn-icon ${pathname === '/vet/dashboard' ? 'btn-secondary' : 'btn-ghost'}`}
+              title="Расписание"
+            >
+              <Clock className="ic" />
+            </Link>
+            <Link
+              href="/vet/patients"
+              className={`btn btn-icon ${pathname === '/vet/patients' ? 'btn-secondary' : 'btn-ghost'}`}
+              title="Пациенты"
+            >
+              <PawPrint className="ic" />
+            </Link>
+            <Link
+              href="/vet/profile"
+              className={`btn btn-icon ${pathname === '/vet/profile' ? 'btn-secondary' : 'btn-ghost'}`}
+              title="Мой профиль"
+            >
+              <UserIcon className="ic" />
+            </Link>
+            <button
+              type="button"
+              className={`btn btn-icon ${bellDropdown ? 'btn-secondary' : 'btn-ghost'} relative`}
+              onClick={() => setBellDropdown(!bellDropdown)}
+              title="Уведомления"
+            >
+              <Bell className="ic" />
+              {unreadCount > 0 && (
+                <span className="dot dot-danger" style={{ position: 'absolute', top: '8px', right: '8px' }} />
+              )}
+            </button>
+          </>
+        )}
+
+        {role === 'ADMIN' && (
+          <>
+            <Link
+              href="/admin/dashboard"
+              className={`btn btn-icon ${pathname === '/admin/dashboard' ? 'btn-secondary' : 'btn-ghost'}`}
+              title="Обзор"
+            >
+              <BarChart2 className="ic" />
+            </Link>
+            <Link
+              href="/admin/appointments"
+              className={`btn btn-icon ${pathname === '/admin/appointments' ? 'btn-secondary' : 'btn-ghost'}`}
+              title="Записи"
+            >
+              <Calendar className="ic" />
+            </Link>
+            <Link
+              href="/admin/pets"
+              className={`btn btn-icon ${pathname === '/admin/pets' ? 'btn-secondary' : 'btn-ghost'}`}
+              title="Пациенты"
+            >
+              <PawPrint className="ic" />
+            </Link>
+            <Link
+              href="/admin/veterinarians"
+              className={`btn btn-icon ${pathname === '/admin/veterinarians' ? 'btn-secondary' : 'btn-ghost'}`}
+              title="Врачи"
+            >
+              <Stethoscope className="ic" />
+            </Link>
+            <Link
+              href="/admin/services"
+              className={`btn btn-icon ${pathname === '/admin/services' ? 'btn-secondary' : 'btn-ghost'}`}
+              title="Услуги"
+            >
+              <ClipboardList className="ic" />
+            </Link>
+          </>
+        )}
+      </nav>
     </div>
   );
 };
