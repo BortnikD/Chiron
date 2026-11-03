@@ -47,18 +47,19 @@ export const ThemeProvider: React.FC<{ children: ReactNode }> = ({ children }) =
   useEffect(() => {
     if (!mounted) return;
     document.documentElement.setAttribute('data-theme', resolvedTheme);
+    document.body.setAttribute('data-theme', resolvedTheme);
     if (resolvedTheme === 'dark') {
       document.documentElement.classList.add('dark');
+      document.body.classList.add('dark');
     } else {
       document.documentElement.classList.remove('dark');
+      document.body.classList.remove('dark');
     }
   }, [resolvedTheme, mounted]);
 
   return (
     <ThemeContext.Provider value={{ theme, resolvedTheme, setTheme }}>
-      <div className="app min-h-screen w-full" data-theme={resolvedTheme}>
-        {children}
-      </div>
+      {children}
     </ThemeContext.Provider>
   );
 };

@@ -1,4 +1,7 @@
 @import "tailwindcss";
+
+@variant dark (&:where(.dark, .dark *, [data-theme="dark"], [data-theme="dark"] *));
+
 @import "../styles/chiron.css";
 
 @layer base {
