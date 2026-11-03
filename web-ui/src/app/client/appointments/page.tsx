@@ -1,352 +1,432 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import Link from 'next/link';
-import { clientApi } from '../../../api';
-import { Appointment } from '../../../types';
+import { clientApi, clinicApi } from '../../../api';
+import { Appointment, Pet, Service, Veterinarian } from '../../../types';
 import { AppShell } from '../../../components/layout/AppShell';
-import { Modal } from '../../../components/ui/Modal';
+import { SpeciesIcon } from '../../../components/ui/SpeciesIcon';
 import {
   Calendar,
-  CalendarCheck,
   CalendarPlus,
   Clock,
+  X,
   XCircle,
-  User,
-  PawPrint,
-  ChevronRight,
   AlertCircle,
-  Stethoscope,
-  Info,
+  ChevronRight,
+  Filter,
 } from 'lucide-react';
+
+const STATUS_SHORT: Record<string, string> = {
+  PENDING: 'Ожидает',
+  CONFIRMED: 'Подтверждена',
+  COMPLETED: 'Завершена',
+  CANCELLED: 'Отменена',
+  NO_SHOW: 'Неявка',
+};
 
 export default function AppointmentsPage() {
   const [appointments, setAppointments] = useState<Appointment[]>([]);
+  const [pets, setPets] = useState<Pet[]>([]);
+  const [services, setServices] = useState<Service[]>([]);
+  const [veterinarians, setVeterinarians] = useState<Veterinarian[]>([]);
   const [loading, setLoading] = useState(true);
-  const [tab, setTab] = useState<'UPCOMING' | 'COMPLETED' | 'ALL'>('UPCOMING');
 
-  // Состояние модальных окон
-  const [cancellingAppt, setCancellingAppt] = useState<Appointment | null>(null);
+  // Фильтры
+  const [tab, setTab] = useState<'UPCOMING' | 'COMPLETED' | 'ALL'>('UPCOMING');
+  const [selectedPetId, setSelectedPetId] = useState<string>('ALL');
+
+  // Выбранная запись для бокового острова детального просмотра
+  const [selectedAppt, setSelectedAppt] = useState<Appointment | null>(null);
+
+  // Отмена записи
+  const [isCancelModalOpen, setIsCancelModalOpen] = useState(false);
   const [cancelReason, setCancelReason] = useState('');
   const [cancelling, setCancelling] = useState(false);
+  const [cancelError, setCancelError] = useState<string | null>(null);
 
-  const [detailsAppt, setDetailsAppt] = useState<Appointment | null>(null);
-
-  const loadAppointments = () => {
+  const loadAll = async () => {
     setLoading(true);
-    clientApi
-      .getAppointments(0, 50)
-      .then((res) => {
-        const items = res?.items ?? (Array.isArray(res) ? res : []);
-        setAppointments(items);
-      })
-      .catch((err) => {
-        console.error('Failed to load appointments', err);
-        setAppointments([]);
-      })
-      .finally(() => setLoading(false));
+    try {
+      const [apptsRes, petsRes, svcRes, vetsRes] = await Promise.all([
+        clientApi.getAppointments(0, 100),
+        clientApi.getPets(),
+        clinicApi.getServices(),
+        clinicApi.getVeterinarians(),
+      ]);
+
+      const items = apptsRes?.items ?? (Array.isArray(apptsRes) ? apptsRes : []);
+      setAppointments(items);
+      setPets(Array.isArray(petsRes) ? petsRes : []);
+      setServices(Array.isArray(svcRes) ? svcRes : []);
+      setVeterinarians(Array.isArray(vetsRes) ? vetsRes : []);
+
+      if (items.length > 0 && !selectedAppt && typeof window !== 'undefined' && window.innerWidth >= 1280) {
+        setSelectedAppt(items[0]);
+      }
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
   };
 
   useEffect(() => {
-    loadAppointments();
+    loadAll();
   }, []);
 
-  const handleCancel = async () => {
-    if (!cancellingAppt) return;
+  const petsMap = useMemo(() => {
+    const map: Record<string, Pet> = {};
+    pets.forEach((p) => {
+      map[p.id] = p;
+    });
+    return map;
+  }, [pets]);
+
+  const servicesMap = useMemo(() => {
+    const map: Record<string, Service> = {};
+    services.forEach((s) => {
+      map[s.id] = s;
+    });
+    return map;
+  }, [services]);
+
+  const handleCancelAppointment = async () => {
+    if (!selectedAppt) return;
     setCancelling(true);
+    setCancelError(null);
+
     try {
-      await clientApi.cancelAppointment(cancellingAppt.id, cancelReason);
-      setCancellingAppt(null);
+      await clientApi.cancelAppointment(selectedAppt.id, cancelReason.trim() || undefined);
+      setIsCancelModalOpen(false);
       setCancelReason('');
-      loadAppointments();
-    } catch (err) {
-      console.error(err);
+      await loadAll();
+      if (selectedAppt) {
+        setSelectedAppt((prev) => (prev ? { ...prev, status: 'CANCELLED' } : null));
+      }
+    } catch (err: any) {
+      setCancelError(err?.message || 'Не удалось отменить запись');
     } finally {
       setCancelling(false);
     }
   };
 
-  const safeAppointments = appointments || [];
-  const filtered = safeAppointments.filter((appt) => {
-    const isUpcoming = appt.status === 'PENDING' || appt.status === 'CONFIRMED';
-    const isCompleted = appt.status === 'COMPLETED' || appt.status === 'CANCELLED' || appt.status === 'NO_SHOW';
+  const filteredAppointments = appointments.filter((a) => {
+    const isUpcoming = a.status === 'PENDING' || a.status === 'CONFIRMED';
+    const isPast = a.status === 'COMPLETED' || a.status === 'CANCELLED' || a.status === 'NO_SHOW';
 
-    if (tab === 'UPCOMING') return isUpcoming;
-    if (tab === 'COMPLETED') return isCompleted;
+    if (tab === 'UPCOMING' && !isUpcoming) return false;
+    if (tab === 'COMPLETED' && !isPast) return false;
+    if (selectedPetId !== 'ALL' && a.petId !== selectedPetId) return false;
+
     return true;
   });
 
-  const getStatusBadge = (status: string) => {
-    switch (status) {
-      case 'PENDING':
-        return <span className="badge badge-PENDING">Ожидает</span>;
-      case 'CONFIRMED':
-        return <span className="badge badge-CONFIRMED">Подтверждена</span>;
-      case 'COMPLETED':
-        return <span className="badge badge-COMPLETED">Завершена</span>;
-      case 'CANCELLED':
-        return <span className="badge badge-CANCELLED">Отменена</span>;
-      case 'NO_SHOW':
-        return <span className="badge badge-NO_SHOW">Неявка</span>;
-      default:
-        return <span className="badge">{status}</span>;
-    }
-  };
-
-  const formatPrice = (p?: number) => (p !== undefined ? `${p.toLocaleString('ru-RU')} ₽` : '—');
-
   return (
-    <AppShell
-      title="Мои записи на приём"
-      subtitle="История и предстоящие посещения ветеринарной клиники"
-      actions={
-        <Link href="/client/book" className="btn btn-primary h-8 px-3 text-xs flex items-center gap-1.5">
-          <CalendarPlus className="w-3.5 h-3.5" />
-          <span>Записаться</span>
-        </Link>
-      }
-    >
-      <div className="flex flex-col gap-2 p-1">
-        {/* Список записей на приём */}
-        <section className="island p-5 flex flex-col gap-4">
-          {/* Вкладки: Предстоящие / История */}
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-2 border-b border-[var(--border)]">
+    <AppShell title="Записи на приём" currentSection="Записи">
+      <div className="content-col grow" style={{ gap: '12px' }}>
+        {/* Верхний остров фильтров */}
+        <section className="island filters" aria-label="Фильтры">
+          <div className="field" style={{ width: 'auto' }}>
+            <span className="field-label">Показать</span>
             <div className="seg">
               <button
                 type="button"
-                className={`seg-item text-xs ${tab === 'UPCOMING' ? 'on font-semibold' : ''}`}
+                className={`seg-item ${tab === 'UPCOMING' ? 'on' : ''}`}
                 onClick={() => setTab('UPCOMING')}
               >
                 Предстоящие
               </button>
               <button
                 type="button"
-                className={`seg-item text-xs ${tab === 'COMPLETED' ? 'on font-semibold' : ''}`}
+                className={`seg-item ${tab === 'COMPLETED' ? 'on' : ''}`}
                 onClick={() => setTab('COMPLETED')}
               >
-                Завершённые
+                Прошедшие
               </button>
               <button
                 type="button"
-                className={`seg-item text-xs ${tab === 'ALL' ? 'on font-semibold' : ''}`}
+                className={`seg-item ${tab === 'ALL' ? 'on' : ''}`}
                 onClick={() => setTab('ALL')}
               >
-                Все ({safeAppointments.length})
-              </button>
-            </div>
-
-            <span className="text-xs text-[var(--muted-foreground)]">
-              Найдено записей: <strong className="font-mono text-[var(--foreground)]">{filtered.length}</strong>
-            </span>
-          </div>
-
-          {loading ? (
-            <div className="py-16 text-center text-xs text-[var(--muted-foreground)]">
-              Загрузка записей...
-            </div>
-          ) : filtered.length === 0 ? (
-            <div className="py-16 text-center text-xs text-[var(--muted-foreground)] flex flex-col items-center gap-3">
-              <Calendar className="w-10 h-10 opacity-20" />
-              <span>
-                {tab === 'UPCOMING' ? 'У вас нет предстоящих записей' : 'Записи в данной категории не найдены'}
-              </span>
-              <Link href="/client/book" className="btn btn-primary h-8 px-4 text-xs mt-1">
-                + Записаться на приём
-              </Link>
-            </div>
-          ) : (
-            <div className="flex flex-col gap-2">
-              {filtered.map((appt) => {
-                const canCancel = appt.status === 'PENDING' || appt.status === 'CONFIRMED';
-                const dateObj = appt.startAt ? new Date(appt.startAt) : null;
-
-                return (
-                  <div
-                    key={appt.id}
-                    className="card p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4 hover:border-[var(--primary)] transition-all bg-[var(--card)]"
-                  >
-                    <div className="flex items-center gap-4">
-                      {/* Блок даты приёма */}
-                      <div className="datebox shrink-0">
-                        <b>{dateObj ? dateObj.toLocaleDateString('ru-RU', { day: '2-digit' }) : '—'}</b>
-                        <span>{dateObj ? dateObj.toLocaleDateString('ru-RU', { month: 'short' }) : ''}</span>
-                      </div>
-
-                      <div className="flex flex-col">
-                        <div className="flex items-center gap-2">
-                          <span className="font-mono font-bold text-sm">
-                            {dateObj
-                              ? dateObj.toLocaleTimeString('ru-RU', {
-                                  hour: '2-digit',
-                                  minute: '2-digit',
-                                })
-                              : ''}
-                          </span>
-                          <span>·</span>
-                          <span className="font-bold text-sm text-[var(--foreground)]">
-                            {appt.pet?.name || 'Питомец'}
-                          </span>
-                          {getStatusBadge(appt.status)}
-                        </div>
-
-                        <div className="text-xs text-[var(--muted-foreground)] flex items-center gap-2 mt-0.5">
-                          <span>{appt.service?.name || 'Услуга'}</span>
-                          <span>·</span>
-                          <span>{appt.veterinarian?.user?.fullName || 'Врач Chiron'}</span>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Стоимость и кнопки действий */}
-                    <div className="flex items-center justify-between sm:justify-end gap-3 pt-2 sm:pt-0 border-t sm:border-0 border-[var(--border)]">
-                      <span className="font-mono text-sm font-bold text-[var(--foreground)]">
-                        {formatPrice(appt.priceSnapshot || appt.service?.basePrice)}
-                      </span>
-
-                      <div className="flex items-center gap-1.5">
-                        <button
-                          type="button"
-                          onClick={() => setDetailsAppt(appt)}
-                          className="btn btn-outline h-7 px-2.5 text-xs"
-                        >
-                          Детали
-                        </button>
-
-                        {canCancel && (
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setCancellingAppt(appt);
-                              setCancelReason('');
-                            }}
-                            className="btn btn-destructive-outline h-7 px-2.5 text-xs"
-                          >
-                            Отменить
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </section>
-      </div>
-
-      {/* Модальное окно деталей записи */}
-      <Modal
-        isOpen={!!detailsAppt}
-        onClose={() => setDetailsAppt(null)}
-        title="Информация о приёме"
-        description="Детальные сведения о записи, питомце и рекомендациях врача"
-      >
-        {detailsAppt && (
-          <div className="flex flex-col gap-3 text-xs">
-            <div className="flex items-center justify-between p-3 rounded-lg bg-[var(--muted)]/50 border border-[var(--border)]">
-              <div>
-                <span className="font-bold text-sm block">{detailsAppt.service?.name}</span>
-                <span className="text-[11px] text-[var(--muted-foreground)]">
-                  Питомец: {detailsAppt.pet?.name} ({detailsAppt.pet?.species?.name || 'Вид не указан'})
-                </span>
-              </div>
-              {getStatusBadge(detailsAppt.status)}
-            </div>
-
-            <div className="grid grid-cols-2 gap-2 text-xs">
-              <div className="p-2.5 rounded-lg border border-[var(--border)] flex flex-col gap-0.5">
-                <span className="text-[10px] text-[var(--muted-foreground)] uppercase">Дата и время</span>
-                <span className="font-mono font-semibold">
-                  {detailsAppt.startAt ? new Date(detailsAppt.startAt).toLocaleString('ru-RU') : '—'}
-                </span>
-              </div>
-              <div className="p-2.5 rounded-lg border border-[var(--border)] flex flex-col gap-0.5">
-                <span className="text-[10px] text-[var(--muted-foreground)] uppercase">Стоимость</span>
-                <span className="font-mono font-semibold text-[var(--foreground)]">
-                  {formatPrice(detailsAppt.priceSnapshot || detailsAppt.service?.basePrice)}
-                </span>
-              </div>
-            </div>
-
-            <div className="p-2.5 rounded-lg border border-[var(--border)] flex flex-col gap-0.5">
-              <span className="text-[10px] text-[var(--muted-foreground)] uppercase">Врач</span>
-              <span className="font-semibold">
-                {detailsAppt.veterinarian?.user?.fullName || 'Врач клиники Chiron'}
-              </span>
-              <span className="text-[11px] text-[var(--muted-foreground)]">
-                {detailsAppt.veterinarian?.specialization?.name || 'Ветеринарный специалист'}
-              </span>
-            </div>
-
-            {detailsAppt.clientComment && (
-              <div className="p-2.5 rounded-lg border border-[var(--border)] flex flex-col gap-0.5">
-                <span className="text-[10px] text-[var(--muted-foreground)] uppercase">Ваш комментарий</span>
-                <p className="text-[11px] italic text-[var(--foreground)]">{detailsAppt.clientComment}</p>
-              </div>
-            )}
-
-            {detailsAppt.vetNotes && (
-              <div className="p-2.5 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 dark:text-emerald-400 flex flex-col gap-0.5">
-                <span className="text-[10px] font-bold uppercase">Заключение и рекомендации врача</span>
-                <p className="text-xs leading-relaxed">{detailsAppt.vetNotes}</p>
-              </div>
-            )}
-
-            <div className="flex justify-end pt-3 border-t border-[var(--border)]">
-              <button
-                type="button"
-                className="btn btn-outline h-8 px-4 text-xs"
-                onClick={() => setDetailsAppt(null)}
-              >
-                Закрыть
+                Все
               </button>
             </div>
           </div>
-        )}
-      </Modal>
-
-      {/* Модальное окно отмены приёма */}
-      <Modal
-        isOpen={!!cancellingAppt}
-        onClose={() => setCancellingAppt(null)}
-        title="Отмена записи на приём"
-        description="Вы действительно хотите отменить эту запись?"
-      >
-        <div className="flex flex-col gap-3 text-xs">
-          <p className="text-[var(--muted-foreground)]">
-            Запись будет снята с расписания врача. Слот освободится для других пациентов.
-          </p>
 
           <div className="field">
-            <label className="field-label text-xs">Причина отмены (необязательно)</label>
-            <textarea
-              rows={2}
-              value={cancelReason}
-              onChange={(e) => setCancelReason(e.target.value)}
-              placeholder="Например: изменились планы, питомец поправился..."
-              className="textarea text-xs"
-            />
+            <span className="field-label">Питомец</span>
+            <select
+              className="select"
+              value={selectedPetId}
+              onChange={(e) => setSelectedPetId(e.target.value)}
+            >
+              <option value="ALL">Все питомцы</option>
+              {pets.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.name}
+                </option>
+              ))}
+            </select>
           </div>
 
-          <div className="flex justify-end gap-2 pt-3 border-t border-[var(--border)]">
-            <button
-              type="button"
-              className="btn btn-ghost h-8 px-3 text-xs"
-              onClick={() => setCancellingAppt(null)}
+          <div className="spacer" />
+
+          <Link
+            href="/client/book"
+            className="btn btn-primary"
+            style={{ textDecoration: 'none', alignSelf: 'flex-end', height: '34px' }}
+          >
+            <CalendarPlus className="ic" />
+            <span>Записаться</span>
+          </Link>
+        </section>
+
+        {/* Сетка: Таблица записей + Боковой остров детального просмотра */}
+        <div className="content-row">
+          {/* Левая колонка: Таблица записей */}
+          <section className="island grow">
+            <div className="island-head">
+              <span className="island-title">
+                <Calendar className="ic" />
+                Записи <span className="count">Найдено: {filteredAppointments.length}</span>
+              </span>
+            </div>
+
+            <div className="table-wrap">
+              <div
+                className="dtable"
+                style={{
+                  '--cols': '1.6fr 1fr 1.5fr 1fr 1.1fr 0.8fr',
+                  minWidth: '760px',
+                } as React.CSSProperties}
+              >
+                <div className="thead">
+                  <span>Дата и время</span>
+                  <span>Питомец</span>
+                  <span>Услуга</span>
+                  <span>Статус</span>
+                  <span>Цена</span>
+                </div>
+
+                {filteredAppointments.length === 0 ? (
+                  <div className="p-8 text-center text-xs text-[var(--muted-foreground)]">
+                    Записей с выбранными фильтрами не найдено
+                  </div>
+                ) : (
+                  filteredAppointments.map((a) => {
+                    const isSel = selectedAppt?.id === a.id;
+                    const pet = petsMap[a.petId];
+                    const svc = servicesMap[a.serviceId];
+
+                    const dateStr = new Date(a.startAt).toLocaleDateString('ru-RU', {
+                      day: '2-digit',
+                      month: '2-digit',
+                      year: 'numeric',
+                    });
+                    const timeStr = new Date(a.startAt).toLocaleTimeString('ru-RU', {
+                      hour: '2-digit',
+                      minute: '2-digit',
+                      timeZone: 'Europe/Moscow',
+                    });
+
+                    return (
+                      <button
+                        key={a.id}
+                        type="button"
+                        className={`trow ${isSel ? 'sel' : ''}`}
+                        onClick={() => setSelectedAppt(a)}
+                        style={{ textAlign: 'left', cursor: 'pointer' }}
+                      >
+                        <span className="row" style={{ gap: '6px' }}>
+                          <span className="cell-main tnum">{dateStr}</span>
+                          <span className="muted tnum">{timeStr}</span>
+                        </span>
+                        <span className="pet-cell">
+                          <span className="t-ava xs tone-cat">
+                            <SpeciesIcon species="cat" size={14} />
+                          </span>
+                          <span>{pet?.name || 'Питомец'}</span>
+                        </span>
+                        <span>{svc?.name || 'Услуга'}</span>
+                        <span>
+                          <span className={`badge st badge-${a.status}`}>
+                            {STATUS_SHORT[a.status] || a.status}
+                          </span>
+                        </span>
+                        <span className="right tnum">
+                          {a.priceSnapshot ? `${a.priceSnapshot.toLocaleString('ru-RU')} ₽` : '—'}
+                        </span>
+                      </button>
+                    );
+                  })
+                )}
+              </div>
+            </div>
+          </section>
+
+          {/* Правая колонка: Остров детальной информации о записи */}
+          {selectedAppt && (
+            <section
+              className="island detail-island"
+              style={{ flex: 'none' }}
+              aria-label="Детали записи"
             >
-              Назад
-            </button>
-            <button
-              type="button"
-              disabled={cancelling}
-              className="btn btn-destructive h-8 px-4 text-xs"
-              onClick={handleCancel}
-            >
-              {cancelling ? 'Отмена...' : 'Подтвердить отмену'}
-            </button>
+              <div className="island-head">
+                <div className="col" style={{ gap: '2px', minWidth: 0 }}>
+                  <span className="h2" style={{ wordBreak: 'break-word' }}>
+                    {servicesMap[selectedAppt.serviceId]?.name || 'Приём'}
+                  </span>
+                  <span className="cell-sub">
+                    {new Date(selectedAppt.startAt).toLocaleDateString('ru-RU', {
+                      day: 'numeric',
+                      month: 'long',
+                      year: 'numeric',
+                    })}
+                    , в{' '}
+                    {new Date(selectedAppt.startAt).toLocaleTimeString('ru-RU', {
+                      hour: '2-digit',
+                      minute: '2-digit',
+                      timeZone: 'Europe/Moscow',
+                    })}
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  className="btn btn-ghost btn-icon btn-sm"
+                  aria-label="Закрыть"
+                  onClick={() => setSelectedAppt(null)}
+                >
+                  <X className="ic" />
+                </button>
+              </div>
+
+              <div className="island-body">
+                <div className="col" style={{ gap: '16px' }}>
+                  <div className="row wrap">
+                    <span className={`badge st badge-${selectedAppt.status}`}>
+                      {STATUS_SHORT[selectedAppt.status] || selectedAppt.status}
+                    </span>
+                  </div>
+
+                  <dl className="kv" style={{ margin: 0 }}>
+                    <dt>Питомец</dt>
+                    <dd>{petsMap[selectedAppt.petId]?.name || 'Питомец'}</dd>
+                    <dt>Дата и время</dt>
+                    <dd className="tnum">
+                      {new Date(selectedAppt.startAt).toLocaleDateString('ru-RU')} в{' '}
+                      {new Date(selectedAppt.startAt).toLocaleTimeString('ru-RU', {
+                        hour: '2-digit',
+                        minute: '2-digit',
+                      })}
+                    </dd>
+                    <dt>Стоимость</dt>
+                    <dd className="cell-main tnum">
+                      {selectedAppt.priceSnapshot
+                        ? `${selectedAppt.priceSnapshot.toLocaleString('ru-RU')} ₽`
+                        : '—'}
+                    </dd>
+                  </dl>
+
+                  {selectedAppt.clientComment && (
+                    <div className="col" style={{ gap: '6px' }}>
+                      <span className="section-title">Ваш комментарий</span>
+                      <div className="note">{selectedAppt.clientComment}</div>
+                    </div>
+                  )}
+
+                  {selectedAppt.vetNotes && (
+                    <div className="col" style={{ gap: '6px' }}>
+                      <span className="section-title">Заметки врача</span>
+                      <div className="note">{selectedAppt.vetNotes}</div>
+                    </div>
+                  )}
+
+                  {selectedAppt.status === 'CANCELLED' && (
+                    <div className="alert alert-info">
+                      <AlertCircle className="ic" />
+                      <div>
+                        <b>Запись отменена.</b> {selectedAppt.cancelReason ? `Причина: ${selectedAppt.cancelReason}` : ''}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Возможность отмены записи */}
+              {(selectedAppt.status === 'PENDING' || selectedAppt.status === 'CONFIRMED') && (
+                <div className="island-foot">
+                  <span className="small muted">Отмена доступна до начала приёма</span>
+                  <button
+                    type="button"
+                    className="btn btn-destructive-outline"
+                    onClick={() => setIsCancelModalOpen(true)}
+                  >
+                    <XCircle className="ic" />
+                    <span>Отменить запись</span>
+                  </button>
+                </div>
+              )}
+            </section>
+          )}
+        </div>
+      </div>
+
+      {/* Диалог подтверждения отмены записи */}
+      {isCancelModalOpen && selectedAppt && (
+        <div className="dialog-backdrop">
+          <div className="dialog" style={{ width: '420px', maxWidth: 'calc(100vw - 32px)' }}>
+            <div className="dialog-head">
+              <span className="dialog-title">Отмена записи</span>
+              <span className="dialog-desc">
+                Вы уверены, что хотите отменить приём на{' '}
+                {new Date(selectedAppt.startAt).toLocaleDateString('ru-RU')}?
+              </span>
+            </div>
+
+            <div className="dialog-body">
+              {cancelError && (
+                <div className="alert alert-destructive">
+                  <AlertCircle className="ic" />
+                  <div>{cancelError}</div>
+                </div>
+              )}
+
+              <div className="field">
+                <label className="field-label" htmlFor="c-reason">
+                  Причина отмены (необязательно)
+                </label>
+                <textarea
+                  id="c-reason"
+                  className="textarea"
+                  rows={2}
+                  value={cancelReason}
+                  onChange={(e) => setCancelReason(e.target.value)}
+                  placeholder="Изменились планы, питомец поправился..."
+                />
+              </div>
+            </div>
+
+            <div className="dialog-foot">
+              <button
+                type="button"
+                className="btn btn-outline"
+                onClick={() => setIsCancelModalOpen(false)}
+              >
+                Назад
+              </button>
+              <button
+                type="button"
+                className="btn btn-destructive"
+                disabled={cancelling}
+                onClick={handleCancelAppointment}
+              >
+                {cancelling ? 'Отмена...' : 'Подтвердить отмену'}
+              </button>
+            </div>
           </div>
         </div>
-      </Modal>
+      )}
     </AppShell>
   );
 }

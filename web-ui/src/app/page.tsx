@@ -5,28 +5,24 @@ import Link from 'next/link';
 import { PublicHeader } from '../components/layout/PublicHeader';
 import { clinicApi } from '../api';
 import { Service, Veterinarian, Specialization } from '../types';
-import { getDoctorDisplay } from '../utils/doctorHelpers';
 import { HeroIllustration } from '../components/home/HeroIllustration';
+import { SpeciesIcon } from '../components/ui/SpeciesIcon';
+import { useTheme } from '../context/ThemeContext';
 import {
   Calendar,
-  CalendarCheck,
+  ChevronRight,
   Stethoscope,
   ClipboardList,
-  ArrowRight,
+  CalendarPlus,
   ShieldCheck,
-  Clock,
-  Heart,
-  ChevronRight,
   Phone,
-  Syringe,
-  PawPrint,
 } from 'lucide-react';
 
 export default function HomePage() {
+  const { resolvedTheme } = useTheme();
   const [services, setServices] = useState<Service[]>([]);
   const [vets, setVets] = useState<Veterinarian[]>([]);
-  const [specsMap, setSpecsMap] = useState<Record<string, string>>({});
-  const [loading, setLoading] = useState(true);
+  const [specs, setSpecs] = useState<Specialization[]>([]);
 
   useEffect(() => {
     Promise.all([
@@ -35,258 +31,276 @@ export default function HomePage() {
       clinicApi.getSpecializations(),
     ])
       .then(([svc, vt, sp]) => {
-        setServices(svc.slice(0, 6));
-        setVets(vt.slice(0, 4));
-        const map: Record<string, string> = {};
-        if (Array.isArray(sp)) {
-          sp.forEach((s) => {
-            map[s.id] = s.name;
-          });
-        }
-        setSpecsMap(map);
+        setServices(Array.isArray(svc) ? svc : []);
+        setVets(Array.isArray(vt) ? vt : []);
+        setSpecs(Array.isArray(sp) ? sp : []);
       })
-      .catch((err) => console.error(err))
-      .finally(() => setLoading(false));
+      .catch((err) => console.error(err));
   }, []);
 
+  // Направления клиники (согласно прототипу Guest.html)
+  const defaultSpecs = [
+    { id: 'ther', name: 'Терапия', who: 'И. И. Петров' },
+    { id: 'surg', name: 'Хирургия', who: 'М. А. Соколова' },
+    { id: 'dent', name: 'Стоматология', who: 'О. В. Ким' },
+    { id: 'derm', name: 'Дерматология', who: 'Е. П. Морозова' },
+    { id: 'opht', name: 'Офтальмология', who: 'А. С. Белов' },
+    { id: 'prev', name: 'Профилактика', who: 'Н. И. Орлова' },
+  ];
+
+  // Популярные услуги (согласно прототипу Guest.html)
+  const popularOffers = [
+    {
+      spec: 'ther',
+      specName: 'Терапия',
+      name: 'Первичный осмотр',
+      desc: 'Осмотр, сбор анамнеза, план обследования и лечения.',
+      dur: 30,
+      price: '1 500 ₽',
+      serviceId: services.find((s) => s.name.toLowerCase().includes('осмотр') || s.name.toLowerCase().includes('check-up'))?.id,
+    },
+    {
+      spec: 'surg',
+      specName: 'Хирургия',
+      name: 'Стерилизация и кастрация',
+      desc: 'Плановые операции под ингаляционным наркозом с мониторингом.',
+      dur: 60,
+      price: '4 500 ₽',
+      serviceId: services.find((s) => s.name.toLowerCase().includes('spaying') || s.name.toLowerCase().includes('стерил'))?.id,
+    },
+    {
+      spec: 'dent',
+      specName: 'Стоматология',
+      name: 'Ультразвуковая чистка зубов',
+      desc: 'Снятие зубного камня, полировка, санация ротовой полости.',
+      dur: 40,
+      price: '3 000 ₽',
+      serviceId: services.find((s) => s.name.toLowerCase().includes('teeth') || s.name.toLowerCase().includes('чистк'))?.id,
+    },
+  ];
+
   return (
-    <div className="flex flex-col min-h-screen w-full p-2 gap-2 bg-[var(--background)] text-[var(--foreground)]">
-      {/* Верхняя шапка сайта */}
+    <div className="app" data-theme={resolvedTheme} style={{ flexDirection: 'column' }}>
+      {/* Шапка гостевого интерфейса */}
       <PublicHeader />
 
-      <main className="flex-1 flex flex-col gap-2 overflow-y-auto min-h-0">
-        {/* Главный баннер (Hero) с иллюстрацией */}
-        <section className="island ab-hero shrink-0 min-h-fit" style={{ flex: 'none' }}>
-          <div className="ab-hero-text">
-            <span className="hm-date text-xs font-mono text-[var(--muted-foreground)] tracking-wide">
-              ВЕТЕРИНАРНАЯ КЛИНИКА · РОСТОВ-НА-ДОНУ · +7 863 200-10-00
-            </span>
-            <h1 className="ab-title">
-              Забота о питомце —<br />
-              <span>от первого осмотра до ревакцинации</span>
-            </h1>
-            <p className="ab-lead">
-              Chiron — клиника и онлайн-кабинет в одном. Выбирайте врача и свободное время, храните историю приёмов и прививок, получайте напоминания о записях и ревакцинации.
-            </p>
-
-            <div className="flex flex-wrap items-center gap-3 pt-1">
-              <Link
-                href="/client/book"
-                className="btn btn-primary h-11 px-6 text-sm font-semibold flex items-center gap-2 shadow-md"
-              >
-                <Calendar className="w-4 h-4" />
-                <span>Записаться на приём</span>
-              </Link>
-              <Link
-                href="/services"
-                className="btn btn-outline h-11 px-5 text-sm font-medium flex items-center gap-2"
-              >
-                <span>Услуги и цены</span>
-                <ChevronRight className="w-4 h-4" />
-              </Link>
-            </div>
-
-            {/* Ключевые показатели клиники */}
-            <div className="ab-facts">
-              <div>
-                <b>{vets.length || 6}</b>
-                <span>врачей</span>
-              </div>
-              <div>
-                <b>{Object.keys(specsMap).length || 6}</b>
-                <span>направлений</span>
-              </div>
-              <div>
-                <b>{services.length || 12}</b>
-                <span>услуг</span>
-              </div>
-              <div>
-                <b>4</b>
-                <span>вида животных</span>
-              </div>
-            </div>
-          </div>
-
-          {/* Иллюстрация кошки и собаки с бейджами */}
-          <HeroIllustration />
-        </section>
-
-        {/* Блок «Как записаться» и гарантии стандартов */}
-        <div className="ab-grid shrink-0">
-          <section className="island p-6 flex flex-col gap-4">
-            <div className="flex items-center justify-between pb-2 border-b border-[var(--border)]">
-              <div className="flex items-center gap-2 font-bold text-sm">
-                <CalendarCheck className="w-4 h-4 text-[var(--primary-text)]" />
-                <span>Как записаться на приём</span>
-              </div>
-            </div>
-            <ol className="ab-steps">
-              <li>
-                <span className="ab-step-n">1</span>
-                <span className="flex flex-col gap-0.5">
-                  <strong className="text-sm">Создайте аккаунт</strong>
-                  <span className="text-xs text-[var(--muted-foreground)]">
-                    Добавьте питомцев — вид, породу, возраст и особенности здоровья
-                  </span>
-                </span>
-              </li>
-              <li>
-                <span className="ab-step-n">2</span>
-                <span className="flex flex-col gap-0.5">
-                  <strong className="text-sm">Выберите услугу и время</strong>
-                  <span className="text-xs text-[var(--muted-foreground)]">
-                    Видны только свободные окна врачей, которые лечат ваш вид животного
-                  </span>
-                </span>
-              </li>
-              <li>
-                <span className="ab-step-n">3</span>
-                <span className="flex flex-col gap-0.5">
-                  <strong className="text-sm">Приходите на приём</strong>
-                  <span className="text-xs text-[var(--muted-foreground)]">
-                    Напомним заранее, а протоколы осмотра и вакцинации сохранятся в кабинете
-                  </span>
-                </span>
-              </li>
-            </ol>
-            <Link
-              href="/register"
-              className="btn btn-primary h-9 w-full justify-center text-xs font-semibold mt-2"
-            >
-              Создать аккаунт
-            </Link>
-          </section>
-
-          <section className="island p-6 flex flex-col justify-between gap-4">
-            <div className="flex flex-col gap-3">
-              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-semibold bg-[var(--primary)]/15 text-[var(--primary-text)] w-fit border border-[var(--primary)]/20">
-                <ShieldCheck className="w-3.5 h-3.5" />
-                <span>Гарантия стандартов Chiron</span>
-              </div>
-              <h3 className="text-lg font-bold">
-                Мы делаем животных здоровыми, а хозяев — спокойными
-              </h3>
-              <p className="text-xs text-[var(--muted-foreground)] leading-relaxed">
-                Квалифицированные терапевты, хирурги и стоматологи. Собственная операционная, УЗИ и лаборатория экспресс-анализов в Ростове-на-Дону.
+      {/* Основной контент страницы «О клинике» */}
+      <div className="content-row">
+        <div className="scroll-col grow" style={{ gap: '12px' }}>
+          {/* Главный Hero-баннер с иллюстрацией */}
+          <section className="island ab-hero" style={{ flex: 'none' }}>
+            <div className="ab-hero-text">
+              <span className="hm-date">
+                ВЕТЕРИНАРНАЯ КЛИНИКА · РОСТОВ-НА-ДОНУ · +7 863 200-10-00
+              </span>
+              <h1 className="ab-title">
+                Забота о питомце —<br />
+                <span>от первого осмотра до ревакцинации</span>
+              </h1>
+              <p className="ab-lead">
+                Chiron — клиника и онлайн-кабинет в одном. Выбирайте врача и свободное время,
+                храните историю приёмов и прививок, получайте напоминания о записях и ревакцинации.
               </p>
+
+              <div className="row wrap" style={{ gap: '8px' }}>
+                <Link href="/client/book" className="btn btn-primary btn-lg" style={{ textDecoration: 'none' }}>
+                  <CalendarPlus className="ic" />
+                  <span>Записаться на приём</span>
+                </Link>
+                <Link href="/services" className="btn btn-outline btn-lg" style={{ textDecoration: 'none' }}>
+                  <span>Услуги и цены</span>
+                  <ChevronRight className="ic" />
+                </Link>
+              </div>
+
+              {/* Ключевые показатели клиники */}
+              <div className="ab-facts">
+                <div>
+                  <b>{vets.length || 6}</b>
+                  <span>врачей</span>
+                </div>
+                <div>
+                  <b>{specs.length || 6}</b>
+                  <span>направлений</span>
+                </div>
+                <div>
+                  <b>{services.length || 12}</b>
+                  <span>услуг</span>
+                </div>
+                <div>
+                  <b>4</b>
+                  <span>вида животных</span>
+                </div>
+              </div>
             </div>
 
-            <div className="flex flex-col gap-2 pt-3 border-t border-[var(--border)]">
-              <span className="text-[11px] text-[var(--muted-foreground)]">Принимаем пациентов:</span>
-              <div className="flex flex-wrap gap-1.5">
-                <span className="badge b-completed text-xs font-medium">Кошки</span>
-                <span className="badge b-completed text-xs font-medium">Собаки</span>
-                <span className="badge b-completed text-xs font-medium">Кролики</span>
-                <span className="badge b-completed text-xs font-medium">Грызуны и птицы</span>
+            {/* Иллюстрация кошки и собаки с анимированными бейджами */}
+            <HeroIllustration />
+          </section>
+
+          {/* Блок «Приём ведут» — сетка направлений и ведущих специалистов */}
+          <section className="island" style={{ flex: 'none' }}>
+            <div className="island-head">
+              <span className="island-title">
+                <Stethoscope className="ic" />
+                Приём ведут
+              </span>
+              <Link href="/veterinarians" className="btn btn-ghost btn-sm" style={{ textDecoration: 'none' }}>
+                <span>Все врачи</span>
+                <ChevronRight className="ic" />
+              </Link>
+            </div>
+            <div className="island-body" style={{ paddingTop: 0 }}>
+              <div className="ab-specs">
+                {defaultSpecs.map((sp) => (
+                  <Link
+                    key={sp.id}
+                    href={`/veterinarians?spec=${sp.id}`}
+                    className={`ab-spec tone-${sp.id}`}
+                    style={{ textDecoration: 'none' }}
+                  >
+                    <span className="t-ava">
+                      <Stethoscope className="ic ic-20" />
+                    </span>
+                    <span className="col" style={{ gap: '1px', minWidth: 0 }}>
+                      <b>{sp.name}</b>
+                      <span>{sp.who}</span>
+                    </span>
+                  </Link>
+                ))}
               </div>
             </div>
           </section>
-        </div>
 
-        {/* Популярные услуги клиники */}
-        <section className="island shrink-0 min-h-fit p-6 flex flex-col gap-4">
-          <div className="flex items-center justify-between pb-2 border-b border-[var(--border)]">
-            <div className="flex items-center gap-2">
-              <ClipboardList className="w-4 h-4 text-[var(--primary-text)]" />
-              <h2 className="text-base font-bold">Популярные услуги клиники</h2>
-            </div>
-            <Link href="/services" className="linkish text-xs flex items-center gap-1">
-              <span>Весь прайс-лист</span>
-              <ChevronRight className="w-3.5 h-3.5" />
-            </Link>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-            {services.map((svc) => (
-              <div
-                key={svc.id}
-                className="card p-4 flex flex-col justify-between hover:border-[var(--primary)] transition-colors"
-              >
-                <div className="flex flex-col gap-1.5">
-                  <div className="flex items-start justify-between gap-2">
-                    <h3 className="font-bold text-sm leading-snug">{svc.name}</h3>
-                    <span className="badge font-mono text-[11px] shrink-0 font-semibold bg-[var(--primary)]/10 text-[var(--primary-text)]">
-                      {svc.basePrice?.toLocaleString('ru-RU')} ₽
-                    </span>
-                  </div>
-                  {svc.description && (
-                    <p className="text-xs text-[var(--muted-foreground)] line-clamp-2 leading-relaxed">
-                      {svc.description}
-                    </p>
-                  )}
-                </div>
-
-                <div className="flex items-center justify-between pt-3 mt-2 border-t border-[var(--border)] text-xs text-[var(--muted-foreground)]">
-                  <span className="flex items-center gap-1 font-mono text-[11px]">
-                    <Clock className="w-3.5 h-3.5" />
-                    {svc.baseDurationMin ?? svc.durationMin ?? 30} минут
-                  </span>
-                  <Link
-                    href={`/client/book?serviceId=${svc.id}`}
-                    className="text-[var(--primary-text)] hover:underline font-medium flex items-center gap-1 text-[11px]"
-                  >
-                    Записаться
-                    <ChevronRight className="w-3 h-3" />
-                  </Link>
+          {/* Двухколоночная сетка: Популярные услуги + Как записаться */}
+          <div className="ab-grid">
+            {/* Левая колонка: Популярные услуги */}
+            <section className="island">
+              <div className="island-head">
+                <span className="island-title">
+                  <ClipboardList className="ic" />
+                  Популярные услуги
+                </span>
+                <Link href="/services" className="btn btn-ghost btn-sm" style={{ textDecoration: 'none' }}>
+                  <span>Все услуги</span>
+                  <ChevronRight className="ic" />
+                </Link>
+              </div>
+              <div className="island-body" style={{ paddingTop: 0 }}>
+                <div className="ab-offers">
+                  {popularOffers.map((offer) => (
+                    <Link
+                      key={offer.name}
+                      href={offer.serviceId ? `/services?open=${offer.serviceId}` : '/services'}
+                      className={`ab-offer tone-${offer.spec}`}
+                      style={{ textDecoration: 'none' }}
+                    >
+                      <span className="t-badge">{offer.specName}</span>
+                      <b className="ab-offer-name">{offer.name}</b>
+                      <span className="tcard-desc">{offer.desc}</span>
+                      <span className="ab-offer-foot">
+                        <span className="tcard-meta">
+                          <svg className="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                            <circle cx="12" cy="12" r="10" />
+                            <polyline points="12 6 12 12 16 14" />
+                          </svg>
+                          {offer.dur} мин
+                        </span>
+                        <span className="tcard-price">от {offer.price}</span>
+                      </span>
+                    </Link>
+                  ))}
                 </div>
               </div>
-            ))}
-          </div>
-        </section>
+            </section>
 
-        {/* Ведущие ветеринарные врачи */}
-        <section className="island shrink-0 min-h-fit p-6 flex flex-col gap-4">
-          <div className="flex items-center justify-between pb-2 border-b border-[var(--border)]">
-            <div className="flex items-center gap-2">
-              <Stethoscope className="w-4 h-4 text-[var(--primary-text)]" />
-              <h2 className="text-base font-bold">Наши ведущие ветеринары</h2>
-            </div>
-            <Link href="/veterinarians" className="linkish text-xs flex items-center gap-1">
-              <span>Все врачи</span>
-              <ChevronRight className="w-3.5 h-3.5" />
-            </Link>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-            {vets.map((v) => {
-              const { name, initials, title } = getDoctorDisplay(v, specsMap);
-
-              return (
-                <div key={v.id} className="card p-4 flex flex-col gap-3">
-                  <div className="flex items-center gap-3">
-                    <span className="avatar w-12 h-12 text-sm font-bold bg-[var(--primary)]/15 text-[var(--primary-text)] shrink-0">
-                      {initials}
+            {/* Правая колонка: Как записаться */}
+            <section className="island">
+              <div className="island-head">
+                <span className="island-title">
+                  <CalendarPlus className="ic" />
+                  Как записаться
+                </span>
+              </div>
+              <div className="island-body" style={{ paddingTop: 0 }}>
+                <ol className="ab-steps">
+                  <li>
+                    <span className="ab-step-n">1</span>
+                    <span className="col" style={{ gap: '2px' }}>
+                      <b>Создайте аккаунт</b>
+                      <span>Добавьте питомцев — вид, возраст, особенности</span>
                     </span>
-                    <div className="flex flex-col min-w-0">
-                      <span className="font-bold text-sm truncate" title={name}>{name}</span>
-                      <span className="text-xs text-[var(--muted-foreground)] truncate" title={title}>{title}</span>
-                    </div>
-                  </div>
-
-                  <div className="text-xs text-[var(--muted-foreground)] flex items-center justify-between pt-2 border-t border-[var(--border)]">
-                    <span>Стаж: <strong className="font-mono text-[var(--foreground)]">{v.experienceYears} лет</strong></span>
-                    <Link
-                      href={`/client/book?vetId=${v.id}`}
-                      className="text-[var(--primary-text)] hover:underline font-medium text-[11px]"
-                    >
-                      К врачу
-                    </Link>
-                  </div>
-                </div>
-              );
-            })}
+                  </li>
+                  <li>
+                    <span className="ab-step-n">2</span>
+                    <span className="col" style={{ gap: '2px' }}>
+                      <b>Выберите услугу и время</b>
+                      <span>Видны только свободные окна врачей, которые лечат ваш вид</span>
+                    </span>
+                  </li>
+                  <li>
+                    <span className="ab-step-n">3</span>
+                    <span className="col" style={{ gap: '2px' }}>
+                      <b>Приходите на приём</b>
+                      <span>Напомним заранее, а история и прививки сохранятся в кабинете</span>
+                    </span>
+                  </li>
+                </ol>
+                <Link
+                  href="/register"
+                  className="btn btn-primary"
+                  style={{ width: '100%', justifyContent: 'center', marginTop: '14px', textDecoration: 'none' }}
+                >
+                  Создать аккаунт
+                </Link>
+              </div>
+            </section>
           </div>
-        </section>
 
-        {/* Подвал главной страницы */}
-        <footer className="island shrink-0 p-4 text-xs text-[var(--muted-foreground)] flex flex-col sm:flex-row items-center justify-between gap-3">
-          <div className="flex items-center gap-2 font-mono">
-            <Phone className="w-3.5 h-3.5 text-emerald-500" />
-            <span>Приёмная клиники: +7 863 200-10-00 (08:00–21:00)</span>
-          </div>
-          <div>© {new Date().getFullYear()} Chiron Veterinary Clinic · Все права защищены</div>
-        </footer>
-      </main>
+          {/* Нижний гарантийный баннер клиники */}
+          <section className="island ab-cta" style={{ flex: 'none' }}>
+            <span className="t-ava lg tone-prev">
+              <ShieldCheck className="ic" style={{ width: '26px', height: '26px' }} />
+            </span>
+            <span className="col grow" style={{ gap: '2px', minWidth: 0 }}>
+              <b>Мы делаем животных здоровыми, а хозяев — спокойными</b>
+              <span className="muted small">
+                Лечим кошек, собак, кроликов и попугаев · приём Пн–Пт 9:00–18:00, Сб 10:00–15:00
+              </span>
+            </span>
+            <div className="row" style={{ gap: '6px' }}>
+              <span className="sp-chip tone-cat">
+                <SpeciesIcon species="cat" size={16} />
+                Кошки
+              </span>
+              <span className="sp-chip tone-dog">
+                <SpeciesIcon species="dog" size={16} />
+                Собаки
+              </span>
+              <span className="sp-chip tone-rab">
+                <SpeciesIcon species="rab" size={16} />
+                Кролики
+              </span>
+              <span className="sp-chip tone-par">
+                <SpeciesIcon species="par" size={16} />
+                Попугаи
+              </span>
+            </div>
+          </section>
+
+          {/* Подвал главной страницы */}
+          <footer
+            className="island shrink-0 p-4 text-xs text-[var(--muted-foreground)] flex flex-col sm:flex-row items-center justify-between gap-3 mt-2"
+            style={{ flex: 'none', padding: '14px 18px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
+          >
+            <div className="flex items-center gap-2 font-mono" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <Phone className="ic" style={{ width: '15px', height: '15px', color: 'var(--primary-text)' }} />
+              <span>Приёмная клиники: +7 863 200-10-00 (08:00–21:00)</span>
+            </div>
+            <div>© {new Date().getFullYear()} Chiron Veterinary Clinic · Все права защищены</div>
+          </footer>
+        </div>
+      </div>
     </div>
   );
 }
