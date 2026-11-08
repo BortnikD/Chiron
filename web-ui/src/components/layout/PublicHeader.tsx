@@ -1,16 +1,22 @@
 'use client';
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useAuth } from '../../context/AuthContext';
 import { ChironLogo } from '../ui/ChironLogo';
 import { ThemeToggle } from '../ui/ThemeToggle';
+import { isDevMode } from '../../utils/env';
 import { Info, ClipboardList, Stethoscope, LogIn, ChevronLeft } from 'lucide-react';
 
 export const PublicHeader: React.FC = () => {
   const pathname = usePathname();
   const { role, isAuthenticated } = useAuth();
+  const [isDev, setIsDev] = useState(false);
+
+  useEffect(() => {
+    setIsDev(isDevMode());
+  }, []);
 
   const cabinetHref =
     role === 'ADMIN'
@@ -63,15 +69,17 @@ export const PublicHeader: React.FC = () => {
 
       <div className="spacer" />
 
-      {/* Индикатор доступности сервера */}
-      <span
-        className="row small muted"
-        style={{ gap: '6px' }}
-        title="GET /actuator/health → UP"
-      >
-        <span className="dot" />
-        <span>Сервер доступен</span>
-      </span>
+      {/* Индикатор доступности сервера (только в Development режиме) */}
+      {isDev && (
+        <span
+          className="row small muted"
+          style={{ gap: '6px' }}
+          title="GET /actuator/health → UP"
+        >
+          <span className="dot" />
+          <span>Сервер доступен</span>
+        </span>
+      )}
 
       {/* Переключатель темы (сегментный) */}
       <ThemeToggle />

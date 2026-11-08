@@ -1,8 +1,8 @@
 'use client';
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, Suspense } from 'react';
 import Link from 'next/link';
-import { usePathname, useRouter } from 'next/navigation';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
 import { ChironLogo } from '../ui/ChironLogo';
@@ -14,6 +14,7 @@ import {
   Home,
   PawPrint,
   Calendar,
+  CalendarDays,
   CalendarPlus,
   Stethoscope,
   ClipboardList,
@@ -35,6 +36,8 @@ import {
   Syringe,
   Info,
 } from 'lucide-react';
+import { isDevMode } from '../../utils/env';
+import { CommandPaletteModal } from './CommandPaletteModal';
 
 interface NavItem {
   href: string;
@@ -48,12 +51,102 @@ interface NavGroup {
   items: NavItem[];
 }
 
+interface SidebarNavLinksProps {
+  navGroups: NavGroup[];
+  collapsed: boolean;
+  pathname: string;
+  onItemClick?: () => void;
+}
+
+function SidebarNavLinks({ navGroups, collapsed, pathname, onItemClick }: SidebarNavLinksProps) {
+  const searchParams = useSearchParams();
+
+  const isItemActive = (href: string) => {
+    if (href.includes('?')) {
+      const [path, query] = href.split('?');
+      if (pathname !== path) return false;
+      const targetParams = new URLSearchParams(query);
+      for (const [k, v] of targetParams.entries()) {
+        if (searchParams.get(k) !== v) return false;
+      }
+      return true;
+    }
+    if (pathname !== href) return false;
+    const tab = searchParams.get('tab');
+    return !tab;
+  };
+
+  return (
+    <>
+      {navGroups.map((group, gIdx) => (
+        <div key={gIdx} className="flex flex-col gap-0.5">
+          {group.label && !collapsed && (
+            <span className="nav-group-label">{group.label}</span>
+          )}
+          {group.items.map((item) => {
+            const isActive = isItemActive(item.href);
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                className={`nav-item ${isActive ? 'active' : ''}`}
+                title={collapsed ? item.label : undefined}
+                onClick={onItemClick}
+              >
+                {item.icon}
+                {!collapsed && <span className="label">{item.label}</span>}
+                {!collapsed && item.badge !== undefined && (
+                  <span className="nav-count">{item.badge}</span>
+                )}
+              </Link>
+            );
+          })}
+        </div>
+      ))}
+    </>
+  );
+}
+
+function SidebarNavLinksFallback({ navGroups, collapsed, pathname, onItemClick }: SidebarNavLinksProps) {
+  return (
+    <>
+      {navGroups.map((group, gIdx) => (
+        <div key={gIdx} className="flex flex-col gap-0.5">
+          {group.label && !collapsed && (
+            <span className="nav-group-label">{group.label}</span>
+          )}
+          {group.items.map((item) => {
+            const isActive = !item.href.includes('?') && pathname === item.href;
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                className={`nav-item ${isActive ? 'active' : ''}`}
+                title={collapsed ? item.label : undefined}
+                onClick={onItemClick}
+              >
+                {item.icon}
+                {!collapsed && <span className="label">{item.label}</span>}
+                {!collapsed && item.badge !== undefined && (
+                  <span className="nav-count">{item.badge}</span>
+                )}
+              </Link>
+            );
+          })}
+        </div>
+      ))}
+    </>
+  );
+}
+
 interface AppShellProps {
   children: React.ReactNode;
   title?: string;
   subtitle?: string;
   actions?: React.ReactNode;
   currentSection?: string;
+  crumbGroup?: string;
+  crumb?: string;
 }
 
 export const AppShell: React.FC<AppShellProps> = ({
@@ -62,6 +155,8 @@ export const AppShell: React.FC<AppShellProps> = ({
   subtitle,
   actions,
   currentSection,
+  crumbGroup,
+  crumb,
 }) => {
   const { user, role, isAuthenticated, isLoading, logout } = useAuth();
   const { resolvedTheme } = useTheme();
@@ -101,11 +196,11 @@ export const AppShell: React.FC<AppShellProps> = ({
     }
 
     if (!isLoading && role) {
-      if (pathname.startsWith('/admin') && role !== 'ADMIN') {
+      if ((pathname.startsWith('/admin/') || pathname === '/admin') && role !== 'ADMIN') {
         router.replace(role === 'VETERINARIAN' ? '/vet/dashboard' : '/client/dashboard');
-      } else if (pathname.startsWith('/vet') && role !== 'VETERINARIAN') {
+      } else if ((pathname.startsWith('/vet/') || pathname === '/vet') && role !== 'VETERINARIAN') {
         router.replace(role === 'ADMIN' ? '/admin/dashboard' : '/client/dashboard');
-      } else if (pathname.startsWith('/client') && role !== 'CLIENT') {
+      } else if ((pathname.startsWith('/client/') || pathname === '/client') && role !== 'CLIENT') {
         router.replace(role === 'ADMIN' ? '/admin/dashboard' : '/vet/dashboard');
       }
     }
@@ -115,9 +210,9 @@ export const AppShell: React.FC<AppShellProps> = ({
   const isAuthorized = React.useMemo(() => {
     if (isLoading) return false;
     if (!isAuthenticated || !tokenStorage.get()) return false;
-    if (pathname.startsWith('/admin')) return role === 'ADMIN';
-    if (pathname.startsWith('/vet')) return role === 'VETERINARIAN';
-    if (pathname.startsWith('/client')) return role === 'CLIENT';
+    if (pathname.startsWith('/admin/') || pathname === '/admin') return role === 'ADMIN';
+    if (pathname.startsWith('/vet/') || pathname === '/vet') return role === 'VETERINARIAN';
+    if (pathname.startsWith('/client/') || pathname === '/client') return role === 'CLIENT';
     return true;
   }, [isLoading, isAuthenticated, role, pathname]);
 
@@ -128,6 +223,25 @@ export const AppShell: React.FC<AppShellProps> = ({
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
   const [unreadCount, setUnreadCount] = useState<number>(0);
   const [loadingNotifications, setLoadingNotifications] = useState(false);
+  const [isDev, setIsDev] = useState(false);
+  const [cmdOpen, setCmdOpen] = useState(false);
+
+
+  useEffect(() => {
+    setIsDev(isDevMode());
+  }, []);
+
+  // Горячая клавиша Ctrl+K / Cmd+K для открытия командной строки поиска
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && (e.key === 'k' || e.key === 'K' || e.key === 'л' || e.key === 'Л')) {
+        e.preventDefault();
+        setCmdOpen((prev) => !prev);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
 
   const userMenuRef = useRef<HTMLDivElement>(null);
   const bellMenuRef = useRef<HTMLDivElement>(null);
@@ -204,7 +318,7 @@ export const AppShell: React.FC<AppShellProps> = ({
           items: [
             { href: '/admin/appointments', label: 'Записи', icon: <Calendar className="ic" /> },
             { href: '/admin/pets', label: 'Питомцы', icon: <PawPrint className="ic" /> },
-            { href: '/admin/appointments?tab=VACC', label: 'Прививки', icon: <Syringe className="ic" /> },
+            { href: '/admin/vaccinations', label: 'Прививки', icon: <Syringe className="ic" /> },
             { href: '/admin/users', label: 'Пользователи', icon: <Users className="ic" /> },
           ],
         },
@@ -212,8 +326,8 @@ export const AppShell: React.FC<AppShellProps> = ({
           label: 'Персонал',
           items: [
             { href: '/admin/veterinarians', label: 'Врачи', icon: <Stethoscope className="ic" /> },
-            { href: '/admin/veterinarians?tab=sched', label: 'Расписания', icon: <Clock className="ic" /> },
-            { href: '/admin/veterinarians?tab=exc', label: 'Исключения', icon: <CalendarPlus className="ic" /> },
+            { href: '/admin/schedules', label: 'Расписания', icon: <Clock className="ic" /> },
+            { href: '/admin/schedules?tab=exc', label: 'Исключения', icon: <CalendarPlus className="ic" /> },
           ],
         },
         {
@@ -227,9 +341,9 @@ export const AppShell: React.FC<AppShellProps> = ({
         {
           label: 'Личное',
           items: [
-            { href: '/admin/dashboard#notifs', label: 'Уведомления', icon: <Bell className="ic" />, badge: unreadCount > 0 ? unreadCount : undefined },
-            { href: '/admin/dashboard#profile', label: 'Профиль', icon: <UserIcon className="ic" /> },
-            { href: '/admin/dashboard#settings', label: 'Настройки', icon: <Settings className="ic" /> },
+            { href: '/admin/notifications', label: 'Уведомления', icon: <Bell className="ic" />, badge: unreadCount > 0 ? unreadCount : undefined },
+            { href: '/admin/profile', label: 'Профиль', icon: <UserIcon className="ic" /> },
+            { href: '/admin/settings', label: 'Настройки', icon: <Settings className="ic" /> },
           ],
         },
       ];
@@ -241,9 +355,12 @@ export const AppShell: React.FC<AppShellProps> = ({
           items: [
             { href: '/vet/dashboard', label: 'Сегодня', icon: <Clock className="ic" /> },
             { href: '/vet/patients', label: 'Пациенты', icon: <PawPrint className="ic" /> },
-            { href: '/vet/profile', label: 'Мой профиль', icon: <Stethoscope className="ic" /> },
+            { href: '/vet/schedule', label: 'Мой график', icon: <CalendarDays className="ic" /> },
+            { href: '/vet/profile', label: 'Профиль врача', icon: <Stethoscope className="ic" /> },
             { href: '/services', label: 'Услуги клиники', icon: <ClipboardList className="ic" /> },
             { href: '/veterinarians', label: 'Коллеги', icon: <Users className="ic" /> },
+            { href: '/vet/notifications', label: 'Уведомления', icon: <Bell className="ic" />, badge: unreadCount > 0 ? unreadCount : undefined },
+            { href: '/vet/settings', label: 'Настройки', icon: <Settings className="ic" /> },
           ],
         },
       ];
@@ -256,10 +373,12 @@ export const AppShell: React.FC<AppShellProps> = ({
           { href: '/client/dashboard', label: 'Главная', icon: <Home className="ic" /> },
           { href: '/client/pets', label: 'Питомцы', icon: <PawPrint className="ic" /> },
           { href: '/client/appointments', label: 'Записи', icon: <Calendar className="ic" /> },
-          { href: '/client/appointments?tab=VACC', label: 'Прививки', icon: <Syringe className="ic" /> },
+          { href: '/client/vaccinations', label: 'Прививки', icon: <Syringe className="ic" /> },
           { href: '/services', label: 'Услуги', icon: <ClipboardList className="ic" /> },
           { href: '/veterinarians', label: 'Врачи', icon: <Stethoscope className="ic" /> },
-          { href: '/client/dashboard#notifs', label: 'Уведомления', icon: <Bell className="ic" />, badge: unreadCount > 0 ? unreadCount : undefined },
+          { href: '/client/notifications', label: 'Уведомления', icon: <Bell className="ic" />, badge: unreadCount > 0 ? unreadCount : undefined },
+          { href: '/client/profile', label: 'Профиль', icon: <UserIcon className="ic" /> },
+          { href: '/client/settings', label: 'Настройки', icon: <Settings className="ic" /> },
         ],
       },
     ];
@@ -274,6 +393,62 @@ export const AppShell: React.FC<AppShellProps> = ({
 
   const roleLabel =
     role === 'ADMIN' ? 'Администратор' : role === 'VETERINARIAN' ? 'Кабинет врача' : 'Кабинет клиента';
+
+  const homeHref =
+    role === 'ADMIN' ? '/admin/dashboard' : role === 'VETERINARIAN' ? '/vet/dashboard' : '/client/dashboard';
+
+  // Определение хлебных крошек согласно таблице TITLES прототипа
+  const getBreadcrumbs = (): [string, string] => {
+    if (crumbGroup && (crumb || title || currentSection)) {
+      return [crumbGroup, (crumb || currentSection || title)!];
+    }
+
+    // Разделы администратора
+    if (role === 'ADMIN' || pathname.startsWith('/admin/') || pathname === '/admin') {
+      if (pathname.includes('/profile')) return ['Личное', 'Профиль'];
+      if (pathname.includes('/settings')) return ['Личное', 'Настройки'];
+      if (pathname.includes('/notifications')) return ['Личное', 'Уведомления'];
+      if (pathname.includes('/dashboard')) return ['Обзор', 'Дашборд'];
+      if (pathname.includes('/appointments')) return ['Клиника', 'Записи'];
+      if (pathname.includes('/pets')) return ['Клиника', 'Питомцы'];
+      if (pathname.includes('/vaccinations')) return ['Клиника', 'Прививки'];
+      if (pathname.includes('/users')) return ['Клиника', 'Пользователи'];
+      if (pathname.includes('/schedules')) return ['Персонал', 'Расписания'];
+      if (pathname.includes('/veterinarians')) return ['Персонал', 'Врачи'];
+      if (pathname.includes('/services')) return ['Справочники', 'Услуги'];
+      return ['Обзор', currentSection || title || 'Дашборд'];
+    }
+
+    // Разделы врача
+    if (role === 'VETERINARIAN' || pathname.startsWith('/vet/') || pathname === '/vet') {
+      if (pathname.includes('/profile')) return ['Личное', 'Профиль'];
+      if (pathname.includes('/settings')) return ['Личное', 'Настройки'];
+      if (pathname.includes('/notifications')) return ['Личное', 'Уведомления'];
+      if (pathname.includes('/dashboard')) return ['Врач', 'Сегодня'];
+      if (pathname.includes('/appointments')) return ['Врач', 'Мои записи'];
+      if (pathname.includes('/patients')) return ['Врач', 'Пациенты'];
+      if (pathname.includes('/vaccinations')) return ['Врач', 'Прививки'];
+      if (pathname.includes('/schedule')) return ['Врач', 'Мой график'];
+      if (pathname.includes('/services')) return ['Клиника', 'Услуги клиники'];
+      if (pathname.includes('/veterinarians')) return ['Клиника', 'Коллеги'];
+      return ['Врач', currentSection || title || 'Сегодня'];
+    }
+
+    // Разделы клиента
+    if (pathname.includes('/profile')) return ['Личное', 'Профиль'];
+    if (pathname.includes('/settings')) return ['Личное', 'Настройки'];
+    if (pathname.includes('/notifications')) return ['Личное', 'Уведомления'];
+    if (pathname.includes('/dashboard')) return ['Кабинет', 'Главная'];
+    if (pathname.includes('/pets')) return ['Кабинет', 'Питомцы'];
+    if (pathname.includes('/book')) return ['Кабинет', 'Запись на приём'];
+    if (pathname.includes('/appointments')) return ['Кабинет', 'Записи'];
+    if (pathname.includes('/vaccinations')) return ['Кабинет', 'Прививки'];
+    if (pathname.includes('/services')) return ['Кабинет', 'Услуги'];
+    if (pathname.includes('/veterinarians')) return ['Кабинет', 'Врачи'];
+    return ['Кабинет', currentSection || title || 'Главная'];
+  };
+
+  const [resolvedGroup, resolvedCrumb] = getBreadcrumbs();
 
   if (!isAuthorized) {
     return (
@@ -315,7 +490,7 @@ export const AppShell: React.FC<AppShellProps> = ({
         <div className="flex flex-col gap-1 min-h-0">
           {/* Логотип клиники */}
           <div className="brand p-2 flex items-center justify-between">
-            <Link href="/" className="flex items-center gap-2.5 text-inherit no-underline">
+            <Link href={homeHref} className="flex items-center gap-2.5 text-inherit no-underline">
               <div className="brand-mark bg-[var(--primary)] text-[var(--primary-foreground)] rounded-lg w-8 h-8 flex items-center justify-center shrink-0">
                 <ChironLogo size={18} />
               </div>
@@ -339,43 +514,34 @@ export const AppShell: React.FC<AppShellProps> = ({
 
           {/* Группы пунктов навигации */}
           <div className="overflow-y-auto flex-1 py-2 flex flex-col gap-1">
-            {navGroups.map((group, gIdx) => (
-              <div key={gIdx} className="flex flex-col gap-0.5">
-                {group.label && !collapsed && (
-                  <div className="nav-group-label uppercase tracking-wider text-[10px] font-semibold text-[var(--muted-foreground)] px-2.5 pt-3 pb-1">
-                    {group.label}
-                  </div>
-                )}
-                {group.items.map((item) => {
-                  const isActive = pathname === item.href;
-                  return (
-                    <Link
-                      key={item.href}
-                      href={item.href}
-                      className={`nav-item ${isActive ? 'active' : ''}`}
-                      title={collapsed ? item.label : undefined}
-                    >
-                      {item.icon}
-                      {!collapsed && <span className="label flex-1 truncate text-xs">{item.label}</span>}
-                      {!collapsed && item.badge !== undefined && (
-                        <span className="nav-count">
-                          {item.badge}
-                        </span>
-                      )}
-                    </Link>
-                  );
-                })}
-              </div>
-            ))}
+            <Suspense
+              fallback={
+                <SidebarNavLinksFallback
+                  navGroups={navGroups}
+                  collapsed={collapsed}
+                  pathname={pathname}
+                  onItemClick={() => setMobileOpen(false)}
+                />
+              }
+            >
+              <SidebarNavLinks
+                navGroups={navGroups}
+                collapsed={collapsed}
+                pathname={pathname}
+                onItemClick={() => setMobileOpen(false)}
+              />
+            </Suspense>
           </div>
         </div>
 
-        {/* Подвал боковой панели согласно прототипу */}
+        {/* Подвал боковой панели */}
         <div className="sidebar-foot shrink-0">
-          <div className="health" title="GET /actuator/health → UP">
-            <span className="dot" />
-            {!collapsed && <span className="label text-xs">Сервер доступен</span>}
-          </div>
+          {isDev && (
+            <div className="health" title="GET /actuator/health → UP">
+              <span className="dot" />
+              {!collapsed && <span className="label text-xs">Сервер доступен</span>}
+            </div>
+          )}
 
           <button
             type="button"
@@ -406,9 +572,9 @@ export const AppShell: React.FC<AppShellProps> = ({
 
             {/* Хлебные крошки согласно прототипу */}
             <nav className="crumbs" aria-label="Хлебные крошки">
-              <span>{role === 'ADMIN' ? 'Обзор' : 'Кабинет'}</span>
+              <span>{crumbGroup || resolvedGroup}</span>
               <ChevronRight className="ic" style={{ width: '14px', height: '14px' }} />
-              <span className="cur">{currentSection || title || (role === 'ADMIN' ? 'Дашборд' : 'Главная')}</span>
+              <span className="cur">{crumb || currentSection || resolvedCrumb}</span>
             </nav>
           </div>
 
@@ -418,15 +584,15 @@ export const AppShell: React.FC<AppShellProps> = ({
           <div className="flex items-center gap-2 shrink-0">
             {actions}
 
-            {/* Быстрый поиск согласно прототипу */}
+            {/* Быстрый поиск (Ctrl+K) */}
             <button
               type="button"
               className="search-trigger hidden md:inline-flex"
-              onClick={() => router.push(role === 'ADMIN' ? '/admin/appointments' : '/services')}
-              aria-label="Поиск (Ctrl+K)"
+              onClick={() => setCmdOpen(true)}
+              aria-label="Быстрый поиск (Ctrl+K)"
             >
               <Search className="ic" />
-              <span>{role === 'ADMIN' ? 'Разделы, пользователи, пит...' : 'Разделы, питомцы, записи'}</span>
+              <span>{role === 'ADMIN' ? 'Разделы, услуги, врачи...' : 'Разделы, услуги, врачи...'}</span>
               <span className="kbd">Ctrl K</span>
             </button>
 
@@ -520,12 +686,22 @@ export const AppShell: React.FC<AppShellProps> = ({
                       ))
                     )}
                   </div>
+
+                  <div className="pt-1.5 border-t border-[var(--border)] text-center">
+                    <Link
+                      href={role === 'ADMIN' ? '/admin/notifications' : role === 'VETERINARIAN' ? '/vet/notifications' : '/client/notifications'}
+                      className="text-xs text-[var(--primary-text)] hover:underline inline-block py-0.5"
+                      onClick={() => setBellDropdown(false)}
+                    >
+                      Все уведомления →
+                    </Link>
+                  </div>
                 </div>
               )}
             </div>
 
             {/* Меню профиля пользователя (аватар) */}
-            <div className="rel" ref={userMenuRef} style={{ position: 'relative' }}>
+            <div className={`rel tone-${role || 'CLIENT'}`} ref={userMenuRef} style={{ position: 'relative' }}>
               <button
                 type="button"
                 className="btn btn-ghost"
@@ -533,7 +709,7 @@ export const AppShell: React.FC<AppShellProps> = ({
                 onClick={() => setUserDropdown(!userDropdown)}
                 aria-label="Меню профиля"
               >
-                <span className="avatar sm font-bold">
+                <span className="t-ava sm round font-bold" style={{ width: '32px', height: '32px', fontSize: '12px' }}>
                   {initials}
                 </span>
               </button>
@@ -556,7 +732,7 @@ export const AppShell: React.FC<AppShellProps> = ({
                   </div>
 
                   <Link
-                    href={role === 'VETERINARIAN' ? '/vet/profile' : '/client/profile'}
+                    href={role === 'ADMIN' ? '/admin/profile' : role === 'VETERINARIAN' ? '/vet/profile' : '/client/profile'}
                     className="menu-item flex items-center gap-2"
                     onClick={() => setUserDropdown(false)}
                   >
@@ -565,7 +741,7 @@ export const AppShell: React.FC<AppShellProps> = ({
                   </Link>
 
                   <Link
-                    href="/client/settings"
+                    href={role === 'ADMIN' ? '/admin/settings' : role === 'VETERINARIAN' ? '/vet/settings' : '/client/settings'}
                     className="menu-item flex items-center gap-2"
                     onClick={() => setUserDropdown(false)}
                   >
@@ -736,6 +912,13 @@ export const AppShell: React.FC<AppShellProps> = ({
           </>
         )}
       </nav>
+
+      {/* Модальное окно быстрого поиска (Command Palette) */}
+      <CommandPaletteModal
+        isOpen={cmdOpen}
+        onClose={() => setCmdOpen(false)}
+        role={role}
+      />
     </div>
   );
 };
