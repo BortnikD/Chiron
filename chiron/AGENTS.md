@@ -149,7 +149,7 @@ Restrictions:
 Kotlin 2.3 (JVM 21), Spring Boot 4.1 (webmvc, security, validation, actuator, flyway), Exposed 1.5 (DSL, not DAO,
 `org.jetbrains.exposed.v1.*` packages), PostgreSQL, jjwt, Jackson 3 (`tools.jackson`), springdoc-openapi, JUnit 5 +
 `kotlin.test`. Build: Gradle Kotlin DSL. Repository root (`..`) also holds `web-ui` (Next.js), `docs/`,
-`docker-compose.local.yaml`, `.env.example`, `README.md`.
+`docker/docker-compose.local.yaml`, `.env.example`, `README.md`.
 
 ### Architecture (clean architecture, package `com.bortnik.chiron`)
 

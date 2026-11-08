@@ -1,0 +1,64 @@
+name: chiron-demo
+
+services:
+  postgres:
+    image: postgres:18-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: chiron_demo
+      POSTGRES_PASSWORD: demo_database_password
+      POSTGRES_DB: chiron_demo
+    ports:
+      - "127.0.0.1:5433:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U chiron_demo -d chiron_demo"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  backend:
+    build:
+      context: ../chiron
+    restart: unless-stopped
+    environment:
+      SPRING_PROFILES_ACTIVE: local
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/chiron_demo
+      SPRING_DATASOURCE_USERNAME: chiron_demo
+      SPRING_DATASOURCE_PASSWORD: demo_database_password
+      JWT_SECRET: ZGVtby1vbmx5LXNlY3JldC1mb3ItY2hpcm9uLW5vdC1mb3ItcHJvZHVjdGlvbi0wMTIzNDU2Nzg5YWJjZGVm
+      ADMIN_EMAIL: admin@demo.chiron.local
+      ADMIN_PASSWORD: demoAdmin123
+      ADMIN_PHONE: "+70000000000"
+      ADMIN_FIRST_NAME: Demo
+      ADMIN_LAST_NAME: Admin
+    ports:
+      - "127.0.0.1:8081:8080"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://localhost:8080/actuator/health/readiness || exit 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 60s
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  seed:
+    image: postgres:18-alpine
+    restart: "no"
+    environment:
+      PGHOST: postgres
+      PGUSER: chiron_demo
+      PGPASSWORD: demo_database_password
+      PGDATABASE: chiron_demo
+    volumes:
+      - ../chiron/scripts:/seed:ro
+    command: ["psql", "-X", "-v", "ON_ERROR_STOP=1", "-f", "/seed/seed-demo.sql"]
+    depends_on:
+      backend:
+        condition: service_healthy
+
+volumes:
+  postgres_data:

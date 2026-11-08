@@ -18,7 +18,7 @@ services:
 
   backend:
     build:
-      context: ./chiron
+      context: ../chiron
     restart: unless-stopped
     environment:
       SPRING_PROFILES_ACTIVE: production
