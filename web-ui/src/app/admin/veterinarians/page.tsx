@@ -1,6 +1,8 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
+import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { adminApi, clinicApi } from '../../../api';
 import {
   Veterinarian,
@@ -10,46 +12,71 @@ import {
   WorkSchedule,
   ScheduleException,
   DayOfWeek,
-  ScheduleExceptionType,
 } from '../../../types';
 import { AppShell } from '../../../components/layout/AppShell';
 import {
   Stethoscope,
   Plus,
-  Edit2,
   Trash2,
-  Clock,
   Calendar,
-  CheckCircle2,
-  XCircle,
-  ShieldCheck,
-  Search,
   AlertCircle,
-  Briefcase,
   X,
-  RefreshCw,
   Check,
 } from 'lucide-react';
 
-const DAYS_OF_WEEK: { value: DayOfWeek; label: string; short: string }[] = [
-  { value: 'MONDAY', label: 'Понедельник', short: 'Пн' },
-  { value: 'TUESDAY', label: 'Вторник', short: 'Вт' },
-  { value: 'WEDNESDAY', label: 'Среда', short: 'Ср' },
-  { value: 'THURSDAY', label: 'Четверг', short: 'Чт' },
-  { value: 'FRIDAY', label: 'Пятница', short: 'Пт' },
-  { value: 'SATURDAY', label: 'Суббота', short: 'Сб' },
-  { value: 'SUNDAY', label: 'Воскресенье', short: 'Вс' },
+const DOW_LABELS: Record<DayOfWeek, string> = {
+  MONDAY: 'Пн',
+  TUESDAY: 'Вт',
+  WEDNESDAY: 'Ср',
+  THURSDAY: 'Чт',
+  FRIDAY: 'Пт',
+  SATURDAY: 'Сб',
+  SUNDAY: 'Вс',
+};
+
+const DOW_ORDER: DayOfWeek[] = [
+  'MONDAY',
+  'TUESDAY',
+  'WEDNESDAY',
+  'THURSDAY',
+  'FRIDAY',
+  'SATURDAY',
+  'SUNDAY',
 ];
 
 export default function AdminVeterinariansPage() {
+  const router = useRouter();
   const [veterinarians, setVeterinarians] = useState<Veterinarian[]>([]);
   const [users, setUsers] = useState<User[]>([]);
   const [specializations, setSpecializations] = useState<Specialization[]>([]);
   const [speciesList, setSpeciesList] = useState<Species[]>([]);
+  const [vetPermMap, setVetPermMap] = useState<Record<string, string[]>>({});
   const [loading, setLoading] = useState(true);
-  const [search, setSearch] = useState('');
 
-  // Модальное окно создания профиля ветеринара
+  // Filters
+  const [filterSpec, setFilterSpec] = useState<string>('ALL');
+  const [filterSpecies, setFilterSpecies] = useState<string>('ALL');
+
+  // Selected Vet for Master-Detail right side panel
+  const [selectedVet, setSelectedVet] = useState<Veterinarian | null>(null);
+  const [activeTab, setActiveTab] = useState<'profile' | 'species' | 'schedule' | 'exceptions'>('profile');
+
+  // Detail panel state for selected vet
+  const [editForm, setEditForm] = useState({
+    specializationId: '',
+    experienceYears: 1,
+    isActive: true,
+    photoUrl: '',
+    bio: '',
+  });
+  const [permittedSpeciesIds, setPermittedSpeciesIds] = useState<string[]>([]);
+  const [vetSchedules, setVetSchedules] = useState<WorkSchedule[]>([]);
+  const [vetExceptions, setVetExceptions] = useState<ScheduleException[]>([]);
+  const [savingVet, setSavingVet] = useState(false);
+  const [saveSuccess, setSaveSuccess] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  // Create Modal
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [createForm, setCreateForm] = useState({
     userId: '',
@@ -62,77 +89,50 @@ export default function AdminVeterinariansPage() {
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
 
-  // Модальное окно редактирования профиля ветеринара
-  const [editingVet, setEditingVet] = useState<Veterinarian | null>(null);
-  const [editForm, setEditForm] = useState({
-    bio: '',
-    photoUrl: '',
-    experienceYears: 1,
-    isActive: true,
-    specializationId: '',
-  });
-  const [updating, setUpdating] = useState(false);
-
-  // Модальное окно рабочих графиков
-  const [selectedVetForSchedule, setSelectedVetForSchedule] = useState<Veterinarian | null>(null);
-  const [schedules, setSchedules] = useState<WorkSchedule[]>([]);
-  const [exceptions, setExceptions] = useState<ScheduleException[]>([]);
-  const [loadingSchedule, setLoadingSchedule] = useState(false);
-
-  // Форма добавления дня в график
-  const [newSchedule, setNewSchedule] = useState({
-    dayOfWeek: 'MONDAY' as DayOfWeek,
-    startTime: '09:00:00',
-    endTime: '18:00:00',
-    breakStart: '13:00:00',
-    breakEnd: '14:00:00',
-  });
-  const [savingSchedule, setSavingSchedule] = useState(false);
-  const [scheduleError, setScheduleError] = useState<string | null>(null);
-
-  // Форма добавления исключения из графика
-  const [newException, setNewException] = useState({
-    type: 'ABSENCE' as ScheduleExceptionType,
-    startDate: new Date().toISOString().split('T')[0],
-    endDate: new Date(Date.now() + 86400000).toISOString().split('T')[0],
-    startTime: '',
-    endTime: '',
-    reason: '',
-  });
-  const [savingException, setSavingException] = useState(false);
-  const [exceptionError, setExceptionError] = useState<string | null>(null);
-
-  // Модальное окно разрешений на виды животных
-  const [selectedVetForSpecies, setSelectedVetForSpecies] = useState<Veterinarian | null>(null);
-  const [permittedSpeciesIds, setPermittedSpeciesIds] = useState<string[]>([]);
-  const [loadingPermissions, setLoadingPermissions] = useState(false);
+  // Delete confirmation
+  const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   const loadData = async () => {
     setLoading(true);
     try {
-      const [vetsRes, usersRes, specsRes, specListRes] = await Promise.all([
-        adminApi.getVeterinarians(),
-        adminApi.getUsers(0, 100, 'VETERINARIAN'),
-        clinicApi.getSpecializations(),
-        clinicApi.getSpecies(),
+      const [vetsData, usersData, specsData, speciesData] = await Promise.all([
+        adminApi.getVeterinarians().catch(() => [] as Veterinarian[]),
+        adminApi.getUsers(0, 100, 'VETERINARIAN').catch(() => ({ items: [] as User[], totalElements: 0, totalPages: 0, page: 0, size: 100 })),
+        clinicApi.getSpecializations().catch(() => [] as Specialization[]),
+        clinicApi.getSpecies().catch(() => [] as Species[]),
       ]);
 
-      const safeVets = Array.isArray(vetsRes) ? vetsRes : [];
-      setVeterinarians(safeVets);
-      setUsers(usersRes?.items ?? []);
-      setSpecializations(Array.isArray(specsRes) ? specsRes : []);
-      setSpeciesList(Array.isArray(specListRes) ? specListRes : []);
+      const vets = Array.isArray(vetsData) ? vetsData : [];
+      setVeterinarians(vets);
+      setUsers(usersData?.items || []);
+      setSpecializations(Array.isArray(specsData) ? specsData : []);
+      setSpeciesList(Array.isArray(speciesData) ? speciesData : []);
 
-      if (usersRes?.items && usersRes.items.length > 0 && !createForm.userId) {
-        setCreateForm((prev) => ({
-          ...prev,
-          userId: usersRes.items[0].id,
-          specializationId: specsRes[0]?.id || '',
-        }));
+      // Load species permissions for all vets
+      const permPromises = vets.map(async (v: Veterinarian) => {
+        try {
+          const perms = await clinicApi.getVetSpeciesPermissions(v.id);
+          return { vetId: v.id, speciesIds: (perms || []).map((p) => p.speciesId) };
+        } catch {
+          return { vetId: v.id, speciesIds: [] };
+        }
+      });
+      const permsResults = await Promise.all(permPromises);
+      const permMap: Record<string, string[]> = {};
+      permsResults.forEach((r) => {
+        permMap[r.vetId] = r.speciesIds;
+      });
+      setVetPermMap(permMap);
+
+      if (selectedVet) {
+        const updated = vets.find((v: Veterinarian) => v.id === selectedVet.id);
+        if (updated) {
+          setSelectedVet(updated);
+        }
       }
     } catch (err) {
-      console.error(err);
-      setVeterinarians([]);
+      console.error('Failed to load veterinarians data', err);
     } finally {
       setLoading(false);
     }
@@ -142,517 +142,681 @@ export default function AdminVeterinariansPage() {
     loadData();
   }, []);
 
+  // When a vet is selected, load their details, schedules, and exceptions
+  useEffect(() => {
+    if (!selectedVet) return;
+
+    setEditForm({
+      specializationId: selectedVet.specializationId || '',
+      experienceYears: selectedVet.experienceYears || 0,
+      isActive: selectedVet.isActive,
+      photoUrl: selectedVet.photoUrl || '',
+      bio: selectedVet.bio || '',
+    });
+    setPermittedSpeciesIds(vetPermMap[selectedVet.id] || []);
+    setSaveSuccess(false);
+    setErrorMessage(null);
+
+    // Fetch schedules, exceptions, and permissions for selected vet
+    Promise.all([
+      clinicApi.getWorkSchedules(selectedVet.id).catch(() => [] as WorkSchedule[]),
+      clinicApi.getScheduleExceptions(selectedVet.id).catch(() => [] as ScheduleException[]),
+      clinicApi.getVetSpeciesPermissions(selectedVet.id).catch(() => []),
+    ]).then(([schedRes, excRes, permsRes]) => {
+      setVetSchedules(Array.isArray(schedRes) ? schedRes : []);
+      setVetExceptions(Array.isArray(excRes) ? excRes : []);
+      const spIds = (permsRes || []).map((p: any) => p.speciesId);
+      setPermittedSpeciesIds(spIds);
+      setVetPermMap((prev) => ({ ...prev, [selectedVet.id]: spIds }));
+    });
+  }, [selectedVet]);
+
+  const handleSelectVet = (vet: Veterinarian) => {
+    if (selectedVet?.id === vet.id) {
+      return;
+    }
+    setSelectedVet(vet);
+  };
+
+  const handleSaveProfile = async () => {
+    if (!selectedVet) return;
+    setSavingVet(true);
+    setErrorMessage(null);
+    setSaveSuccess(false);
+    try {
+      await adminApi.updateVeterinarian(selectedVet.id, {
+        bio: editForm.bio,
+        photoUrl: editForm.photoUrl,
+        experienceYears: Number(editForm.experienceYears),
+        isActive: editForm.isActive,
+        specializationId: editForm.specializationId || undefined,
+      });
+      setSaveSuccess(true);
+      setTimeout(() => setSaveSuccess(false), 2500);
+      await loadData();
+    } catch (err: any) {
+      setErrorMessage(err?.response?.data?.message || err?.message || 'Ошибка при сохранении профиля врача');
+    } finally {
+      setSavingVet(false);
+    }
+  };
+
+  const handleToggleSpeciesPermission = async (speciesId: string) => {
+    if (!selectedVet) return;
+    const isGranted = permittedSpeciesIds.includes(speciesId);
+    try {
+      if (isGranted) {
+        await adminApi.revokeVetSpeciesPermission(selectedVet.id, speciesId);
+        const next = permittedSpeciesIds.filter((id) => id !== speciesId);
+        setPermittedSpeciesIds(next);
+        setVetPermMap((prev) => ({ ...prev, [selectedVet.id]: next }));
+      } else {
+        await adminApi.grantVetSpeciesPermission(selectedVet.id, speciesId);
+        const next = [...permittedSpeciesIds, speciesId];
+        setPermittedSpeciesIds(next);
+        setVetPermMap((prev) => ({ ...prev, [selectedVet.id]: next }));
+      }
+    } catch (err: any) {
+      alert(err?.response?.data?.message || err?.message || 'Не удалось изменить допуск к виду');
+    }
+  };
+
+  const handleDeleteVet = async () => {
+    if (!selectedVet) return;
+    setDeleting(true);
+    try {
+      await adminApi.deleteVeterinarian(selectedVet.id);
+      setIsDeleteConfirmOpen(false);
+      setSelectedVet(null);
+      await loadData();
+    } catch (err: any) {
+      alert(err?.response?.data?.message || err?.message || 'Ошибка при удалении профиля врача');
+    } finally {
+      setDeleting(false);
+    }
+  };
+
   const handleCreateVet = async (e: React.FormEvent) => {
     e.preventDefault();
-    setCreateError(null);
+    if (!createForm.userId || !createForm.specializationId) {
+      setCreateError('Выберите пользователя и специализацию');
+      return;
+    }
     setCreating(true);
-
+    setCreateError(null);
     try {
-      await adminApi.createVeterinarian({
+      const created = await adminApi.createVeterinarian({
         userId: createForm.userId,
         specializationId: createForm.specializationId,
-        bio: createForm.bio.trim() || undefined,
-        photoUrl: createForm.photoUrl.trim() || undefined,
+        bio: createForm.bio,
+        photoUrl: createForm.photoUrl,
         experienceYears: Number(createForm.experienceYears),
         isActive: createForm.isActive,
       });
-
       setIsCreateOpen(false);
-      loadData();
+      setCreateForm({
+        userId: '',
+        specializationId: '',
+        bio: '',
+        photoUrl: '',
+        experienceYears: 3,
+        isActive: true,
+      });
+      await loadData();
+      if (created) {
+        setSelectedVet(created);
+      }
     } catch (err: any) {
-      setCreateError(err?.message || 'Не удалось создать профиль ветеринара');
+      setCreateError(err?.response?.data?.message || err?.message || 'Не удалось создать профиль врача');
     } finally {
       setCreating(false);
     }
   };
 
-  const openEditModal = (vet: Veterinarian) => {
-    setEditingVet(vet);
-    setEditForm({
-      bio: vet.bio || '',
-      photoUrl: vet.photoUrl || '',
-      experienceYears: vet.experienceYears,
-      isActive: vet.isActive,
-      specializationId: vet.specializationId,
-    });
-  };
-
-  const handleUpdateVet = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!editingVet) return;
-    setUpdating(true);
-
-    try {
-      await adminApi.updateVeterinarian(editingVet.id, {
-        bio: editForm.bio.trim() || null,
-        photoUrl: editForm.photoUrl.trim() || null,
-        experienceYears: Number(editForm.experienceYears),
-        isActive: editForm.isActive,
-        specializationId: editForm.specializationId,
-      });
-
-      setEditingVet(null);
-      loadData();
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setUpdating(false);
-    }
-  };
-
-  // Обработчики управления графиком врача
-  const openScheduleModal = async (vet: Veterinarian) => {
-    setSelectedVetForSchedule(vet);
-    setLoadingSchedule(true);
-    setScheduleError(null);
-    setExceptionError(null);
-    try {
-      const [schedRes, excRes] = await Promise.all([
-        clinicApi.getWorkSchedules(vet.id),
-        clinicApi.getScheduleExceptions(vet.id),
-      ]);
-      setSchedules(Array.isArray(schedRes) ? schedRes : []);
-      setExceptions(Array.isArray(excRes) ? excRes : []);
-    } catch (err) {
-      console.error(err);
-      setSchedules([]);
-      setExceptions([]);
-    } finally {
-      setLoadingSchedule(false);
-    }
-  };
-
-  const handleEditScheduleDay = (s: WorkSchedule) => {
-    setScheduleError(null);
-    setNewSchedule({
-      dayOfWeek: s.dayOfWeek,
-      startTime: s.startTime,
-      endTime: s.endTime,
-      breakStart: s.breakStart || '',
-      breakEnd: s.breakEnd || '',
-    });
-  };
-
-  const handleAddScheduleDay = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!selectedVetForSchedule) return;
-    setScheduleError(null);
-
-    const bStart = newSchedule.breakStart?.trim() || null;
-    const bEnd = newSchedule.breakEnd?.trim() || null;
-
-    if (newSchedule.startTime >= newSchedule.endTime) {
-      setScheduleError('Время начала смены должно быть раньше окончания смены');
-      return;
-    }
-
-    if ((bStart && !bEnd) || (!bStart && bEnd)) {
-      setScheduleError('Перерыв должен содержать как время начала, так и время окончания');
-      return;
-    }
-
-    if (bStart && bEnd) {
-      if (bStart >= bEnd) {
-        setScheduleError('Время начала перерыва должно быть раньше окончания');
-        return;
-      }
-      if (bStart < newSchedule.startTime || bEnd > newSchedule.endTime) {
-        setScheduleError('Перерыв должен находиться в пределах рабочего времени смены');
-        return;
-      }
-    }
-
-    setSavingSchedule(true);
-
-    try {
-      const existing = schedules.find((s) => s.dayOfWeek === newSchedule.dayOfWeek);
-
-      if (existing) {
-        // День уже есть в расписании, обновляем часы через PATCH
-        await adminApi.updateWorkSchedule(existing.id, {
-          startTime: newSchedule.startTime,
-          endTime: newSchedule.endTime,
-          breakStart: bStart,
-          breakEnd: bEnd,
-        });
-      } else {
-        // Создаём новую запись дня в расписании через POST
-        await adminApi.createWorkSchedule({
-          veterinarianId: selectedVetForSchedule.id,
-          dayOfWeek: newSchedule.dayOfWeek,
-          startTime: newSchedule.startTime,
-          endTime: newSchedule.endTime,
-          breakStart: bStart,
-          breakEnd: bEnd,
-        });
-      }
-
-      const updated = await clinicApi.getWorkSchedules(selectedVetForSchedule.id);
-      setSchedules(Array.isArray(updated) ? updated : []);
-    } catch (err: any) {
-      setScheduleError(err?.message || 'Не удалось сохранить часы работы');
-    } finally {
-      setSavingSchedule(false);
-    }
-  };
-
-  const handleDeleteScheduleDay = async (id: string) => {
-    if (!selectedVetForSchedule) return;
-    setScheduleError(null);
-    try {
-      await adminApi.deleteWorkSchedule(id);
-      setSchedules((prev) => prev.filter((s) => s.id !== id));
-    } catch (err: any) {
-      setScheduleError(err?.message || 'Не удалось удалить рабочий день');
-    }
-  };
-
-  const handleAddException = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!selectedVetForSchedule) return;
-    setExceptionError(null);
-
-    if (newException.startDate > newException.endDate) {
-      setExceptionError('Дата окончания не может быть раньше даты начала');
-      return;
-    }
-
-    if (newException.type === 'CUSTOM_HOURS') {
-      if (!newException.startTime || !newException.endTime) {
-        setExceptionError('Для индивидуального графика укажите время начала и окончания');
-        return;
-      }
-      if (newException.startTime >= newException.endTime) {
-        setExceptionError('Время начала должно быть раньше времени окончания');
-        return;
-      }
-    }
-
-    setSavingException(true);
-
-    try {
-      await adminApi.createScheduleException({
-        veterinarianId: selectedVetForSchedule.id,
-        type: newException.type,
-        startDate: newException.startDate,
-        endDate: newException.endDate,
-        startTime: newException.type === 'CUSTOM_HOURS' && newException.startTime ? newException.startTime : null,
-        endTime: newException.type === 'CUSTOM_HOURS' && newException.endTime ? newException.endTime : null,
-        reason: newException.reason.trim() || null,
-      });
-
-      const updated = await clinicApi.getScheduleExceptions(selectedVetForSchedule.id);
-      setExceptions(Array.isArray(updated) ? updated : []);
-      setNewException((prev) => ({ ...prev, reason: '' }));
-    } catch (err: any) {
-      setExceptionError(err?.message || 'Не удалось создать исключение расписания');
-    } finally {
-      setSavingException(false);
-    }
-  };
-
-  const handleDeleteException = async (id: string) => {
-    try {
-      await adminApi.deleteScheduleException(id);
-      setExceptions((prev) => prev.filter((e) => e.id !== id));
-    } catch (err) {
-      console.error(err);
-    }
-  };
-
-  // Обработчики допусков врача к видам животных
-  const openSpeciesModal = async (vet: Veterinarian) => {
-    setSelectedVetForSpecies(vet);
-    setLoadingPermissions(true);
-    try {
-      const perms = await clinicApi.getVetSpeciesPermissions(vet.id);
-      const ids = Array.isArray(perms) ? perms.map((p) => p.speciesId) : [];
-      setPermittedSpeciesIds(ids);
-    } catch (err) {
-      console.error(err);
-      setPermittedSpeciesIds([]);
-    } finally {
-      setLoadingPermissions(false);
-    }
-  };
-
-  const handleToggleSpeciesPermission = async (speciesId: string) => {
-    if (!selectedVetForSpecies) return;
-    const isGranted = permittedSpeciesIds.includes(speciesId);
-
-    try {
-      if (isGranted) {
-        await adminApi.revokeVetSpeciesPermission(selectedVetForSpecies.id, speciesId);
-        setPermittedSpeciesIds((prev) => prev.filter((id) => id !== speciesId));
-      } else {
-        await adminApi.grantVetSpeciesPermission(selectedVetForSpecies.id, speciesId);
-        setPermittedSpeciesIds((prev) => [...prev, speciesId]);
-      }
-    } catch (err) {
-      console.error(err);
-    }
-  };
-
-  const getSpecName = (specId: string) => {
-    const spec = specializations.find((s) => s.id === specId);
-    return spec?.name || 'Общая практика';
-  };
-
   const getUserName = (userId: string) => {
-    const u = users.find((item) => item.id === userId);
-    return u?.fullName || `${u?.firstName || ''} ${u?.lastName || ''}`.trim() || 'Врач клиники';
+    const user = users.find((u) => u.id === userId);
+    return user ? user.fullName : `Врач (${userId.slice(0, 8)})`;
   };
 
+  const getUserInitials = (userId: string) => {
+    const user = users.find((u) => u.id === userId);
+    if (!user) return 'ВР';
+    const parts = (user.fullName || '').trim().split(/\s+/);
+    if (parts.length >= 2) return `${parts[0][0]}${parts[1][0]}`.toUpperCase();
+    return (parts[0] ? parts[0].slice(0, 2) : 'ВР').toUpperCase();
+  };
+
+  const getUserEmail = (userId: string) => {
+    const user = users.find((u) => u.id === userId);
+    return user?.email || '—';
+  };
+
+  const getSpecName = (specId?: string) => {
+    if (!specId) return 'Не указана';
+    const s = specializations.find((sp) => sp.id === specId);
+    return s ? s.name : 'Специализация';
+  };
+
+  // Filtered vets
   const filteredVets = veterinarians.filter((v) => {
-    const name = getUserName(v.userId).toLowerCase();
-    const spec = getSpecName(v.specializationId).toLowerCase();
-    const q = search.toLowerCase();
-    return name.includes(q) || spec.includes(q);
+    if (filterSpec !== 'ALL' && v.specializationId !== filterSpec) return false;
+    if (filterSpecies !== 'ALL') {
+      const perms = vetPermMap[v.id] || [];
+      if (!perms.includes(filterSpecies)) return false;
+    }
+    return true;
   });
 
+  // Users without vet profiles
+  const usersWithoutProfile = users.filter((u) => !veterinarians.some((v) => v.userId === u.id));
+
   return (
-    <AppShell
-      title="Врачи и графики"
-      subtitle="Управление профилями докторов, еженедельным расписанием и допусками к животным"
-      actions={
-        <button
-          type="button"
-          onClick={() => setIsCreateOpen(true)}
-          className="btn btn-primary"
-        >
-          <Plus className="ic" />
-          <span>Назначить врача</span>
-        </button>
-      }
-    >
-      <div className="content-col grow" style={{ gap: '8px' }}>
-        {/* Панель поиска и действий */}
-        <section className="island filters" aria-label="Фильтры">
-          <div className="field" style={{ minWidth: '280px', flex: 1 }}>
-            <span className="field-label">Поиск</span>
-            <div className="input-icon">
-              <Search className="ic" />
-              <input
-                className="input input-sm"
-                placeholder="Поиск по имени или специализации..."
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-              />
-            </div>
-          </div>
-          {search && (
-            <div className="field" style={{ justifyContent: 'flex-end' }}>
-              <span className="field-label">&nbsp;</span>
-              <button
-                type="button"
-                className="btn btn-ghost btn-sm"
-                onClick={() => setSearch('')}
-              >
-                <X className="ic" style={{ width: '13px', height: '13px' }} />
-                <span>Очистить</span>
-              </button>
-            </div>
-          )}
-        </section>
-
-        {/* Сетка карточек ветеринарных врачей */}
-        <section className="island grow" style={{ display: 'flex', flexDirection: 'column' }}>
-          <div className="island-head">
-            <span className="island-title">
-              <Stethoscope className="ic" />
-              <span>Штат ветеринарных врачей</span>
-              <span className="count">Всего: {filteredVets.length}</span>
-            </span>
-            <button
-              type="button"
-              className="btn btn-ghost btn-icon btn-sm"
-              onClick={loadData}
-              title="Обновить"
-            >
-              <RefreshCw className={`ic ${loading ? 'animate-spin' : ''}`} />
-            </button>
-          </div>
-
-          {loading ? (
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '8px', padding: '16px' }}>
-              {Array.from({ length: 3 }).map((_, i) => (
-                <div key={i} className="skeleton" style={{ height: '200px', borderRadius: '12px' }} />
-              ))}
-            </div>
-          ) : filteredVets.length > 0 ? (
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '8px' }}>
-              {filteredVets.map((vet) => {
-                const vetName = vet.user?.fullName || getUserName(vet.userId);
-                const specName = vet.specialization?.name || getSpecName(vet.specializationId);
-                const initials = vetName.split(' ').map((n) => n[0]).join('').slice(0, 2).toUpperCase() || 'ВР';
-
-                return (
-                  <div
-                    key={vet.id}
-                    className="island"
-                    style={{
-                      background: 'var(--card)',
-                      border: '1px solid var(--border)',
-                      padding: '16px',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      gap: '12px',
-                    }}
-                  >
-                    <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '8px' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                        <div
-                          className="avatar"
-                          style={{
-                            width: '44px',
-                            height: '44px',
-                            fontSize: '15px',
-                            fontWeight: 700,
-                            background: 'var(--primary)',
-                            color: 'var(--primary-text)',
-                            borderRadius: '10px',
-                          }}
-                        >
-                          {initials}
-                        </div>
-                        <div>
-                          <h3 className="font-bold text-sm" style={{ margin: 0 }}>{vetName}</h3>
-                          <span className="muted text-xs font-medium">{specName}</span>
-                        </div>
-                      </div>
-
-                      <span className={`badge ${vet.isActive ? 'b-completed' : 'b-cancelled'}`}>
-                        {vet.isActive ? 'Активен' : 'Отключён'}
-                      </span>
-                    </div>
-
-                    <div
-                      style={{
-                        padding: '8px 10px',
-                        background: 'var(--island-subtle)',
-                        borderRadius: '8px',
-                        display: 'flex',
-                        flexDirection: 'column',
-                        gap: '4px',
-                        fontSize: '12px',
-                      }}
-                    >
-                      <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                        <span className="muted">Стаж:</span>
-                        <span className="tnum font-semibold">{vet.experienceYears} лет</span>
-                      </div>
-                      {vet.bio && (
-                        <p className="muted italic text-xs line-clamp-2" style={{ margin: 0, borderTop: '1px solid var(--border)', paddingTop: '4px' }}>
-                          «{vet.bio}»
-                        </p>
-                      )}
-                    </div>
-
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px', marginTop: 'auto', paddingTop: '4px' }}>
-                      <button
-                        type="button"
-                        className="btn btn-ghost btn-sm"
-                        onClick={() => openScheduleModal(vet)}
-                        style={{ border: '1px solid var(--border)' }}
-                      >
-                        <Clock className="ic" style={{ width: '13px', height: '13px' }} />
-                        <span>График</span>
-                      </button>
-                      <button
-                        type="button"
-                        className="btn btn-ghost btn-sm"
-                        onClick={() => openSpeciesModal(vet)}
-                        style={{ border: '1px solid var(--border)' }}
-                      >
-                        <ShieldCheck className="ic" style={{ width: '13px', height: '13px' }} />
-                        <span>Животные</span>
-                      </button>
-                    </div>
-
-                    <button
-                      type="button"
-                      className="btn btn-ghost btn-sm w-full"
-                      onClick={() => openEditModal(vet)}
-                    >
-                      <Edit2 className="ic" style={{ width: '13px', height: '13px' }} />
-                      <span>Редактировать профиль</span>
-                    </button>
-                  </div>
-                );
-              })}
-            </div>
-          ) : (
-            <div className="empty" style={{ padding: '48px 16px' }}>
-              <div className="empty-art">
-                <Stethoscope className="ic" style={{ width: '40px', height: '40px', opacity: 0.4 }} />
-              </div>
-              <span className="empty-title">Врачи не найдены</span>
-              <p className="muted text-xs text-center max-w-sm mt-1">
-                В клинике пока нет врачей по заданному поисковому запросу.
-              </p>
-              <button
-                type="button"
-                className="btn btn-primary mt-3"
-                onClick={() => setIsCreateOpen(true)}
-              >
-                <Plus className="ic" />
-                <span>Назначить врача</span>
-              </button>
-            </div>
-          )}
-        </section>
-      </div>
-
-      {/* Модальное окно создания профиля врача */}
-      {isCreateOpen && (
-        <div className="dialog-backdrop">
-          <div className="dialog island" role="dialog" aria-labelledby="create-vet-title" style={{ maxWidth: '480px' }}>
-            <div className="dialog-head">
-              <span className="dialog-title" id="create-vet-title">Назначить ветеринарного врача</span>
-              <button
-                type="button"
-                className="btn btn-ghost btn-icon btn-sm"
-                onClick={() => setIsCreateOpen(false)}
-                aria-label="Закрыть"
-              >
-                <X className="ic" />
-              </button>
-            </div>
-
-            <form onSubmit={handleCreateVet} className="dialog-body" style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-              {createError && (
-                <div className="callout callout-error" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <AlertCircle className="ic shrink-0" />
-                  <span className="text-xs">{createError}</span>
-                </div>
-              )}
-
-              <div className="field">
-                <label className="field-label">Сотрудник (роль: VETERINARIAN)</label>
+    <AppShell crumbGroup="Персонал" crumb="Врачи">
+      <div className="content-row">
+        {/* Left Column: Filters + Table */}
+        <div className="content-col grow">
+          <section className="island filters" aria-label="Фильтры врачей">
+            <div className="field">
+              <span className="field-label">Специализация</span>
+              <div className="dd">
                 <select
-                  className="select"
-                  required
-                  value={createForm.userId}
-                  onChange={(e) => setCreateForm({ ...createForm, userId: e.target.value })}
+                  className="select dd-btn"
+                  value={filterSpec}
+                  onChange={(e) => setFilterSpec(e.target.value)}
                 >
-                  <option value="" disabled>Выберите пользователя...</option>
-                  {users.map((u) => (
-                    <option key={u.id} value={u.id}>
-                      {u.fullName || `${u.firstName} ${u.lastName}`} ({u.email})
+                  <option value="ALL">Все специализации</option>
+                  {specializations.map((s) => (
+                    <option key={s.id} value={s.id}>
+                      {s.name}
                     </option>
                   ))}
                 </select>
               </div>
+            </div>
 
+            <div className="field">
+              <span className="field-label">Допуск к виду</span>
+              <div className="dd">
+                <select
+                  className="select dd-btn"
+                  value={filterSpecies}
+                  onChange={(e) => setFilterSpecies(e.target.value)}
+                >
+                  <option value="ALL">Любой допуск</option>
+                  {speciesList.map((sp) => (
+                    <option key={sp.id} value={sp.id}>
+                      {sp.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            <div className="spacer" />
+
+            <button
+              className="btn btn-primary"
+              onClick={() => {
+                setCreateError(null);
+                setIsCreateOpen(true);
+              }}
+            >
+              <Plus size={16} />
+              Создать профиль врача
+            </button>
+          </section>
+
+          <section className="island grow">
+            <div className="island-head">
+              <span className="island-title">
+                <Stethoscope size={18} />
+                Врачи <span className="count">{filteredVets.length} · включая неактивных</span>
+              </span>
+            </div>
+
+            <div className="table-wrap">
+              <div
+                className="dtable"
+                style={
+                  {
+                    '--cols': '1.4fr 1fr 0.6fr 1.6fr 0.8fr',
+                    minWidth: '720px',
+                  } as React.CSSProperties
+                }
+              >
+                <div className="thead">
+                  <span>Врач</span>
+                  <span>Специализация</span>
+                  <span className="right">Стаж</span>
+                  <span>Допуски к видам</span>
+                  <span>Статус</span>
+                </div>
+
+                {filteredVets.map((v) => {
+                  const specName = getSpecName(v.specializationId);
+                  const isSelected = selectedVet?.id === v.id;
+                  const perms = vetPermMap[v.id] || [];
+                  const permittedSpecies = speciesList.filter((sp) => perms.includes(sp.id));
+
+                  return (
+                    <button
+                      key={v.id}
+                      className={`trow ${isSelected ? 'sel' : ''}`}
+                      onClick={() => handleSelectVet(v)}
+                    >
+                      <span className="row" style={{ gap: 8 }}>
+                        <span className={`t-ava sm round tone-${v.specializationId}`}>
+                          {getUserInitials(v.userId)}
+                        </span>
+                        <span className="cell-main">{getUserName(v.userId)}</span>
+                      </span>
+                      <span>
+                        <span className={`t-badge tone-${v.specializationId}`}>{specName}</span>
+                      </span>
+                      <span className="right tnum">
+                        {v.experienceYears != null ? `${v.experienceYears} г.` : '—'}
+                      </span>
+                      <span className="chips">
+                        {permittedSpecies.length > 0 ? (
+                          permittedSpecies.map((sp) => (
+                            <span key={sp.id} className={`sp-chip tone-${sp.id}`}>
+                              {sp.name}
+                            </span>
+                          ))
+                        ) : (
+                          <span className="small muted">Нет допусков</span>
+                        )}
+                      </span>
+                      <span>
+                        <span className={`badge ${v.isActive ? 'badge-accent' : 'badge-outline'}`}>
+                          {v.isActive ? 'Активен' : 'Неактивен'}
+                        </span>
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+
+              {filteredVets.length === 0 && !loading && (
+                <div className="empty">
+                  <span className="empty-title">Нет врачей по фильтру</span>
+                </div>
+              )}
+            </div>
+          </section>
+        </div>
+
+        {/* Right Column: Master-Detail Island (460px) */}
+        {selectedVet && (
+          <section className="island detail-island" style={{ width: 460 }} aria-label="Врач">
+            <div className="island-head">
+              <div className="row">
+                <span className="avatar avatar-lg">{getUserInitials(selectedVet.userId)}</span>
+                <div className="col" style={{ gap: 2 }}>
+                  <span className="h2">{getUserName(selectedVet.userId)}</span>
+                  <span className="cell-sub">
+                    {getSpecName(selectedVet.specializationId)} · {getUserEmail(selectedVet.userId)}
+                  </span>
+                </div>
+              </div>
+              <button
+                className="btn btn-ghost btn-icon btn-sm"
+                aria-label="Закрыть"
+                onClick={() => setSelectedVet(null)}
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            <div className="tabs-line">
+              <button
+                className={`tab-line ${activeTab === 'profile' ? 'on' : ''}`}
+                onClick={() => setActiveTab('profile')}
+              >
+                Профиль
+              </button>
+              <button
+                className={`tab-line ${activeTab === 'species' ? 'on' : ''}`}
+                onClick={() => setActiveTab('species')}
+              >
+                Допуски к видам
+              </button>
+              <button
+                className={`tab-line ${activeTab === 'schedule' ? 'on' : ''}`}
+                onClick={() => setActiveTab('schedule')}
+              >
+                Расписание
+              </button>
+              <button
+                className={`tab-line ${activeTab === 'exceptions' ? 'on' : ''}`}
+                onClick={() => setActiveTab('exceptions')}
+              >
+                Исключения
+              </button>
+            </div>
+
+            <div className="island-body" style={{ paddingTop: 14 }}>
+              {/* Tab: Profile */}
+              {activeTab === 'profile' && (
+                <div className="col" style={{ gap: 14 }}>
+                  <div className="field">
+                    <span className="field-label">Специализация</span>
+                    <select
+                      className="select"
+                      value={editForm.specializationId}
+                      onChange={(e) =>
+                        setEditForm({ ...editForm, specializationId: e.target.value })
+                      }
+                    >
+                      <option value="">Выберите специализацию</option>
+                      {specializations.map((s) => (
+                        <option key={s.id} value={s.id}>
+                          {s.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="form-grid">
+                    <div className="field">
+                      <label className="field-label" htmlFor="vd-exp">
+                        Стаж, лет
+                      </label>
+                      <input
+                        className="input"
+                        id="vd-exp"
+                        type="number"
+                        min="0"
+                        max="70"
+                        value={editForm.experienceYears}
+                        onChange={(e) =>
+                          setEditForm({
+                            ...editForm,
+                            experienceYears: parseInt(e.target.value) || 0,
+                          })
+                        }
+                      />
+                    </div>
+
+                    <div className="field">
+                      <span className="field-label">Активен</span>
+                      <div className="row" style={{ height: 36, gap: 10 }}>
+                        <button
+                          type="button"
+                          className={`switch ${editForm.isActive ? 'on' : ''}`}
+                          role="switch"
+                          aria-checked={editForm.isActive}
+                          aria-label="Активен"
+                          onClick={() =>
+                            setEditForm({ ...editForm, isActive: !editForm.isActive })
+                          }
+                        />
+                        <span className="small muted">
+                          {editForm.isActive ? 'Принимает записи' : 'Приём закрыт'}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="field span-2">
+                      <label className="field-label" htmlFor="vd-photo">
+                        Фото (URL)
+                      </label>
+                      <input
+                        className="input"
+                        id="vd-photo"
+                        type="url"
+                        maxLength={2048}
+                        placeholder="https://…"
+                        value={editForm.photoUrl}
+                        onChange={(e) => setEditForm({ ...editForm, photoUrl: e.target.value })}
+                      />
+                    </div>
+
+                    <div className="field span-2">
+                      <label className="field-label" htmlFor="vd-bio">
+                        Био
+                      </label>
+                      <textarea
+                        className="textarea"
+                        id="vd-bio"
+                        maxLength={4000}
+                        rows={3}
+                        value={editForm.bio}
+                        onChange={(e) => setEditForm({ ...editForm, bio: e.target.value })}
+                      />
+                    </div>
+                  </div>
+
+                  {errorMessage && (
+                    <div className="alert" role="alert">
+                      <AlertCircle size={16} />
+                      <div>{errorMessage}</div>
+                    </div>
+                  )}
+
+                  {saveSuccess && (
+                    <div className="alert alert-info" style={{ borderColor: 'var(--primary)' }}>
+                      <Check size={16} style={{ color: 'var(--primary)' }} />
+                      <div>Изменения сохранены</div>
+                    </div>
+                  )}
+
+                  <span className="dev-note">
+                    ФИО берётся из пользователя {selectedVet.userId}; смена роли или данных
+                    выполняется в разделе «Пользователи»
+                  </span>
+                </div>
+              )}
+
+              {/* Tab: Species Permissions */}
+              {activeTab === 'species' && (
+                <div className="col" style={{ gap: 12 }}>
+                  <span className="small muted">
+                    Включите вид, чтобы врач мог принимать таких пациентов. Без допуска запись
+                    отклоняется с ошибкой VeterinarianNotPermittedForSpeciesException.
+                  </span>
+
+                  <div className="col" style={{ gap: 6 }}>
+                    {speciesList.map((sp) => {
+                      const isPermitted = permittedSpeciesIds.includes(sp.id);
+                      return (
+                        <div
+                          key={sp.id}
+                          className="row between"
+                          style={{ padding: '8px 0', borderBottom: '1px solid var(--border)' }}
+                        >
+                          <span className="cell-main">{sp.name}</span>
+                          <div className="row" style={{ gap: 10 }}>
+                            <span className="small muted">
+                              {isPermitted ? 'Разрешён' : 'Запрещён'}
+                            </span>
+                            <button
+                              type="button"
+                              className={`switch ${isPermitted ? 'on' : ''}`}
+                              role="switch"
+                              aria-checked={isPermitted}
+                              aria-label={`Допуск: ${sp.name}`}
+                              onClick={() => handleToggleSpeciesPermission(sp.id)}
+                            />
+                          </div>
+                        </div>
+                      );
+                    })}
+
+                    {speciesList.length === 0 && (
+                      <span className="small muted">Виды животных пока не добавлены</span>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Tab: Schedule */}
+              {activeTab === 'schedule' && (
+                <div className="col" style={{ gap: 10 }}>
+                  <div
+                    className="dtable"
+                    style={{ '--cols': '40px 1fr 1fr' } as React.CSSProperties}
+                  >
+                    {DOW_ORDER.map((dow) => {
+                      const item = vetSchedules.find((s) => s.dayOfWeek === dow);
+                      return (
+                        <div key={dow} className="trow static compact">
+                          <span className="cell-main">{DOW_LABELS[dow]}</span>
+                          <span className="tnum">
+                            {item
+                              ? `${item.startTime.slice(0, 5)}–${item.endTime.slice(0, 5)}`
+                              : 'Выходной'}
+                          </span>
+                          <span className="small muted">
+                            {item && item.breakStart && item.breakEnd
+                              ? `перерыв ${item.breakStart.slice(0, 5)}–${item.breakEnd.slice(0, 5)}`
+                              : '—'}
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  <Link
+                    href={`/admin/schedules?vetId=${selectedVet.id}`}
+                    className="btn btn-outline btn-sm"
+                    style={{ alignSelf: 'flex-start' }}
+                  >
+                    <Calendar size={14} />
+                    Редактировать в «Расписаниях»
+                  </Link>
+                </div>
+              )}
+
+              {/* Tab: Exceptions */}
+              {activeTab === 'exceptions' && (
+                <div className="col" style={{ gap: 0 }}>
+                  {vetExceptions.map((e) => (
+                    <div
+                      key={e.id}
+                      className="row between"
+                      style={{ padding: '10px 0', borderBottom: '1px solid var(--border)' }}
+                    >
+                      <div className="col" style={{ gap: 0 }}>
+                        <span className="cell-main tnum">
+                          {e.startDate} {e.endDate && e.endDate !== e.startDate ? `— ${e.endDate}` : ''}
+                        </span>
+                        <span className="cell-sub">{e.reason || 'Без причины'}</span>
+                      </div>
+                      <span
+                        className={`badge ${
+                          e.type === 'ABSENCE' ? 'badge-destructive' : 'badge-accent'
+                        }`}
+                      >
+                        {e.type === 'ABSENCE' ? 'Отсутствие' : 'Свой график'}
+                      </span>
+                    </div>
+                  ))}
+
+                  {vetExceptions.length === 0 && (
+                    <span className="small muted" style={{ padding: '12px 0' }}>
+                      Исключений нет
+                    </span>
+                  )}
+
+                  <Link
+                    href={`/admin/schedules?tab=exc&vetId=${selectedVet.id}`}
+                    className="btn btn-outline btn-sm"
+                    style={{ alignSelf: 'flex-start', marginTop: 12 }}
+                  >
+                    <Calendar size={14} />
+                    Все исключения врача
+                  </Link>
+                </div>
+              )}
+            </div>
+
+            <div className="island-foot">
+              <button
+                className="btn btn-destructive-outline btn-sm"
+                onClick={() => setIsDeleteConfirmOpen(true)}
+              >
+                <Trash2 size={14} />
+                Удалить профиль
+              </button>
+              <button
+                className="btn btn-primary btn-sm"
+                onClick={handleSaveProfile}
+                disabled={savingVet}
+              >
+                {savingVet ? 'Сохранение…' : 'Сохранить'}
+              </button>
+            </div>
+          </section>
+        )}
+      </div>
+
+      {/* Modal: Create Veterinarian Profile */}
+      {isCreateOpen && (
+        <div
+          className="overlay"
+          onClick={() => setIsCreateOpen(false)}
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(0,0,0,0.5)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1000,
+          }}
+        >
+          <div
+            className="dialog dialog-sm"
+            style={{ width: 440 }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="dialog-head">
+              <span className="dialog-title">Создание профиля врача</span>
+              <span className="dialog-desc">
+                Привязка врача к учётной записи пользователя с ролью ВЕТЕРИНАР
+              </span>
+            </div>
+
+            <form onSubmit={handleCreateVet} className="col" style={{ gap: 14 }}>
               <div className="field">
-                <label className="field-label">Специализация</label>
+                <span className="field-label">
+                  Пользователь <span className="req">*</span>
+                </span>
                 <select
                   className="select"
+                  value={createForm.userId}
+                  onChange={(e) => setCreateForm({ ...createForm, userId: e.target.value })}
                   required
-                  value={createForm.specializationId}
-                  onChange={(e) => setCreateForm({ ...createForm, specializationId: e.target.value })}
                 >
-                  <option value="" disabled>Выберите специализацию...</option>
+                  <option value="">Выберите пользователя…</option>
+                  {usersWithoutProfile.map((u) => (
+                    <option key={u.id} value={u.id}>
+                      {u.fullName} ({u.email})
+                    </option>
+                  ))}
+                </select>
+                {usersWithoutProfile.length === 0 && (
+                  <span className="field-hint" style={{ color: 'var(--amber-fg, #b45309)' }}>
+                    Нет свободных пользователей с ролью ВЕТЕРИНАР. Сначала создайте пользователя в
+                    разделе «Пользователи».
+                  </span>
+                )}
+              </div>
+
+              <div className="field">
+                <span className="field-label">
+                  Специализация <span className="req">*</span>
+                </span>
+                <select
+                  className="select"
+                  value={createForm.specializationId}
+                  onChange={(e) =>
+                    setCreateForm({ ...createForm, specializationId: e.target.value })
+                  }
+                  required
+                >
+                  <option value="">Выберите специализацию…</option>
                   {specializations.map((s) => (
                     <option key={s.id} value={s.id}>
                       {s.name}
@@ -661,43 +825,84 @@ export default function AdminVeterinariansPage() {
                 </select>
               </div>
 
-              <div className="field">
-                <label className="field-label">Опыт работы (лет)</label>
-                <input
-                  type="number"
-                  min={0}
-                  max={60}
-                  className="input font-mono"
-                  required
-                  value={createForm.experienceYears}
-                  onChange={(e) => setCreateForm({ ...createForm, experienceYears: parseInt(e.target.value) || 0 })}
-                />
+              <div className="form-grid">
+                <div className="field">
+                  <label className="field-label" htmlFor="cr-exp">
+                    Стаж, лет
+                  </label>
+                  <input
+                    className="input"
+                    id="cr-exp"
+                    type="number"
+                    min="0"
+                    max="70"
+                    value={createForm.experienceYears}
+                    onChange={(e) =>
+                      setCreateForm({
+                        ...createForm,
+                        experienceYears: parseInt(e.target.value) || 0,
+                      })
+                    }
+                  />
+                </div>
+
+                <div className="field">
+                  <span className="field-label">Активен</span>
+                  <div className="row" style={{ height: 36, gap: 8 }}>
+                    <button
+                      type="button"
+                      className={`switch ${createForm.isActive ? 'on' : ''}`}
+                      role="switch"
+                      aria-checked={createForm.isActive}
+                      onClick={() =>
+                        setCreateForm({ ...createForm, isActive: !createForm.isActive })
+                      }
+                    />
+                    <span className="small muted">
+                      {createForm.isActive ? 'Активен' : 'Отключён'}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="field span-2">
+                  <label className="field-label" htmlFor="cr-photo">
+                    Фото (URL)
+                  </label>
+                  <input
+                    className="input"
+                    id="cr-photo"
+                    type="url"
+                    placeholder="https://…"
+                    value={createForm.photoUrl}
+                    onChange={(e) => setCreateForm({ ...createForm, photoUrl: e.target.value })}
+                  />
+                </div>
+
+                <div className="field span-2">
+                  <label className="field-label" htmlFor="cr-bio">
+                    Био
+                  </label>
+                  <textarea
+                    className="textarea"
+                    id="cr-bio"
+                    rows={2}
+                    value={createForm.bio}
+                    onChange={(e) => setCreateForm({ ...createForm, bio: e.target.value })}
+                  />
+                </div>
               </div>
 
-              <div className="field">
-                <label className="field-label">О враче (биография)</label>
-                <textarea
-                  className="textarea"
-                  rows={3}
-                  placeholder="Образование, курсы повышения квалификации..."
-                  value={createForm.bio}
-                  onChange={(e) => setCreateForm({ ...createForm, bio: e.target.value })}
-                />
-              </div>
-
-              <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '13px' }}>
-                <input
-                  type="checkbox"
-                  checked={createForm.isActive}
-                  onChange={(e) => setCreateForm({ ...createForm, isActive: e.target.checked })}
-                />
-                <span>Врач активен и доступен для записи пациентов</span>
-              </label>
+              {createError && (
+                <div className="alert" role="alert">
+                  <AlertCircle size={16} />
+                  <div>{createError}</div>
+                </div>
+              )}
 
               <div className="dialog-foot">
                 <button
                   type="button"
-                  className="btn btn-ghost"
+                  className="btn btn-outline"
                   onClick={() => setIsCreateOpen(false)}
                 >
                   Отмена
@@ -705,9 +910,9 @@ export default function AdminVeterinariansPage() {
                 <button
                   type="submit"
                   className="btn btn-primary"
-                  disabled={creating}
+                  disabled={creating || usersWithoutProfile.length === 0}
                 >
-                  {creating ? 'Создание...' : 'Назначить врача'}
+                  {creating ? 'Создание…' : 'Создать врача'}
                 </button>
               </div>
             </form>
@@ -715,502 +920,50 @@ export default function AdminVeterinariansPage() {
         </div>
       )}
 
-      {/* Модальное окно редактирования профиля врача */}
-      {editingVet && (
-        <div className="dialog-backdrop">
-          <div className="dialog island" role="dialog" aria-labelledby="edit-vet-title" style={{ maxWidth: '480px' }}>
+      {/* Delete Confirmation Dialog */}
+      {isDeleteConfirmOpen && selectedVet && (
+        <div
+          className="overlay"
+          onClick={() => setIsDeleteConfirmOpen(false)}
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(0,0,0,0.5)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1000,
+          }}
+        >
+          <div
+            className="dialog dialog-sm"
+            role="alertdialog"
+            aria-modal="true"
+            onClick={(e) => e.stopPropagation()}
+          >
             <div className="dialog-head">
-              <span className="dialog-title" id="edit-vet-title">
-                Редактирование: {editingVet.user?.fullName || 'Врач'}
+              <span className="dialog-title">Удалить профиль врача?</span>
+              <span className="dialog-desc">
+                Профиль врача «{getUserName(selectedVet.userId)}» будет удалён. Записи и расписание
+                могут быть затронуты. Сама учётная запись пользователя сохранится.
               </span>
-              <button
-                type="button"
-                className="btn btn-ghost btn-icon btn-sm"
-                onClick={() => setEditingVet(null)}
-                aria-label="Закрыть"
-              >
-                <X className="ic" />
-              </button>
             </div>
-
-            <form onSubmit={handleUpdateVet} className="dialog-body" style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-              <div className="field">
-                <label className="field-label">Специализация</label>
-                <select
-                  className="select"
-                  required
-                  value={editForm.specializationId}
-                  onChange={(e) => setEditForm({ ...editForm, specializationId: e.target.value })}
-                >
-                  {specializations.map((s) => (
-                    <option key={s.id} value={s.id}>
-                      {s.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="field">
-                <label className="field-label">Опыт работы (лет)</label>
-                <input
-                  type="number"
-                  min={0}
-                  max={60}
-                  className="input font-mono"
-                  required
-                  value={editForm.experienceYears}
-                  onChange={(e) => setEditForm({ ...editForm, experienceYears: parseInt(e.target.value) || 0 })}
-                />
-              </div>
-
-              <div className="field">
-                <label className="field-label">О враче</label>
-                <textarea
-                  className="textarea"
-                  rows={3}
-                  value={editForm.bio}
-                  onChange={(e) => setEditForm({ ...editForm, bio: e.target.value })}
-                />
-              </div>
-
-              <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '13px' }}>
-                <input
-                  type="checkbox"
-                  checked={editForm.isActive}
-                  onChange={(e) => setEditForm({ ...editForm, isActive: e.target.checked })}
-                />
-                <span>Врач активен в расписании клиники</span>
-              </label>
-
-              <div className="dialog-foot">
-                <button
-                  type="button"
-                  className="btn btn-ghost"
-                  onClick={() => setEditingVet(null)}
-                >
-                  Отмена
-                </button>
-                <button
-                  type="submit"
-                  className="btn btn-primary"
-                  disabled={updating}
-                >
-                  {updating ? 'Сохранение...' : 'Сохранить изменения'}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* Модальное окно графика работы и исключений */}
-      {selectedVetForSchedule && (
-        <div className="dialog-backdrop">
-          <div className="dialog island" role="dialog" aria-labelledby="schedule-title" style={{ maxWidth: '640px', maxHeight: '90vh', overflowY: 'auto' }}>
-            <div className="dialog-head">
-              <span className="dialog-title" id="schedule-title">
-                График: {selectedVetForSchedule.user?.fullName || 'Врач'}
-              </span>
-              <button
-                type="button"
-                className="btn btn-ghost btn-icon btn-sm"
-                onClick={() => setSelectedVetForSchedule(null)}
-                aria-label="Закрыть"
-              >
-                <X className="ic" />
-              </button>
-            </div>
-
-            <div className="dialog-body" style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-              {/* Раздел недельного графика работы */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                  <span className="font-semibold text-sm" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    <Calendar className="ic" style={{ width: '15px', height: '15px' }} />
-                    <span>Еженедельное расписание (по дням)</span>
-                  </span>
-                </div>
-
-                {loadingSchedule ? (
-                  <div className="skeleton" style={{ height: '80px', borderRadius: '8px' }} />
-                ) : schedules.length > 0 ? (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                    {schedules.map((s) => {
-                      const dayMeta = DAYS_OF_WEEK.find((d) => d.value === s.dayOfWeek);
-                      return (
-                        <div
-                          key={s.id}
-                          style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'space-between',
-                            padding: '6px 10px',
-                            background: 'var(--island-subtle)',
-                            border: '1px solid var(--border)',
-                            borderRadius: '8px',
-                            fontSize: '13px',
-                          }}
-                        >
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                            <span className="badge font-bold" style={{ width: '30px', textAlign: 'center' }}>
-                              {dayMeta?.short || s.dayOfWeek.slice(0, 2)}
-                            </span>
-                            <span className="font-medium">{dayMeta?.label || s.dayOfWeek}:</span>
-                            <span className="tnum font-mono text-xs">
-                              {s.startTime.substring(0, 5)} – {s.endTime.substring(0, 5)}
-                            </span>
-                            {s.breakStart && s.breakEnd && (
-                              <span className="tnum muted text-xs font-mono">
-                                (обед: {s.breakStart.substring(0, 5)}–{s.breakEnd.substring(0, 5)})
-                              </span>
-                            )}
-                          </div>
-
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                            <button
-                              type="button"
-                              className="btn btn-ghost btn-icon btn-sm"
-                              onClick={() => handleEditScheduleDay(s)}
-                              title="Редактировать часы"
-                            >
-                              <Edit2 className="ic" style={{ width: '13px', height: '13px' }} />
-                            </button>
-                            <button
-                              type="button"
-                              className="btn btn-ghost btn-icon btn-sm text-[var(--accent-red)]"
-                              onClick={() => handleDeleteScheduleDay(s.id)}
-                              title="Удалить день"
-                            >
-                              <Trash2 className="ic" style={{ width: '13px', height: '13px' }} />
-                            </button>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                ) : (
-                  <p className="muted text-xs italic">Расписание ещё не задано (все дни недели — выходные).</p>
-                )}
-
-                {scheduleError && (
-                  <div className="callout callout-error" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <AlertCircle className="ic shrink-0" />
-                    <span className="text-xs">{scheduleError}</span>
-                  </div>
-                )}
-
-                {/* Форма добавления / редактирования дня */}
-                <form
-                  onSubmit={handleAddScheduleDay}
-                  style={{
-                    padding: '10px',
-                    border: '1px solid var(--border)',
-                    borderRadius: '8px',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    gap: '8px',
-                    marginTop: '4px',
-                  }}
-                >
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                    <span className="font-semibold text-xs">
-                      {schedules.some((s) => s.dayOfWeek === newSchedule.dayOfWeek)
-                        ? 'Изменить часы для выбранного дня'
-                        : 'Добавить рабочий день'}
-                    </span>
-                    {schedules.some((s) => s.dayOfWeek === newSchedule.dayOfWeek) && (
-                      <span className="badge b-pending text-[10px]">День уже задан — обновится</span>
-                    )}
-                  </div>
-
-                  <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr 1fr', gap: '6px' }}>
-                    <div className="field">
-                      <label className="field-label">День недели</label>
-                      <select
-                        className="select input-sm"
-                        value={newSchedule.dayOfWeek}
-                        onChange={(e) => {
-                          const day = e.target.value as DayOfWeek;
-                          const existing = schedules.find((s) => s.dayOfWeek === day);
-                          if (existing) {
-                            handleEditScheduleDay(existing);
-                          } else {
-                            setNewSchedule({
-                              ...newSchedule,
-                              dayOfWeek: day,
-                              startTime: '09:00:00',
-                              endTime: '18:00:00',
-                              breakStart: '13:00:00',
-                              breakEnd: '14:00:00',
-                            });
-                          }
-                        }}
-                      >
-                        {DAYS_OF_WEEK.map((d) => (
-                          <option key={d.value} value={d.value}>{d.label}</option>
-                        ))}
-                      </select>
-                    </div>
-
-                    <div className="field">
-                      <label className="field-label">Начало</label>
-                      <input
-                        type="time"
-                        className="input input-sm font-mono"
-                        required
-                        value={newSchedule.startTime.substring(0, 5)}
-                        onChange={(e) => setNewSchedule({ ...newSchedule, startTime: `${e.target.value}:00` })}
-                      />
-                    </div>
-
-                    <div className="field">
-                      <label className="field-label">Окончание</label>
-                      <input
-                        type="time"
-                        className="input input-sm font-mono"
-                        required
-                        value={newSchedule.endTime.substring(0, 5)}
-                        onChange={(e) => setNewSchedule({ ...newSchedule, endTime: `${e.target.value}:00` })}
-                      />
-                    </div>
-                  </div>
-
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px' }}>
-                    <div className="field">
-                      <label className="field-label">Обед с</label>
-                      <input
-                        type="time"
-                        className="input input-sm font-mono"
-                        value={newSchedule.breakStart ? newSchedule.breakStart.substring(0, 5) : ''}
-                        onChange={(e) => setNewSchedule({ ...newSchedule, breakStart: e.target.value ? `${e.target.value}:00` : '' })}
-                      />
-                    </div>
-                    <div className="field">
-                      <label className="field-label">Обед по</label>
-                      <input
-                        type="time"
-                        className="input input-sm font-mono"
-                        value={newSchedule.breakEnd ? newSchedule.breakEnd.substring(0, 5) : ''}
-                        onChange={(e) => setNewSchedule({ ...newSchedule, breakEnd: e.target.value ? `${e.target.value}:00` : '' })}
-                      />
-                    </div>
-                  </div>
-
-                  <button
-                    type="submit"
-                    className="btn btn-primary btn-sm self-start"
-                    disabled={savingSchedule}
-                  >
-                    {savingSchedule ? 'Сохранение...' : schedules.some((s) => s.dayOfWeek === newSchedule.dayOfWeek) ? 'Обновить день' : 'Сохранить день'}
-                  </button>
-                </form>
-              </div>
-
-              {/* Раздел исключений из графика (отпуска, больничные) */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', borderTop: '1px solid var(--border)', paddingTop: '12px' }}>
-                <span className="font-semibold text-sm" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  <AlertCircle className="ic" style={{ width: '15px', height: '15px' }} />
-                  <span>Исключения (отпуска, больничные, особые смены)</span>
-                </span>
-
-                {exceptions.length > 0 ? (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                    {exceptions.map((exc) => (
-                      <div
-                        key={exc.id}
-                        style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'space-between',
-                          padding: '6px 10px',
-                          background: 'var(--island-subtle)',
-                          border: '1px solid var(--border)',
-                          borderRadius: '8px',
-                          fontSize: '13px',
-                        }}
-                      >
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                            <span className="badge b-pending text-[10px]">
-                              {exc.type === 'ABSENCE' ? 'Отсутствие' : 'Особые часы'}
-                            </span>
-                            <span className="tnum font-mono text-xs font-semibold">
-                              {exc.startDate} — {exc.endDate}
-                            </span>
-                          </div>
-                          {exc.reason && <span className="muted text-xs italic">Причина: {exc.reason}</span>}
-                        </div>
-
-                        <button
-                          type="button"
-                          className="btn btn-ghost btn-icon btn-sm text-[var(--accent-red)]"
-                          onClick={() => handleDeleteException(exc.id)}
-                          title="Удалить исключение"
-                        >
-                          <Trash2 className="ic" style={{ width: '13px', height: '13px' }} />
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <p className="muted text-xs italic">Исключений нет.</p>
-                )}
-
-                {exceptionError && (
-                  <div className="callout callout-error" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <AlertCircle className="ic shrink-0" />
-                    <span className="text-xs">{exceptionError}</span>
-                  </div>
-                )}
-
-                <form
-                  onSubmit={handleAddException}
-                  style={{
-                    padding: '10px',
-                    border: '1px solid var(--border)',
-                    borderRadius: '8px',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    gap: '8px',
-                  }}
-                >
-                  <span className="font-semibold text-xs">Добавить исключение</span>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px' }}>
-                    <div className="field">
-                      <label className="field-label">Тип</label>
-                      <select
-                        className="select input-sm"
-                        value={newException.type}
-                        onChange={(e) => setNewException({ ...newException, type: e.target.value as ScheduleExceptionType })}
-                      >
-                        <option value="ABSENCE">Отсутствие / Отпуск</option>
-                        <option value="CUSTOM_HOURS">Особые часы</option>
-                      </select>
-                    </div>
-
-                    <div className="field">
-                      <label className="field-label">Причина</label>
-                      <input
-                        className="input input-sm"
-                        placeholder="Отпуск / Конференция..."
-                        value={newException.reason}
-                        onChange={(e) => setNewException({ ...newException, reason: e.target.value })}
-                      />
-                    </div>
-                  </div>
-
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px' }}>
-                    <div className="field">
-                      <label className="field-label">С даты</label>
-                      <input
-                        type="date"
-                        className="input input-sm"
-                        required
-                        value={newException.startDate}
-                        onChange={(e) => setNewException({ ...newException, startDate: e.target.value })}
-                      />
-                    </div>
-                    <div className="field">
-                      <label className="field-label">По дату</label>
-                      <input
-                        type="date"
-                        className="input input-sm"
-                        required
-                        value={newException.endDate}
-                        onChange={(e) => setNewException({ ...newException, endDate: e.target.value })}
-                      />
-                    </div>
-                  </div>
-
-                  <button
-                    type="submit"
-                    className="btn btn-ghost btn-sm self-start"
-                    style={{ border: '1px solid var(--border)' }}
-                    disabled={savingException}
-                  >
-                    {savingException ? 'Сохранение...' : 'Внести исключение'}
-                  </button>
-                </form>
-              </div>
-            </div>
-
             <div className="dialog-foot">
               <button
                 type="button"
-                className="btn btn-primary"
-                onClick={() => setSelectedVetForSchedule(null)}
+                className="btn btn-outline"
+                onClick={() => setIsDeleteConfirmOpen(false)}
               >
-                Готово
+                Отмена
               </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Модальное окно разрешений на приём видов животных */}
-      {selectedVetForSpecies && (
-        <div className="dialog-backdrop">
-          <div className="dialog island" role="dialog" aria-labelledby="species-title" style={{ maxWidth: '440px' }}>
-            <div className="dialog-head">
-              <span className="dialog-title" id="species-title">
-                Допуск к животным: {selectedVetForSpecies.user?.fullName || 'Врач'}
-              </span>
               <button
                 type="button"
-                className="btn btn-ghost btn-icon btn-sm"
-                onClick={() => setSelectedVetForSpecies(null)}
-                aria-label="Закрыть"
+                className="btn btn-destructive"
+                onClick={handleDeleteVet}
+                disabled={deleting}
               >
-                <X className="ic" />
+                {deleting ? 'Удаление…' : 'Удалить'}
               </button>
-            </div>
-
-            <div className="dialog-body" style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-              <p className="text-xs muted">
-                Отметьте виды питомцев, которых имеет право осматривать и оперировать данный доктор:
-              </p>
-
-              {loadingPermissions ? (
-                <div className="skeleton" style={{ height: '120px', borderRadius: '8px' }} />
-              ) : (
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px' }}>
-                  {speciesList.map((spec) => {
-                    const isPermitted = permittedSpeciesIds.includes(spec.id);
-                    return (
-                      <button
-                        key={spec.id}
-                        type="button"
-                        onClick={() => handleToggleSpeciesPermission(spec.id)}
-                        className={`chip ${isPermitted ? 'on' : ''}`}
-                        style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'space-between',
-                          padding: '8px 10px',
-                          cursor: 'pointer',
-                        }}
-                      >
-                        <span className="text-xs font-medium">{spec.name}</span>
-                        {isPermitted ? (
-                          <Check className="ic" style={{ width: '13px', height: '13px' }} />
-                        ) : (
-                          <span style={{ width: '13px', height: '13px' }} />
-                        )}
-                      </button>
-                    );
-                  })}
-                </div>
-              )}
-
-              <div className="dialog-foot">
-                <button
-                  type="button"
-                  className="btn btn-primary"
-                  onClick={() => setSelectedVetForSpecies(null)}
-                >
-                  Готово
-                </button>
-              </div>
             </div>
           </div>
         </div>

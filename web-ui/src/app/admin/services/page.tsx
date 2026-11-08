@@ -1,48 +1,45 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, Suspense } from 'react';
+import { useSearchParams, useRouter } from 'next/navigation';
 import { adminApi, clinicApi } from '../../../api';
 import { Service, Specialization, Species, ServiceSpecies } from '../../../types';
 import { AppShell } from '../../../components/layout/AppShell';
 import {
   ClipboardList,
   Plus,
-  Clock,
   Search,
-  Edit2,
   Trash2,
   Tags,
-  Sliders,
-  AlertCircle,
-  FolderTree,
-  RefreshCw,
-  X,
   PawPrint,
+  AlertCircle,
+  X,
+  Check,
+  Edit2,
 } from 'lucide-react';
 
-export default function AdminServicesPage() {
+function AdminServicesContent() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const tabParam = searchParams.get('tab');
+
   const [services, setServices] = useState<Service[]>([]);
   const [specializations, setSpecializations] = useState<Specialization[]>([]);
   const [speciesList, setSpeciesList] = useState<Species[]>([]);
+  const [serviceSpeciesMap, setServiceSpeciesMap] = useState<Record<string, ServiceSpecies[]>>({});
   const [loading, setLoading] = useState(true);
+
+  // Top Nav Tab (from URL or switch)
+  const [mainTab, setMainTab] = useState<'SERVICES' | 'SPECIES' | 'SPECIALIZATIONS'>('SERVICES');
+
+  // Filters for services
+  const [filterSpec, setFilterSpec] = useState<string>('ALL');
+  const [filterSpecies, setFilterSpecies] = useState<string>('ALL');
   const [search, setSearch] = useState('');
-  const [activeTab, setActiveTab] = useState<'SERVICES' | 'SPECIES' | 'SPECIALIZATIONS'>('SERVICES');
 
-  // Модальное окно добавления услуги
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [form, setForm] = useState({
-    name: '',
-    specializationId: '',
-    description: '',
-    basePrice: 1500,
-    baseDurationMin: 30,
-    bufferAfterMin: 10,
-    isActive: true,
-  });
-  const [creating, setCreating] = useState(false);
-
-  // Модальное окно редактирования услуги
-  const [editingService, setEditingService] = useState<Service | null>(null);
+  // Selected Service for Master-Detail panel
+  const [selectedService, setSelectedService] = useState<Service | null>(null);
+  const [detailTab, setDetailTab] = useState<'main' | 'species'>('main');
   const [editForm, setEditForm] = useState({
     name: '',
     specializationId: '',
@@ -52,40 +49,52 @@ export default function AdminServicesPage() {
     bufferAfterMin: 10,
     isActive: true,
   });
-  const [updating, setUpdating] = useState(false);
+  const [serviceLinks, setServiceLinks] = useState<ServiceSpecies[]>([]);
+  const [savingService, setSavingService] = useState(false);
+  const [saveSuccess, setSaveSuccess] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
 
-  // Модальное окно удаления услуги
-  const [deletingServiceId, setDeletingServiceId] = useState<string | null>(null);
+  // Attach species state
+  const [attachSpeciesId, setAttachSpeciesId] = useState('');
+  const [attachDur, setAttachDur] = useState<number | ''>('');
+  const [attachPrice, setAttachPrice] = useState<number | ''>('');
+  const [attaching, setAttaching] = useState(false);
+
+  // Create Service Modal
+  const [isCreateOpen, setIsCreateOpen] = useState(false);
+  const [createForm, setCreateForm] = useState({
+    name: '',
+    specializationId: '',
+    description: '',
+    basePrice: 1500,
+    baseDurationMin: 30,
+    bufferAfterMin: 10,
+    isActive: true,
+  });
+  const [creating, setCreating] = useState(false);
+  const [createError, setCreateError] = useState<string | null>(null);
+
+  // Delete Service Modal
+  const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
 
-  // Модальное окно цен и ограничений по видам животных
-  const [selectedServiceForSpecies, setSelectedServiceForSpecies] = useState<Service | null>(null);
-  const [serviceSpeciesList, setServiceSpeciesList] = useState<ServiceSpecies[]>([]);
-  const [loadingSpeciesOverrides, setLoadingSpeciesOverrides] = useState(false);
-  const [newOverride, setNewOverride] = useState({
-    speciesId: '',
-    durationMin: 30,
-    price: 1500,
-  });
-  const [savingOverride, setSavingOverride] = useState(false);
-
-  // Модальное окно добавления вида животных
+  // Species management state
   const [isSpeciesModalOpen, setIsSpeciesModalOpen] = useState(false);
   const [newSpeciesName, setNewSpeciesName] = useState('');
   const [savingSpecies, setSavingSpecies] = useState(false);
 
-  // Модальное окно добавления специализации
+  // Specialization management state
   const [isSpecModalOpen, setIsSpecModalOpen] = useState(false);
-  const [newSpecForm, setNewSpecForm] = useState({ name: '', description: '' });
+  const [specForm, setSpecForm] = useState({ id: '', name: '', description: '' });
   const [savingSpec, setSavingSpec] = useState(false);
 
   const loadData = async () => {
     setLoading(true);
     try {
       const [svcData, specData, speciesData] = await Promise.all([
-        adminApi.getServices(),
-        clinicApi.getSpecializations(),
-        clinicApi.getSpecies(),
+        adminApi.getServices().catch(() => [] as Service[]),
+        clinicApi.getSpecializations().catch(() => [] as Specialization[]),
+        clinicApi.getSpecies().catch(() => [] as Species[]),
       ]);
 
       const safeServices = Array.isArray(svcData) ? svcData : [];
@@ -96,17 +105,28 @@ export default function AdminServicesPage() {
       setSpecializations(safeSpecs);
       setSpeciesList(safeSpecies);
 
-      if (safeSpecs.length > 0 && !form.specializationId) {
-        setForm((prev) => ({ ...prev, specializationId: safeSpecs[0].id }));
-      }
-      if (safeSpecies.length > 0 && !newOverride.speciesId) {
-        setNewOverride((prev) => ({ ...prev, speciesId: safeSpecies[0].id }));
+      // Load species links for all services
+      const linkPromises = safeServices.map(async (svc) => {
+        try {
+          const links = await clinicApi.getServiceSpecies(svc.id);
+          return { serviceId: svc.id, links: Array.isArray(links) ? links : [] };
+        } catch {
+          return { serviceId: svc.id, links: [] };
+        }
+      });
+      const linkResults = await Promise.all(linkPromises);
+      const linkMap: Record<string, ServiceSpecies[]> = {};
+      linkResults.forEach((r) => {
+        linkMap[r.serviceId] = r.links;
+      });
+      setServiceSpeciesMap(linkMap);
+
+      if (selectedService) {
+        const updated = safeServices.find((s: Service) => s.id === selectedService.id);
+        if (updated) setSelectedService(updated);
       }
     } catch (err) {
-      console.error(err);
-      setServices([]);
-      setSpecializations([]);
-      setSpeciesList([]);
+      console.error('Failed to load services data', err);
     } finally {
       setLoading(false);
     }
@@ -116,22 +136,118 @@ export default function AdminServicesPage() {
     loadData();
   }, []);
 
+  useEffect(() => {
+    if (tabParam === 'specs' || tabParam === 'specializations') {
+      setMainTab('SPECIALIZATIONS');
+    } else if (tabParam === 'species') {
+      setMainTab('SPECIES');
+    } else {
+      setMainTab('SERVICES');
+    }
+  }, [tabParam]);
+
+  // When selected service changes, populate detail form
+  useEffect(() => {
+    if (!selectedService) return;
+    setEditForm({
+      name: selectedService.name,
+      specializationId: selectedService.specializationId,
+      description: selectedService.description || '',
+      basePrice: selectedService.basePrice,
+      baseDurationMin: selectedService.baseDurationMin,
+      bufferAfterMin: selectedService.bufferAfterMin,
+      isActive: selectedService.isActive,
+    });
+    setServiceLinks(serviceSpeciesMap[selectedService.id] || []);
+    setSaveSuccess(false);
+    setSaveError(null);
+
+    // Refresh species links for selected service
+    clinicApi
+      .getServiceSpecies(selectedService.id)
+      .then((links) => {
+        const safe = Array.isArray(links) ? links : [];
+        setServiceLinks(safe);
+        setServiceSpeciesMap((prev) => ({ ...prev, [selectedService.id]: safe }));
+      })
+      .catch(() => {});
+  }, [selectedService]);
+
+  const getSpecName = (specId?: string) => {
+    if (!specId) return '—';
+    const s = specializations.find((sp) => sp.id === specId);
+    return s ? s.name : '—';
+  };
+
+  const getSpeciesName = (spId?: string) => {
+    if (!spId) return '—';
+    const s = speciesList.find((sp) => sp.id === spId);
+    return s ? s.name : '—';
+  };
+
+  // Save Service
+  const handleSaveService = async () => {
+    if (!selectedService) return;
+    setSavingService(true);
+    setSaveError(null);
+    setSaveSuccess(false);
+    try {
+      await adminApi.updateService(selectedService.id, {
+        name: editForm.name.trim(),
+        specializationId: editForm.specializationId,
+        description: editForm.description.trim(),
+        basePrice: Number(editForm.basePrice),
+        baseDurationMin: Number(editForm.baseDurationMin),
+        bufferAfterMin: Number(editForm.bufferAfterMin),
+        isActive: editForm.isActive,
+      });
+      setSaveSuccess(true);
+      setTimeout(() => setSaveSuccess(false), 2500);
+      await loadData();
+    } catch (err: any) {
+      setSaveError(err?.response?.data?.message || err?.message || 'Ошибка сохранения услуги');
+    } finally {
+      setSavingService(false);
+    }
+  };
+
+  // Delete Service
+  const handleDeleteService = async () => {
+    if (!selectedService) return;
+    setDeleting(true);
+    try {
+      await adminApi.deleteService(selectedService.id);
+      setIsDeleteConfirmOpen(false);
+      setSelectedService(null);
+      await loadData();
+    } catch (err: any) {
+      alert(err?.response?.data?.message || err?.message || 'Ошибка удаления услуги');
+    } finally {
+      setDeleting(false);
+    }
+  };
+
+  // Create Service
   const handleCreateService = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!createForm.name || !createForm.specializationId) {
+      setCreateError('Заполните обязательные поля');
+      return;
+    }
     setCreating(true);
+    setCreateError(null);
     try {
-      await adminApi.createService({
-        name: form.name.trim(),
-        specializationId: form.specializationId,
-        description: form.description.trim(),
-        basePrice: form.basePrice,
-        baseDurationMin: form.baseDurationMin,
-        bufferAfterMin: form.bufferAfterMin,
-        isActive: form.isActive,
+      const created = await adminApi.createService({
+        name: createForm.name.trim(),
+        specializationId: createForm.specializationId,
+        description: createForm.description.trim(),
+        basePrice: Number(createForm.basePrice),
+        baseDurationMin: Number(createForm.baseDurationMin),
+        bufferAfterMin: Number(createForm.bufferAfterMin),
+        isActive: createForm.isActive,
       });
-
-      setIsModalOpen(false);
-      setForm({
+      setIsCreateOpen(false);
+      setCreateForm({
         name: '',
         specializationId: specializations[0]?.id || '',
         description: '',
@@ -140,566 +256,896 @@ export default function AdminServicesPage() {
         bufferAfterMin: 10,
         isActive: true,
       });
-      loadData();
-    } catch (err) {
-      console.error(err);
+      await loadData();
+      if (created) setSelectedService(created);
+    } catch (err: any) {
+      setCreateError(err?.response?.data?.message || err?.message || 'Ошибка создания услуги');
     } finally {
       setCreating(false);
     }
   };
 
-  const openEditModal = (svc: Service) => {
-    setEditingService(svc);
-    setEditForm({
-      name: svc.name,
-      specializationId: svc.specializationId,
-      description: svc.description,
-      basePrice: svc.basePrice,
-      baseDurationMin: svc.baseDurationMin,
-      bufferAfterMin: svc.bufferAfterMin,
-      isActive: svc.isActive,
-    });
-  };
-
-  const handleUpdateService = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!editingService) return;
-    setUpdating(true);
+  // Attach Species Override
+  const handleAttachSpecies = async () => {
+    if (!selectedService || !attachSpeciesId) return;
+    setAttaching(true);
     try {
-      await adminApi.updateService(editingService.id, {
-        name: editForm.name.trim(),
-        specializationId: editForm.specializationId,
-        description: editForm.description.trim(),
-        basePrice: editForm.basePrice,
-        baseDurationMin: editForm.baseDurationMin,
-        bufferAfterMin: editForm.bufferAfterMin,
-        isActive: editForm.isActive,
+      await adminApi.createServiceSpecies(selectedService.id, {
+        speciesId: attachSpeciesId,
+        durationMin: attachDur !== '' ? Number(attachDur) : null,
+        price: attachPrice !== '' ? Number(attachPrice) : null,
       });
-
-      setEditingService(null);
-      loadData();
-    } catch (err) {
-      console.error(err);
+      setAttachSpeciesId('');
+      setAttachDur('');
+      setAttachPrice('');
+      const links = await clinicApi.getServiceSpecies(selectedService.id);
+      const safe = Array.isArray(links) ? links : [];
+      setServiceLinks(safe);
+      setServiceSpeciesMap((prev) => ({ ...prev, [selectedService.id]: safe }));
+    } catch (err: any) {
+      alert(err?.response?.data?.message || err?.message || 'Ошибка привязки вида к услуге');
     } finally {
-      setUpdating(false);
+      setAttaching(false);
     }
   };
 
-  const handleDeleteService = async () => {
-    if (!deletingServiceId) return;
-    setDeleting(true);
+  // Detach Species Override
+  const handleDetachSpecies = async (speciesId: string) => {
+    if (!selectedService) return;
     try {
-      await adminApi.deleteService(deletingServiceId);
-      setDeletingServiceId(null);
-      loadData();
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setDeleting(false);
+      await adminApi.deleteServiceSpecies(selectedService.id, speciesId);
+      const next = serviceLinks.filter((l) => l.speciesId !== speciesId);
+      setServiceLinks(next);
+      setServiceSpeciesMap((prev) => ({ ...prev, [selectedService.id]: next }));
+    } catch (err: any) {
+      alert(err?.response?.data?.message || err?.message || 'Ошибка отвязки вида от услуги');
     }
   };
 
-  // Ограничения и цены по видам животных
-  const openOverridesModal = async (svc: Service) => {
-    setSelectedServiceForSpecies(svc);
-    setLoadingSpeciesOverrides(true);
+  // Save Species Overrides
+  const handleSaveOverrides = async () => {
+    if (!selectedService) return;
     try {
-      const overrides = await clinicApi.getServiceSpecies(svc.id);
-      setServiceSpeciesList(Array.isArray(overrides) ? overrides : []);
-      setNewOverride({
-        speciesId: speciesList[0]?.id || '',
-        durationMin: svc.baseDurationMin,
-        price: svc.basePrice,
-      });
-    } catch (err) {
-      console.error(err);
-      setServiceSpeciesList([]);
-    } finally {
-      setLoadingSpeciesOverrides(false);
+      for (const link of serviceLinks) {
+        await adminApi.createServiceSpecies(selectedService.id, {
+          speciesId: link.speciesId,
+          durationMin: link.durationMin != null ? Number(link.durationMin) : null,
+          price: link.price != null ? Number(link.price) : null,
+        });
+      }
+      alert('Переопределения сохранены');
+    } catch (err: any) {
+      alert(err?.response?.data?.message || err?.message || 'Ошибка сохранения переопределений');
     }
   };
 
-  const handleAddOverride = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!selectedServiceForSpecies) return;
-    setSavingOverride(true);
-    try {
-      await adminApi.createServiceSpecies(selectedServiceForSpecies.id, {
-        speciesId: newOverride.speciesId,
-        durationMin: Number(newOverride.durationMin),
-        price: Number(newOverride.price),
-      });
-
-      const updated = await clinicApi.getServiceSpecies(selectedServiceForSpecies.id);
-      setServiceSpeciesList(Array.isArray(updated) ? updated : []);
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setSavingOverride(false);
-    }
-  };
-
-  const handleDeleteOverride = async (speciesId: string) => {
-    if (!selectedServiceForSpecies) return;
-    try {
-      await adminApi.deleteServiceSpecies(selectedServiceForSpecies.id, speciesId);
-      setServiceSpeciesList((prev) => prev.filter((s) => s.speciesId !== speciesId));
-    } catch (err) {
-      console.error(err);
-    }
-  };
-
-  const handleCreateSpecies = async (e: React.FormEvent) => {
+  // Species Actions
+  const handleAddSpecies = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newSpeciesName.trim()) return;
     setSavingSpecies(true);
     try {
       await adminApi.createSpecies(newSpeciesName.trim());
-      setNewSpeciesName('');
       setIsSpeciesModalOpen(false);
-      loadData();
-    } catch (err) {
-      console.error(err);
+      setNewSpeciesName('');
+      await loadData();
+    } catch (err: any) {
+      alert(err?.response?.data?.message || err?.message || 'Ошибка добавления вида');
     } finally {
       setSavingSpecies(false);
     }
   };
 
   const handleDeleteSpecies = async (id: string) => {
+    if (!confirm('Удалить вид животных?')) return;
     try {
       await adminApi.deleteSpecies(id);
-      loadData();
-    } catch (err) {
-      console.error(err);
+      await loadData();
+    } catch (err: any) {
+      alert(err?.response?.data?.message || err?.message || 'Ошибка удаления вида');
     }
   };
 
-  const handleCreateSpec = async (e: React.FormEvent) => {
+  // Specialization Actions
+  const handleSaveSpec = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newSpecForm.name.trim()) return;
+    if (!specForm.name.trim()) return;
     setSavingSpec(true);
     try {
-      await adminApi.createSpecialization({
-        name: newSpecForm.name.trim(),
-        description: newSpecForm.description.trim(),
-      });
-      setNewSpecForm({ name: '', description: '' });
+      if (specForm.id) {
+        await adminApi.updateSpecialization(specForm.id, {
+          name: specForm.name.trim(),
+          description: specForm.description.trim(),
+        });
+      } else {
+        await adminApi.createSpecialization({
+          name: specForm.name.trim(),
+          description: specForm.description.trim(),
+        });
+      }
       setIsSpecModalOpen(false);
-      loadData();
-    } catch (err) {
-      console.error(err);
+      setSpecForm({ id: '', name: '', description: '' });
+      await loadData();
+    } catch (err: any) {
+      alert(err?.response?.data?.message || err?.message || 'Ошибка сохранения специализации');
     } finally {
       setSavingSpec(false);
     }
   };
 
   const handleDeleteSpec = async (id: string) => {
+    if (!confirm('Удалить специализацию?')) return;
     try {
       await adminApi.deleteSpecialization(id);
-      loadData();
-    } catch (err) {
-      console.error(err);
+      await loadData();
+    } catch (err: any) {
+      alert(err?.response?.data?.message || err?.message || 'Ошибка удаления специализации');
     }
   };
 
-  const getSpecName = (id: string) => {
-    return specializations.find((s) => s.id === id)?.name || 'Общая практика';
-  };
+  // Filtered Services
+  const filteredServices = services.filter((s) => {
+    if (filterSpec !== 'ALL' && s.specializationId !== filterSpec) return false;
+    if (filterSpecies !== 'ALL') {
+      const attached = serviceSpeciesMap[s.id] || [];
+      if (!attached.some((l) => l.speciesId === filterSpecies)) return false;
+    }
+    if (search) {
+      const q = search.toLowerCase();
+      const name = s.name.toLowerCase();
+      const spec = getSpecName(s.specializationId).toLowerCase();
+      if (!name.includes(q) && !spec.includes(q)) return false;
+    }
+    return true;
+  });
 
-  const getSpeciesName = (id: string) => {
-    return speciesList.find((s) => s.id === id)?.name || id;
-  };
-
-  const filtered = services.filter((s) =>
-    s.name.toLowerCase().includes(search.toLowerCase())
-  );
+  // Attached species set for current service
+  const attachedSpeciesIds = new Set(serviceLinks.map((l) => l.speciesId));
+  const unattachedSpecies = speciesList.filter((sp) => !attachedSpeciesIds.has(sp.id));
 
   return (
     <AppShell
-      title="Услуги и прейскурант"
-      subtitle="Тарифы клиники, продолжительность процедур и справочники видов животных"
-      actions={
-        activeTab === 'SERVICES' ? (
-          <button
-            type="button"
-            onClick={() => setIsModalOpen(true)}
-            className="btn btn-primary"
-          >
-            <Plus className="ic" />
-            <span>Добавить услугу</span>
-          </button>
-        ) : activeTab === 'SPECIES' ? (
-          <button
-            type="button"
-            onClick={() => setIsSpeciesModalOpen(true)}
-            className="btn btn-primary"
-          >
-            <Plus className="ic" />
-            <span>Добавить вид</span>
-          </button>
-        ) : (
-          <button
-            type="button"
-            onClick={() => setIsSpecModalOpen(true)}
-            className="btn btn-primary"
-          >
-            <Plus className="ic" />
-            <span>Добавить специализацию</span>
-          </button>
-        )
-      }
+      crumbGroup="Справочники"
+      crumb={mainTab === 'SPECIES' ? 'Виды животных' : mainTab === 'SPECIALIZATIONS' ? 'Специализации' : 'Услуги'}
     >
-      <div className="content-col grow" style={{ gap: '8px' }}>
-        {/* Вкладки справочников и поиск */}
-        <section className="island filters" aria-label="Разделы справочников">
-          <div className="segmented" style={{ width: 'auto' }}>
-            <button
-              type="button"
-              className={activeTab === 'SERVICES' ? 'on' : ''}
-              onClick={() => setActiveTab('SERVICES')}
-            >
-              Услуги ({services.length})
-            </button>
-            <button
-              type="button"
-              className={activeTab === 'SPECIES' ? 'on' : ''}
-              onClick={() => setActiveTab('SPECIES')}
-            >
-              Виды животных ({speciesList.length})
-            </button>
-            <button
-              type="button"
-              className={activeTab === 'SPECIALIZATIONS' ? 'on' : ''}
-              onClick={() => setActiveTab('SPECIALIZATIONS')}
-            >
-              Специализации ({specializations.length})
-            </button>
+      {/* Tab Switcher */}
+      <div className="tabs-line" style={{ marginBottom: 'var(--gap)' }}>
+        <button
+          className={`tab-line ${mainTab === 'SERVICES' ? 'on' : ''}`}
+          onClick={() => {
+            setMainTab('SERVICES');
+            router.replace('/admin/services');
+          }}
+        >
+          Услуги
+        </button>
+        <button
+          className={`tab-line ${mainTab === 'SPECIES' ? 'on' : ''}`}
+          onClick={() => {
+            setMainTab('SPECIES');
+            router.replace('/admin/services?tab=species');
+          }}
+        >
+          Виды животных
+        </button>
+        <button
+          className={`tab-line ${mainTab === 'SPECIALIZATIONS' ? 'on' : ''}`}
+          onClick={() => {
+            setMainTab('SPECIALIZATIONS');
+            router.replace('/admin/services?tab=specs');
+          }}
+        >
+          Специализации
+        </button>
+      </div>
+
+      {mainTab === 'SERVICES' && (
+        <div className="content-row">
+          {/* Left Column: Filters + Table */}
+          <div className="content-col grow">
+            <section className="island filters" aria-label="Фильтры услуг">
+              <div className="field">
+                <span className="field-label">Специализация</span>
+                <div className="dd">
+                  <select
+                    className="select dd-btn"
+                    value={filterSpec}
+                    onChange={(e) => setFilterSpec(e.target.value)}
+                  >
+                    <option value="ALL">Все специализации</option>
+                    {specializations.map((s) => (
+                      <option key={s.id} value={s.id}>
+                        {s.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              <div className="field">
+                <span className="field-label">Для вида</span>
+                <div className="dd">
+                  <select
+                    className="select dd-btn"
+                    value={filterSpecies}
+                    onChange={(e) => setFilterSpecies(e.target.value)}
+                  >
+                    <option value="ALL">Любой вид</option>
+                    {speciesList.map((sp) => (
+                      <option key={sp.id} value={sp.id}>
+                        {sp.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              <div className="field" style={{ width: 180 }}>
+                <span className="field-label">Поиск</span>
+                <div className="input-icon">
+                  <Search size={14} className="ic" />
+                  <input
+                    type="text"
+                    className="input"
+                    placeholder="Название…"
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                  />
+                </div>
+              </div>
+
+              <div className="spacer" />
+
+              <button
+                className="btn btn-primary"
+                onClick={() => {
+                  setCreateError(null);
+                  if (specializations.length > 0 && !createForm.specializationId) {
+                    setCreateForm((prev) => ({
+                      ...prev,
+                      specializationId: specializations[0].id,
+                    }));
+                  }
+                  setIsCreateOpen(true);
+                }}
+              >
+                <Plus size={16} />
+                Новая услуга
+              </button>
+            </section>
+
+            <section className="island grow">
+              <div className="island-head">
+                <span className="island-title">
+                  <ClipboardList size={18} />
+                  Услуги <span className="count">{filteredServices.length} · включая неактивные</span>
+                </span>
+              </div>
+
+              <div className="table-wrap">
+                <div
+                  className="dtable"
+                  style={
+                    {
+                      '--cols': '1.7fr 1fr 0.7fr 0.7fr 0.6fr 1.3fr 0.7fr',
+                      minWidth: '860px',
+                    } as React.CSSProperties
+                  }
+                >
+                  <div className="thead">
+                    <span>Название ↑</span>
+                    <span>Специализация</span>
+                    <span className="right">Цена</span>
+                    <span className="right">Длит.</span>
+                    <span className="right">Буфер</span>
+                    <span>Виды</span>
+                    <span>Статус</span>
+                  </div>
+
+                  {filteredServices.map((r) => {
+                    const isSelected = selectedService?.id === r.id;
+                    const links = serviceSpeciesMap[r.id] || [];
+
+                    return (
+                      <button
+                        key={r.id}
+                        className={`trow ${isSelected ? 'sel' : ''}`}
+                        onClick={() => setSelectedService(r)}
+                      >
+                        <span className="cell-main">{r.name}</span>
+                        <span className="muted">{getSpecName(r.specializationId)}</span>
+                        <span className="right tnum">{r.basePrice.toLocaleString('ru-RU')} ₽</span>
+                        <span className="right tnum">{r.baseDurationMin} мин</span>
+                        <span className="right tnum">{r.bufferAfterMin} мин</span>
+                        <span className="chips">
+                          {links.length > 0 ? (
+                            links.map((l) => (
+                              <span key={l.speciesId} className="badge badge-outline">
+                                {getSpeciesName(l.speciesId)}
+                              </span>
+                            ))
+                          ) : (
+                            <span className="small muted">Нет видов</span>
+                          )}
+                        </span>
+                        <span>
+                          <span
+                            className={`badge ${r.isActive ? 'badge-accent' : 'badge-outline'}`}
+                          >
+                            {r.isActive ? 'Активна' : 'Отключена'}
+                          </span>
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {filteredServices.length === 0 && !loading && (
+                  <div className="empty">
+                    <span className="empty-title">Услуги не найдены</span>
+                  </div>
+                )}
+              </div>
+            </section>
           </div>
 
-          {activeTab === 'SERVICES' && (
-            <div className="field" style={{ minWidth: '220px', marginLeft: 'auto' }}>
-              <div className="input-icon">
-                <Search className="ic" />
-                <input
-                  className="input input-sm"
-                  placeholder="Поиск услуги..."
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                />
+          {/* Right Column: Master-Detail Island (480px) */}
+          {selectedService && (
+            <section className="island detail-island" style={{ width: 480 }} aria-label="Услуга">
+              <div className="island-head">
+                <div className="col" style={{ gap: 2 }}>
+                  <span className="h2">{selectedService.name}</span>
+                  <span className="cell-sub">{getSpecName(selectedService.specializationId)}</span>
+                </div>
+                <button
+                  className="btn btn-ghost btn-icon btn-sm"
+                  aria-label="Закрыть"
+                  onClick={() => setSelectedService(null)}
+                >
+                  <X size={16} />
+                </button>
               </div>
-            </div>
-          )}
-        </section>
 
-        {/* Вкладка 1: Услуги и цены */}
-        {activeTab === 'SERVICES' && (
-          <section className="island grow" style={{ display: 'flex', flexDirection: 'column' }}>
-            <div className="island-head">
-              <span className="island-title">
-                <ClipboardList className="ic" />
-                <span>Каталог ветеринарных услуг</span>
-                <span className="count">Всего: {filtered.length}</span>
-              </span>
-              <button
-                type="button"
-                className="btn btn-ghost btn-icon btn-sm"
-                onClick={loadData}
-                title="Обновить"
-              >
-                <RefreshCw className={`ic ${loading ? 'animate-spin' : ''}`} />
-              </button>
-            </div>
-
-            {loading ? (
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '8px', padding: '16px' }}>
-                {Array.from({ length: 4 }).map((_, i) => (
-                  <div key={i} className="skeleton" style={{ height: '160px', borderRadius: '12px' }} />
-                ))}
+              <div className="tabs-line">
+                <button
+                  className={`tab-line ${detailTab === 'main' ? 'on' : ''}`}
+                  onClick={() => setDetailTab('main')}
+                >
+                  Основное
+                </button>
+                <button
+                  className={`tab-line ${detailTab === 'species' ? 'on' : ''}`}
+                  onClick={() => setDetailTab('species')}
+                >
+                  Для видов <span className="small muted">{serviceLinks.length}</span>
+                </button>
               </div>
-            ) : filtered.length > 0 ? (
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '8px' }}>
-                {filtered.map((svc) => (
-                  <div
-                    key={svc.id}
-                    className="island"
-                    style={{
-                      background: 'var(--card)',
-                      border: '1px solid var(--border)',
-                      padding: '14px',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      gap: '8px',
-                    }}
-                  >
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                      <span className="badge font-medium text-xs">
-                        {getSpecName(svc.specializationId)}
+
+              <div className="island-body" style={{ paddingTop: 14 }}>
+                {/* Tab 1: Main */}
+                {detailTab === 'main' && (
+                  <div className="col" style={{ gap: 14 }}>
+                    <div className="field">
+                      <span className="field-label">
+                        Специализация <span className="req">*</span>
                       </span>
-                      <span className="tnum font-bold text-base font-mono">
-                        {svc.basePrice.toLocaleString('ru-RU')} ₽
-                      </span>
+                      <select
+                        className="select"
+                        value={editForm.specializationId}
+                        onChange={(e) =>
+                          setEditForm({ ...editForm, specializationId: e.target.value })
+                        }
+                      >
+                        {specializations.map((s) => (
+                          <option key={s.id} value={s.id}>
+                            {s.name}
+                          </option>
+                        ))}
+                      </select>
                     </div>
 
-                    <div>
-                      <h3 className="font-bold text-sm" style={{ margin: 0 }}>{svc.name}</h3>
-                      <p className="muted text-xs line-clamp-2 mt-1" style={{ margin: '4px 0 0 0' }}>
-                        {svc.description || 'Описание не указано'}
-                      </p>
+                    <div className="field">
+                      <label className="field-label" htmlFor="sd-name">
+                        Название <span className="req">*</span>
+                      </label>
+                      <input
+                        id="sd-name"
+                        className="input"
+                        value={editForm.name}
+                        onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
+                      />
+                    </div>
+
+                    <div className="field">
+                      <label className="field-label" htmlFor="sd-desc">
+                        Описание
+                      </label>
+                      <textarea
+                        id="sd-desc"
+                        className="textarea"
+                        rows={2}
+                        value={editForm.description}
+                        onChange={(e) =>
+                          setEditForm({ ...editForm, description: e.target.value })
+                        }
+                      />
                     </div>
 
                     <div
-                      style={{
-                        padding: '6px 8px',
-                        background: 'var(--island-subtle)',
-                        borderRadius: '6px',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'space-between',
-                        fontSize: '12px',
-                        marginTop: 'auto',
-                      }}
+                      className="form-grid"
+                      style={{ gridTemplateColumns: 'repeat(3, minmax(0, 1fr))' }}
                     >
-                      <span className="muted flex items-center gap-1 font-mono text-xs">
-                        <Clock className="ic text-slate-400" style={{ width: '13px', height: '13px' }} />
-                        {svc.baseDurationMin} мин.
-                      </span>
-                      <span className={`badge ${svc.isActive ? 'b-completed' : 'b-cancelled'} text-[10px]`}>
-                        {svc.isActive ? 'Активна' : 'Скрыта'}
-                      </span>
-                    </div>
-
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '4px', paddingTop: '4px' }}>
-                      <button
-                        type="button"
-                        className="btn btn-ghost btn-sm"
-                        onClick={() => openOverridesModal(svc)}
-                        style={{ border: '1px solid var(--border)', fontSize: '11px' }}
-                      >
-                        <Sliders className="ic" style={{ width: '12px', height: '12px' }} />
-                        <span>Тарифы по видам</span>
-                      </button>
-
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '2px' }}>
-                        <button
-                          type="button"
-                          className="btn btn-ghost btn-icon btn-sm"
-                          onClick={() => openEditModal(svc)}
-                          title="Редактировать"
-                        >
-                          <Edit2 className="ic" style={{ width: '13px', height: '13px' }} />
-                        </button>
-                        <button
-                          type="button"
-                          className="btn btn-ghost btn-icon btn-sm text-[var(--accent-red)]"
-                          onClick={() => setDeletingServiceId(svc.id)}
-                          title="Удалить"
-                        >
-                          <Trash2 className="ic" style={{ width: '13px', height: '13px' }} />
-                        </button>
+                      <div className="field">
+                        <label className="field-label" htmlFor="sd-price">
+                          Цена, ₽
+                        </label>
+                        <input
+                          id="sd-price"
+                          type="number"
+                          min="0"
+                          className="input"
+                          value={editForm.basePrice}
+                          onChange={(e) =>
+                            setEditForm({
+                              ...editForm,
+                              basePrice: parseInt(e.target.value) || 0,
+                            })
+                          }
+                        />
+                      </div>
+                      <div className="field">
+                        <label className="field-label" htmlFor="sd-dur">
+                          Длит., мин
+                        </label>
+                        <input
+                          id="sd-dur"
+                          type="number"
+                          min="1"
+                          max="1440"
+                          className="input"
+                          value={editForm.baseDurationMin}
+                          onChange={(e) =>
+                            setEditForm({
+                              ...editForm,
+                              baseDurationMin: parseInt(e.target.value) || 30,
+                            })
+                          }
+                        />
+                      </div>
+                      <div className="field">
+                        <label className="field-label" htmlFor="sd-buf">
+                          Буфер, мин
+                        </label>
+                        <input
+                          id="sd-buf"
+                          type="number"
+                          min="0"
+                          max="240"
+                          className="input"
+                          value={editForm.bufferAfterMin}
+                          onChange={(e) =>
+                            setEditForm({
+                              ...editForm,
+                              bufferAfterMin: parseInt(e.target.value) || 0,
+                            })
+                          }
+                        />
                       </div>
                     </div>
+
+                    <div className="row" style={{ height: 36, gap: 10 }}>
+                      <button
+                        type="button"
+                        className={`switch ${editForm.isActive ? 'on' : ''}`}
+                        role="switch"
+                        aria-checked={editForm.isActive}
+                        aria-label="Активна"
+                        onClick={() =>
+                          setEditForm({ ...editForm, isActive: !editForm.isActive })
+                        }
+                      />
+                      <span>Активна — видна в каталоге и доступна для записи</span>
+                    </div>
+
+                    {saveError && (
+                      <div className="alert" role="alert">
+                        <AlertCircle size={16} />
+                        <div>{saveError}</div>
+                      </div>
+                    )}
+
+                    {saveSuccess && (
+                      <div className="alert alert-info" style={{ borderColor: 'var(--primary)' }}>
+                        <Check size={16} style={{ color: 'var(--primary)' }} />
+                        <div>Услуга обновлена</div>
+                      </div>
+                    )}
                   </div>
-                ))}
-              </div>
-            ) : (
-              <div className="empty" style={{ padding: '48px 16px' }}>
-                <div className="empty-art">
-                  <ClipboardList className="ic" style={{ width: '40px', height: '40px', opacity: 0.4 }} />
-                </div>
-                <span className="empty-title">Услуги не найдены</span>
-                <p className="muted text-xs text-center max-w-sm mt-1">
-                  По заданному запросу ничего не найдено.
-                </p>
-              </div>
-            )}
-          </section>
-        )}
+                )}
 
-        {/* Вкладка 2: Виды животных */}
-        {activeTab === 'SPECIES' && (
-          <section className="island grow" style={{ display: 'flex', flexDirection: 'column' }}>
-            <div className="island-head">
-              <span className="island-title">
-                <PawPrint className="ic" />
-                <span>Виды обслуживаемых животных</span>
-                <span className="count">Всего: {speciesList.length}</span>
-              </span>
-              <button
-                type="button"
-                className="btn btn-primary btn-sm"
-                onClick={() => setIsSpeciesModalOpen(true)}
-              >
-                <Plus className="ic" />
-                <span>Новый вид</span>
-              </button>
-            </div>
+                {/* Tab 2: Species Overrides */}
+                {detailTab === 'species' && (
+                  <div className="col" style={{ gap: 12 }}>
+                    <span className="small muted">
+                      Пустые поля = базовое значение услуги ({selectedService.baseDurationMin} мин,{' '}
+                      {selectedService.basePrice} ₽). Сохранение пустого поля отправляет null.
+                    </span>
 
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', gap: '8px' }}>
-              {speciesList.map((spec) => (
-                <div
-                  key={spec.id}
-                  className="island"
-                  style={{
-                    background: 'var(--card)',
-                    border: '1px solid var(--border)',
-                    padding: '12px 14px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                  }}
-                >
-                  <span className="font-semibold text-sm">{spec.name}</span>
-                  <button
-                    type="button"
-                    className="btn btn-ghost btn-icon btn-sm text-[var(--accent-red)]"
-                    onClick={() => handleDeleteSpecies(spec.id)}
-                    title="Удалить вид"
-                  >
-                    <Trash2 className="ic" style={{ width: '14px', height: '14px' }} />
-                  </button>
-                </div>
-              ))}
-            </div>
-          </section>
-        )}
+                    <div
+                      className="dtable"
+                      style={{ '--cols': '0.9fr 1fr 1fr 70px' } as React.CSSProperties}
+                    >
+                      <div className="thead" style={{ padding: 0 }}>
+                        <span>Вид</span>
+                        <span>Длительность</span>
+                        <span>Цена</span>
+                        <span />
+                      </div>
 
-        {/* Вкладка 3: Специализации врачей */}
-        {activeTab === 'SPECIALIZATIONS' && (
-          <section className="island grow" style={{ display: 'flex', flexDirection: 'column' }}>
-            <div className="island-head">
-              <span className="island-title">
-                <Tags className="ic" />
-                <span>Направления и специализации врачей</span>
-                <span className="count">Всего: {specializations.length}</span>
-              </span>
-              <button
-                type="button"
-                className="btn btn-primary btn-sm"
-                onClick={() => setIsSpecModalOpen(true)}
-              >
-                <Plus className="ic" />
-                <span>Новая специализация</span>
-              </button>
-            </div>
+                      {serviceLinks.map((l, index) => (
+                        <div key={l.speciesId} className="trow static" style={{ padding: '6px 0' }}>
+                          <span className="cell-main">{getSpeciesName(l.speciesId)}</span>
+                          <input
+                            className="input input-sm"
+                            type="number"
+                            min="1"
+                            max="1440"
+                            placeholder={`${selectedService.baseDurationMin} мин`}
+                            value={l.durationMin != null ? l.durationMin : ''}
+                            onChange={(e) => {
+                              const val = e.target.value === '' ? null : parseInt(e.target.value);
+                              const next = [...serviceLinks];
+                              next[index] = { ...l, durationMin: val };
+                              setServiceLinks(next);
+                            }}
+                          />
+                          <input
+                            className="input input-sm"
+                            type="number"
+                            min="0"
+                            placeholder={`${selectedService.basePrice} ₽`}
+                            value={l.price != null ? l.price : ''}
+                            onChange={(e) => {
+                              const val = e.target.value === '' ? null : parseInt(e.target.value);
+                              const next = [...serviceLinks];
+                              next[index] = { ...l, price: val };
+                              setServiceLinks(next);
+                            }}
+                          />
+                          <span className="row-actions">
+                            <button
+                              type="button"
+                              className="btn btn-ghost btn-icon btn-sm"
+                              aria-label={`Отвязать ${getSpeciesName(l.speciesId)}`}
+                              onClick={() => handleDetachSpecies(l.speciesId)}
+                            >
+                              <Trash2 size={14} />
+                            </button>
+                          </span>
+                        </div>
+                      ))}
+                    </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '8px' }}>
-              {specializations.map((spec) => (
-                <div
-                  key={spec.id}
-                  className="island"
-                  style={{
-                    background: 'var(--card)',
-                    border: '1px solid var(--border)',
-                    padding: '14px',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    gap: '6px',
-                  }}
-                >
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                    <h4 className="font-bold text-sm" style={{ margin: 0 }}>{spec.name}</h4>
+                    {unattachedSpecies.length > 0 && (
+                      <div className="row wrap" style={{ gap: 6 }}>
+                        <div style={{ width: 180 }}>
+                          <select
+                            className="select"
+                            value={attachSpeciesId}
+                            onChange={(e) => setAttachSpeciesId(e.target.value)}
+                          >
+                            <option value="">Привязать вид…</option>
+                            {unattachedSpecies.map((sp) => (
+                              <option key={sp.id} value={sp.id}>
+                                {sp.name}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                        <button
+                          type="button"
+                          className="btn btn-outline btn-sm"
+                          onClick={handleAttachSpecies}
+                          disabled={!attachSpeciesId || attaching}
+                        >
+                          <Plus size={14} />
+                          Привязать
+                        </button>
+                      </div>
+                    )}
+
+                    {serviceLinks.length === 0 && (
+                      <div className="alert">
+                        <AlertCircle size={16} />
+                        <div>Услуга не привязана ни к одному виду — записаться на неё нельзя</div>
+                      </div>
+                    )}
+
                     <button
                       type="button"
-                      className="btn btn-ghost btn-icon btn-sm text-[var(--accent-red)]"
-                      onClick={() => handleDeleteSpec(spec.id)}
-                      title="Удалить"
+                      className="btn btn-outline btn-sm"
+                      style={{ alignSelf: 'flex-start' }}
+                      onClick={handleSaveOverrides}
                     >
-                      <Trash2 className="ic" style={{ width: '13px', height: '13px' }} />
+                      Сохранить переопределения
                     </button>
                   </div>
-                  <p className="muted text-xs line-clamp-2" style={{ margin: 0 }}>
-                    {spec.description || 'Описание направления отсутствует'}
-                  </p>
+                )}
+              </div>
+
+              <div className="island-foot">
+                <button
+                  className="btn btn-destructive-outline btn-sm"
+                  onClick={() => setIsDeleteConfirmOpen(true)}
+                >
+                  <Trash2 size={14} />
+                  Удалить
+                </button>
+                <button
+                  className="btn btn-primary btn-sm"
+                  onClick={handleSaveService}
+                  disabled={savingService}
+                >
+                  {savingService ? 'Сохранение…' : 'Сохранить'}
+                </button>
+              </div>
+            </section>
+          )}
+        </div>
+      )}
+
+      {/* SPECIES TAB */}
+      {mainTab === 'SPECIES' && (
+        <section className="island grow">
+          <div className="island-head">
+            <span className="island-title">
+              <PawPrint size={18} />
+              Виды животных <span className="count">{speciesList.length}</span>
+            </span>
+            <button
+              className="btn btn-primary btn-sm"
+              onClick={() => setIsSpeciesModalOpen(true)}
+            >
+              <Plus size={14} />
+              Добавить вид
+            </button>
+          </div>
+
+          <div className="table-wrap">
+            <div
+              className="dtable"
+              style={{ '--cols': '1.5fr 1fr 100px', minWidth: '600px' } as React.CSSProperties}
+            >
+              <div className="thead">
+                <span>Название</span>
+                <span>Идентификатор</span>
+                <span className="right">Действия</span>
+              </div>
+
+              {speciesList.map((sp) => (
+                <div key={sp.id} className="trow static">
+                  <span className="cell-main">{sp.name}</span>
+                  <span className="tnum muted">{sp.id}</span>
+                  <span className="row-actions right">
+                    <button
+                      className="btn btn-ghost btn-icon btn-sm"
+                      onClick={() => handleDeleteSpecies(sp.id)}
+                    >
+                      <Trash2 size={14} />
+                    </button>
+                  </span>
                 </div>
               ))}
             </div>
-          </section>
-        )}
-      </div>
+          </div>
+        </section>
+      )}
 
-      {/* Модальное окно создания услуги */}
-      {isModalOpen && (
-        <div className="dialog-backdrop">
-          <div className="dialog island" role="dialog" aria-labelledby="add-svc-title" style={{ maxWidth: '480px' }}>
-            <div className="dialog-head">
-              <span className="dialog-title" id="add-svc-title">Добавить услугу</span>
-              <button
-                type="button"
-                className="btn btn-ghost btn-icon btn-sm"
-                onClick={() => setIsModalOpen(false)}
-                aria-label="Закрыть"
-              >
-                <X className="ic" />
-              </button>
-            </div>
+      {/* SPECIALIZATIONS TAB */}
+      {mainTab === 'SPECIALIZATIONS' && (
+        <section className="island grow">
+          <div className="island-head">
+            <span className="island-title">
+              <Tags size={18} />
+              Специализации врачей <span className="count">{specializations.length}</span>
+            </span>
+            <button
+              className="btn btn-primary btn-sm"
+              onClick={() => {
+                setSpecForm({ id: '', name: '', description: '' });
+                setIsSpecModalOpen(true);
+              }}
+            >
+              <Plus size={14} />
+              Добавить специализацию
+            </button>
+          </div>
 
-            <form onSubmit={handleCreateService} className="dialog-body" style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-              <div className="field">
-                <label className="field-label">Название услуги</label>
-                <input
-                  className="input"
-                  placeholder="Первичный осмотр терапевта"
-                  required
-                  value={form.name}
-                  onChange={(e) => setForm({ ...form, name: e.target.value })}
-                />
+          <div className="table-wrap">
+            <div
+              className="dtable"
+              style={{ '--cols': '1.2fr 2fr 100px', minWidth: '700px' } as React.CSSProperties}
+            >
+              <div className="thead">
+                <span>Специализация</span>
+                <span>Описание</span>
+                <span className="right">Действия</span>
               </div>
 
+              {specializations.map((sp) => (
+                <div key={sp.id} className="trow static">
+                  <span className="cell-main">{sp.name}</span>
+                  <span className="muted">{sp.description || '—'}</span>
+                  <span className="row-actions right">
+                    <button
+                      className="btn btn-ghost btn-icon btn-sm"
+                      onClick={() => {
+                        setSpecForm({
+                          id: sp.id,
+                          name: sp.name,
+                          description: sp.description || '',
+                        });
+                        setIsSpecModalOpen(true);
+                      }}
+                    >
+                      <Edit2 size={14} />
+                    </button>
+                    <button
+                      className="btn btn-ghost btn-icon btn-sm"
+                      onClick={() => handleDeleteSpec(sp.id)}
+                    >
+                      <Trash2 size={14} />
+                    </button>
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+      )}
+
+      {/* Modal: Create Service */}
+      {isCreateOpen && (
+        <div
+          className="overlay"
+          onClick={() => setIsCreateOpen(false)}
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(0,0,0,0.5)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1000,
+          }}
+        >
+          <div
+            className="dialog dialog-md"
+            style={{ width: 480 }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="dialog-head">
+              <span className="dialog-title">Новая услуга</span>
+              <span className="dialog-desc">Создание ветеринарной услуги клиники</span>
+            </div>
+
+            <form onSubmit={handleCreateService} className="col" style={{ gap: 14 }}>
               <div className="field">
-                <label className="field-label">Специализация</label>
+                <span className="field-label">
+                  Специализация <span className="req">*</span>
+                </span>
                 <select
                   className="select"
+                  value={createForm.specializationId}
+                  onChange={(e) =>
+                    setCreateForm({ ...createForm, specializationId: e.target.value })
+                  }
                   required
-                  value={form.specializationId}
-                  onChange={(e) => setForm({ ...form, specializationId: e.target.value })}
                 >
                   {specializations.map((s) => (
-                    <option key={s.id} value={s.id}>{s.name}</option>
+                    <option key={s.id} value={s.id}>
+                      {s.name}
+                    </option>
                   ))}
                 </select>
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+              <div className="field">
+                <label className="field-label" htmlFor="cr-sname">
+                  Название <span className="req">*</span>
+                </label>
+                <input
+                  id="cr-sname"
+                  className="input"
+                  value={createForm.name}
+                  onChange={(e) => setCreateForm({ ...createForm, name: e.target.value })}
+                  required
+                />
+              </div>
+
+              <div className="field">
+                <label className="field-label" htmlFor="cr-sdesc">
+                  Описание
+                </label>
+                <textarea
+                  id="cr-sdesc"
+                  className="textarea"
+                  rows={2}
+                  value={createForm.description}
+                  onChange={(e) =>
+                    setCreateForm({ ...createForm, description: e.target.value })
+                  }
+                />
+              </div>
+
+              <div className="form-grid" style={{ gridTemplateColumns: 'repeat(3, minmax(0, 1fr))' }}>
                 <div className="field">
-                  <label className="field-label">Базовая цена (₽)</label>
+                  <label className="field-label" htmlFor="cr-sprice">
+                    Цена, ₽
+                  </label>
                   <input
+                    id="cr-sprice"
                     type="number"
-                    min={0}
-                    className="input font-mono"
-                    required
-                    value={form.basePrice}
-                    onChange={(e) => setForm({ ...form, basePrice: parseFloat(e.target.value) || 0 })}
+                    min="0"
+                    className="input"
+                    value={createForm.basePrice}
+                    onChange={(e) =>
+                      setCreateForm({ ...createForm, basePrice: parseInt(e.target.value) || 0 })
+                    }
                   />
                 </div>
                 <div className="field">
-                  <label className="field-label">Длительность (мин)</label>
+                  <label className="field-label" htmlFor="cr-sdur">
+                    Длит., мин
+                  </label>
                   <input
+                    id="cr-sdur"
                     type="number"
-                    min={5}
-                    className="input font-mono"
-                    required
-                    value={form.baseDurationMin}
-                    onChange={(e) => setForm({ ...form, baseDurationMin: parseInt(e.target.value) || 30 })}
+                    min="1"
+                    max="1440"
+                    className="input"
+                    value={createForm.baseDurationMin}
+                    onChange={(e) =>
+                      setCreateForm({
+                        ...createForm,
+                        baseDurationMin: parseInt(e.target.value) || 30,
+                      })
+                    }
+                  />
+                </div>
+                <div className="field">
+                  <label className="field-label" htmlFor="cr-sbuf">
+                    Буфер, мин
+                  </label>
+                  <input
+                    id="cr-sbuf"
+                    type="number"
+                    min="0"
+                    max="240"
+                    className="input"
+                    value={createForm.bufferAfterMin}
+                    onChange={(e) =>
+                      setCreateForm({
+                        ...createForm,
+                        bufferAfterMin: parseInt(e.target.value) || 0,
+                      })
+                    }
                   />
                 </div>
               </div>
 
-              <div className="field">
-                <label className="field-label">Описание</label>
-                <textarea
-                  className="textarea"
-                  rows={3}
-                  placeholder="Подробное описание процедуры..."
-                  value={form.description}
-                  onChange={(e) => setForm({ ...form, description: e.target.value })}
-                />
-              </div>
+              {createError && (
+                <div className="alert" role="alert">
+                  <AlertCircle size={16} />
+                  <div>{createError}</div>
+                </div>
+              )}
 
               <div className="dialog-foot">
                 <button
                   type="button"
-                  className="btn btn-ghost"
-                  onClick={() => setIsModalOpen(false)}
+                  className="btn btn-outline"
+                  onClick={() => setIsCreateOpen(false)}
                 >
                   Отмена
                 </button>
@@ -708,7 +1154,7 @@ export default function AdminServicesPage() {
                   className="btn btn-primary"
                   disabled={creating}
                 >
-                  {creating ? 'Сохранение...' : 'Сохранить услугу'}
+                  {creating ? 'Создание…' : 'Создать'}
                 </button>
               </div>
             </form>
@@ -716,278 +1162,49 @@ export default function AdminServicesPage() {
         </div>
       )}
 
-      {/* Модальное окно редактирования услуги */}
-      {editingService && (
-        <div className="dialog-backdrop">
-          <div className="dialog island" role="dialog" aria-labelledby="edit-svc-title" style={{ maxWidth: '480px' }}>
-            <div className="dialog-head">
-              <span className="dialog-title" id="edit-svc-title">Редактирование: {editingService.name}</span>
-              <button
-                type="button"
-                className="btn btn-ghost btn-icon btn-sm"
-                onClick={() => setEditingService(null)}
-                aria-label="Закрыть"
-              >
-                <X className="ic" />
-              </button>
-            </div>
-
-            <form onSubmit={handleUpdateService} className="dialog-body" style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-              <div className="field">
-                <label className="field-label">Название услуги</label>
-                <input
-                  className="input"
-                  required
-                  value={editForm.name}
-                  onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
-                />
-              </div>
-
-              <div className="field">
-                <label className="field-label">Специализация</label>
-                <select
-                  className="select"
-                  required
-                  value={editForm.specializationId}
-                  onChange={(e) => setEditForm({ ...editForm, specializationId: e.target.value })}
-                >
-                  {specializations.map((s) => (
-                    <option key={s.id} value={s.id}>{s.name}</option>
-                  ))}
-                </select>
-              </div>
-
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
-                <div className="field">
-                  <label className="field-label">Базовая цена (₽)</label>
-                  <input
-                    type="number"
-                    min={0}
-                    className="input font-mono"
-                    required
-                    value={editForm.basePrice}
-                    onChange={(e) => setEditForm({ ...editForm, basePrice: parseFloat(e.target.value) || 0 })}
-                  />
-                </div>
-                <div className="field">
-                  <label className="field-label">Длительность (мин)</label>
-                  <input
-                    type="number"
-                    min={5}
-                    className="input font-mono"
-                    required
-                    value={editForm.baseDurationMin}
-                    onChange={(e) => setEditForm({ ...editForm, baseDurationMin: parseInt(e.target.value) || 30 })}
-                  />
-                </div>
-              </div>
-
-              <div className="field">
-                <label className="field-label">Описание</label>
-                <textarea
-                  className="textarea"
-                  rows={3}
-                  value={editForm.description}
-                  onChange={(e) => setEditForm({ ...editForm, description: e.target.value })}
-                />
-              </div>
-
-              <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '13px' }}>
-                <input
-                  type="checkbox"
-                  checked={editForm.isActive}
-                  onChange={(e) => setEditForm({ ...editForm, isActive: e.target.checked })}
-                />
-                <span>Услуга активна в каталоге</span>
-              </label>
-
-              <div className="dialog-foot">
-                <button
-                  type="button"
-                  className="btn btn-ghost"
-                  onClick={() => setEditingService(null)}
-                >
-                  Отмена
-                </button>
-                <button
-                  type="submit"
-                  className="btn btn-primary"
-                  disabled={updating}
-                >
-                  {updating ? 'Сохранение...' : 'Сохранить изменения'}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* Модальное окно настройки видов животных для услуги */}
-      {selectedServiceForSpecies && (
-        <div className="dialog-backdrop">
-          <div className="dialog island" role="dialog" aria-labelledby="overrides-title" style={{ maxWidth: '520px' }}>
-            <div className="dialog-head">
-              <span className="dialog-title" id="overrides-title">
-                Тарифы по видам: {selectedServiceForSpecies.name}
-              </span>
-              <button
-                type="button"
-                className="btn btn-ghost btn-icon btn-sm"
-                onClick={() => setSelectedServiceForSpecies(null)}
-                aria-label="Закрыть"
-              >
-                <X className="ic" />
-              </button>
-            </div>
-
-            <div className="dialog-body" style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-              <p className="text-xs muted">
-                Переопределение стоимости и длительности услуги для конкретного вида животного (для остальных действует базовый тариф: {selectedServiceForSpecies.basePrice} ₽, {selectedServiceForSpecies.baseDurationMin} мин).
-              </p>
-
-              {loadingSpeciesOverrides ? (
-                <div className="skeleton" style={{ height: '70px', borderRadius: '8px' }} />
-              ) : serviceSpeciesList.length > 0 ? (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                  {serviceSpeciesList.map((item) => (
-                    <div
-                      key={item.speciesId}
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'space-between',
-                        padding: '6px 10px',
-                        background: 'var(--island-subtle)',
-                        border: '1px solid var(--border)',
-                        borderRadius: '8px',
-                        fontSize: '12px',
-                      }}
-                    >
-                      <div>
-                        <span className="font-semibold">{getSpeciesName(item.speciesId)}: </span>
-                        <span className="tnum font-mono font-medium">{item.price ?? 'Базовая'} ₽, </span>
-                        <span className="tnum font-mono muted">{item.durationMin ?? 'Базовая'} мин.</span>
-                      </div>
-
-                      <button
-                        type="button"
-                        className="btn btn-ghost btn-icon btn-sm text-[var(--accent-red)]"
-                        onClick={() => handleDeleteOverride(item.speciesId)}
-                        title="Удалить"
-                      >
-                        <Trash2 className="ic" style={{ width: '13px', height: '13px' }} />
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <p className="muted text-xs italic">Для всех видов применяются стандартные базовые параметры.</p>
-              )}
-
-              {/* Форма добавления */}
-              <form
-                onSubmit={handleAddOverride}
-                style={{
-                  padding: '10px',
-                  border: '1px solid var(--border)',
-                  borderRadius: '8px',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: '8px',
-                  marginTop: '4px',
-                }}
-              >
-                <span className="font-semibold text-xs">Задать персональный тариф</span>
-                <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr 1fr', gap: '6px' }}>
-                  <div className="field">
-                    <label className="field-label">Вид</label>
-                    <select
-                      className="select input-sm"
-                      value={newOverride.speciesId}
-                      onChange={(e) => setNewOverride({ ...newOverride, speciesId: e.target.value })}
-                    >
-                      {speciesList.map((s) => (
-                        <option key={s.id} value={s.id}>{s.name}</option>
-                      ))}
-                    </select>
-                  </div>
-                  <div className="field">
-                    <label className="field-label">Цена (₽)</label>
-                    <input
-                      type="number"
-                      className="input input-sm font-mono"
-                      required
-                      value={newOverride.price}
-                      onChange={(e) => setNewOverride({ ...newOverride, price: parseFloat(e.target.value) || 0 })}
-                    />
-                  </div>
-                  <div className="field">
-                    <label className="field-label">Время (мин)</label>
-                    <input
-                      type="number"
-                      className="input input-sm font-mono"
-                      required
-                      value={newOverride.durationMin}
-                      onChange={(e) => setNewOverride({ ...newOverride, durationMin: parseInt(e.target.value) || 0 })}
-                    />
-                  </div>
-                </div>
-
-                <button
-                  type="submit"
-                  className="btn btn-primary btn-sm self-start"
-                  disabled={savingOverride}
-                >
-                  {savingOverride ? 'Сохранение...' : 'Сохранить тариф'}
-                </button>
-              </form>
-            </div>
-
-            <div className="dialog-foot">
-              <button
-                type="button"
-                className="btn btn-ghost"
-                onClick={() => setSelectedServiceForSpecies(null)}
-              >
-                Закрыть
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Модальное окно добавления вида животного */}
+      {/* Modal: Add Species */}
       {isSpeciesModalOpen && (
-        <div className="dialog-backdrop">
-          <div className="dialog island" role="dialog" aria-labelledby="add-species-title" style={{ maxWidth: '400px' }}>
+        <div
+          className="overlay"
+          onClick={() => setIsSpeciesModalOpen(false)}
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(0,0,0,0.5)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1000,
+          }}
+        >
+          <div
+            className="dialog dialog-sm"
+            style={{ width: 400 }}
+            onClick={(e) => e.stopPropagation()}
+          >
             <div className="dialog-head">
-              <span className="dialog-title" id="add-species-title">Новый вид животного</span>
-              <button
-                type="button"
-                className="btn btn-ghost btn-icon btn-sm"
-                onClick={() => setIsSpeciesModalOpen(false)}
-                aria-label="Закрыть"
-              >
-                <X className="ic" />
-              </button>
+              <span className="dialog-title">Добавить вид животных</span>
             </div>
 
-            <form onSubmit={handleCreateSpecies} className="dialog-body" style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            <form onSubmit={handleAddSpecies} className="col" style={{ gap: 14 }}>
               <div className="field">
-                <label className="field-label">Название вида</label>
+                <label className="field-label" htmlFor="new-sp-name">
+                  Название <span className="req">*</span>
+                </label>
                 <input
+                  id="new-sp-name"
                   className="input"
-                  placeholder="Собака / Кошка / Птица..."
-                  required
+                  placeholder="Кошка, Собака…"
                   value={newSpeciesName}
                   onChange={(e) => setNewSpeciesName(e.target.value)}
+                  required
                 />
               </div>
 
               <div className="dialog-foot">
                 <button
                   type="button"
-                  className="btn btn-ghost"
+                  className="btn btn-outline"
                   onClick={() => setIsSpeciesModalOpen(false)}
                 >
                   Отмена
@@ -997,7 +1214,7 @@ export default function AdminServicesPage() {
                   className="btn btn-primary"
                   disabled={savingSpecies}
                 >
-                  {savingSpecies ? 'Сохранение...' : 'Добавить вид'}
+                  {savingSpecies ? 'Сохранение…' : 'Добавить'}
                 </button>
               </div>
             </form>
@@ -1005,49 +1222,64 @@ export default function AdminServicesPage() {
         </div>
       )}
 
-      {/* Модальное окно добавления специализации */}
+      {/* Modal: Specialization Form */}
       {isSpecModalOpen && (
-        <div className="dialog-backdrop">
-          <div className="dialog island" role="dialog" aria-labelledby="add-spec-title" style={{ maxWidth: '420px' }}>
+        <div
+          className="overlay"
+          onClick={() => setIsSpecModalOpen(false)}
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(0,0,0,0.5)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1000,
+          }}
+        >
+          <div
+            className="dialog dialog-sm"
+            style={{ width: 440 }}
+            onClick={(e) => e.stopPropagation()}
+          >
             <div className="dialog-head">
-              <span className="dialog-title" id="add-spec-title">Новая специализация</span>
-              <button
-                type="button"
-                className="btn btn-ghost btn-icon btn-sm"
-                onClick={() => setIsSpecModalOpen(false)}
-                aria-label="Закрыть"
-              >
-                <X className="ic" />
-              </button>
+              <span className="dialog-title">
+                {specForm.id ? 'Редактировать специализацию' : 'Новая специализация'}
+              </span>
             </div>
 
-            <form onSubmit={handleCreateSpec} className="dialog-body" style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            <form onSubmit={handleSaveSpec} className="col" style={{ gap: 14 }}>
               <div className="field">
-                <label className="field-label">Название направления</label>
+                <label className="field-label" htmlFor="spec-name">
+                  Название <span className="req">*</span>
+                </label>
                 <input
+                  id="spec-name"
                   className="input"
-                  placeholder="Хирургия / Терапия / Офтальмология..."
+                  placeholder="Терапия, Хирургия…"
+                  value={specForm.name}
+                  onChange={(e) => setSpecForm({ ...specForm, name: e.target.value })}
                   required
-                  value={newSpecForm.name}
-                  onChange={(e) => setNewSpecForm({ ...newSpecForm, name: e.target.value })}
                 />
               </div>
 
               <div className="field">
-                <label className="field-label">Описание направления</label>
+                <label className="field-label" htmlFor="spec-desc">
+                  Описание
+                </label>
                 <textarea
+                  id="spec-desc"
                   className="textarea"
                   rows={2}
-                  placeholder="Краткое описание профиля..."
-                  value={newSpecForm.description}
-                  onChange={(e) => setNewSpecForm({ ...newSpecForm, description: e.target.value })}
+                  value={specForm.description}
+                  onChange={(e) => setSpecForm({ ...specForm, description: e.target.value })}
                 />
               </div>
 
               <div className="dialog-foot">
                 <button
                   type="button"
-                  className="btn btn-ghost"
+                  className="btn btn-outline"
                   onClick={() => setIsSpecModalOpen(false)}
                 >
                   Отмена
@@ -1057,7 +1289,7 @@ export default function AdminServicesPage() {
                   className="btn btn-primary"
                   disabled={savingSpec}
                 >
-                  {savingSpec ? 'Сохранение...' : 'Добавить специализацию'}
+                  {savingSpec ? 'Сохранение…' : 'Сохранить'}
                 </button>
               </div>
             </form>
@@ -1065,50 +1297,61 @@ export default function AdminServicesPage() {
         </div>
       )}
 
-      {/* Модальное окно удаления услуги */}
-      {deletingServiceId && (
-        <div className="dialog-backdrop">
-          <div className="dialog island" role="dialog" aria-labelledby="del-svc-title" style={{ maxWidth: '400px' }}>
+      {/* Delete Service Confirmation Dialog */}
+      {isDeleteConfirmOpen && selectedService && (
+        <div
+          className="overlay"
+          onClick={() => setIsDeleteConfirmOpen(false)}
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(0,0,0,0.5)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1000,
+          }}
+        >
+          <div
+            className="dialog dialog-sm"
+            role="alertdialog"
+            aria-modal="true"
+            onClick={(e) => e.stopPropagation()}
+          >
             <div className="dialog-head">
-              <span className="dialog-title text-[var(--accent-red)]" id="del-svc-title">
-                Удаление услуги
+              <span className="dialog-title">Удалить услугу?</span>
+              <span className="dialog-desc">
+                Услуга «{selectedService.name}» будет удалена. Записи с этой услугой могут быть затронуты.
               </span>
+            </div>
+            <div className="dialog-foot">
               <button
                 type="button"
-                className="btn btn-ghost btn-icon btn-sm"
-                onClick={() => setDeletingServiceId(null)}
-                aria-label="Закрыть"
+                className="btn btn-outline"
+                onClick={() => setIsDeleteConfirmOpen(false)}
               >
-                <X className="ic" />
+                Отмена
               </button>
-            </div>
-
-            <div className="dialog-body" style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-              <p className="text-sm">
-                Вы действительно хотите удалить эту услугу из системы?
-              </p>
-              <div className="dialog-foot" style={{ marginTop: '12px' }}>
-                <button
-                  type="button"
-                  className="btn btn-ghost"
-                  onClick={() => setDeletingServiceId(null)}
-                >
-                  Отмена
-                </button>
-                <button
-                  type="button"
-                  className="btn btn-danger"
-                  onClick={handleDeleteService}
-                  disabled={deleting}
-                >
-                  <Trash2 className="ic" />
-                  <span>{deleting ? 'Удаление...' : 'Удалить'}</span>
-                </button>
-              </div>
+              <button
+                type="button"
+                className="btn btn-destructive"
+                onClick={handleDeleteService}
+                disabled={deleting}
+              >
+                {deleting ? 'Удаление…' : 'Удалить'}
+              </button>
             </div>
           </div>
         </div>
       )}
     </AppShell>
+  );
+}
+
+export default function AdminServicesPage() {
+  return (
+    <Suspense fallback={<div className="p-8 text-center text-sm text-[var(--muted-foreground)]">Загрузка справочников…</div>}>
+      <AdminServicesContent />
+    </Suspense>
   );
 }

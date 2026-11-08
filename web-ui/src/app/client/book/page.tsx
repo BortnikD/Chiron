@@ -610,7 +610,8 @@ function BookAppointmentContent() {
                                 <button
                                   key={slot.startAt}
                                   type="button"
-                                  className={`slot ${isSel ? 'sel' : ''}`}
+                                  className={`slot ${isSel ? 'on sel' : ''}`}
+                                  aria-pressed={isSel}
                                   onClick={() => setSelectedSlot(slot)}
                                 >
                                   {timeStr}

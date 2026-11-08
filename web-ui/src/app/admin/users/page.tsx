@@ -3,497 +3,740 @@
 import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { adminApi } from '../../../api';
-import { User, UserRole } from '../../../types';
+import { User, UserRole, Pet, Appointment } from '../../../types';
 import { AppShell } from '../../../components/layout/AppShell';
 import {
   Users,
-  UserPlus,
+  Plus,
   Search,
-  Mail,
-  Phone,
-  Edit2,
   Trash2,
   Stethoscope,
+  PawPrint,
   AlertCircle,
-  RefreshCw,
   X,
-  User as UserIcon,
+  Check,
 } from 'lucide-react';
+
+const ROLE_META: Record<UserRole, { label: string; cls: string }> = {
+  CLIENT: { label: 'Клиент', cls: 'badge-outline' },
+  VETERINARIAN: { label: 'Ветеринар', cls: 'badge-accent' },
+  ADMIN: { label: 'Администратор', cls: 'badge-CONFIRMED' },
+};
 
 export default function AdminUsersPage() {
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
-  const [roleFilter, setRoleFilter] = useState<string>('');
+
+  // Filters
+  const [roleFilter, setRoleFilter] = useState<string>('ALL');
   const [search, setSearch] = useState('');
 
-  // Модальное окно создания пользователя
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [form, setForm] = useState({
+  // Selected User for Master-Detail panel
+  const [selectedUser, setSelectedUser] = useState<User | null>(null);
+  const [activeTab, setActiveTab] = useState<'profile' | 'pets' | 'appointments'>('profile');
+  const [userPets, setUserPets] = useState<Pet[]>([]);
+  const [userAppointments, setUserAppointments] = useState<Appointment[]>([]);
+
+  // Profile Edit State
+  const [editForm, setEditForm] = useState({
     firstName: '',
-    lastName: '',
     middleName: '',
+    lastName: '',
+    email: '',
+    phone: '',
+  });
+  const [savingUser, setSavingUser] = useState(false);
+  const [saveSuccess, setSaveSuccess] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  // Create User Modal
+  const [isCreateOpen, setIsCreateOpen] = useState(false);
+  const [createForm, setCreateForm] = useState({
+    firstName: '',
+    middleName: '',
+    lastName: '',
     email: '',
     phone: '',
     password: '',
-    role: 'VETERINARIAN' as UserRole,
+    role: 'CLIENT' as UserRole,
   });
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
 
-  // Модальное окно редактирования пользователя
-  const [editingUser, setEditingUser] = useState<User | null>(null);
-  const [editForm, setEditForm] = useState({
-    firstName: '',
-    lastName: '',
-    middleName: '',
-    email: '',
-    phone: '',
-  });
-  const [updating, setUpdating] = useState(false);
-
-  // Модальное окно удаления пользователя
-  const [deletingUserId, setDeletingUserId] = useState<string | null>(null);
+  // Delete User Dialog
+  const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
 
-  const loadUsers = () => {
+  const loadUsers = async () => {
     setLoading(true);
-    adminApi
-      .getUsers(0, 50, roleFilter || undefined)
-      .then((res) => {
-        const items = res?.items ?? (Array.isArray(res) ? res : []);
-        setUsers(items);
-      })
-      .catch((err) => {
-        console.error(err);
-        setUsers([]);
-      })
-      .finally(() => setLoading(false));
+    try {
+      const res = await adminApi.getUsers(
+        0,
+        100,
+        roleFilter !== 'ALL' ? (roleFilter as UserRole) : undefined
+      );
+      const items = res?.items || [];
+      setUsers(items);
+
+      if (selectedUser) {
+        const updated = items.find((u: User) => u.id === selectedUser.id);
+        if (updated) setSelectedUser(updated);
+      }
+    } catch (err) {
+      console.error('Failed to load users', err);
+      setUsers([]);
+    } finally {
+      setLoading(false);
+    }
   };
 
   useEffect(() => {
     loadUsers();
   }, [roleFilter]);
 
-  const handleCreateUser = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setCreateError(null);
-    setCreating(true);
-    try {
-      await adminApi.createUser({
-        firstName: form.firstName.trim(),
-        lastName: form.lastName.trim(),
-        middleName: form.middleName.trim() || undefined,
-        email: form.email.trim(),
-        phone: form.phone.trim(),
-        password: form.password,
-        role: form.role,
-      });
+  // When selected user changes, load their profile form, pets, and appointments
+  useEffect(() => {
+    if (!selectedUser) return;
 
-      setIsModalOpen(false);
-      setForm({
-        firstName: '',
-        lastName: '',
-        middleName: '',
-        email: '',
-        phone: '',
-        password: '',
-        role: 'VETERINARIAN',
-      });
-      loadUsers();
-    } catch (err: any) {
-      setCreateError(err?.message || 'Не удалось создать пользователя');
-    } finally {
-      setCreating(false);
-    }
-  };
-
-  const openEditModal = (u: User) => {
-    setEditingUser(u);
     setEditForm({
-      firstName: u.firstName,
-      lastName: u.lastName,
-      middleName: u.middleName || '',
-      email: u.email,
-      phone: u.phone,
+      firstName: selectedUser.firstName || '',
+      middleName: selectedUser.middleName || '',
+      lastName: selectedUser.lastName || '',
+      email: selectedUser.email || '',
+      phone: selectedUser.phone || '',
     });
+    setSaveSuccess(false);
+    setErrorMessage(null);
+
+    // Fetch user pets and appointments
+    Promise.all([
+      adminApi.getPets(0, 50).catch(() => ({ items: [] })),
+      adminApi.getAppointments(0, 50).catch(() => ({ items: [] })),
+    ]).then(([petsRes, apptsRes]) => {
+      const allPets: Pet[] = petsRes?.items || [];
+      const userPetList = allPets.filter((p) => p.ownerId === selectedUser.id);
+      setUserPets(userPetList);
+
+      const userPetIds = new Set(userPetList.map((p) => p.id));
+      const allAppts: Appointment[] = apptsRes?.items || [];
+      const userApptList = allAppts.filter((a) => userPetIds.has(a.petId));
+      setUserAppointments(userApptList);
+    });
+  }, [selectedUser]);
+
+  const getUserInitials = (u: User) => {
+    const f = (u.firstName || '').trim();
+    const l = (u.lastName || '').trim();
+    if (f && l) return `${f[0]}${l[0]}`.toUpperCase();
+    if (f) return f.slice(0, 2).toUpperCase();
+    return 'ПЛ';
   };
 
-  const handleUpdateUser = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!editingUser) return;
-    setUpdating(true);
+  const handleSaveProfile = async () => {
+    if (!selectedUser) return;
+    setSavingUser(true);
+    setErrorMessage(null);
+    setSaveSuccess(false);
     try {
-      await adminApi.updateUser(editingUser.id, {
+      await adminApi.updateUser(selectedUser.id, {
         firstName: editForm.firstName.trim(),
-        lastName: editForm.lastName.trim(),
         middleName: editForm.middleName.trim() || null,
+        lastName: editForm.lastName.trim(),
         email: editForm.email.trim(),
         phone: editForm.phone.trim(),
       });
-
-      setEditingUser(null);
-      loadUsers();
-    } catch (err) {
-      console.error(err);
+      setSaveSuccess(true);
+      setTimeout(() => setSaveSuccess(false), 2500);
+      await loadUsers();
+    } catch (err: any) {
+      setErrorMessage(err?.response?.data?.message || err?.message || 'Ошибка обновления пользователя');
     } finally {
-      setUpdating(false);
+      setSavingUser(false);
     }
   };
 
   const handleDeleteUser = async () => {
-    if (!deletingUserId) return;
+    if (!selectedUser) return;
     setDeleting(true);
     try {
-      await adminApi.deleteUser(deletingUserId);
-      setDeletingUserId(null);
-      loadUsers();
-    } catch (err) {
-      console.error(err);
+      await adminApi.deleteUser(selectedUser.id);
+      setIsDeleteConfirmOpen(false);
+      setSelectedUser(null);
+      await loadUsers();
+    } catch (err: any) {
+      alert(err?.response?.data?.message || err?.message || 'Ошибка при удалении пользователя');
     } finally {
       setDeleting(false);
     }
   };
 
-  const filtered = users.filter(
-    (u) =>
-      u.fullName.toLowerCase().includes(search.toLowerCase()) ||
-      u.email.toLowerCase().includes(search.toLowerCase()) ||
-      u.phone.includes(search)
-  );
-
-  const getRoleBadge = (role: UserRole) => {
-    switch (role) {
-      case 'ADMIN':
-        return <span className="badge b-pending font-semibold text-[10px]">Администратор</span>;
-      case 'VETERINARIAN':
-        return <span className="badge b-completed font-semibold text-[10px]">Врач</span>;
-      default:
-        return <span className="badge font-semibold text-[10px]">Клиент</span>;
+  const handleCreateSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!createForm.firstName || !createForm.lastName || !createForm.email || !createForm.password) {
+      setCreateError('Заполните обязательные поля');
+      return;
+    }
+    setCreating(true);
+    setCreateError(null);
+    try {
+      const created = await adminApi.createUser({
+        firstName: createForm.firstName.trim(),
+        middleName: createForm.middleName.trim() || undefined,
+        lastName: createForm.lastName.trim(),
+        email: createForm.email.trim(),
+        phone: createForm.phone.trim(),
+        password: createForm.password,
+        role: createForm.role,
+      });
+      setIsCreateOpen(false);
+      setCreateForm({
+        firstName: '',
+        middleName: '',
+        lastName: '',
+        email: '',
+        phone: '',
+        password: '',
+        role: 'CLIENT',
+      });
+      await loadUsers();
+      if (created) setSelectedUser(created);
+    } catch (err: any) {
+      setCreateError(err?.response?.data?.message || err?.message || 'Ошибка создания пользователя');
+    } finally {
+      setCreating(false);
     }
   };
 
+  const filteredUsers = users.filter((u) => {
+    if (!search) return true;
+    const q = search.toLowerCase();
+    const name = (u.fullName || `${u.firstName} ${u.lastName}`).toLowerCase();
+    const email = (u.email || '').toLowerCase();
+    const phone = (u.phone || '').toLowerCase();
+    return name.includes(q) || email.includes(q) || phone.includes(q);
+  });
+
   return (
-    <AppShell
-      title="Пользователи"
-      subtitle="Реестр сотрудников клиники, ветеринарных врачей и зарегистрированных клиентов"
-      actions={
-        <button
-          type="button"
-          onClick={() => setIsModalOpen(true)}
-          className="btn btn-primary"
-        >
-          <UserPlus className="ic" />
-          <span>Добавить пользователя</span>
-        </button>
-      }
-    >
-      <div className="content-col grow" style={{ gap: '8px' }}>
-        {/* Панель поиска и фильтров */}
-        <section className="island filters" aria-label="Фильтры пользователей">
-          <div className="field" style={{ minWidth: '240px', flex: 1 }}>
-            <span className="field-label">Поиск</span>
-            <div className="input-icon">
-              <Search className="ic" />
-              <input
-                className="input input-sm"
-                placeholder="Имя, email или телефон..."
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-              />
-            </div>
-          </div>
-
-          <div className="field">
-            <span className="field-label">Роль</span>
-            <div className="chips">
-              {[
-                { val: '', label: 'Все' },
-                { val: 'VETERINARIAN', label: 'Врачи' },
-                { val: 'CLIENT', label: 'Клиенты' },
-                { val: 'ADMIN', label: 'Администраторы' },
-              ].map((chip) => (
+    <AppShell crumbGroup="Клиника" crumb="Пользователи">
+      <div className="content-row">
+        {/* Left Column: Filters + Table */}
+        <div className="content-col grow">
+          <section className="island filters" aria-label="Фильтры пользователей">
+            <div className="field" style={{ width: 'auto' }}>
+              <span className="field-label">Роль</span>
+              <div className="seg">
                 <button
-                  key={chip.val}
                   type="button"
-                  className={`chip ${roleFilter === chip.val ? 'on' : ''}`}
-                  onClick={() => setRoleFilter(chip.val)}
+                  className={`seg-item ${roleFilter === 'ALL' ? 'on' : ''}`}
+                  onClick={() => setRoleFilter('ALL')}
                 >
-                  {chip.label}
+                  Все
                 </button>
-              ))}
-            </div>
-          </div>
-
-          {(search || roleFilter) && (
-            <div className="field" style={{ justifyContent: 'flex-end', marginLeft: 'auto' }}>
-              <span className="field-label">&nbsp;</span>
-              <button
-                type="button"
-                className="btn btn-ghost btn-sm"
-                onClick={() => {
-                  setSearch('');
-                  setRoleFilter('');
-                }}
-              >
-                <X className="ic" style={{ width: '13px', height: '13px' }} />
-                <span>Сбросить</span>
-              </button>
-            </div>
-          )}
-        </section>
-
-        {/* Таблица пользователей клиники */}
-        <section className="island grow" style={{ display: 'flex', flexDirection: 'column' }}>
-          <div className="island-head">
-            <span className="island-title">
-              <Users className="ic" />
-              <span>Список учётных записей</span>
-              <span className="count">Найдено: {filtered.length}</span>
-            </span>
-            <button
-              type="button"
-              className="btn btn-ghost btn-icon btn-sm"
-              onClick={loadUsers}
-              title="Обновить"
-            >
-              <RefreshCw className={`ic ${loading ? 'animate-spin' : ''}`} />
-            </button>
-          </div>
-
-          {loading ? (
-            <div style={{ padding: '32px 16px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-              {Array.from({ length: 5 }).map((_, i) => (
-                <div key={i} className="skeleton" style={{ height: '48px', borderRadius: '8px' }} />
-              ))}
-            </div>
-          ) : filtered.length > 0 ? (
-            <div className="table-wrap">
-              <table className="table" aria-label="Список пользователей">
-                <thead>
-                  <tr>
-                    <th>Пользователь</th>
-                    <th style={{ width: '140px' }}>Роль</th>
-                    <th>Контакты</th>
-                    <th style={{ width: '130px' }}>Регистрация</th>
-                    <th style={{ textAlign: 'right', width: '120px' }}>Действия</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filtered.map((u) => {
-                    const initials = u.fullName
-                      .split(' ')
-                      .map((p) => p[0])
-                      .join('')
-                      .slice(0, 2)
-                      .toUpperCase() || 'US';
-
-                    return (
-                      <tr key={u.id}>
-                        <td>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                            <div
-                              className="avatar"
-                              style={{
-                                width: '34px',
-                                height: '34px',
-                                fontSize: '13px',
-                                fontWeight: 600,
-                                background: 'var(--island-subtle)',
-                                color: 'var(--text)',
-                                border: '1px solid var(--border)',
-                              }}
-                            >
-                              {initials}
-                            </div>
-                            <div>
-                              <span className="font-semibold text-sm block">{u.fullName}</span>
-                              <span className="muted text-xs tnum font-mono">ID: {u.id.substring(0, 8)}</span>
-                            </div>
-                          </div>
-                        </td>
-                        <td>
-                          {getRoleBadge(u.role)}
-                        </td>
-                        <td>
-                          <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', fontSize: '12px' }}>
-                            <span className="flex items-center gap-1.5">
-                              <Mail className="ic muted" style={{ width: '12px', height: '12px' }} />
-                              <span>{u.email}</span>
-                            </span>
-                            <span className="flex items-center gap-1.5 muted tnum font-mono">
-                              <Phone className="ic muted" style={{ width: '12px', height: '12px' }} />
-                              <span>{u.phone}</span>
-                            </span>
-                          </div>
-                        </td>
-                        <td>
-                          <span className="tnum text-xs muted font-mono">
-                            {new Date(u.createdAt).toLocaleDateString('ru-RU')}
-                          </span>
-                        </td>
-                        <td style={{ textAlign: 'right' }}>
-                          <div style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
-                            {u.role === 'VETERINARIAN' && (
-                              <Link href="/admin/veterinarians">
-                                <button
-                                  type="button"
-                                  className="btn btn-ghost btn-icon btn-sm text-[var(--primary-text)]"
-                                  title="Профиль и график врача"
-                                >
-                                  <Stethoscope className="ic" style={{ width: '14px', height: '14px' }} />
-                                </button>
-                              </Link>
-                            )}
-                            <button
-                              type="button"
-                              className="btn btn-ghost btn-icon btn-sm"
-                              onClick={() => openEditModal(u)}
-                              title="Редактировать"
-                            >
-                              <Edit2 className="ic" style={{ width: '14px', height: '14px' }} />
-                            </button>
-                            <button
-                              type="button"
-                              className="btn btn-ghost btn-icon btn-sm text-[var(--accent-red)]"
-                              onClick={() => setDeletingUserId(u.id)}
-                              title="Удалить"
-                            >
-                              <Trash2 className="ic" style={{ width: '14px', height: '14px' }} />
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          ) : (
-            <div className="empty" style={{ padding: '48px 16px' }}>
-              <div className="empty-art">
-                <Users className="ic" style={{ width: '40px', height: '40px', opacity: 0.4 }} />
+                <button
+                  type="button"
+                  className={`seg-item ${roleFilter === 'CLIENT' ? 'on' : ''}`}
+                  onClick={() => setRoleFilter('CLIENT')}
+                >
+                  Клиенты
+                </button>
+                <button
+                  type="button"
+                  className={`seg-item ${roleFilter === 'VETERINARIAN' ? 'on' : ''}`}
+                  onClick={() => setRoleFilter('VETERINARIAN')}
+                >
+                  Врачи
+                </button>
+                <button
+                  type="button"
+                  className={`seg-item ${roleFilter === 'ADMIN' ? 'on' : ''}`}
+                  onClick={() => setRoleFilter('ADMIN')}
+                >
+                  Админы
+                </button>
               </div>
-              <span className="empty-title">Пользователи не найдены</span>
-              <p className="muted text-xs text-center max-w-sm mt-1">
-                По заданным критериям фильтрации пользователи не найдены.
-              </p>
             </div>
-          )}
-        </section>
-      </div>
 
-      {/* Модальное окно добавления пользователя */}
-      {isModalOpen && (
-        <div className="dialog-backdrop">
-          <div className="dialog island" role="dialog" aria-labelledby="create-user-title" style={{ maxWidth: '480px' }}>
-            <div className="dialog-head">
-              <span className="dialog-title" id="create-user-title">Создание учётной записи</span>
-              <button
-                type="button"
-                className="btn btn-ghost btn-icon btn-sm"
-                onClick={() => setIsModalOpen(false)}
-                aria-label="Закрыть"
+            <div className="field" style={{ width: 260 }}>
+              <span className="field-label">Поиск</span>
+              <div className="input-icon">
+                <Search size={14} className="ic" />
+                <input
+                  type="text"
+                  className="input"
+                  placeholder="ФИО, email или телефон…"
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                />
+              </div>
+            </div>
+
+            <div className="spacer" />
+
+            <button
+              className="btn btn-primary"
+              onClick={() => {
+                setCreateError(null);
+                setIsCreateOpen(true);
+              }}
+            >
+              <Plus size={16} />
+              Создать пользователя
+            </button>
+          </section>
+
+          <section className="island grow">
+            <div className="island-head">
+              <span className="island-title">
+                <Users size={18} />
+                Пользователи <span className="count">Найдено: {filteredUsers.length}</span>
+              </span>
+            </div>
+
+            <div className="table-wrap">
+              <div
+                className="dtable"
+                style={
+                  {
+                    '--cols': '1.4fr 1.4fr 1fr 0.9fr 0.8fr',
+                    minWidth: '760px',
+                  } as React.CSSProperties
+                }
               >
-                <X className="ic" />
+                <div className="thead">
+                  <span>ФИО</span>
+                  <span>Email</span>
+                  <span>Телефон</span>
+                  <span>Роль</span>
+                  <span>Регистрация ↑</span>
+                </div>
+
+                {filteredUsers.map((u) => {
+                  const isSelected = selectedUser?.id === u.id;
+                  const rInfo = ROLE_META[u.role] || { label: u.role, cls: 'badge-outline' };
+                  const created = u.createdAt ? u.createdAt.slice(0, 10) : '—';
+
+                  return (
+                    <button
+                      key={u.id}
+                      className={`trow ${isSelected ? 'sel' : ''}`}
+                      onClick={() => setSelectedUser(u)}
+                    >
+                      <span className="row" style={{ gap: 8 }}>
+                        <span className={`t-ava sm round tone-${u.role}`}>
+                          {getUserInitials(u)}
+                        </span>
+                        <span className="cell-main">{u.fullName || `${u.firstName} ${u.lastName}`}</span>
+                      </span>
+                      <span className="muted">{u.email}</span>
+                      <span className="tnum">{u.phone || '—'}</span>
+                      <span>
+                        <span className={`t-badge tone-${u.role}`}>{rInfo.label}</span>
+                      </span>
+                      <span className="tnum">{created}</span>
+                    </button>
+                  );
+                })}
+              </div>
+
+              {filteredUsers.length === 0 && !loading && (
+                <div className="empty">
+                  <span className="empty-title">Пользователи не найдены</span>
+                </div>
+              )}
+            </div>
+          </section>
+        </div>
+
+        {/* Right Column: Master-Detail Island (460px) */}
+        {selectedUser && (
+          <section className="island detail-island" style={{ width: 460 }} aria-label="Пользователь">
+            <div className="island-head">
+              <div className="row">
+                <span className="avatar avatar-lg">{getUserInitials(selectedUser)}</span>
+                <div className="col" style={{ gap: 2 }}>
+                  <span className="h2">
+                    {selectedUser.fullName || `${selectedUser.firstName} ${selectedUser.lastName}`}
+                  </span>
+                  <span
+                    className={`badge ${ROLE_META[selectedUser.role]?.cls}`}
+                    style={{ alignSelf: 'flex-start' }}
+                  >
+                    {ROLE_META[selectedUser.role]?.label || selectedUser.role}
+                  </span>
+                </div>
+              </div>
+              <button
+                className="btn btn-ghost btn-icon btn-sm"
+                aria-label="Закрыть"
+                onClick={() => setSelectedUser(null)}
+              >
+                <X size={16} />
               </button>
             </div>
 
-            <form onSubmit={handleCreateUser} className="dialog-body" style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-              {createError && (
-                <div className="callout callout-error" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <AlertCircle className="ic shrink-0" />
-                  <span className="text-xs">{createError}</span>
+            <div className="tabs-line">
+              <button
+                className={`tab-line ${activeTab === 'profile' ? 'on' : ''}`}
+                onClick={() => setActiveTab('profile')}
+              >
+                Профиль
+              </button>
+              <button
+                className={`tab-line ${activeTab === 'pets' ? 'on' : ''}`}
+                onClick={() => setActiveTab('pets')}
+              >
+                Питомцы <span className="small muted">{userPets.length}</span>
+              </button>
+              <button
+                className={`tab-line ${activeTab === 'appointments' ? 'on' : ''}`}
+                onClick={() => setActiveTab('appointments')}
+              >
+                Записи <span className="small muted">{userAppointments.length}</span>
+              </button>
+            </div>
+
+            <div className="island-body" style={{ paddingTop: 14 }}>
+              {/* Tab 1: Profile */}
+              {activeTab === 'profile' && (
+                <div className="col" style={{ gap: 14 }}>
+                  <div className="form-grid">
+                    <div className="field">
+                      <label className="field-label" htmlFor="ud-first">
+                        Имя
+                      </label>
+                      <input
+                        id="ud-first"
+                        className="input"
+                        value={editForm.firstName}
+                        onChange={(e) => setEditForm({ ...editForm, firstName: e.target.value })}
+                      />
+                    </div>
+                    <div className="field">
+                      <label className="field-label" htmlFor="ud-middle">
+                        Отчество
+                      </label>
+                      <input
+                        id="ud-middle"
+                        className="input"
+                        value={editForm.middleName}
+                        onChange={(e) => setEditForm({ ...editForm, middleName: e.target.value })}
+                      />
+                    </div>
+                    <div className="field span-2">
+                      <label className="field-label" htmlFor="ud-last">
+                        Фамилия
+                      </label>
+                      <input
+                        id="ud-last"
+                        className="input"
+                        value={editForm.lastName}
+                        onChange={(e) => setEditForm({ ...editForm, lastName: e.target.value })}
+                      />
+                    </div>
+                    <div className="field span-2">
+                      <label className="field-label" htmlFor="ud-email">
+                        Email
+                      </label>
+                      <input
+                        id="ud-email"
+                        type="email"
+                        className="input"
+                        value={editForm.email}
+                        onChange={(e) => setEditForm({ ...editForm, email: e.target.value })}
+                      />
+                    </div>
+                    <div className="field span-2">
+                      <label className="field-label" htmlFor="ud-phone">
+                        Телефон
+                      </label>
+                      <input
+                        id="ud-phone"
+                        type="tel"
+                        className="input"
+                        value={editForm.phone}
+                        onChange={(e) => setEditForm({ ...editForm, phone: e.target.value })}
+                      />
+                    </div>
+                  </div>
+
+                  <span className="small muted">
+                    fullName собирает сервер · зарегистрирован {selectedUser.createdAt ? selectedUser.createdAt.slice(0, 10) : '—'}
+                  </span>
+
+                  {selectedUser.role === 'VETERINARIAN' && (
+                    <div className="alert alert-info">
+                      <Stethoscope size={16} />
+                      <div className="col" style={{ gap: 6 }}>
+                        <span>
+                          Пользователь имеет роль ВЕТЕРИНАР. График работы, специализация и допуски к видам
+                          настраиваются в разделе «Врачи».
+                        </span>
+                        <Link
+                          href="/admin/veterinarians"
+                          className="btn btn-outline btn-sm"
+                          style={{ alignSelf: 'flex-start' }}
+                        >
+                          Перейти к профилю врача
+                        </Link>
+                      </div>
+                    </div>
+                  )}
+
+                  {errorMessage && (
+                    <div className="alert" role="alert">
+                      <AlertCircle size={16} />
+                      <div>{errorMessage}</div>
+                    </div>
+                  )}
+
+                  {saveSuccess && (
+                    <div className="alert alert-info" style={{ borderColor: 'var(--primary)' }}>
+                      <Check size={16} style={{ color: 'var(--primary)' }} />
+                      <div>Данные пользователя сохранены</div>
+                    </div>
+                  )}
                 </div>
               )}
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
-                <div className="field">
-                  <label className="field-label">Имя</label>
-                  <input
-                    className="input"
-                    placeholder="Иван"
-                    required
-                    value={form.firstName}
-                    onChange={(e) => setForm({ ...form, firstName: e.target.value })}
-                  />
-                </div>
-                <div className="field">
-                  <label className="field-label">Фамилия</label>
-                  <input
-                    className="input"
-                    placeholder="Иванов"
-                    required
-                    value={form.lastName}
-                    onChange={(e) => setForm({ ...form, lastName: e.target.value })}
-                  />
-                </div>
-              </div>
+              {/* Tab 2: Pets */}
+              {activeTab === 'pets' && (
+                <div className="col" style={{ gap: 4, margin: '0 -10px' }}>
+                  {userPets.map((p) => (
+                    <Link
+                      key={p.id}
+                      href={`/admin/pets`}
+                      className="lrow"
+                    >
+                      <span
+                        className="pet-ava"
+                        style={{ width: 36, height: 36, borderRadius: 10 }}
+                      >
+                        <PawPrint size={16} />
+                      </span>
+                      <span className="col" style={{ gap: 1 }}>
+                        <span className="cell-main">{p.name}</span>
+                        <span className="cell-sub">{p.gender === 'MALE' ? 'Самец' : 'Самка'}</span>
+                      </span>
+                      {p.isArchived && <span className="badge">Архив</span>}
+                    </Link>
+                  ))}
 
+                  {userPets.length === 0 && (
+                    <div className="empty" style={{ padding: 24 }}>
+                      Питомцев нет
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Tab 3: Appointments */}
+              {activeTab === 'appointments' && (
+                <div className="col" style={{ gap: 4, margin: '0 -10px' }}>
+                  {userAppointments.map((a) => {
+                    const d = new Date(a.startAt);
+                    const dd = d.getDate();
+                    const mon = d.toLocaleDateString('ru-RU', { month: 'short' });
+                    const time = d.toLocaleTimeString('ru-RU', {
+                      hour: '2-digit',
+                      minute: '2-digit',
+                    });
+
+                    return (
+                      <Link
+                        key={a.id}
+                        href="/admin/appointments"
+                        className="lrow"
+                      >
+                        <span className="datebox">
+                          <b>{dd}</b>
+                          <span>{mon}</span>
+                        </span>
+                        <span className="col" style={{ gap: 1 }}>
+                          <span className="cell-main">{a.service?.name || 'Услуга'}</span>
+                          <span className="cell-sub">{time}</span>
+                        </span>
+                        <span className={`badge st badge-${a.status}`}>{a.status}</span>
+                      </Link>
+                    );
+                  })}
+
+                  {userAppointments.length === 0 && (
+                    <div className="empty" style={{ padding: 24 }}>
+                      Записей нет
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
+            <div className="island-foot">
+              <button
+                className="btn btn-destructive-outline btn-sm"
+                onClick={() => setIsDeleteConfirmOpen(true)}
+              >
+                <Trash2 size={14} />
+                Удалить
+              </button>
+              <button
+                className="btn btn-primary btn-sm"
+                onClick={handleSaveProfile}
+                disabled={savingUser}
+              >
+                {savingUser ? 'Сохранение…' : 'Сохранить'}
+              </button>
+            </div>
+          </section>
+        )}
+      </div>
+
+      {/* Modal: Create User */}
+      {isCreateOpen && (
+        <div
+          className="overlay"
+          onClick={() => setIsCreateOpen(false)}
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(0,0,0,0.5)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1000,
+          }}
+        >
+          <div
+            className="dialog dialog-md"
+            style={{ width: 480 }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="dialog-head">
+              <span className="dialog-title">Создать пользователя</span>
+              <span className="dialog-desc">Регистрация нового пользователя в системе Chiron</span>
+            </div>
+
+            <form onSubmit={handleCreateSubmit} className="col" style={{ gap: 14 }}>
               <div className="field">
-                <label className="field-label">Отчество (необязательно)</label>
-                <input
-                  className="input"
-                  placeholder="Иванович"
-                  value={form.middleName}
-                  onChange={(e) => setForm({ ...form, middleName: e.target.value })}
-                />
+                <span className="field-label">Роль</span>
+                <div className="seg">
+                  <button
+                    type="button"
+                    className={`seg-item ${createForm.role === 'CLIENT' ? 'on' : ''}`}
+                    onClick={() => setCreateForm({ ...createForm, role: 'CLIENT' })}
+                  >
+                    Клиент
+                  </button>
+                  <button
+                    type="button"
+                    className={`seg-item ${createForm.role === 'VETERINARIAN' ? 'on' : ''}`}
+                    onClick={() => setCreateForm({ ...createForm, role: 'VETERINARIAN' })}
+                  >
+                    Ветеринар
+                  </button>
+                  <button
+                    type="button"
+                    className={`seg-item ${createForm.role === 'ADMIN' ? 'on' : ''}`}
+                    onClick={() => setCreateForm({ ...createForm, role: 'ADMIN' })}
+                  >
+                    Админ
+                  </button>
+                </div>
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+              <div className="form-grid">
                 <div className="field">
-                  <label className="field-label">Email</label>
+                  <label className="field-label" htmlFor="cu-first">
+                    Имя <span className="req">*</span>
+                  </label>
                   <input
+                    id="cu-first"
+                    className="input"
+                    value={createForm.firstName}
+                    onChange={(e) => setCreateForm({ ...createForm, firstName: e.target.value })}
+                    required
+                  />
+                </div>
+
+                <div className="field">
+                  <label className="field-label" htmlFor="cu-middle">
+                    Отчество
+                  </label>
+                  <input
+                    id="cu-middle"
+                    className="input"
+                    value={createForm.middleName}
+                    onChange={(e) => setCreateForm({ ...createForm, middleName: e.target.value })}
+                  />
+                </div>
+
+                <div className="field span-2">
+                  <label className="field-label" htmlFor="cu-last">
+                    Фамилия <span className="req">*</span>
+                  </label>
+                  <input
+                    id="cu-last"
+                    className="input"
+                    value={createForm.lastName}
+                    onChange={(e) => setCreateForm({ ...createForm, lastName: e.target.value })}
+                    required
+                  />
+                </div>
+
+                <div className="field span-2">
+                  <label className="field-label" htmlFor="cu-email">
+                    Email <span className="req">*</span>
+                  </label>
+                  <input
+                    id="cu-email"
                     type="email"
                     className="input"
-                    placeholder="doctor@chiron.ru"
+                    value={createForm.email}
+                    onChange={(e) => setCreateForm({ ...createForm, email: e.target.value })}
                     required
-                    value={form.email}
-                    onChange={(e) => setForm({ ...form, email: e.target.value })}
                   />
                 </div>
-                <div className="field">
-                  <label className="field-label">Телефон</label>
+
+                <div className="field span-2">
+                  <label className="field-label" htmlFor="cu-phone">
+                    Телефон <span className="req">*</span>
+                  </label>
                   <input
-                    className="input font-mono"
-                    placeholder="+79991234567"
+                    id="cu-phone"
+                    type="tel"
+                    className="input"
+                    value={createForm.phone}
+                    onChange={(e) => setCreateForm({ ...createForm, phone: e.target.value })}
                     required
-                    value={form.phone}
-                    onChange={(e) => setForm({ ...form, phone: e.target.value })}
+                  />
+                </div>
+
+                <div className="field span-2">
+                  <label className="field-label" htmlFor="cu-pass">
+                    Пароль <span className="req">*</span>
+                  </label>
+                  <input
+                    id="cu-pass"
+                    type="password"
+                    className="input"
+                    placeholder="Минимум 8 символов"
+                    value={createForm.password}
+                    onChange={(e) => setCreateForm({ ...createForm, password: e.target.value })}
+                    required
                   />
                 </div>
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
-                <div className="field">
-                  <label className="field-label">Пароль</label>
-                  <input
-                    type="password"
-                    className="input font-mono"
-                    placeholder="Минимум 8 знаков"
-                    required
-                    value={form.password}
-                    onChange={(e) => setForm({ ...form, password: e.target.value })}
-                  />
+              {createError && (
+                <div className="alert" role="alert">
+                  <AlertCircle size={16} />
+                  <div>{createError}</div>
                 </div>
-                <div className="field">
-                  <label className="field-label">Роль</label>
-                  <select
-                    className="select"
-                    value={form.role}
-                    onChange={(e) => setForm({ ...form, role: e.target.value as UserRole })}
-                  >
-                    <option value="VETERINARIAN">Ветеринарный врач</option>
-                    <option value="CLIENT">Клиент</option>
-                    <option value="ADMIN">Администратор</option>
-                  </select>
-                </div>
-              </div>
+              )}
 
               <div className="dialog-foot">
                 <button
                   type="button"
-                  className="btn btn-ghost"
-                  onClick={() => setIsModalOpen(false)}
+                  className="btn btn-outline"
+                  onClick={() => setIsCreateOpen(false)}
                 >
                   Отмена
                 </button>
@@ -502,7 +745,7 @@ export default function AdminUsersPage() {
                   className="btn btn-primary"
                   disabled={creating}
                 >
-                  {creating ? 'Создание...' : 'Создать пользователя'}
+                  {creating ? 'Создание…' : 'Создать'}
                 </button>
               </div>
             </form>
@@ -510,142 +753,50 @@ export default function AdminUsersPage() {
         </div>
       )}
 
-      {/* Модальное окно редактирования профиля */}
-      {editingUser && (
-        <div className="dialog-backdrop">
-          <div className="dialog island" role="dialog" aria-labelledby="edit-user-title" style={{ maxWidth: '480px' }}>
+      {/* Delete Confirmation Dialog */}
+      {isDeleteConfirmOpen && selectedUser && (
+        <div
+          className="overlay"
+          onClick={() => setIsDeleteConfirmOpen(false)}
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(0,0,0,0.5)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1000,
+          }}
+        >
+          <div
+            className="dialog dialog-sm"
+            role="alertdialog"
+            aria-modal="true"
+            onClick={(e) => e.stopPropagation()}
+          >
             <div className="dialog-head">
-              <span className="dialog-title" id="edit-user-title">
-                Редактирование: {editingUser.fullName}
+              <span className="dialog-title">Удалить пользователя?</span>
+              <span className="dialog-desc">
+                Пользователь «{selectedUser.fullName || selectedUser.email}» будет безвозвратно удалён.
+                Связанные данные могут стать недоступны.
               </span>
+            </div>
+            <div className="dialog-foot">
               <button
                 type="button"
-                className="btn btn-ghost btn-icon btn-sm"
-                onClick={() => setEditingUser(null)}
-                aria-label="Закрыть"
+                className="btn btn-outline"
+                onClick={() => setIsDeleteConfirmOpen(false)}
               >
-                <X className="ic" />
+                Отмена
               </button>
-            </div>
-
-            <form onSubmit={handleUpdateUser} className="dialog-body" style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
-                <div className="field">
-                  <label className="field-label">Имя</label>
-                  <input
-                    className="input"
-                    required
-                    value={editForm.firstName}
-                    onChange={(e) => setEditForm({ ...editForm, firstName: e.target.value })}
-                  />
-                </div>
-                <div className="field">
-                  <label className="field-label">Фамилия</label>
-                  <input
-                    className="input"
-                    required
-                    value={editForm.lastName}
-                    onChange={(e) => setEditForm({ ...editForm, lastName: e.target.value })}
-                  />
-                </div>
-              </div>
-
-              <div className="field">
-                <label className="field-label">Отчество</label>
-                <input
-                  className="input"
-                  value={editForm.middleName}
-                  onChange={(e) => setEditForm({ ...editForm, middleName: e.target.value })}
-                />
-              </div>
-
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
-                <div className="field">
-                  <label className="field-label">Email</label>
-                  <input
-                    type="email"
-                    className="input"
-                    required
-                    value={editForm.email}
-                    onChange={(e) => setEditForm({ ...editForm, email: e.target.value })}
-                  />
-                </div>
-                <div className="field">
-                  <label className="field-label">Телефон</label>
-                  <input
-                    className="input font-mono"
-                    required
-                    value={editForm.phone}
-                    onChange={(e) => setEditForm({ ...editForm, phone: e.target.value })}
-                  />
-                </div>
-              </div>
-
-              <div className="dialog-foot">
-                <button
-                  type="button"
-                  className="btn btn-ghost"
-                  onClick={() => setEditingUser(null)}
-                >
-                  Отмена
-                </button>
-                <button
-                  type="submit"
-                  className="btn btn-primary"
-                  disabled={updating}
-                >
-                  {updating ? 'Сохранение...' : 'Сохранить изменения'}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* Модальное окно подтверждения удаления */}
-      {deletingUserId && (
-        <div className="dialog-backdrop">
-          <div className="dialog island" role="dialog" aria-labelledby="del-user-title" style={{ maxWidth: '420px' }}>
-            <div className="dialog-head">
-              <span className="dialog-title text-[var(--accent-red)]" id="del-user-title">
-                Удаление пользователя
-              </span>
               <button
                 type="button"
-                className="btn btn-ghost btn-icon btn-sm"
-                onClick={() => setDeletingUserId(null)}
-                aria-label="Закрыть"
+                className="btn btn-destructive"
+                onClick={handleDeleteUser}
+                disabled={deleting}
               >
-                <X className="ic" />
+                {deleting ? 'Удаление…' : 'Удалить'}
               </button>
-            </div>
-
-            <div className="dialog-body" style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-              <p className="text-sm">
-                Вы действительно хотите удалить данного пользователя?
-              </p>
-              <p className="text-xs muted">
-                Учётная запись будет деактивирована или удалена из базы данных.
-              </p>
-
-              <div className="dialog-foot" style={{ marginTop: '12px' }}>
-                <button
-                  type="button"
-                  className="btn btn-ghost"
-                  onClick={() => setDeletingUserId(null)}
-                >
-                  Отмена
-                </button>
-                <button
-                  type="button"
-                  className="btn btn-danger"
-                  onClick={handleDeleteUser}
-                  disabled={deleting}
-                >
-                  <Trash2 className="ic" />
-                  <span>{deleting ? 'Удаление...' : 'Удалить'}</span>
-                </button>
-              </div>
             </div>
           </div>
         </div>

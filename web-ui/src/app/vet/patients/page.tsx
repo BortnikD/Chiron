@@ -1,10 +1,9 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { vetApi } from '../../../api';
-import { Pet, Vaccination, CreateVaccinationRequest } from '../../../types';
+import { vetApi, clinicApi } from '../../../api';
+import { Pet, Vaccination, Appointment, Species, CreateVaccinationRequest } from '../../../types';
 import { AppShell } from '../../../components/layout/AppShell';
-import { Modal } from '../../../components/ui/Modal';
 import {
   PawPrint,
   Syringe,
@@ -12,294 +11,522 @@ import {
   Plus,
   AlertCircle,
   Clock,
-  ShieldCheck,
-  User,
+  Calendar,
+  X,
+  Check,
 } from 'lucide-react';
 
 export default function VetPatientsPage() {
   const [patients, setPatients] = useState<Pet[]>([]);
-  const [vaccinations, setVaccinations] = useState<Vaccination[]>([]);
+  const [appointments, setAppointments] = useState<Appointment[]>([]);
+  const [speciesList, setSpeciesList] = useState<Species[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
 
-  // Модальное окно внесения вакцинации
-  const [selectedPetForVac, setSelectedPetForVac] = useState<Pet | null>(null);
+  // Selected Patient for Master-Detail panel
+  const [selectedPatient, setSelectedPatient] = useState<Pet | null>(null);
+  const [activeTab, setActiveTab] = useState<'overview' | 'appointments' | 'vaccinations'>('overview');
+  const [patientVacs, setPatientVacs] = useState<Vaccination[]>([]);
+
+  // Modal: Add Vaccination
+  const [isAddVacOpen, setIsAddVacOpen] = useState(false);
   const [vacForm, setVacForm] = useState({
     name: '',
-    administeredOn: new Date().toISOString().split('T')[0],
-    nextDueOn: new Date(Date.now() + 365 * 86400000).toISOString().split('T')[0],
+    administeredOn: new Date().toISOString().substring(0, 10),
+    nextDueOn: new Date(Date.now() + 365 * 86400000).toISOString().substring(0, 10),
     notes: '',
   });
   const [savingVac, setSavingVac] = useState(false);
   const [vacError, setVacError] = useState<string | null>(null);
 
-  const loadData = () => {
+  const loadData = async () => {
     setLoading(true);
-    Promise.all([vetApi.getPatients(), vetApi.getVaccinations(0, 100)])
-      .then(([patientsData, vacsData]) => {
-        setPatients(Array.isArray(patientsData) ? patientsData : []);
-        setVaccinations(vacsData?.items ?? (Array.isArray(vacsData) ? vacsData : []));
-      })
-      .catch((err) => {
-        console.error(err);
-        setPatients([]);
-        setVaccinations([]);
-      })
-      .finally(() => setLoading(false));
+    try {
+      const [patientsData, apptsData, speciesData] = await Promise.all([
+        vetApi.getPatients().catch(() => [] as Pet[]),
+        vetApi.getAppointments(0, 100).catch(() => ({ items: [] as Appointment[] })),
+        clinicApi.getSpecies().catch(() => [] as Species[]),
+      ]);
+
+      const safePatients = Array.isArray(patientsData) ? patientsData : [];
+      const safeAppts = apptsData?.items || [];
+      const safeSpecies = Array.isArray(speciesData) ? speciesData : [];
+
+      setPatients(safePatients);
+      setAppointments(safeAppts);
+      setSpeciesList(safeSpecies);
+
+      if (selectedPatient) {
+        const updated = safePatients.find((p: Pet) => p.id === selectedPatient.id);
+        if (updated) setSelectedPatient(updated);
+      }
+    } catch (err) {
+      console.error('Failed to load vet patients data', err);
+    } finally {
+      setLoading(false);
+    }
   };
 
   useEffect(() => {
     loadData();
   }, []);
 
+  // When patient selected, load their vaccinations
+  useEffect(() => {
+    if (!selectedPatient) return;
+    vetApi
+      .getVaccinations(0, 50, selectedPatient.id)
+      .then((res) => {
+        setPatientVacs(res?.items || []);
+      })
+      .catch(() => {
+        setPatientVacs([]);
+      });
+  }, [selectedPatient]);
+
+  const getSpeciesName = (spId?: string) => {
+    if (!spId) return '—';
+    const s = speciesList.find((sp) => sp.id === spId);
+    return s ? s.name : '—';
+  };
+
+  const calculateAge = (birthDate?: string | null) => {
+    if (!birthDate) return '—';
+    const birth = new Date(birthDate);
+    if (isNaN(birth.getTime())) return '—';
+    const now = new Date();
+    let years = now.getFullYear() - birth.getFullYear();
+    let months = now.getMonth() - birth.getMonth();
+    if (months < 0) {
+      years--;
+      months += 12;
+    }
+    if (years > 0) return `${years} г. ${months > 0 ? `${months} м.` : ''}`.trim();
+    if (months > 0) return `${months} мес.`;
+    return 'Меньше месяца';
+  };
+
+  const getPatientAppointments = (petId: string) => {
+    return appointments.filter((a) => a.petId === petId);
+  };
+
+  const getLastAppointment = (petId: string) => {
+    const list = getPatientAppointments(petId)
+      .filter((a) => new Date(a.startAt) <= new Date())
+      .sort((a, b) => new Date(b.startAt).getTime() - new Date(a.startAt).getTime());
+    if (list.length === 0) return '—';
+    return list[0].startAt.slice(0, 10);
+  };
+
+  const getNextAppointment = (petId: string) => {
+    const list = getPatientAppointments(petId)
+      .filter((a) => new Date(a.startAt) > new Date() && a.status !== 'CANCELLED')
+      .sort((a, b) => new Date(a.startAt).getTime() - new Date(b.startAt).getTime());
+    if (list.length === 0) return '—';
+    const d = new Date(list[0].startAt);
+    const today = new Date().toISOString().slice(0, 10);
+    const dateStr = list[0].startAt.slice(0, 10);
+    if (dateStr === today) {
+      return `сегодня ${d.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })}`;
+    }
+    return dateStr;
+  };
+
   const handleAddVaccination = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedPetForVac) return;
+    if (!selectedPatient || !vacForm.name.trim()) return;
     setVacError(null);
-
-    if (!vacForm.name.trim()) {
-      setVacError('Укажите название вакцины');
-      return;
-    }
-    const today = new Date().toISOString().split('T')[0];
-    if (vacForm.administeredOn > today) {
-      setVacError('Дата вакцинации не может быть в будущем');
-      return;
-    }
-
     setSavingVac(true);
     try {
       const payload: CreateVaccinationRequest = {
-        petId: selectedPetForVac.id,
+        petId: selectedPatient.id,
         name: vacForm.name.trim(),
         administeredOn: vacForm.administeredOn,
         nextDueOn: vacForm.nextDueOn || null,
         notes: vacForm.notes.trim() || null,
       };
-
       await vetApi.createVaccination(payload);
-      setSelectedPetForVac(null);
+      setIsAddVacOpen(false);
       setVacForm({
         name: '',
-        administeredOn: today,
-        nextDueOn: new Date(Date.now() + 365 * 86400000).toISOString().split('T')[0],
+        administeredOn: new Date().toISOString().substring(0, 10),
+        nextDueOn: new Date(Date.now() + 365 * 86400000).toISOString().substring(0, 10),
         notes: '',
       });
-      loadData();
+      const res = await vetApi.getVaccinations(0, 50, selectedPatient.id);
+      setPatientVacs(res?.items || []);
     } catch (err: any) {
-      setVacError(err?.message || 'Не удалось сохранить запись вакцинации');
+      setVacError(err?.response?.data?.message || err?.message || 'Ошибка сохранения прививки');
     } finally {
       setSavingVac(false);
     }
   };
 
-  const filteredPatients = patients.filter((pet) => {
+  const filteredPatients = patients.filter((p) => {
+    if (!search) return true;
     const q = search.toLowerCase();
-    const nameMatch = pet.name.toLowerCase().includes(q);
-    const specMatch = pet.species?.name?.toLowerCase().includes(q);
-    return nameMatch || specMatch;
+    const pName = p.name.toLowerCase();
+    const sName = getSpeciesName(p.speciesId).toLowerCase();
+    return pName.includes(q) || sName.includes(q);
   });
 
   return (
-    <AppShell
-      title="Пациенты клиники"
-      subtitle="Электронные карты, история вакцинаций и анамнез"
-    >
-      <div className="flex flex-col gap-2 p-1">
-        {/* Шапка и поиск по пациентам */}
-        <section className="island p-5 flex flex-col gap-4">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-2 border-b border-[var(--border)]">
-            <div className="flex items-center gap-2">
-              <PawPrint className="w-4 h-4 text-[var(--primary-text)]" />
-              <h2 className="text-sm font-bold">Картотека пациентов</h2>
-              <span className="badge text-[10px] font-mono">{patients.length}</span>
+    <AppShell crumbGroup="Пациенты" crumb="Список">
+      <div className="content-row">
+        {/* Left Column: Table */}
+        <div className="content-col grow">
+          <section className="island grow">
+            <div className="island-head">
+              <span className="island-title">
+                <PawPrint size={18} />
+                Пациенты <span className="count">{filteredPatients.length}</span>
+              </span>
+              <div className="input-icon" style={{ width: 260 }}>
+                <Search size={14} className="ic" />
+                <input
+                  type="text"
+                  className="input input-sm"
+                  placeholder="Кличка…"
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                />
+              </div>
             </div>
 
-            <div className="w-full sm:w-72 input-icon" style={{ position: 'relative' }}>
-              <Search className="ic" style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', width: '16px', height: '16px', color: 'var(--muted-foreground)', pointerEvents: 'none' }} />
-              <input
-                type="text"
-                placeholder="Поиск по кличке или виду..."
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                className="input text-xs"
-                style={{ paddingLeft: '34px' }}
-              />
+            <div className="row" style={{ padding: '0 16px 10px' }}>
+              <span className="dev-note">
+                Отдельного списка пациентов в API нет — список собран из уникальных petId ваших записей
+              </span>
             </div>
-          </div>
 
-          {loading ? (
-            <div className="py-16 text-center text-xs text-[var(--muted-foreground)]">
-              Загрузка картотеки...
-            </div>
-          ) : filteredPatients.length === 0 ? (
-            <div className="py-16 text-center text-xs text-[var(--muted-foreground)]">
-              Пациенты не найдены
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-              {filteredPatients.map((pet) => {
-                const petVacs = vaccinations.filter((v) => v.petId === pet.id);
-                const today = new Date().toISOString().split('T')[0];
-                const hasOverdue = petVacs.some((v) => v.nextDueOn && v.nextDueOn <= today);
+            <div className="table-wrap">
+              <div
+                className="dtable keep-table"
+                style={
+                  {
+                    '--cols': '1.3fr 0.8fr 0.8fr 1.1fr 1.1fr 0.6fr',
+                    minWidth: '720px',
+                  } as React.CSSProperties
+                }
+              >
+                <div className="thead">
+                  <span>Пациент</span>
+                  <span>Вид</span>
+                  <span>Возраст</span>
+                  <span>Последний приём</span>
+                  <span>Следующий</span>
+                  <span className="right">Приёмов</span>
+                </div>
 
-                return (
-                  <div
-                    key={pet.id}
-                    className="card p-5 flex flex-col justify-between hover:border-[var(--primary)] transition-all bg-[var(--card)]"
+                {filteredPatients.map((p) => {
+                  const isSelected = selectedPatient?.id === p.id;
+                  const age = calculateAge(p.birthDate);
+                  const last = getLastAppointment(p.id);
+                  const next = getNextAppointment(p.id);
+                  const count = getPatientAppointments(p.id).length;
+
+                  return (
+                    <button
+                      key={p.id}
+                      className={`trow ${isSelected ? 'sel' : ''}`}
+                      onClick={() => setSelectedPatient(p)}
+                    >
+                      <span className="row" style={{ gap: 10 }}>
+                        <span className={`t-ava sm tone-${p.speciesId}`}>
+                          <PawPrint size={14} />
+                        </span>
+                        <span className="cell-main">{p.name}</span>
+                        {p.isArchived && <span className="badge">Архив</span>}
+                      </span>
+                      <span>{getSpeciesName(p.speciesId)}</span>
+                      <span className="tnum">{age}</span>
+                      <span className="tnum">{last}</span>
+                      <span className="tnum">
+                        {next.startsWith('сегодня') ? (
+                          <span className="t-badge tone-prev">{next}</span>
+                        ) : (
+                          next
+                        )}
+                      </span>
+                      <span className="right tnum">{count}</span>
+                    </button>
+                  );
+                })}
+              </div>
+
+              {filteredPatients.length === 0 && !loading && (
+                <div className="empty">
+                  <span className="empty-title">Пациент не найден</span>
+                </div>
+              )}
+            </div>
+          </section>
+        </div>
+
+        {/* Right Column: Master-Detail Island (460px) */}
+        {selectedPatient && (
+          <section className="island detail-island" style={{ width: 460 }} aria-label="Карточка пациента">
+            <div className="island-head">
+              <div className="row">
+                <span className="pet-ava">
+                  <PawPrint size={20} />
+                </span>
+                <div className="col" style={{ gap: 0 }}>
+                  <span className="h2">{selectedPatient.name}</span>
+                  <span className="cell-sub">
+                    {getSpeciesName(selectedPatient.speciesId)} ·{' '}
+                    {selectedPatient.gender === 'MALE' ? 'Самец' : 'Самка'} ·{' '}
+                    {calculateAge(selectedPatient.birthDate)}
+                  </span>
+                </div>
+              </div>
+              <button
+                className="btn btn-ghost btn-icon btn-sm"
+                aria-label="Закрыть"
+                onClick={() => setSelectedPatient(null)}
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            <div className="tabs-line" role="tablist">
+              <button
+                className={`tab-line ${activeTab === 'overview' ? 'on' : ''}`}
+                onClick={() => setActiveTab('overview')}
+              >
+                Обзор
+              </button>
+              <button
+                className={`tab-line ${activeTab === 'appointments' ? 'on' : ''}`}
+                onClick={() => setActiveTab('appointments')}
+              >
+                Приёмы у меня{' '}
+                <span className="small muted">
+                  {getPatientAppointments(selectedPatient.id).length}
+                </span>
+              </button>
+              <button
+                className={`tab-line ${activeTab === 'vaccinations' ? 'on' : ''}`}
+                onClick={() => setActiveTab('vaccinations')}
+              >
+                Прививки <span className="small muted">{patientVacs.length}</span>
+              </button>
+            </div>
+
+            <div className="island-body" style={{ paddingTop: 14 }}>
+              {/* Tab 1: Overview */}
+              {activeTab === 'overview' && (
+                <div className="col" style={{ gap: 14 }}>
+                  <dl className="kv" style={{ margin: 0 }}>
+                    <dt>Вид</dt>
+                    <dd>{getSpeciesName(selectedPatient.speciesId)}</dd>
+                    <dt>Пол</dt>
+                    <dd>{selectedPatient.gender === 'MALE' ? 'Самец' : 'Самка'}</dd>
+                    <dt>Дата рождения</dt>
+                    <dd className="tnum">{selectedPatient.birthDate || 'Не указана'}</dd>
+                    <dt>Вес</dt>
+                    <dd className="tnum">
+                      {selectedPatient.weightKg != null
+                        ? `${String(selectedPatient.weightKg).replace('.', ',')} кг`
+                        : '—'}
+                    </dd>
+                    <dt>Заметки</dt>
+                    <dd>{selectedPatient.notes || '—'}</dd>
+                  </dl>
+
+                  <span className="small muted">Контакты владельца врачу недоступны.</span>
+
+                  <button
+                    className="btn btn-outline"
+                    onClick={() => setIsAddVacOpen(true)}
                   >
-                    <div className="flex flex-col gap-3">
-                      <div className="flex items-start justify-between">
-                        <div className="flex items-center gap-3">
-                          <div className="w-11 h-11 rounded-xl bg-[var(--primary)]/15 text-[var(--primary-text)] flex items-center justify-center font-bold text-base shrink-0">
-                            {pet.name.charAt(0)}
-                          </div>
-                          <div>
-                            <h3 className="font-bold text-sm">{pet.name}</h3>
-                            <span className="text-xs text-[var(--muted-foreground)]">
-                              {pet.species?.name || 'Вид не указан'}
-                            </span>
-                          </div>
-                        </div>
+                    <Syringe size={14} />
+                    Внести прививку
+                  </button>
+                </div>
+              )}
 
-                        {pet.isArchived && (
-                          <span className="badge badge-CANCELLED text-[10px]">В архиве</span>
-                        )}
-                      </div>
+              {/* Tab 2: My Appointments */}
+              {activeTab === 'appointments' && (
+                <div className="col" style={{ gap: 4, margin: '0 -10px' }}>
+                  {getPatientAppointments(selectedPatient.id).map((a) => {
+                    const d = new Date(a.startAt);
+                    const dd = d.getDate();
+                    const mon = d.toLocaleDateString('ru-RU', { month: 'short' });
+                    const time = d.toLocaleTimeString('ru-RU', {
+                      hour: '2-digit',
+                      minute: '2-digit',
+                    });
 
-                      <div className="p-3 rounded-lg bg-[var(--muted)]/50 border border-[var(--border)] text-xs flex flex-col gap-1.5">
-                        <div className="flex justify-between text-[var(--muted-foreground)]">
-                          <span>Пол:</span>
-                          <span className="font-medium text-[var(--foreground)]">
-                            {pet.gender === 'MALE' ? 'Самец' : 'Самка'}
+                    return (
+                      <div key={a.id} className="lrow">
+                        <span className="datebox">
+                          <b>{dd}</b>
+                          <span>{mon}</span>
+                        </span>
+                        <span className="col" style={{ gap: 1 }}>
+                          <span className="cell-main">{a.service?.name || 'Приём'}</span>
+                          <span className="cell-sub">
+                            {time} · {a.priceSnapshot || a.price || 0} ₽
                           </span>
-                        </div>
-                        <div className="flex justify-between text-[var(--muted-foreground)]">
-                          <span>Вес:</span>
-                          <span className="font-mono text-[var(--foreground)]">
-                            {pet.weightKg ? `${pet.weightKg} кг` : '—'}
-                          </span>
-                        </div>
-                        {pet.birthDate && (
-                          <div className="flex justify-between text-[var(--muted-foreground)]">
-                            <span>Дата рождения:</span>
-                            <span className="font-mono text-[var(--foreground)]">{pet.birthDate}</span>
-                          </div>
-                        )}
-                        {pet.notes && (
-                          <div className="pt-1 border-t border-[var(--border)]/60 text-[11px] text-[var(--muted-foreground)] italic">
-                            {pet.notes}
-                          </div>
-                        )}
+                        </span>
+                        <span className={`badge st badge-${a.status}`}>{a.status}</span>
                       </div>
+                    );
+                  })}
+
+                  {getPatientAppointments(selectedPatient.id).length === 0 && (
+                    <div className="empty" style={{ padding: 24 }}>
+                      Приёмов нет
                     </div>
+                  )}
+                </div>
+              )}
 
-                    <div className="flex items-center justify-between pt-3 mt-3 border-t border-[var(--border)] text-xs">
-                      {hasOverdue ? (
-                        <span className="badge due-over text-[10px]">Нужна прививка</span>
-                      ) : petVacs.length > 0 ? (
-                        <span className="badge due-later text-[10px]">{petVacs.length} вакцин</span>
-                      ) : (
-                        <span className="badge text-[10px]">Нет записей</span>
-                      )}
-
-                      <button
-                        type="button"
-                        onClick={() => setSelectedPetForVac(pet)}
-                        className="btn btn-outline h-7 px-3 text-xs flex items-center gap-1.5"
+              {/* Tab 3: Vaccinations */}
+              {activeTab === 'vaccinations' && (
+                <div className="col" style={{ gap: 4, margin: '0 -10px' }}>
+                  {patientVacs.map((v) => (
+                    <div key={v.id} className="lrow">
+                      <span
+                        className="pet-ava"
+                        style={{ width: 36, height: 36, borderRadius: 10 }}
                       >
-                        <Syringe className="w-3.5 h-3.5 text-teal-500" />
-                        <span>Вакцинация</span>
-                      </button>
+                        <Syringe size={16} />
+                      </span>
+                      <span className="col" style={{ gap: 1 }}>
+                        <span className="cell-main">{v.name}</span>
+                        <span className="cell-sub">Введена {v.administeredOn}</span>
+                      </span>
+                      {v.nextDueOn && (
+                        <span className="badge badge-accent">до {v.nextDueOn}</span>
+                      )}
                     </div>
-                  </div>
-                );
-              })}
+                  ))}
+
+                  {patientVacs.length === 0 && (
+                    <div className="empty" style={{ padding: 24 }}>
+                      Прививок нет
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
-          )}
-        </section>
+          </section>
+        )}
       </div>
 
-      {/* Модальное окно внесения вакцинации */}
-      <Modal
-        isOpen={!!selectedPetForVac}
-        onClose={() => setSelectedPetForVac(null)}
-        title={`Вакцинация: ${selectedPetForVac?.name || ''}`}
-        description="Внесите запись о сделанной прививке в ветеринарный паспорт"
-      >
-        <form onSubmit={handleAddVaccination} className="flex flex-col gap-3 text-xs">
-          {vacError && (
-            <div className="alert p-2.5 rounded-lg bg-rose-500/10 border border-rose-500/30 text-rose-500 text-xs flex items-center gap-2">
-              <AlertCircle className="w-4 h-4 shrink-0" />
-              <span>{vacError}</span>
-            </div>
-          )}
-
-          <div className="field">
-            <label className="field-label text-xs">
-              Наименование вакцины <span className="req">*</span>
-            </label>
-            <input
-              type="text"
-              required
-              value={vacForm.name}
-              onChange={(e) => setVacForm({ ...vacForm, name: e.target.value })}
-              placeholder="Например: Нобивак DHPPi + Рабиес"
-              className="input text-xs"
-            />
-          </div>
-
-          <div className="grid grid-cols-2 gap-2">
-            <div className="field">
-              <label className="field-label text-xs">
-                Дата введения <span className="req">*</span>
-              </label>
-              <input
-                type="date"
-                required
-                max={new Date().toISOString().split('T')[0]}
-                value={vacForm.administeredOn}
-                onChange={(e) => setVacForm({ ...vacForm, administeredOn: e.target.value })}
-                className="input text-xs font-mono"
-              />
+      {/* Modal: Add Vaccination */}
+      {isAddVacOpen && selectedPatient && (
+        <div
+          className="overlay"
+          onClick={() => setIsAddVacOpen(false)}
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(0,0,0,0.5)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1000,
+          }}
+        >
+          <div
+            className="dialog dialog-sm"
+            style={{ width: 420 }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="dialog-head">
+              <span className="dialog-title">Внести прививку</span>
+              <span className="dialog-desc">Запись вакцинации для «{selectedPatient.name}»</span>
             </div>
 
-            <div className="field">
-              <label className="field-label text-xs">Дата ревакцинации</label>
-              <input
-                type="date"
-                value={vacForm.nextDueOn}
-                onChange={(e) => setVacForm({ ...vacForm, nextDueOn: e.target.value })}
-                className="input text-xs font-mono"
-              />
-            </div>
-          </div>
+            <form onSubmit={handleAddVaccination} className="col" style={{ gap: 14 }}>
+              <div className="field">
+                <label className="field-label" htmlFor="vet-vac-name">
+                  Название вакцины <span className="req">*</span>
+                </label>
+                <input
+                  id="vet-vac-name"
+                  className="input"
+                  placeholder="Нобивак DHPPi…"
+                  value={vacForm.name}
+                  onChange={(e) => setVacForm({ ...vacForm, name: e.target.value })}
+                  required
+                />
+              </div>
 
-          <div className="field">
-            <label className="field-label text-xs">Серия / Заметки</label>
-            <textarea
-              rows={2}
-              value={vacForm.notes}
-              onChange={(e) => setVacForm({ ...vacForm, notes: e.target.value })}
-              placeholder="Серия препарата, реакция питомца..."
-              className="textarea text-xs"
-            />
-          </div>
+              <div className="form-grid">
+                <div className="field">
+                  <label className="field-label" htmlFor="vet-vac-adm">
+                    Дата введения <span className="req">*</span>
+                  </label>
+                  <input
+                    id="vet-vac-adm"
+                    type="date"
+                    className="input"
+                    value={vacForm.administeredOn}
+                    onChange={(e) =>
+                      setVacForm({ ...vacForm, administeredOn: e.target.value })
+                    }
+                    required
+                  />
+                </div>
 
-          <div className="flex justify-end gap-2 pt-3 border-t border-[var(--border)]">
-            <button
-              type="button"
-              className="btn btn-ghost h-8 px-3 text-xs"
-              onClick={() => setSelectedPetForVac(null)}
-            >
-              Отмена
-            </button>
-            <button type="submit" disabled={savingVac} className="btn btn-primary h-8 px-4 text-xs">
-              {savingVac ? 'Сохранение...' : 'Записать в паспорт'}
-            </button>
+                <div className="field">
+                  <label className="field-label" htmlFor="vet-vac-due">
+                    Следующая дата
+                  </label>
+                  <input
+                    id="vet-vac-due"
+                    type="date"
+                    className="input"
+                    value={vacForm.nextDueOn}
+                    onChange={(e) => setVacForm({ ...vacForm, nextDueOn: e.target.value })}
+                  />
+                </div>
+              </div>
+
+              <div className="field">
+                <label className="field-label" htmlFor="vet-vac-notes">
+                  Заметки
+                </label>
+                <textarea
+                  id="vet-vac-notes"
+                  className="textarea"
+                  rows={2}
+                  value={vacForm.notes}
+                  onChange={(e) => setVacForm({ ...vacForm, notes: e.target.value })}
+                />
+              </div>
+
+              {vacError && (
+                <div className="alert" role="alert">
+                  <AlertCircle size={16} />
+                  <div>{vacError}</div>
+                </div>
+              )}
+
+              <div className="dialog-foot">
+                <button
+                  type="button"
+                  className="btn btn-outline"
+                  onClick={() => setIsAddVacOpen(false)}
+                >
+                  Отмена
+                </button>
+                <button
+                  type="submit"
+                  className="btn btn-primary"
+                  disabled={savingVac}
+                >
+                  {savingVac ? 'Сохранение…' : 'Внести'}
+                </button>
+              </div>
+            </form>
           </div>
-        </form>
-      </Modal>
+        </div>
+      )}
     </AppShell>
   );
 }

@@ -17,7 +17,9 @@ import {
   AlertCircle,
   Check,
   ChevronRight,
+  Printer,
 } from 'lucide-react';
+import { ConsultationPrintSheet } from '../../../components/print/ConsultationPrintSheet';
 
 const STATUS_SHORT: Record<string, string> = {
   PENDING: 'Ожидает',
@@ -252,7 +254,7 @@ export default function VetDashboardPage() {
         </section>
 
         {/* Правая колонка: Ближайший приём + Детали выбранного приёма */}
-        <div className="content-col" style={{ width: '420px', flex: 'none', gap: '12px' }}>
+        <div className="content-col" style={{ width: '420px', flex: 'none' }}>
           {/* Остров детального протокола приёма */}
           {selectedAppt && (
             <section className="island detail-island" style={{ width: '100%' }}>
@@ -362,6 +364,16 @@ export default function VetDashboardPage() {
                     >
                       <Repeat className="ic" />
                       <span>Повторный приём</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      className="btn btn-outline btn-sm"
+                      onClick={() => window.print()}
+                      title="Распечатать медицинский протокол приёма"
+                    >
+                      <Printer className="ic" />
+                      <span>Печать листа</span>
                     </button>
                   </div>
                 </div>
@@ -496,6 +508,14 @@ export default function VetDashboardPage() {
             </form>
           </div>
         </div>
+      )}
+
+      {selectedAppt && (
+        <ConsultationPrintSheet
+          appointment={selectedAppt}
+          serviceName={servicesMap[selectedAppt.serviceId]}
+          notes={notesText}
+        />
       )}
     </AppShell>
   );

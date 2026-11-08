@@ -226,7 +226,7 @@ export default function ClientDashboardPage() {
   return (
     <AppShell title="Главная" currentSection="Главная">
       <div className="content-row">
-        <div className="scroll-col grow" style={{ gap: '12px' }}>
+        <div className="scroll-col grow">
           {/* HERO БЛОК С БЛИЖАЙШИМ ПРИЁМОМ И СТАТИСТИКОЙ */}
           <section className="island hm-hero" style={{ flex: 'none' }}>
             <div className="hm-hero-main">

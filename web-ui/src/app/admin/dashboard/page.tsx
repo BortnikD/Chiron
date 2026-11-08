@@ -168,7 +168,8 @@ export default function AdminDashboardPage() {
   // Date picker dropdown state
   const [dpOpen, setDpOpen] = useState<'from' | 'to' | null>(null);
   const [dpViewMonth, setDpViewMonth] = useState<string>('2026-10'); // YYYY-MM
-  const dpRef = useRef<HTMLDivElement>(null);
+  const dpFromRef = useRef<HTMLDivElement>(null);
+  const dpToRef = useRef<HTMLDivElement>(null);
 
   // Load stats from backend
   const loadData = async (from: string, to: string, g: StatisticsGranularity) => {
@@ -206,7 +207,10 @@ export default function AdminDashboardPage() {
   // Close datepicker popover on outside click
   useEffect(() => {
     const handleOutside = (e: MouseEvent) => {
-      if (dpRef.current && !dpRef.current.contains(e.target as Node)) {
+      const target = e.target as Node;
+      const clickedFrom = dpFromRef.current && dpFromRef.current.contains(target);
+      const clickedTo = dpToRef.current && dpToRef.current.contains(target);
+      if (!clickedFrom && !clickedTo) {
         setDpOpen(null);
       }
     };
@@ -492,7 +496,7 @@ export default function AdminDashboardPage() {
 
   return (
     <AppShell title="Дашборд" currentSection="Дашборд">
-      <div className="scroll-col grow p-1">
+      <div className="scroll-col grow">
         {/* ============ 1. PERIOD FILTER ISLAND ============ */}
         <section className="island filters" style={{ flex: 'none' }} aria-label="Период">
           <div className="field" style={{ width: 'auto' }}>
@@ -534,7 +538,7 @@ export default function AdminDashboardPage() {
             <label className="field-label" htmlFor="st-from">
               С
             </label>
-            <div className="dp" ref={dpRef}>
+            <div className="dp" ref={dpFromRef}>
               <button
                 type="button"
                 className="input dp-btn"
@@ -565,7 +569,6 @@ export default function AdminDashboardPage() {
               {dpOpen === 'from' && (
                 <div
                   className="popover dp-pop shadow-xl"
-                  style={{ top: '44px', left: 0 }}
                   onClick={(e) => e.stopPropagation()}
                 >
                   <div className="dp-head">
@@ -652,7 +655,7 @@ export default function AdminDashboardPage() {
             <label className="field-label" htmlFor="st-to">
               По (включительно)
             </label>
-            <div className="dp" ref={dpRef}>
+            <div className="dp" ref={dpToRef}>
               <button
                 type="button"
                 className="input dp-btn"
@@ -683,7 +686,6 @@ export default function AdminDashboardPage() {
               {dpOpen === 'to' && (
                 <div
                   className="popover dp-pop shadow-xl"
-                  style={{ top: '44px', left: 0 }}
                   onClick={(e) => e.stopPropagation()}
                 >
                   <div className="dp-head">
@@ -764,12 +766,6 @@ export default function AdminDashboardPage() {
               )}
             </div>
           </div>
-
-          <div className="spacer" />
-
-          <span className="small muted" style={{ paddingBottom: '8px' }}>
-            {formatIsoDisplay(stFrom)} — {formatIsoDisplay(stTo)} · GET /admin/statistics/*
-          </span>
         </section>
 
         {/* ============ 2. THE 3 KPI CARDS ============ */}

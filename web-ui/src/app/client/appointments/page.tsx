@@ -124,7 +124,7 @@ export default function AppointmentsPage() {
 
   return (
     <AppShell title="Записи на приём" currentSection="Записи">
-      <div className="content-col grow" style={{ gap: '12px' }}>
+      <div className="content-col grow">
         {/* Верхний остров фильтров */}
         <section className="island filters" aria-label="Фильтры">
           <div className="field" style={{ width: 'auto' }}>

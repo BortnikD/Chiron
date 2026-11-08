@@ -1,38 +1,52 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
+import Link from 'next/link';
 import { adminApi, clinicApi } from '../../../api';
-import { Pet, Species, Gender, CreatePetRequest, UpdatePetRequest, User, Vaccination } from '../../../types';
+import {
+  Pet,
+  Species,
+  Gender,
+  CreatePetRequest,
+  UpdatePetRequest,
+  User,
+  Vaccination,
+  Appointment,
+} from '../../../types';
 import { AppShell } from '../../../components/layout/AppShell';
 import {
-  Heart,
+  PawPrint,
   Plus,
   Edit2,
   Trash2,
-  Search,
   Archive,
-  User as UserIcon,
-  AlertCircle,
+  Search,
   Syringe,
-  ShieldCheck,
   Calendar,
+  AlertCircle,
   X,
-  RefreshCw,
-  PawPrint,
+  Check,
 } from 'lucide-react';
 
 export default function AdminPetsPage() {
   const [pets, setPets] = useState<Pet[]>([]);
   const [speciesList, setSpeciesList] = useState<Species[]>([]);
-  const [clients, setClients] = useState<User[]>([]);
+  const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // Параметры фильтрации
+  // Filters
   const [search, setSearch] = useState('');
-  const [speciesFilter, setSpeciesFilter] = useState('');
-  const [archivedFilter, setArchivedFilter] = useState<'ALL' | 'ACTIVE' | 'ARCHIVED'>('ALL');
+  const [speciesFilter, setSpeciesFilter] = useState('ALL');
+  const [genderFilter, setGenderFilter] = useState<'ALL' | 'MALE' | 'FEMALE'>('ALL');
+  const [statusFilter, setStatusFilter] = useState<'ALL' | 'ACTIVE' | 'ARCHIVED'>('ALL');
 
-  // Модальное окно создания питомца
+  // Master-Detail selection
+  const [selectedPet, setSelectedPet] = useState<Pet | null>(null);
+  const [activeTab, setActiveTab] = useState<'overview' | 'appointments' | 'vaccinations'>('overview');
+  const [petAppointments, setPetAppointments] = useState<Appointment[]>([]);
+  const [petVaccinations, setPetVaccinations] = useState<Vaccination[]>([]);
+
+  // Create Modal
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [createForm, setCreateForm] = useState({
     name: '',
@@ -46,8 +60,8 @@ export default function AdminPetsPage() {
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
 
-  // Модальное окно редактирования питомца
-  const [editingPet, setEditingPet] = useState<Pet | null>(null);
+  // Edit Modal / Dialog
+  const [isEditOpen, setIsEditOpen] = useState(false);
   const [editForm, setEditForm] = useState({
     name: '',
     speciesId: '',
@@ -57,57 +71,50 @@ export default function AdminPetsPage() {
     notes: '',
     isArchived: false,
   });
-  const [updating, setUpdating] = useState(false);
+  const [savingEdit, setSavingEdit] = useState(false);
 
-  // Модальное окно удаления питомца
-  const [deletingId, setDeletingId] = useState<string | null>(null);
+  // Delete Confirmation
+  const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
 
-  // Модальное окно вакцинаций
-  const [selectedPetForVac, setSelectedPetForVac] = useState<Pet | null>(null);
-  const [vaccinations, setVaccinations] = useState<Vaccination[]>([]);
-  const [loadingVac, setLoadingVac] = useState(false);
-  const [savingVac, setSavingVac] = useState(false);
-  const [vacError, setVacError] = useState<string | null>(null);
-  const [newVac, setNewVac] = useState({
+  // Add Vaccination Modal
+  const [isAddVacOpen, setIsAddVacOpen] = useState(false);
+  const [vacForm, setVacForm] = useState({
     name: '',
     administeredOn: new Date().toISOString().substring(0, 10),
     nextDueOn: '',
   });
+  const [savingVac, setSavingVac] = useState(false);
 
   const loadData = async () => {
     setLoading(true);
     try {
       const isArchivedParam =
-        archivedFilter === 'ACTIVE' ? false : archivedFilter === 'ARCHIVED' ? true : undefined;
+        statusFilter === 'ACTIVE' ? false : statusFilter === 'ARCHIVED' ? true : undefined;
 
       const [petsRes, speciesRes, usersRes] = await Promise.all([
         adminApi.getPets(0, 100, {
-          speciesId: speciesFilter || undefined,
+          speciesId: speciesFilter !== 'ALL' ? speciesFilter : undefined,
           isArchived: isArchivedParam,
-        }),
-        clinicApi.getSpecies(),
-        adminApi.getUsers(0, 100),
+        }).catch(() => ({ items: [] })),
+        clinicApi.getSpecies().catch(() => [] as Species[]),
+        adminApi.getUsers(0, 100).catch(() => ({ items: [] })),
       ]);
 
-      const safePets = petsRes?.items ?? (Array.isArray(petsRes) ? petsRes : []);
+      const safePets = petsRes?.items || [];
       const safeSpecies = Array.isArray(speciesRes) ? speciesRes : [];
-      const safeClients = usersRes?.items ?? (Array.isArray(usersRes) ? usersRes : []);
+      const safeUsers = usersRes?.items || [];
 
       setPets(safePets);
       setSpeciesList(safeSpecies);
-      setClients(safeClients);
+      setUsers(safeUsers);
 
-      if (safeClients.length > 0 && !createForm.ownerId) {
-        setCreateForm((prev) => ({
-          ...prev,
-          ownerId: safeClients[0].id,
-          speciesId: safeSpecies[0]?.id || '',
-        }));
+      if (selectedPet) {
+        const updated = safePets.find((p: Pet) => p.id === selectedPet.id);
+        if (updated) setSelectedPet(updated);
       }
     } catch (err) {
-      console.error(err);
-      setPets([]);
+      console.error('Failed to load pets data', err);
     } finally {
       setLoading(false);
     }
@@ -115,513 +122,637 @@ export default function AdminPetsPage() {
 
   useEffect(() => {
     loadData();
-  }, [speciesFilter, archivedFilter]);
+  }, [speciesFilter, statusFilter]);
 
-  const handleCreatePet = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setCreateError(null);
-    setCreating(true);
+  // When a pet is selected, load its appointments and vaccinations
+  useEffect(() => {
+    if (!selectedPet) return;
 
-    try {
-      const payload: CreatePetRequest & { ownerId: string } = {
-        name: createForm.name.trim(),
-        ownerId: createForm.ownerId,
-        speciesId: createForm.speciesId,
-        gender: createForm.gender,
-        birthDate: createForm.birthDate || null,
-        weightKg: createForm.weightKg ? parseFloat(createForm.weightKg) : null,
-        notes: createForm.notes.trim() || null,
-      };
-
-      await adminApi.createPet(payload);
-      setIsCreateOpen(false);
-      setCreateForm({
-        name: '',
-        ownerId: clients[0]?.id || '',
-        speciesId: speciesList[0]?.id || '',
-        gender: 'MALE',
-        birthDate: '',
-        weightKg: '',
-        notes: '',
-      });
-      loadData();
-    } catch (err: any) {
-      setCreateError(err?.message || 'Не удалось зарегистрировать питомца');
-    } finally {
-      setCreating(false);
-    }
-  };
-
-  const openEditModal = (pet: Pet) => {
-    setEditingPet(pet);
-    setEditForm({
-      name: pet.name,
-      speciesId: pet.speciesId,
-      gender: pet.gender,
-      birthDate: pet.birthDate || '',
-      weightKg: pet.weightKg ? pet.weightKg.toString() : '',
-      notes: pet.notes || '',
-      isArchived: pet.isArchived,
+    Promise.all([
+      adminApi.getAppointments(0, 50, { petId: selectedPet.id }).catch(() => ({ items: [] })),
+      adminApi.getVaccinations({ petId: selectedPet.id }).catch(() => ({ items: [] })),
+    ]).then(([apptsRes, vacRes]) => {
+      setPetAppointments(apptsRes?.items || []);
+      setPetVaccinations(vacRes?.items || []);
     });
+  }, [selectedPet]);
+
+  const getOwnerName = (ownerId?: string) => {
+    if (!ownerId) return '—';
+    const user = users.find((u) => u.id === ownerId);
+    return user ? user.fullName : '—';
   };
 
-  const handleUpdatePet = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!editingPet) return;
-    setUpdating(true);
+  const getSpeciesName = (spId?: string) => {
+    if (!spId) return '—';
+    const sp = speciesList.find((s) => s.id === spId);
+    return sp ? sp.name : '—';
+  };
 
+  const calculateAge = (birthDate?: string | null) => {
+    if (!birthDate) return '—';
+    const birth = new Date(birthDate);
+    if (isNaN(birth.getTime())) return '—';
+    const now = new Date();
+    let years = now.getFullYear() - birth.getFullYear();
+    let months = now.getMonth() - birth.getMonth();
+    if (months < 0) {
+      years--;
+      months += 12;
+    }
+    if (years > 0) return `${years} г. ${months > 0 ? `${months} м.` : ''}`.trim();
+    if (months > 0) return `${months} мес.`;
+    return 'Меньше месяца';
+  };
+
+  const handleToggleArchive = async () => {
+    if (!selectedPet) return;
     try {
-      const payload: UpdatePetRequest = {
-        name: editForm.name.trim(),
-        speciesId: editForm.speciesId,
-        gender: editForm.gender,
-        birthDate: editForm.birthDate || null,
-        weightKg: editForm.weightKg ? parseFloat(editForm.weightKg) : null,
-        notes: editForm.notes.trim() || null,
-        isArchived: editForm.isArchived,
-      };
-
-      await adminApi.updatePet(editingPet.id, payload);
-      setEditingPet(null);
-      loadData();
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setUpdating(false);
+      await adminApi.updatePet(selectedPet.id, {
+        isArchived: !selectedPet.isArchived,
+      });
+      await loadData();
+    } catch (err: any) {
+      alert(err?.response?.data?.message || err?.message || 'Ошибка обновления статуса питомца');
     }
   };
 
   const handleDeletePet = async () => {
-    if (!deletingId) return;
+    if (!selectedPet) return;
     setDeleting(true);
     try {
-      await adminApi.deletePet(deletingId);
-      setDeletingId(null);
-      loadData();
-    } catch (err) {
-      console.error(err);
+      await adminApi.deletePet(selectedPet.id);
+      setIsDeleteConfirmOpen(false);
+      setSelectedPet(null);
+      await loadData();
+    } catch (err: any) {
+      alert(err?.response?.data?.message || err?.message || 'Ошибка при удалении питомца');
     } finally {
       setDeleting(false);
     }
   };
 
-  const openVacModal = async (pet: Pet) => {
-    setSelectedPetForVac(pet);
-    setLoadingVac(true);
-    setVacError(null);
-    setNewVac({
-      name: '',
-      administeredOn: new Date().toISOString().substring(0, 10),
-      nextDueOn: '',
-    });
+  const handleCreateSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!createForm.name || !createForm.speciesId || !createForm.ownerId) {
+      setCreateError('Заполните обязательные поля');
+      return;
+    }
+    setCreating(true);
+    setCreateError(null);
     try {
-      const res = await adminApi.getVaccinations({ petId: pet.id });
-      setVaccinations(res.items || []);
-    } catch (err) {
-      console.error(err);
-      setVaccinations([]);
+      const payload: CreatePetRequest = {
+        name: createForm.name,
+        speciesId: createForm.speciesId,
+        ownerId: createForm.ownerId,
+        gender: createForm.gender,
+        birthDate: createForm.birthDate || null,
+        weightKg: createForm.weightKg ? parseFloat(createForm.weightKg) : null,
+        notes: createForm.notes || null,
+      };
+      const created = await adminApi.createPet(payload);
+      setIsCreateOpen(false);
+      setCreateForm({
+        name: '',
+        ownerId: '',
+        speciesId: '',
+        gender: 'MALE',
+        birthDate: '',
+        weightKg: '',
+        notes: '',
+      });
+      await loadData();
+      if (created) setSelectedPet(created);
+    } catch (err: any) {
+      setCreateError(err?.response?.data?.message || err?.message || 'Ошибка создания питомца');
     } finally {
-      setLoadingVac(false);
+      setCreating(false);
+    }
+  };
+
+  const openEditDialog = () => {
+    if (!selectedPet) return;
+    setEditForm({
+      name: selectedPet.name,
+      speciesId: selectedPet.speciesId,
+      gender: selectedPet.gender,
+      birthDate: selectedPet.birthDate || '',
+      weightKg: selectedPet.weightKg != null ? String(selectedPet.weightKg) : '',
+      notes: selectedPet.notes || '',
+      isArchived: selectedPet.isArchived,
+    });
+    setIsEditOpen(true);
+  };
+
+  const handleEditSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedPet) return;
+    setSavingEdit(true);
+    try {
+      const payload: UpdatePetRequest = {
+        name: editForm.name,
+        speciesId: editForm.speciesId,
+        gender: editForm.gender,
+        birthDate: editForm.birthDate || null,
+        weightKg: editForm.weightKg ? parseFloat(editForm.weightKg) : null,
+        notes: editForm.notes || null,
+        isArchived: editForm.isArchived,
+      };
+      await adminApi.updatePet(selectedPet.id, payload);
+      setIsEditOpen(false);
+      await loadData();
+    } catch (err: any) {
+      alert(err?.response?.data?.message || err?.message || 'Ошибка обновления питомца');
+    } finally {
+      setSavingEdit(false);
     }
   };
 
   const handleAddVaccination = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedPetForVac) return;
-    setVacError(null);
-
-    if (!newVac.name.trim()) {
-      setVacError('Укажите наименование вакцины');
-      return;
-    }
-    if (!newVac.administeredOn) {
-      setVacError('Укажите дату вакцинации');
-      return;
-    }
-    const today = new Date().toISOString().substring(0, 10);
-    if (newVac.administeredOn > today) {
-      setVacError('Дата вакцинации не может быть в будущем');
-      return;
-    }
-    if (newVac.nextDueOn && newVac.nextDueOn <= newVac.administeredOn) {
-      setVacError('Дата ревакцинации должна быть позже даты введения');
-      return;
-    }
-
+    if (!selectedPet || !vacForm.name) return;
     setSavingVac(true);
     try {
       await adminApi.createVaccination({
-        petId: selectedPetForVac.id,
-        name: newVac.name.trim(),
-        administeredOn: newVac.administeredOn,
-        nextDueOn: newVac.nextDueOn || null,
+        petId: selectedPet.id,
+        name: vacForm.name,
+        administeredOn: vacForm.administeredOn,
+        nextDueOn: vacForm.nextDueOn || null,
       });
-
-      const res = await adminApi.getVaccinations({ petId: selectedPetForVac.id });
-      setVaccinations(res.items || []);
-      setNewVac({
+      setIsAddVacOpen(false);
+      setVacForm({
         name: '',
-        administeredOn: today,
+        administeredOn: new Date().toISOString().substring(0, 10),
         nextDueOn: '',
       });
+      const vacs = await adminApi.getVaccinations({ petId: selectedPet.id });
+      setPetVaccinations(vacs?.items || []);
     } catch (err: any) {
-      setVacError(err?.message || 'Не удалось добавить вакцинацию');
+      alert(err?.response?.data?.message || err?.message || 'Ошибка добавления прививки');
     } finally {
       setSavingVac(false);
     }
   };
 
-  const handleDeleteVaccination = async (id: string) => {
-    if (!selectedPetForVac) return;
-    try {
-      await adminApi.deleteVaccination(id);
-      setVaccinations((prev) => prev.filter((v) => v.id !== id));
-    } catch (err) {
-      console.error(err);
+  // Filtered pets
+  const filteredPets = pets.filter((p) => {
+    if (genderFilter !== 'ALL' && p.gender !== genderFilter) return false;
+    if (search) {
+      const q = search.toLowerCase();
+      const pName = p.name.toLowerCase();
+      const oName = getOwnerName(p.ownerId).toLowerCase();
+      if (!pName.includes(q) && !oName.includes(q)) return false;
     }
-  };
-
-  const getSpeciesName = (speciesId: string) => {
-    const s = speciesList.find((item) => item.id === speciesId);
-    return s?.name || 'Питомец';
-  };
-
-  const getOwnerName = (ownerId: string) => {
-    const c = clients.find((item) => item.id === ownerId);
-    return c?.fullName || `${c?.firstName || ''} ${c?.lastName || ''}`.trim() || 'Владелец';
-  };
-
-  const filteredPets = pets.filter((pet) => {
-    const name = pet.name.toLowerCase();
-    const owner = getOwnerName(pet.ownerId).toLowerCase();
-    const spec = getSpeciesName(pet.speciesId).toLowerCase();
-    const q = search.toLowerCase();
-    return name.includes(q) || owner.includes(q) || spec.includes(q);
+    return true;
   });
 
   return (
-    <AppShell
-      title="Пациенты"
-      subtitle="Единая база животных, медицинские карты и паспорта вакцинации"
-      actions={
-        <button
-          type="button"
-          onClick={() => setIsCreateOpen(true)}
-          className="btn btn-primary"
-        >
-          <Plus className="ic" />
-          <span>Добавить питомца</span>
-        </button>
-      }
-    >
-      <div className="content-col grow" style={{ gap: '8px' }}>
-        {/* Панель фильтрации пациентов */}
-        <section className="island filters" aria-label="Фильтры пациентов">
-          <div className="field" style={{ minWidth: '240px', flex: 1 }}>
-            <span className="field-label">Поиск</span>
-            <div className="input-icon">
-              <Search className="ic" />
-              <input
-                className="input input-sm"
-                placeholder="Кличка, владелец, вид..."
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-              />
-            </div>
-          </div>
-
-          <div className="field">
-            <span className="field-label">Вид животного</span>
-            <select
-              className="select input-sm"
-              value={speciesFilter}
-              onChange={(e) => setSpeciesFilter(e.target.value)}
-            >
-              <option value="">Все виды</option>
-              {speciesList.map((s) => (
-                <option key={s.id} value={s.id}>{s.name}</option>
-              ))}
-            </select>
-          </div>
-
-          <div className="field">
-            <span className="field-label">Статус</span>
-            <div className="chips">
-              {[
-                { val: 'ALL', label: 'Все' },
-                { val: 'ACTIVE', label: 'Активные' },
-                { val: 'ARCHIVED', label: 'В архиве' },
-              ].map((chip) => (
-                <button
-                  key={chip.val}
-                  type="button"
-                  className={`chip ${archivedFilter === chip.val ? 'on' : ''}`}
-                  onClick={() => setArchivedFilter(chip.val as any)}
+    <AppShell crumbGroup="Клиника" crumb="Питомцы">
+      <div className="content-row">
+        {/* Left Column: Filters + Table */}
+        <div className="content-col grow">
+          <section className="island filters" aria-label="Фильтры питомцев">
+            <div className="field">
+              <span className="field-label">Вид</span>
+              <div className="dd">
+                <select
+                  className="select dd-btn"
+                  value={speciesFilter}
+                  onChange={(e) => setSpeciesFilter(e.target.value)}
                 >
-                  {chip.label}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {(search || speciesFilter || archivedFilter !== 'ALL') && (
-            <div className="field" style={{ justifyContent: 'flex-end', marginLeft: 'auto' }}>
-              <span className="field-label">&nbsp;</span>
-              <button
-                type="button"
-                className="btn btn-ghost btn-sm"
-                onClick={() => {
-                  setSearch('');
-                  setSpeciesFilter('');
-                  setArchivedFilter('ALL');
-                }}
-              >
-                <X className="ic" style={{ width: '13px', height: '13px' }} />
-                <span>Сбросить</span>
-              </button>
-            </div>
-          )}
-        </section>
-
-        {/* Список пациентов клиники */}
-        <section className="island grow" style={{ display: 'flex', flexDirection: 'column' }}>
-          <div className="island-head">
-            <span className="island-title">
-              <PawPrint className="ic" />
-              <span>Реестр пациентов</span>
-              <span className="count">Всего: {filteredPets.length}</span>
-            </span>
-            <button
-              type="button"
-              className="btn btn-ghost btn-icon btn-sm"
-              onClick={loadData}
-              title="Обновить"
-            >
-              <RefreshCw className={`ic ${loading ? 'animate-spin' : ''}`} />
-            </button>
-          </div>
-
-          {loading ? (
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '8px', padding: '16px' }}>
-              {Array.from({ length: 3 }).map((_, i) => (
-                <div key={i} className="skeleton" style={{ height: '180px', borderRadius: '12px' }} />
-              ))}
-            </div>
-          ) : filteredPets.length > 0 ? (
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '8px' }}>
-              {filteredPets.map((pet) => {
-                const specName = getSpeciesName(pet.speciesId);
-                const ownerName = getOwnerName(pet.ownerId);
-
-                return (
-                  <div
-                    key={pet.id}
-                    className="island"
-                    style={{
-                      background: 'var(--card)',
-                      border: '1px solid var(--border)',
-                      padding: '14px',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      gap: '10px',
-                    }}
-                  >
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <div
-                          className="avatar"
-                          style={{
-                            width: '38px',
-                            height: '38px',
-                            fontWeight: 700,
-                            fontSize: '14px',
-                            background: 'var(--primary)',
-                            color: 'var(--primary-text)',
-                            borderRadius: '10px',
-                          }}
-                        >
-                          {pet.name.charAt(0).toUpperCase()}
-                        </div>
-                        <div>
-                          <h3 className="font-bold text-sm" style={{ margin: 0 }}>{pet.name}</h3>
-                          <span className="muted text-xs font-medium">{specName}</span>
-                        </div>
-                      </div>
-
-                      <span className={`badge ${pet.isArchived ? 'b-cancelled' : 'b-completed'}`}>
-                        {pet.isArchived ? 'В архиве' : 'Активен'}
-                      </span>
-                    </div>
-
-                    <div
-                      style={{
-                        padding: '8px 10px',
-                        background: 'var(--island-subtle)',
-                        borderRadius: '8px',
-                        display: 'flex',
-                        flexDirection: 'column',
-                        gap: '4px',
-                        fontSize: '12px',
-                      }}
-                    >
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                        <UserIcon className="ic text-slate-400" style={{ width: '13px', height: '13px' }} />
-                        <span className="muted">Владелец:</span>
-                        <span className="font-medium">{ownerName}</span>
-                      </div>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px solid var(--border)', paddingTop: '4px' }}>
-                        <span>Пол: <strong className="font-medium">{pet.gender === 'MALE' ? 'Самец' : 'Самка'}</strong></span>
-                        <span>Вес: <strong className="tnum font-mono">{pet.weightKg ? `${pet.weightKg} кг` : '—'}</strong></span>
-                      </div>
-                      {pet.birthDate && (
-                        <span className="muted text-xs">
-                          Родился: {new Date(pet.birthDate).toLocaleDateString('ru-RU')}
-                        </span>
-                      )}
-                      {pet.notes && (
-                        <p className="muted italic text-xs line-clamp-2" style={{ margin: 0, borderTop: '1px solid var(--border)', paddingTop: '4px' }}>
-                          «{pet.notes}»
-                        </p>
-                      )}
-                    </div>
-
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '4px', marginTop: 'auto', paddingTop: '4px' }}>
-                      <button
-                        type="button"
-                        className="btn btn-ghost btn-sm"
-                        onClick={() => openVacModal(pet)}
-                        style={{ border: '1px solid var(--border)' }}
-                      >
-                        <Syringe className="ic" style={{ width: '13px', height: '13px' }} />
-                        <span>Прививки</span>
-                      </button>
-                      <button
-                        type="button"
-                        className="btn btn-ghost btn-icon btn-sm"
-                        onClick={() => openEditModal(pet)}
-                        title="Редактировать"
-                      >
-                        <Edit2 className="ic" style={{ width: '13px', height: '13px' }} />
-                      </button>
-                      <button
-                        type="button"
-                        className="btn btn-ghost btn-icon btn-sm text-[var(--accent-red)]"
-                        onClick={() => setDeletingId(pet.id)}
-                        title="Удалить"
-                      >
-                        <Trash2 className="ic" style={{ width: '13px', height: '13px' }} />
-                      </button>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          ) : (
-            <div className="empty" style={{ padding: '48px 16px' }}>
-              <div className="empty-art">
-                <PawPrint className="ic" style={{ width: '40px', height: '40px', opacity: 0.4 }} />
+                  <option value="ALL">Все виды</option>
+                  {speciesList.map((s) => (
+                    <option key={s.id} value={s.id}>
+                      {s.name}
+                    </option>
+                  ))}
+                </select>
               </div>
-              <span className="empty-title">Питомцы не найдены</span>
-              <p className="muted text-xs text-center max-w-sm mt-1">
-                По заданным критериям фильтрации питомцы не найдены.
-              </p>
-              <button
-                type="button"
-                className="btn btn-primary mt-3"
-                onClick={() => setIsCreateOpen(true)}
-              >
-                <Plus className="ic" />
-                <span>Добавить питомца</span>
-              </button>
             </div>
-          )}
-        </section>
-      </div>
 
-      {/* Модальное окно добавления питомца */}
-      {isCreateOpen && (
-        <div className="dialog-backdrop">
-          <div className="dialog island" role="dialog" aria-labelledby="create-pet-title" style={{ maxWidth: '480px' }}>
-            <div className="dialog-head">
-              <span className="dialog-title" id="create-pet-title">Добавить питомца</span>
+            <div className="field" style={{ width: 'auto' }}>
+              <span className="field-label">Пол</span>
+              <div className="seg">
+                <button
+                  type="button"
+                  className={`seg-item ${genderFilter === 'ALL' ? 'on' : ''}`}
+                  onClick={() => setGenderFilter('ALL')}
+                >
+                  Все
+                </button>
+                <button
+                  type="button"
+                  className={`seg-item ${genderFilter === 'MALE' ? 'on' : ''}`}
+                  onClick={() => setGenderFilter('MALE')}
+                >
+                  Самец
+                </button>
+                <button
+                  type="button"
+                  className={`seg-item ${genderFilter === 'FEMALE' ? 'on' : ''}`}
+                  onClick={() => setGenderFilter('FEMALE')}
+                >
+                  Самка
+                </button>
+              </div>
+            </div>
+
+            <div className="field" style={{ width: 200 }}>
+              <span className="field-label">Поиск</span>
+              <div className="input-icon">
+                <Search size={14} className="ic" />
+                <input
+                  type="text"
+                  className="input"
+                  placeholder="Кличка или владелец…"
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                />
+              </div>
+            </div>
+
+            <div className="spacer" />
+
+            <button
+              className="btn btn-primary"
+              onClick={() => {
+                setCreateError(null);
+                if (speciesList.length > 0 && !createForm.speciesId) {
+                  setCreateForm((prev) => ({
+                    ...prev,
+                    speciesId: speciesList[0].id,
+                    ownerId: users[0]?.id || '',
+                  }));
+                }
+                setIsCreateOpen(true);
+              }}
+            >
+              <Plus size={16} />
+              Добавить питомца
+            </button>
+          </section>
+
+          <section className="island grow">
+            <div className="island-head">
+              <span className="island-title">
+                <PawPrint size={18} />
+                Питомцы <span className="count">Найдено: {filteredPets.length}</span>
+              </span>
+            </div>
+
+            <div className="table-wrap">
+              <div
+                className="dtable"
+                style={
+                  {
+                    '--cols': '1.2fr 0.8fr 0.7fr 0.8fr 0.7fr 1.3fr 0.7fr',
+                    minWidth: '820px',
+                  } as React.CSSProperties
+                }
+              >
+                <div className="thead">
+                  <span>Кличка</span>
+                  <span>Вид</span>
+                  <span>Пол</span>
+                  <span>Возраст</span>
+                  <span>Вес</span>
+                  <span>Владелец</span>
+                  <span>Статус</span>
+                </div>
+
+                {filteredPets.map((p) => {
+                  const isSelected = selectedPet?.id === p.id;
+                  const age = calculateAge(p.birthDate);
+                  const weight = p.weightKg != null ? `${String(p.weightKg).replace('.', ',')} кг` : '—';
+
+                  return (
+                    <button
+                      key={p.id}
+                      className={`trow ${isSelected ? 'sel' : ''}`}
+                      onClick={() => setSelectedPet(p)}
+                    >
+                      <span className="pet-cell">
+                        <span className={`t-ava sm tone-${p.speciesId}`}>
+                          <PawPrint size={14} />
+                        </span>
+                        <span className="cell-main">{p.name}</span>
+                      </span>
+                      <span>{getSpeciesName(p.speciesId)}</span>
+                      <span>{p.gender === 'MALE' ? 'Самец' : 'Самка'}</span>
+                      <span className="tnum">{age}</span>
+                      <span className="tnum">{weight}</span>
+                      <span className="muted">{getOwnerName(p.ownerId)}</span>
+                      <span>
+                        <span className={`badge ${p.isArchived ? 'badge-outline' : 'badge-accent'}`}>
+                          {p.isArchived ? 'Архив' : 'Активен'}
+                        </span>
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+
+              {filteredPets.length === 0 && !loading && (
+                <div className="empty">
+                  <span className="empty-title">Питомцы не найдены</span>
+                </div>
+              )}
+            </div>
+          </section>
+        </div>
+
+        {/* Right Column: Master-Detail Island (460px) */}
+        {selectedPet && (
+          <section className="island detail-island" style={{ width: 460 }} aria-label="Питомец">
+            <div className="island-head">
+              <div className="row">
+                <span className="pet-ava">
+                  <PawPrint size={20} />
+                </span>
+                <div className="col" style={{ gap: 0 }}>
+                  <span className="h2">{selectedPet.name}</span>
+                  <span className="cell-sub">
+                    {getSpeciesName(selectedPet.speciesId)} ·{' '}
+                    {selectedPet.gender === 'MALE' ? 'Самец' : 'Самка'} ·{' '}
+                    {calculateAge(selectedPet.birthDate)}
+                  </span>
+                </div>
+              </div>
               <button
-                type="button"
                 className="btn btn-ghost btn-icon btn-sm"
-                onClick={() => setIsCreateOpen(false)}
                 aria-label="Закрыть"
+                onClick={() => setSelectedPet(null)}
               >
-                <X className="ic" />
+                <X size={16} />
               </button>
             </div>
 
-            <form onSubmit={handleCreatePet} className="dialog-body" style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-              {createError && (
-                <div className="callout callout-error" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <AlertCircle className="ic shrink-0" />
-                  <span className="text-xs">{createError}</span>
+            {/* Actions Row */}
+            <div className="row wrap" style={{ gap: 6, padding: '0 16px 12px' }}>
+              <button className="btn btn-outline btn-sm" onClick={openEditDialog}>
+                <Edit2 size={14} />
+                Изменить
+              </button>
+              <button className="btn btn-outline btn-sm" onClick={handleToggleArchive}>
+                <Archive size={14} />
+                {selectedPet.isArchived ? 'Вернуть из архива' : 'В архив'}
+              </button>
+              <button
+                className="btn btn-destructive-outline btn-sm"
+                onClick={() => setIsDeleteConfirmOpen(true)}
+              >
+                <Trash2 size={14} />
+                Удалить
+              </button>
+            </div>
+
+            {/* Tabs Header */}
+            <div className="tabs-line">
+              <button
+                className={`tab-line ${activeTab === 'overview' ? 'on' : ''}`}
+                onClick={() => setActiveTab('overview')}
+              >
+                Обзор
+              </button>
+              <button
+                className={`tab-line ${activeTab === 'appointments' ? 'on' : ''}`}
+                onClick={() => setActiveTab('appointments')}
+              >
+                Записи <span className="small muted">{petAppointments.length}</span>
+              </button>
+              <button
+                className={`tab-line ${activeTab === 'vaccinations' ? 'on' : ''}`}
+                onClick={() => setActiveTab('vaccinations')}
+              >
+                Прививки <span className="small muted">{petVaccinations.length}</span>
+              </button>
+            </div>
+
+            <div className="island-body" style={{ paddingTop: 14 }}>
+              {/* Tab 1: Overview */}
+              {activeTab === 'overview' && (
+                <div className="col" style={{ gap: 14 }}>
+                  <dl className="kv" style={{ margin: 0 }}>
+                    <dt>Владелец</dt>
+                    <dd>{getOwnerName(selectedPet.ownerId)}</dd>
+                    <dt>Вид</dt>
+                    <dd>{getSpeciesName(selectedPet.speciesId)}</dd>
+                    <dt>Пол</dt>
+                    <dd>{selectedPet.gender === 'MALE' ? 'Самец' : 'Самка'}</dd>
+                    <dt>Дата рождения</dt>
+                    <dd className="tnum">{selectedPet.birthDate || 'Не указана'}</dd>
+                    <dt>Вес</dt>
+                    <dd className="tnum">
+                      {selectedPet.weightKg != null
+                        ? `${String(selectedPet.weightKg).replace('.', ',')} кг`
+                        : '—'}
+                    </dd>
+                    <dt>Заметки</dt>
+                    <dd>{selectedPet.notes || '—'}</dd>
+                    <dt>Статус</dt>
+                    <dd>{selectedPet.isArchived ? 'В архиве' : 'Активен'}</dd>
+                  </dl>
                 </div>
               )}
 
+              {/* Tab 2: Appointments */}
+              {activeTab === 'appointments' && (
+                <div className="col" style={{ gap: 4, margin: '0 -10px' }}>
+                  {petAppointments.map((a) => {
+                    const d = new Date(a.startAt);
+                    const dd = d.getDate();
+                    const mon = d.toLocaleDateString('ru-RU', { month: 'short' });
+                    const time = d.toLocaleTimeString('ru-RU', {
+                      hour: '2-digit',
+                      minute: '2-digit',
+                    });
+
+                    return (
+                      <div key={a.id} className="lrow">
+                        <span className="datebox">
+                          <b>{dd}</b>
+                          <span>{mon}</span>
+                        </span>
+                        <span className="col" style={{ gap: 1 }}>
+                          <span className="cell-main">{a.service?.name || 'Услуга'}</span>
+                          <span className="cell-sub">{time}</span>
+                        </span>
+                        <span className={`badge st badge-${a.status}`}>{a.status}</span>
+                      </div>
+                    );
+                  })}
+
+                  {petAppointments.length === 0 && (
+                    <div className="empty" style={{ padding: 24 }}>
+                      Записей нет
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Tab 3: Vaccinations */}
+              {activeTab === 'vaccinations' && (
+                <div className="col" style={{ gap: 6 }}>
+                  <button
+                    className="btn btn-outline btn-sm"
+                    style={{ alignSelf: 'flex-start', marginBottom: 8 }}
+                    onClick={() => setIsAddVacOpen(true)}
+                  >
+                    <Syringe size={14} />
+                    Внести прививку
+                  </button>
+
+                  <div className="col" style={{ gap: 4, margin: '0 -10px' }}>
+                    {petVaccinations.map((v) => (
+                      <div key={v.id} className="lrow">
+                        <span
+                          className="pet-ava"
+                          style={{ width: 36, height: 36, borderRadius: 10 }}
+                        >
+                          <Syringe size={16} />
+                        </span>
+                        <span className="col" style={{ gap: 1 }}>
+                          <span className="cell-main">{v.name}</span>
+                          <span className="cell-sub">Введена {v.administeredOn}</span>
+                        </span>
+                        {v.nextDueOn && (
+                          <span className="badge badge-accent">до {v.nextDueOn}</span>
+                        )}
+                      </div>
+                    ))}
+
+                    {petVaccinations.length === 0 && (
+                      <div className="empty" style={{ padding: 24 }}>
+                        Прививок нет
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+          </section>
+        )}
+      </div>
+
+      {/* Modal: Create Pet */}
+      {isCreateOpen && (
+        <div
+          className="overlay"
+          onClick={() => setIsCreateOpen(false)}
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(0,0,0,0.5)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1000,
+          }}
+        >
+          <div
+            className="dialog dialog-md"
+            style={{ width: 480 }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="dialog-head">
+              <span className="dialog-title">Добавить питомца</span>
+              <span className="dialog-desc">Регистрация питомца за клиентом клиники</span>
+            </div>
+
+            <form onSubmit={handleCreateSubmit} className="col" style={{ gap: 14 }}>
               <div className="field">
-                <label className="field-label">Владелец</label>
+                <span className="field-label">
+                  Владелец <span className="req">*</span>
+                </span>
                 <select
                   className="select"
-                  required
                   value={createForm.ownerId}
                   onChange={(e) => setCreateForm({ ...createForm, ownerId: e.target.value })}
+                  required
                 >
-                  <option value="" disabled>Выберите владельца...</option>
-                  {clients.map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {c.fullName || `${c.firstName} ${c.lastName}`} ({c.email})
+                  <option value="">Выберите владельца…</option>
+                  {users.map((u) => (
+                    <option key={u.id} value={u.id}>
+                      {u.fullName} ({u.email})
                     </option>
                   ))}
                 </select>
               </div>
 
-              <div className="field">
-                <label className="field-label">Кличка</label>
-                <input
-                  className="input"
-                  required
-                  placeholder="Барсик"
-                  value={createForm.name}
-                  onChange={(e) => setCreateForm({ ...createForm, name: e.target.value })}
-                />
-              </div>
-
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+              <div className="form-grid">
                 <div className="field">
-                  <label className="field-label">Вид животного</label>
+                  <label className="field-label" htmlFor="cr-pname">
+                    Кличка <span className="req">*</span>
+                  </label>
+                  <input
+                    id="cr-pname"
+                    className="input"
+                    value={createForm.name}
+                    onChange={(e) => setCreateForm({ ...createForm, name: e.target.value })}
+                    required
+                  />
+                </div>
+
+                <div className="field">
+                  <span className="field-label">
+                    Вид <span className="req">*</span>
+                  </span>
                   <select
                     className="select"
-                    required
                     value={createForm.speciesId}
                     onChange={(e) => setCreateForm({ ...createForm, speciesId: e.target.value })}
+                    required
                   >
+                    <option value="">Выберите вид…</option>
                     {speciesList.map((s) => (
-                      <option key={s.id} value={s.id}>{s.name}</option>
+                      <option key={s.id} value={s.id}>
+                        {s.name}
+                      </option>
                     ))}
                   </select>
                 </div>
 
                 <div className="field">
-                  <label className="field-label">Пол</label>
-                  <select
-                    className="select"
-                    value={createForm.gender}
-                    onChange={(e) => setCreateForm({ ...createForm, gender: e.target.value as Gender })}
-                  >
-                    <option value="MALE">Самец</option>
-                    <option value="FEMALE">Самка</option>
-                  </select>
+                  <span className="field-label">Пол</span>
+                  <div className="seg">
+                    <button
+                      type="button"
+                      className={`seg-item ${createForm.gender === 'MALE' ? 'on' : ''}`}
+                      onClick={() => setCreateForm({ ...createForm, gender: 'MALE' })}
+                    >
+                      Самец
+                    </button>
+                    <button
+                      type="button"
+                      className={`seg-item ${createForm.gender === 'FEMALE' ? 'on' : ''}`}
+                      onClick={() => setCreateForm({ ...createForm, gender: 'FEMALE' })}
+                    >
+                      Самка
+                    </button>
+                  </div>
                 </div>
-              </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
                 <div className="field">
-                  <label className="field-label">Дата рождения</label>
+                  <label className="field-label" htmlFor="cr-pweight">
+                    Вес, кг
+                  </label>
                   <input
+                    id="cr-pweight"
+                    type="number"
+                    step="0.1"
+                    min="0"
+                    className="input"
+                    value={createForm.weightKg}
+                    onChange={(e) => setCreateForm({ ...createForm, weightKg: e.target.value })}
+                  />
+                </div>
+
+                <div className="field span-2">
+                  <label className="field-label" htmlFor="cr-pbirth">
+                    Дата рождения
+                  </label>
+                  <input
+                    id="cr-pbirth"
                     type="date"
                     className="input"
                     value={createForm.birthDate}
@@ -629,34 +760,31 @@ export default function AdminPetsPage() {
                   />
                 </div>
 
-                <div className="field">
-                  <label className="field-label">Вес (кг)</label>
-                  <input
-                    type="number"
-                    step="0.1"
-                    className="input font-mono"
-                    placeholder="4.5"
-                    value={createForm.weightKg}
-                    onChange={(e) => setCreateForm({ ...createForm, weightKg: e.target.value })}
+                <div className="field span-2">
+                  <label className="field-label" htmlFor="cr-pnotes">
+                    Заметки
+                  </label>
+                  <textarea
+                    id="cr-pnotes"
+                    className="textarea"
+                    rows={2}
+                    value={createForm.notes}
+                    onChange={(e) => setCreateForm({ ...createForm, notes: e.target.value })}
                   />
                 </div>
               </div>
 
-              <div className="field">
-                <label className="field-label">Особенности / Анамнез</label>
-                <textarea
-                  className="textarea"
-                  rows={2}
-                  placeholder="Хронические заболевания, аллергии..."
-                  value={createForm.notes}
-                  onChange={(e) => setCreateForm({ ...createForm, notes: e.target.value })}
-                />
-              </div>
+              {createError && (
+                <div className="alert" role="alert">
+                  <AlertCircle size={16} />
+                  <div>{createError}</div>
+                </div>
+              )}
 
               <div className="dialog-foot">
                 <button
                   type="button"
-                  className="btn btn-ghost"
+                  className="btn btn-outline"
                   onClick={() => setIsCreateOpen(false)}
                 >
                   Отмена
@@ -666,7 +794,7 @@ export default function AdminPetsPage() {
                   className="btn btn-primary"
                   disabled={creating}
                 >
-                  {creating ? 'Регистрация...' : 'Зарегистрировать питомца'}
+                  {creating ? 'Создание…' : 'Добавить'}
                 </button>
               </div>
             </form>
@@ -674,65 +802,105 @@ export default function AdminPetsPage() {
         </div>
       )}
 
-      {/* Модальное окно редактирования данных питомца */}
-      {editingPet && (
-        <div className="dialog-backdrop">
-          <div className="dialog island" role="dialog" aria-labelledby="edit-pet-title" style={{ maxWidth: '480px' }}>
+      {/* Modal: Edit Pet */}
+      {isEditOpen && selectedPet && (
+        <div
+          className="overlay"
+          onClick={() => setIsEditOpen(false)}
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(0,0,0,0.5)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1000,
+          }}
+        >
+          <div
+            className="dialog dialog-md"
+            style={{ width: 480 }}
+            onClick={(e) => e.stopPropagation()}
+          >
             <div className="dialog-head">
-              <span className="dialog-title" id="edit-pet-title">Редактирование: {editingPet.name}</span>
-              <button
-                type="button"
-                className="btn btn-ghost btn-icon btn-sm"
-                onClick={() => setEditingPet(null)}
-                aria-label="Закрыть"
-              >
-                <X className="ic" />
-              </button>
+              <span className="dialog-title">Редактировать питомца</span>
+              <span className="dialog-desc">Изменение данных «{selectedPet.name}»</span>
             </div>
 
-            <form onSubmit={handleUpdatePet} className="dialog-body" style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-              <div className="field">
-                <label className="field-label">Кличка</label>
-                <input
-                  className="input"
-                  required
-                  value={editForm.name}
-                  onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
-                />
-              </div>
-
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+            <form onSubmit={handleEditSubmit} className="col" style={{ gap: 14 }}>
+              <div className="form-grid">
                 <div className="field">
-                  <label className="field-label">Вид животного</label>
+                  <label className="field-label" htmlFor="ed-pname">
+                    Кличка <span className="req">*</span>
+                  </label>
+                  <input
+                    id="ed-pname"
+                    className="input"
+                    value={editForm.name}
+                    onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
+                    required
+                  />
+                </div>
+
+                <div className="field">
+                  <span className="field-label">
+                    Вид <span className="req">*</span>
+                  </span>
                   <select
                     className="select"
-                    required
                     value={editForm.speciesId}
                     onChange={(e) => setEditForm({ ...editForm, speciesId: e.target.value })}
+                    required
                   >
                     {speciesList.map((s) => (
-                      <option key={s.id} value={s.id}>{s.name}</option>
+                      <option key={s.id} value={s.id}>
+                        {s.name}
+                      </option>
                     ))}
                   </select>
                 </div>
 
                 <div className="field">
-                  <label className="field-label">Пол</label>
-                  <select
-                    className="select"
-                    value={editForm.gender}
-                    onChange={(e) => setEditForm({ ...editForm, gender: e.target.value as Gender })}
-                  >
-                    <option value="MALE">Самец</option>
-                    <option value="FEMALE">Самка</option>
-                  </select>
+                  <span className="field-label">Пол</span>
+                  <div className="seg">
+                    <button
+                      type="button"
+                      className={`seg-item ${editForm.gender === 'MALE' ? 'on' : ''}`}
+                      onClick={() => setEditForm({ ...editForm, gender: 'MALE' })}
+                    >
+                      Самец
+                    </button>
+                    <button
+                      type="button"
+                      className={`seg-item ${editForm.gender === 'FEMALE' ? 'on' : ''}`}
+                      onClick={() => setEditForm({ ...editForm, gender: 'FEMALE' })}
+                    >
+                      Самка
+                    </button>
+                  </div>
                 </div>
-              </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
                 <div className="field">
-                  <label className="field-label">Дата рождения</label>
+                  <label className="field-label" htmlFor="ed-pweight">
+                    Вес, кг
+                  </label>
                   <input
+                    id="ed-pweight"
+                    type="number"
+                    step="0.1"
+                    min="0"
+                    className="input"
+                    value={editForm.weightKg}
+                    onChange={(e) => setEditForm({ ...editForm, weightKg: e.target.value })}
+                  />
+                </div>
+
+                <div className="field span-2">
+                  <label className="field-label" htmlFor="ed-pbirth">
+                    Дата рождения
+                  </label>
+                  <input
+                    id="ed-pbirth"
                     type="date"
                     className="input"
                     value={editForm.birthDate}
@@ -740,51 +908,34 @@ export default function AdminPetsPage() {
                   />
                 </div>
 
-                <div className="field">
-                  <label className="field-label">Вес (кг)</label>
-                  <input
-                    type="number"
-                    step="0.1"
-                    className="input font-mono"
-                    value={editForm.weightKg}
-                    onChange={(e) => setEditForm({ ...editForm, weightKg: e.target.value })}
+                <div className="field span-2">
+                  <label className="field-label" htmlFor="ed-pnotes">
+                    Заметки
+                  </label>
+                  <textarea
+                    id="ed-pnotes"
+                    className="textarea"
+                    rows={2}
+                    value={editForm.notes}
+                    onChange={(e) => setEditForm({ ...editForm, notes: e.target.value })}
                   />
                 </div>
               </div>
 
-              <div className="field">
-                <label className="field-label">Особенности / Заметки</label>
-                <textarea
-                  className="textarea"
-                  rows={2}
-                  value={editForm.notes}
-                  onChange={(e) => setEditForm({ ...editForm, notes: e.target.value })}
-                />
-              </div>
-
-              <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '13px' }}>
-                <input
-                  type="checkbox"
-                  checked={editForm.isArchived}
-                  onChange={(e) => setEditForm({ ...editForm, isArchived: e.target.checked })}
-                />
-                <span>Архивировать питомца (сохранить историю, скрыть из активных)</span>
-              </label>
-
               <div className="dialog-foot">
                 <button
                   type="button"
-                  className="btn btn-ghost"
-                  onClick={() => setEditingPet(null)}
+                  className="btn btn-outline"
+                  onClick={() => setIsEditOpen(false)}
                 >
                   Отмена
                 </button>
                 <button
                   type="submit"
                   className="btn btn-primary"
-                  disabled={updating}
+                  disabled={savingEdit}
                 >
-                  {updating ? 'Сохранение...' : 'Сохранить изменения'}
+                  {savingEdit ? 'Сохранение…' : 'Сохранить'}
                 </button>
               </div>
             </form>
@@ -792,212 +943,138 @@ export default function AdminPetsPage() {
         </div>
       )}
 
-      {/* Подтверждение удаления питомца */}
-      {deletingId && (
-        <div className="dialog-backdrop">
-          <div className="dialog island" role="dialog" aria-labelledby="del-pet-title" style={{ maxWidth: '420px' }}>
+      {/* Modal: Add Vaccination */}
+      {isAddVacOpen && selectedPet && (
+        <div
+          className="overlay"
+          onClick={() => setIsAddVacOpen(false)}
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(0,0,0,0.5)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1000,
+          }}
+        >
+          <div
+            className="dialog dialog-sm"
+            style={{ width: 420 }}
+            onClick={(e) => e.stopPropagation()}
+          >
             <div className="dialog-head">
-              <span className="dialog-title text-[var(--accent-red)]" id="del-pet-title">
-                Удаление питомца
-              </span>
-              <button
-                type="button"
-                className="btn btn-ghost btn-icon btn-sm"
-                onClick={() => setDeletingId(null)}
-                aria-label="Закрыть"
-              >
-                <X className="ic" />
-              </button>
+              <span className="dialog-title">Внести прививку</span>
+              <span className="dialog-desc">Запись вакцинации для «{selectedPet.name}»</span>
             </div>
 
-            <div className="dialog-body" style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-              <p className="text-sm">
-                Вы действительно хотите удалить данного питомца из клиники?
-              </p>
-              <p className="text-xs muted">
-                Все связанные данные и история посещений будут удалены без возможности восстановления.
-              </p>
+            <form onSubmit={handleAddVaccination} className="col" style={{ gap: 14 }}>
+              <div className="field">
+                <label className="field-label" htmlFor="vac-name">
+                  Название вакцины <span className="req">*</span>
+                </label>
+                <input
+                  id="vac-name"
+                  className="input"
+                  placeholder="Нобивак DHPPi…"
+                  value={vacForm.name}
+                  onChange={(e) => setVacForm({ ...vacForm, name: e.target.value })}
+                  required
+                />
+              </div>
 
-              <div className="dialog-foot" style={{ marginTop: '12px' }}>
+              <div className="form-grid">
+                <div className="field">
+                  <label className="field-label" htmlFor="vac-adm">
+                    Дата введения <span className="req">*</span>
+                  </label>
+                  <input
+                    id="vac-adm"
+                    type="date"
+                    className="input"
+                    value={vacForm.administeredOn}
+                    onChange={(e) => setVacForm({ ...vacForm, administeredOn: e.target.value })}
+                    required
+                  />
+                </div>
+
+                <div className="field">
+                  <label className="field-label" htmlFor="vac-due">
+                    Следующая дата
+                  </label>
+                  <input
+                    id="vac-due"
+                    type="date"
+                    className="input"
+                    value={vacForm.nextDueOn}
+                    onChange={(e) => setVacForm({ ...vacForm, nextDueOn: e.target.value })}
+                  />
+                </div>
+              </div>
+
+              <div className="dialog-foot">
                 <button
                   type="button"
-                  className="btn btn-ghost"
-                  onClick={() => setDeletingId(null)}
+                  className="btn btn-outline"
+                  onClick={() => setIsAddVacOpen(false)}
                 >
                   Отмена
                 </button>
                 <button
-                  type="button"
-                  className="btn btn-danger"
-                  onClick={handleDeletePet}
-                  disabled={deleting}
+                  type="submit"
+                  className="btn btn-primary"
+                  disabled={savingVac}
                 >
-                  <Trash2 className="ic" />
-                  <span>{deleting ? 'Удаление...' : 'Удалить'}</span>
+                  {savingVac ? 'Сохранение…' : 'Внести'}
                 </button>
               </div>
-            </div>
+            </form>
           </div>
         </div>
       )}
 
-      {/* Паспорт вакцинаций питомца */}
-      {selectedPetForVac && (
-        <div className="dialog-backdrop">
-          <div className="dialog island" role="dialog" aria-labelledby="vac-title" style={{ maxWidth: '540px' }}>
+      {/* Delete Confirmation Dialog */}
+      {isDeleteConfirmOpen && selectedPet && (
+        <div
+          className="overlay"
+          onClick={() => setIsDeleteConfirmOpen(false)}
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(0,0,0,0.5)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1000,
+          }}
+        >
+          <div
+            className="dialog dialog-sm"
+            role="alertdialog"
+            aria-modal="true"
+            onClick={(e) => e.stopPropagation()}
+          >
             <div className="dialog-head">
-              <span className="dialog-title" id="vac-title">
-                Вакцинации: {selectedPetForVac.name}
+              <span className="dialog-title">Удалить питомца?</span>
+              <span className="dialog-desc">
+                Питомец «{selectedPet.name}» будет безвозвратно удалён из базы клиники.
               </span>
-              <button
-                type="button"
-                className="btn btn-ghost btn-icon btn-sm"
-                onClick={() => setSelectedPetForVac(null)}
-                aria-label="Закрыть"
-              >
-                <X className="ic" />
-              </button>
             </div>
-
-            <div className="dialog-body" style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-              {vacError && (
-                <div className="callout callout-error" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <AlertCircle className="ic shrink-0" />
-                  <span className="text-xs">{vacError}</span>
-                </div>
-              )}
-
-              {/* Список введённых вакцин */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                <span className="font-semibold text-xs muted uppercase tracking-wide">
-                  История прививок
-                </span>
-
-                {loadingVac ? (
-                  <div className="skeleton" style={{ height: '60px', borderRadius: '8px' }} />
-                ) : vaccinations.length === 0 ? (
-                  <p className="muted text-xs italic" style={{ padding: '8px', background: 'var(--island-subtle)', borderRadius: '6px' }}>
-                    Записей о вакцинации пока нет.
-                  </p>
-                ) : (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', maxHeight: '180px', overflowY: 'auto' }}>
-                    {vaccinations.map((vac) => {
-                      const today = new Date().toISOString().substring(0, 10);
-                      const isOverdue = vac.nextDueOn && vac.nextDueOn <= today;
-
-                      return (
-                        <div
-                          key={vac.id}
-                          style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'space-between',
-                            padding: '6px 10px',
-                            background: 'var(--island-subtle)',
-                            border: '1px solid var(--border)',
-                            borderRadius: '8px',
-                            fontSize: '12px',
-                          }}
-                        >
-                          <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                              <span className="font-semibold">{vac.name || vac.vaccineName}</span>
-                              {vac.nextDueOn && (
-                                <span className={`badge ${isOverdue ? 'due-over' : 'due-later'} text-[10px]`}>
-                                  {isOverdue ? 'Требуется ревакцинация' : 'Вакцинация действует'}
-                                </span>
-                              )}
-                            </div>
-                            <span className="muted text-xs tnum font-mono">
-                              Введена: {vac.administeredOn || vac.administeredAt || '—'}
-                              {vac.nextDueOn && ` · До: ${vac.nextDueOn}`}
-                            </span>
-                          </div>
-
-                          <button
-                            type="button"
-                            className="btn btn-ghost btn-icon btn-sm text-[var(--accent-red)]"
-                            onClick={() => handleDeleteVaccination(vac.id)}
-                            title="Удалить запись"
-                          >
-                            <Trash2 className="ic" style={{ width: '13px', height: '13px' }} />
-                          </button>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
-
-              {/* Форма добавления вакцины */}
-              <form
-                onSubmit={handleAddVaccination}
-                style={{
-                  padding: '10px',
-                  border: '1px solid var(--border)',
-                  borderRadius: '8px',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: '8px',
-                  marginTop: '4px',
-                }}
-              >
-                <span className="font-semibold text-xs flex items-center gap-1.5">
-                  <Syringe className="ic" style={{ width: '13px', height: '13px' }} />
-                  <span>Добавить вакцинацию</span>
-                </span>
-
-                <div className="field">
-                  <label className="field-label">Препарат</label>
-                  <input
-                    className="input input-sm"
-                    required
-                    placeholder="Нобивак DHPPi, Мультифел..."
-                    value={newVac.name}
-                    onChange={(e) => setNewVac({ ...newVac, name: e.target.value })}
-                  />
-                </div>
-
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px' }}>
-                  <div className="field">
-                    <label className="field-label">Дата введения</label>
-                    <input
-                      type="date"
-                      className="input input-sm font-mono"
-                      required
-                      max={new Date().toISOString().substring(0, 10)}
-                      value={newVac.administeredOn}
-                      onChange={(e) => setNewVac({ ...newVac, administeredOn: e.target.value })}
-                    />
-                  </div>
-                  <div className="field">
-                    <label className="field-label">Ревакцинация до</label>
-                    <input
-                      type="date"
-                      className="input input-sm font-mono"
-                      value={newVac.nextDueOn}
-                      onChange={(e) => setNewVac({ ...newVac, nextDueOn: e.target.value })}
-                    />
-                  </div>
-                </div>
-
-                <button
-                  type="submit"
-                  className="btn btn-primary btn-sm self-start"
-                  disabled={savingVac}
-                >
-                  {savingVac ? 'Сохранение...' : 'Записать вакцинацию'}
-                </button>
-              </form>
-            </div>
-
             <div className="dialog-foot">
               <button
                 type="button"
-                className="btn btn-ghost"
-                onClick={() => setSelectedPetForVac(null)}
+                className="btn btn-outline"
+                onClick={() => setIsDeleteConfirmOpen(false)}
               >
-                Закрыть
+                Отмена
+              </button>
+              <button
+                type="button"
+                className="btn btn-destructive"
+                onClick={handleDeletePet}
+                disabled={deleting}
+              >
+                {deleting ? 'Удаление…' : 'Удалить'}
               </button>
             </div>
           </div>
