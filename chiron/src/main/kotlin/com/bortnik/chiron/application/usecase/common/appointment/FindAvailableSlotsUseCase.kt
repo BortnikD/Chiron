@@ -1,5 +1,6 @@
 package com.bortnik.chiron.application.usecase.common.appointment
 
+import com.bortnik.chiron.application.config.ClinicProperties
 import com.bortnik.chiron.domain.dto.appointment.AvailableSlot
 import com.bortnik.chiron.domain.dto.appointment.AvailableSlotFilter
 import com.bortnik.chiron.domain.dto.veterinarian.VeterinarianFilter
@@ -32,6 +33,7 @@ class FindAvailableSlotsUseCase(
     private val veterinarianRepository: VeterinarianRepository,
     private val permissionRepository: VeterinarianSpeciesPermissionRepository,
     private val checkAvailability: CheckAppointmentAvailabilityUseCase,
+    private val clinicProperties: ClinicProperties,
 ) {
 
     // A slot is as long as the booking will be (species-specific duration plus the buffer), so any returned
@@ -52,7 +54,11 @@ class FindAvailableSlotsUseCase(
         val dates = filter.from.datesUntil(filter.to.plusDays(1)).toList()
         val veterinarianIdsByStart = sortedMapOf<Instant, MutableList<UUID>>()
         for (veterinarian in findVeterinarians(filter)) {
-            val availability = checkAvailability.availabilityOf(veterinarian.id)
+            val availability = checkAvailability.availabilityOf(
+                veterinarian.id,
+                filter.from.atStartOfDay(clinicProperties.zoneId).toInstant(),
+                filter.to.plusDays(1).atStartOfDay(clinicProperties.zoneId).toInstant(),
+            )
             dates.flatMap { availability.freeSlotStarts(it, duration) }
                 .filter { it > now }
                 .forEach { veterinarianIdsByStart.getOrPut(it) { mutableListOf() } += veterinarian.id }

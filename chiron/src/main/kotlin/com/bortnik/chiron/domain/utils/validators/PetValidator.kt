@@ -14,19 +14,21 @@ object PetValidator {
         ensureMaxLength("name", filter.name, SEARCH_MAX_LENGTH)
     }
 
-    fun validate(dto: CreatePetDto) = validateAll {
-        pet(dto.name, dto.birthDate, dto.weightKg, dto.notes)
+    fun validate(dto: CreatePetDto, today: LocalDate) = validateAll {
+        pet(dto.name, dto.birthDate, dto.weightKg, dto.notes, today)
     }
 
     // Only the fields present in the partial update are checked.
-    fun validate(dto: UpdatePetDto) = validateAll {
-        pet(dto.name, dto.birthDate.orElse(null), dto.weightKg.orElse(null), dto.notes.orElse(null))
+    fun validate(dto: UpdatePetDto, today: LocalDate) = validateAll {
+        pet(dto.name, dto.birthDate.orElse(null), dto.weightKg.orElse(null), dto.notes.orElse(null), today)
     }
 
-    private fun ValidationErrorCollector.pet(name: String?, birthDate: LocalDate?, weightKg: Double?, notes: String?) {
+    private fun ValidationErrorCollector.pet(
+        name: String?, birthDate: LocalDate?, weightKg: Double?, notes: String?, today: LocalDate,
+    ) {
         ensureNotBlank("name", name)
         ensureMaxLength("name", name, PetRules.NAME_MAX_LENGTH)
-        ensure(birthDate == null || !birthDate.isAfter(LocalDate.now()), "birthDate", "must not be in the future")
+        ensure(birthDate == null || !birthDate.isAfter(today), "birthDate", "must not be in the future")
         ensure(weightKg == null || weightKg > PetRules.WEIGHT_MIN_EXCLUSIVE, "weightKg", "must be positive")
         ensure(weightKg == null || weightKg <= PetRules.WEIGHT_MAX, "weightKg", "must be at most ${PetRules.WEIGHT_MAX}")
         ensureMaxLength("notes", notes, PetRules.NOTES_MAX_LENGTH)

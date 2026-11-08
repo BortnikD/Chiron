@@ -1,6 +1,7 @@
 package com.bortnik.chiron.application.usecase.admin.scheduleexception
 
 import com.bortnik.chiron.application.security.Actor
+import com.bortnik.chiron.domain.dto.scheduleexception.ScheduleExceptionFilter
 import com.bortnik.chiron.domain.dto.scheduleexception.UpdateScheduleExceptionDto
 import com.bortnik.chiron.domain.entities.ScheduleException
 import com.bortnik.chiron.domain.exceptions.notfound.ScheduleExceptionNotFoundException
@@ -19,7 +20,14 @@ class AdminUpdateScheduleExceptionUseCase(private val scheduleExceptionRepositor
 
     fun update(actor: Actor, id: UUID, dto: UpdateScheduleExceptionDto): ScheduleException {
         val existing = scheduleExceptionRepository.findById(id) ?: throw ScheduleExceptionNotFoundException(id)
-        ScheduleExceptionValidator.validate(existing, dto)
+        val exceptions = scheduleExceptionRepository.findAll(
+            ScheduleExceptionFilter(
+                veterinarianId = existing.veterinarianId,
+                from = dto.startDate ?: existing.startDate,
+                to = dto.endDate ?: existing.endDate,
+            ),
+        )
+        ScheduleExceptionValidator.validate(existing, dto, exceptions)
         val exception = scheduleExceptionRepository.update(id, dto) ?: throw ScheduleExceptionNotFoundException(id)
         log.info(
             "Admin {} ({}) updated schedule exception {} ({}) for veterinarian {}: {} - {}",

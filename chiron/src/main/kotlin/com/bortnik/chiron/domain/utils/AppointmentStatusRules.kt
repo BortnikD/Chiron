@@ -14,8 +14,6 @@ object AppointmentStatusRules {
     fun canTransition(from: AppointmentStatus, to: AppointmentStatus): Boolean =
         from == to || to in allowedTransitions.getValue(from)
 
-    fun isTerminal(status: AppointmentStatus): Boolean = allowedTransitions.getValue(status).isEmpty()
-
     // A follow-up continues a visit that has taken place or is agreed to take place.
     fun allowsFollowUp(status: AppointmentStatus): Boolean =
         status == AppointmentStatus.CONFIRMED || status == AppointmentStatus.COMPLETED

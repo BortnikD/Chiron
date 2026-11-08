@@ -84,6 +84,27 @@ class VeterinarianAvailabilityTest {
         assertNotNull(availability.unavailabilityReason(start, start + Duration.ofMinutes(15)))
     }
 
+    @Test
+    fun `empty and reversed slots are unavailable even inside working hours`() {
+        val availability = availability(schedules = listOf(schedule("09:00", "18:00")))
+        assertNotNull(availability.unavailabilityReason(at("11:00"), at("11:00")))
+        assertNotNull(availability.unavailabilityReason(at("11:00"), at("10:00")))
+    }
+
+    @Test
+    fun `existing conflicting custom hours are reported instead of choosing one silently`() {
+        val availability = availability(
+            exceptions = listOf(
+                exception(ScheduleExceptionType.CUSTOM_HOURS, "09:00", "12:00"),
+                exception(ScheduleExceptionType.CUSTOM_HOURS, "14:00", "18:00"),
+            ),
+        )
+        assertEquals(
+            "conflicting custom working hours on $DATE",
+            availability.unavailabilityReason(at("10:00"), at("10:30")),
+        )
+    }
+
     private companion object {
         val DATE: LocalDate = LocalDate.parse("2026-10-12")
         val VETERINARIAN_ID: UUID = UUID.randomUUID()

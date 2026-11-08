@@ -49,13 +49,6 @@ class ExposedScheduleExceptionRepository : ScheduleExceptionRepository {
             ?.toScheduleException()
     }
 
-    override fun findAllByVeterinarianId(veterinarianId: UUID): List<ScheduleException> = exposedSql {
-        ExposedScheduleExceptionTable.selectAll()
-            .where { ExposedScheduleExceptionTable.veterinarianId eq veterinarianId }
-            .orderBy(ExposedScheduleExceptionTable.startDate, SortOrder.ASC)
-            .map { it.toScheduleException() }
-    }
-
     override fun findAll(filter: ScheduleExceptionFilter): List<ScheduleException> = exposedSql {
         ExposedScheduleExceptionTable.selectAll()
             .where { filter.toCondition() }

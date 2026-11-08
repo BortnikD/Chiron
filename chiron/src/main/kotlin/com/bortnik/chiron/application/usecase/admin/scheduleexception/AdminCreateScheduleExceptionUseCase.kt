@@ -2,6 +2,7 @@ package com.bortnik.chiron.application.usecase.admin.scheduleexception
 
 import com.bortnik.chiron.application.security.Actor
 import com.bortnik.chiron.domain.dto.scheduleexception.CreateScheduleExceptionDto
+import com.bortnik.chiron.domain.dto.scheduleexception.ScheduleExceptionFilter
 import com.bortnik.chiron.domain.entities.ScheduleException
 import com.bortnik.chiron.domain.repositories.ScheduleExceptionRepository
 import com.bortnik.chiron.domain.utils.validators.ScheduleExceptionValidator
@@ -16,7 +17,10 @@ class AdminCreateScheduleExceptionUseCase(private val scheduleExceptionRepositor
     private val log = LoggerFactory.getLogger(javaClass)
 
     fun create(actor: Actor, dto: CreateScheduleExceptionDto): ScheduleException {
-        ScheduleExceptionValidator.validate(dto)
+        val exceptions = scheduleExceptionRepository.findAll(
+            ScheduleExceptionFilter(veterinarianId = dto.veterinarianId, from = dto.startDate, to = dto.endDate),
+        )
+        ScheduleExceptionValidator.validate(dto, exceptions)
         val exception = scheduleExceptionRepository.create(dto)
         log.info(
             "Admin {} ({}) created schedule exception {} ({}) for veterinarian {}: {} - {}",

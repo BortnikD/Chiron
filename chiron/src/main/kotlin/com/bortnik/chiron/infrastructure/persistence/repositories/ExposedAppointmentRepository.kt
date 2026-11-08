@@ -8,6 +8,7 @@ import com.bortnik.chiron.domain.dto.ifPresent
 import com.bortnik.chiron.domain.dto.pagination.Page
 import com.bortnik.chiron.domain.dto.pagination.PageRequest
 import com.bortnik.chiron.domain.entities.Appointment
+import com.bortnik.chiron.domain.entities.enums.AppointmentStatus
 import com.bortnik.chiron.domain.repositories.AppointmentRepository
 import com.bortnik.chiron.infrastructure.persistence.exposedSql
 import com.bortnik.chiron.infrastructure.persistence.toPage
@@ -18,12 +19,15 @@ import com.bortnik.chiron.infrastructure.persistence.models.ExposedAppointmentTa
 import com.bortnik.chiron.infrastructure.persistence.models.ExposedPetTable
 import org.jetbrains.exposed.v1.core.Op
 import org.jetbrains.exposed.v1.core.SortOrder
+import org.jetbrains.exposed.v1.core.and
 import org.jetbrains.exposed.v1.core.andIfNotNull
 import org.jetbrains.exposed.v1.core.eq
+import org.jetbrains.exposed.v1.core.greater
 import org.jetbrains.exposed.v1.core.greaterEq
 import org.jetbrains.exposed.v1.core.inList
 import org.jetbrains.exposed.v1.core.inSubQuery
 import org.jetbrains.exposed.v1.core.less
+import org.jetbrains.exposed.v1.core.neq
 import org.jetbrains.exposed.v1.javatime.CurrentTimestampWithTimeZone
 import org.jetbrains.exposed.v1.jdbc.deleteWhere
 import org.jetbrains.exposed.v1.jdbc.insertReturning
@@ -32,6 +36,7 @@ import org.jetbrains.exposed.v1.jdbc.selectAll
 import org.jetbrains.exposed.v1.jdbc.updateReturning
 import org.springframework.stereotype.Repository
 import org.springframework.transaction.annotation.Transactional
+import java.time.Instant
 import java.util.UUID
 
 @Repository
@@ -78,9 +83,14 @@ class ExposedAppointmentRepository : AppointmentRepository {
             ) { it.toAppointment() }
     }
 
-    override fun findAllByVeterinarianId(veterinarianId: UUID): List<Appointment> = exposedSql {
+    override fun findOverlapping(veterinarianId: UUID, from: Instant, to: Instant): List<Appointment> = exposedSql {
         ExposedAppointmentTable.selectAll()
-            .where { ExposedAppointmentTable.veterinarianId eq veterinarianId }
+            .where {
+                (ExposedAppointmentTable.veterinarianId eq veterinarianId) and
+                    (ExposedAppointmentTable.status neq AppointmentStatus.CANCELLED) and
+                    (ExposedAppointmentTable.startAt less to.toDbTimestamp()) and
+                    (ExposedAppointmentTable.endAt greater from.toDbTimestamp())
+            }
             .orderBy(ExposedAppointmentTable.startAt, SortOrder.ASC)
             .map { it.toAppointment() }
     }

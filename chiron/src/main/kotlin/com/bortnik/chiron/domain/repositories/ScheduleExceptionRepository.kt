@@ -13,8 +13,6 @@ interface ScheduleExceptionRepository {
 
     fun findById(id: UUID): ScheduleException?
 
-    fun findAllByVeterinarianId(veterinarianId: UUID): List<ScheduleException>
-
     fun findAll(filter: ScheduleExceptionFilter): List<ScheduleException>
 
     fun findAll(filter: ScheduleExceptionFilter, pageRequest: PageRequest): Page<ScheduleException>

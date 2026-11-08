@@ -7,15 +7,17 @@ import com.bortnik.chiron.domain.repositories.VaccinationRepository
 import com.bortnik.chiron.domain.utils.validators.VaccinationValidator
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
+import java.time.Clock
+import java.time.LocalDate
 import java.util.UUID
 
 @Service
 @Transactional
-class UpdateVaccinationUseCase(private val vaccinationRepository: VaccinationRepository) {
+class UpdateVaccinationUseCase(private val vaccinationRepository: VaccinationRepository, private val clock: Clock) {
 
     fun update(id: UUID, dto: UpdateVaccinationDto): Vaccination {
         val existing = vaccinationRepository.findById(id) ?: throw VaccinationNotFoundException(id)
-        VaccinationValidator.validate(existing, dto)
+        VaccinationValidator.validate(existing, dto, LocalDate.now(clock))
         return vaccinationRepository.update(id, dto) ?: throw VaccinationNotFoundException(id)
     }
 }

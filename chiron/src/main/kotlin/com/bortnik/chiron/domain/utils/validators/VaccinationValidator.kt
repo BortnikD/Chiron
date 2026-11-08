@@ -16,17 +16,21 @@ object VaccinationValidator {
         ensureNotBefore("nextDueTo", filter.nextDueTo, "nextDueFrom", filter.nextDueFrom)
     }
 
-    fun validate(dto: CreateVaccinationDto) = validateAll { vaccination(dto.name, dto.administeredOn, dto.nextDueOn) }
-
-    // Validates the state the vaccination will have once the partial update is applied.
-    fun validate(existing: Vaccination, dto: UpdateVaccinationDto) = validateAll {
-        vaccination(dto.name, dto.administeredOn ?: existing.administeredOn, dto.nextDueOn.orElse(existing.nextDueOn))
+    fun validate(dto: CreateVaccinationDto, today: LocalDate) = validateAll {
+        vaccination(dto.name, dto.administeredOn, dto.nextDueOn, today)
     }
 
-    private fun ValidationErrorCollector.vaccination(name: String?, administeredOn: LocalDate, nextDueOn: LocalDate?) {
+    // Validates the state the vaccination will have once the partial update is applied.
+    fun validate(existing: Vaccination, dto: UpdateVaccinationDto, today: LocalDate) = validateAll {
+        vaccination(dto.name, dto.administeredOn ?: existing.administeredOn, dto.nextDueOn.orElse(existing.nextDueOn), today)
+    }
+
+    private fun ValidationErrorCollector.vaccination(
+        name: String?, administeredOn: LocalDate, nextDueOn: LocalDate?, today: LocalDate,
+    ) {
         ensureNotBlank("name", name)
         ensureMaxLength("name", name, VaccinationRules.NAME_MAX_LENGTH)
-        ensure(!administeredOn.isAfter(LocalDate.now()), "administeredOn", "must not be in the future")
+        ensure(!administeredOn.isAfter(today), "administeredOn", "must not be in the future")
         ensure(nextDueOn == null || nextDueOn.isAfter(administeredOn), "nextDueOn", "must be after administeredOn")
     }
 }
