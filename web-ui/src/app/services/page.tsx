@@ -6,6 +6,7 @@ import { useSearchParams } from 'next/navigation';
 import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
 import { PublicHeader } from '../../components/layout/PublicHeader';
+import { AppShell } from '../../components/layout/AppShell';
 import { clinicApi } from '../../api';
 import { Service, Specialization, Species, ServiceSpecies, AvailableSlotResponse } from '../../types';
 import {
@@ -31,7 +32,7 @@ function ServicesContent() {
   const { resolvedTheme } = useTheme();
   const searchParams = useSearchParams();
   const openParam = searchParams.get('open');
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, role } = useAuth();
 
   const [services, setServices] = useState<Service[]>([]);
   const [specializations, setSpecializations] = useState<Specialization[]>([]);
@@ -141,12 +142,8 @@ function ServicesContent() {
     return matchesSpec && matchesSearch;
   });
 
-  return (
-    <div className="app" data-theme={resolvedTheme} style={{ flexDirection: 'column' }}>
-      {/* Шапка гостевого интерфейса */}
-      <PublicHeader />
-
-      <div className="scroll-col grow" style={{ gap: '12px' }}>
+  const content = (
+    <div className="scroll-col grow">
         {/* Остров фильтров каталога */}
         <section className="island filters" aria-label="Фильтры">
           <div className="field">
@@ -435,15 +432,34 @@ function ServicesContent() {
                               minute: '2-digit',
                               timeZone: 'Europe/Moscow',
                             });
+                            if (!isAuthenticated) {
+                              return (
+                                <Link
+                                  key={slot.startAt}
+                                  href="/login"
+                                  className="slot"
+                                  title="Войдите для записи"
+                                >
+                                  {timeStr}
+                                </Link>
+                              );
+                            }
+                            if (role === 'CLIENT') {
+                              return (
+                                <Link
+                                  key={slot.startAt}
+                                  href={`/client/book?serviceId=${selectedService.id}&slot=${slot.startAt}`}
+                                  className="slot"
+                                  title="Записаться на это время"
+                                >
+                                  {timeStr}
+                                </Link>
+                              );
+                            }
                             return (
-                              <Link
-                                key={slot.startAt}
-                                href={isAuthenticated ? `/client/book?serviceId=${selectedService.id}&slot=${slot.startAt}` : '/login'}
-                                className="slot"
-                                title="Записаться на это время"
-                              >
+                              <span key={slot.startAt} className="slot" title="Свободное окно">
                                 {timeStr}
-                              </Link>
+                              </span>
                             );
                           })}
                         </div>
@@ -459,21 +475,65 @@ function ServicesContent() {
 
               <div className="island-foot">
                 <span className="small muted">
-                  {isAuthenticated ? 'Выберите врача и время' : 'Для записи нужен вход'}
+                  {!isAuthenticated
+                    ? 'Для записи нужен вход'
+                    : role === 'CLIENT'
+                    ? 'Выберите врача и время'
+                    : role === 'VETERINARIAN'
+                    ? 'Справочник услуг клиники'
+                    : 'Справочник услуг'}
                 </span>
-                <Link
-                  href={isAuthenticated ? `/client/book?serviceId=${selectedService.id}` : '/login'}
-                  className="btn btn-primary"
-                  style={{ textDecoration: 'none' }}
-                >
-                  <CalendarPlus className="ic" />
-                  <span>Записаться</span>
-                </Link>
+                {!isAuthenticated ? (
+                  <Link
+                    href="/login"
+                    className="btn btn-primary"
+                    style={{ textDecoration: 'none' }}
+                  >
+                    <CalendarPlus className="ic" />
+                    <span>Записаться</span>
+                  </Link>
+                ) : role === 'CLIENT' ? (
+                  <Link
+                    href={`/client/book?serviceId=${selectedService.id}`}
+                    className="btn btn-primary"
+                    style={{ textDecoration: 'none' }}
+                  >
+                    <CalendarPlus className="ic" />
+                    <span>Записаться</span>
+                  </Link>
+                ) : role === 'ADMIN' ? (
+                  <Link
+                    href="/admin/services"
+                    className="btn btn-outline btn-sm"
+                    style={{ textDecoration: 'none' }}
+                  >
+                    <span>Управление в админке</span>
+                  </Link>
+                ) : (
+                  <span className="badge badge-accent">Услуга клиники</span>
+                )}
               </div>
             </section>
           )}
         </div>
       </div>
+  );
+
+  if (isAuthenticated) {
+    return (
+      <AppShell
+        crumbGroup={role === 'VETERINARIAN' ? 'Клиника' : role === 'ADMIN' ? 'Справочники' : 'Кабинет'}
+        crumb={role === 'VETERINARIAN' ? 'Услуги клиники' : 'Услуги'}
+      >
+        {content}
+      </AppShell>
+    );
+  }
+
+  return (
+    <div className="app" data-theme={resolvedTheme} style={{ flexDirection: 'column' }}>
+      <PublicHeader />
+      {content}
     </div>
   );
 }

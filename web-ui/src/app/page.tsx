@@ -2,12 +2,14 @@
 
 import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { PublicHeader } from '../components/layout/PublicHeader';
 import { clinicApi } from '../api';
 import { Service, Veterinarian, Specialization } from '../types';
 import { HeroIllustration } from '../components/home/HeroIllustration';
 import { SpeciesIcon } from '../components/ui/SpeciesIcon';
 import { useTheme } from '../context/ThemeContext';
+import { useAuth } from '../context/AuthContext';
 import {
   Calendar,
   ChevronRight,
@@ -20,9 +22,25 @@ import {
 
 export default function HomePage() {
   const { resolvedTheme } = useTheme();
+  const { isAuthenticated, role, isLoading } = useAuth();
+  const router = useRouter();
+
   const [services, setServices] = useState<Service[]>([]);
   const [vets, setVets] = useState<Veterinarian[]>([]);
   const [specs, setSpecs] = useState<Specialization[]>([]);
+
+  // Автоматический редирект авторизованного пользователя в соответствующий дашборд
+  useEffect(() => {
+    if (!isLoading && isAuthenticated && role) {
+      if (role === 'ADMIN') {
+        router.replace('/admin/dashboard');
+      } else if (role === 'VETERINARIAN') {
+        router.replace('/vet/dashboard');
+      } else {
+        router.replace('/client/dashboard');
+      }
+    }
+  }, [isLoading, isAuthenticated, role, router]);
 
   useEffect(() => {
     Promise.all([
@@ -79,6 +97,27 @@ export default function HomePage() {
     },
   ];
 
+  if (!isLoading && isAuthenticated) {
+    return (
+      <div
+        className="app"
+        data-theme={resolvedTheme}
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          height: '100vh',
+          width: '100vw',
+        }}
+      >
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px' }}>
+          <div className="spinner" style={{ width: '32px', height: '32px' }} />
+          <span className="small muted">Перенаправление в личный кабинет...</span>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="app" data-theme={resolvedTheme} style={{ flexDirection: 'column' }}>
       {/* Шапка гостевого интерфейса */}
@@ -86,7 +125,7 @@ export default function HomePage() {
 
       {/* Основной контент страницы «О клинике» */}
       <div className="content-row">
-        <div className="scroll-col grow" style={{ gap: '12px' }}>
+        <div className="scroll-col grow">
           {/* Главный Hero-баннер с иллюстрацией */}
           <section className="island ab-hero" style={{ flex: 'none' }}>
             <div className="ab-hero-text">
@@ -290,14 +329,21 @@ export default function HomePage() {
 
           {/* Подвал главной страницы */}
           <footer
-            className="island shrink-0 p-4 text-xs text-[var(--muted-foreground)] flex flex-col sm:flex-row items-center justify-between gap-3 mt-2"
-            style={{ flex: 'none', padding: '14px 18px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
+            className="island shrink-0 text-sm text-[var(--muted-foreground)] flex flex-col sm:flex-row items-center justify-between gap-3"
+            style={{
+              flex: 'none',
+              padding: '16px 20px',
+              fontSize: '14px',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+            }}
           >
             <div className="flex items-center gap-2 font-mono" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <Phone className="ic" style={{ width: '15px', height: '15px', color: 'var(--primary-text)' }} />
-              <span>Приёмная клиники: +7 863 200-10-00 (08:00–21:00)</span>
+              <Phone className="ic" style={{ width: '18px', height: '18px', color: 'var(--primary-text)' }} />
+              <span style={{ fontSize: '14px' }}>Приёмная клиники: +7 863 200-10-00 (08:00–21:00)</span>
             </div>
-            <div>© {new Date().getFullYear()} Chiron Veterinary Clinic · Все права защищены</div>
+            <div style={{ fontSize: '13.5px' }}>© {new Date().getFullYear()} Chiron Veterinary Clinic · Все права защищены</div>
           </footer>
         </div>
       </div>

@@ -9,6 +9,7 @@ import { ChironLogo } from '../../components/ui/ChironLogo';
 import { ThemeToggle } from '../../components/ui/ThemeToggle';
 import { AuthHeroMobile } from '../../components/auth/AuthHeroMobile';
 import { ApiError } from '../../api/client';
+import { isDevMode } from '../../utils/env';
 import {
   PawPrint,
   LogIn,
@@ -26,8 +27,18 @@ function LoginContent() {
   const [mode, setMode] = useState<'login' | 'register'>('login');
 
   // Состояние формы входа
-  const [loginEmail, setLoginEmail] = useState('anna.kozlova@mail.ru');
-  const [loginPassword, setLoginPassword] = useState('chiron2026');
+  const [loginEmail, setLoginEmail] = useState('');
+  const [loginPassword, setLoginPassword] = useState('');
+  const [isDev, setIsDev] = useState(false);
+
+  useEffect(() => {
+    const dev = isDevMode();
+    setIsDev(dev);
+    if (dev) {
+      setLoginEmail('client1@seed.chiron.local');
+      setLoginPassword('password123');
+    }
+  }, []);
 
   // Состояние формы регистрации
   const [regForm, setRegForm] = useState({
@@ -111,11 +122,23 @@ function LoginContent() {
     }
   };
 
-  const fillDemo = (email: string, pass: string) => {
+  const fillDemo = async (email: string, pass: string) => {
     setMode('login');
     setLoginEmail(email);
     setLoginPassword(pass);
     setError(null);
+    setLoading(true);
+    try {
+      await login({ email, password: pass });
+    } catch (err: any) {
+      if (err instanceof ApiError) {
+        setError(err.message || 'Неверный адрес почты или пароль');
+      } else {
+        setError(err?.message || 'Не удалось войти в систему');
+      }
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -180,76 +203,78 @@ function LoginContent() {
             </p>
           </div>
 
-          {/* Быстрый вход для тестирования согласно прототипу */}
-          <div className="col" style={{ gap: '10px' }}>
-            <div className="row between wrap">
-              <span className="section-title">Демо-режим — войти как</span>
-              <span className="dev-note">только в прототипе</span>
+          {/* Быстрый вход для тестирования (только в Development режиме) */}
+          {isDev && (
+            <div className="col" style={{ gap: '10px' }}>
+              <div className="row between wrap">
+                <span className="section-title">Демо-режим — войти как</span>
+                <span className="dev-note">только в Dev</span>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: '8px' }}>
+                <button
+                  type="button"
+                  onClick={() => fillDemo('client1@seed.chiron.local', 'password123')}
+                  className="card clickable"
+                  style={{ textAlign: 'left', textDecoration: 'none', color: 'inherit' }}
+                >
+                  <div className="row">
+                    <span className="avatar">ИС</span>
+                    <div className="col" style={{ gap: 0 }}>
+                      <span className="cell-main">Клиент</span>
+                      <span className="cell-sub">И. Соколов · 2 питомца</span>
+                    </div>
+                  </div>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => fillDemo('vet2@seed.chiron.local', 'password123')}
+                  className="card clickable"
+                  style={{ textAlign: 'left', textDecoration: 'none', color: 'inherit' }}
+                >
+                  <div className="row">
+                    <span className="avatar">ПП</span>
+                    <div className="col" style={{ gap: 0 }}>
+                      <span className="cell-main">Ветеринар</span>
+                      <span className="cell-sub">П. Петров · терапевт</span>
+                    </div>
+                  </div>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => fillDemo('admin@chiron.local', 'admin123')}
+                  className="card clickable"
+                  style={{ textAlign: 'left', textDecoration: 'none', color: 'inherit' }}
+                >
+                  <div className="row">
+                    <span className="avatar">АД</span>
+                    <div className="col" style={{ gap: 0 }}>
+                      <span className="cell-main">Администратор</span>
+                      <span className="cell-sub">Администратор клиники</span>
+                    </div>
+                  </div>
+                </button>
+
+                <Link
+                  href="/services"
+                  className="card clickable"
+                  style={{ textDecoration: 'none', color: 'inherit' }}
+                >
+                  <div className="row">
+                    <span className="avatar">
+                      <ClipboardList className="ic" />
+                    </span>
+                    <div className="col" style={{ gap: 0 }}>
+                      <span className="cell-main">Гость</span>
+                      <span className="cell-sub">Каталог без входа</span>
+                    </div>
+                  </div>
+                </Link>
+              </div>
             </div>
-
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: '8px' }}>
-              <button
-                type="button"
-                onClick={() => fillDemo('anna.kozlova@mail.ru', 'chiron2026')}
-                className="card clickable"
-                style={{ textAlign: 'left', textDecoration: 'none', color: 'inherit' }}
-              >
-                <div className="row">
-                  <span className="avatar">АК</span>
-                  <div className="col" style={{ gap: 0 }}>
-                    <span className="cell-main">Клиент</span>
-                    <span className="cell-sub">А. С. Козлова · 3 питомца</span>
-                  </div>
-                </div>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => fillDemo('doctor.petrov@chiron.ru', 'chiron2026')}
-                className="card clickable"
-                style={{ textAlign: 'left', textDecoration: 'none', color: 'inherit' }}
-              >
-                <div className="row">
-                  <span className="avatar">ИП</span>
-                  <div className="col" style={{ gap: 0 }}>
-                    <span className="cell-main">Ветеринар</span>
-                    <span className="cell-sub">И. И. Петров · терапевт</span>
-                  </div>
-                </div>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => fillDemo('admin.volkov@chiron.ru', 'chiron2026')}
-                className="card clickable"
-                style={{ textAlign: 'left', textDecoration: 'none', color: 'inherit' }}
-              >
-                <div className="row">
-                  <span className="avatar">СВ</span>
-                  <div className="col" style={{ gap: 0 }}>
-                    <span className="cell-main">Администратор</span>
-                    <span className="cell-sub">С. В. Волков</span>
-                  </div>
-                </div>
-              </button>
-
-              <Link
-                href="/services"
-                className="card clickable"
-                style={{ textDecoration: 'none', color: 'inherit' }}
-              >
-                <div className="row">
-                  <span className="avatar">
-                    <ClipboardList className="ic" />
-                  </span>
-                  <div className="col" style={{ gap: 0 }}>
-                    <span className="cell-main">Гость</span>
-                    <span className="cell-sub">Каталог без входа</span>
-                  </div>
-                </div>
-              </Link>
-            </div>
-          </div>
+          )}
         </section>
 
         {/* Правая колонка: форма входа / регистрации */}
@@ -337,7 +362,7 @@ function LoginContent() {
                     Пароль
                   </label>
                   <span className="text-[11px] text-[var(--muted-foreground)]">
-                    пароль по умолчанию: chiron2026
+                    пароль: password123 (admin123 для админа)
                   </span>
                 </div>
                 <input
@@ -475,9 +500,11 @@ function LoginContent() {
             </form>
           )}
 
-            <p className="small muted" style={{ marginTop: '14px' }}>
-              Демо-аккаунты: anna.kozlova@mail.ru, doctor.petrov@chiron.ru, admin.volkov@chiron.ru — пароль любой от 8 символов.
-            </p>
+            {isDev && (
+              <p className="small muted" style={{ marginTop: '14px' }}>
+                Демо-аккаунты: client1@seed.chiron.local (клиент), vet2@seed.chiron.local (врач), admin@chiron.local (админ) — пароль password123 (admin123 для админа).
+              </p>
+            )}
             <p className="small muted">
               {mode === 'login' ? (
                 <>
