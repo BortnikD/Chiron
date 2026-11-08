@@ -307,8 +307,7 @@ function AdminServicesContent() {
     if (!selectedService) return;
     try {
       for (const link of serviceLinks) {
-        await adminApi.createServiceSpecies(selectedService.id, {
-          speciesId: link.speciesId,
+        await adminApi.updateServiceSpecies(selectedService.id, link.speciesId, {
           durationMin: link.durationMin != null ? Number(link.durationMin) : null,
           price: link.price != null ? Number(link.price) : null,
         });

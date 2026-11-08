@@ -405,7 +405,10 @@ export const adminApi = {
     if (filter?.speciesId) params.append('speciesId', filter.speciesId);
     if (filter?.ownerId) params.append('ownerId', filter.ownerId);
     if (filter?.isArchived !== undefined) params.append('isArchived', filter.isArchived.toString());
-    if (filter?.search) params.append('search', filter.search);
+    if (filter?.search) {
+      params.append('name', filter.search);
+      params.append('search', filter.search);
+    }
     return api.get<PageResponse<Pet>>(`/api/v1/admin/pets?${params.toString()}`);
   },
 
