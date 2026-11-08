@@ -1,226 +1,152 @@
 # Chiron
 
-Chiron - ветеринарная клиника
+Chiron — приложение для ветеринарной клиники: питомцы и прививки, запись на приём,
+расписания врачей, уведомления и статистика. Роли: клиент, ветеринар и администратор.
 
-## Backend
-*chiron* - Kotlin Spring Boot Application
+## Стек
 
-## Frontend
-*web-ui* - Typescript Next.js Application
+- **Бэкенд (`chiron/`):** Kotlin 2.3, Java 21, Spring Boot 4.1, Spring Security / JWT,
+  Exposed, PostgreSQL 18, Flyway, WebSocket / STOMP, OpenAPI.
+- **Фронтенд (`web-ui/`):** TypeScript, Next.js 16, React 19, Tailwind CSS 4.
+  Пока это стартовая страница Next.js без подключения к API.
+- **Запуск:** Docker Compose; для разработки без контейнера бэкенда — JDK 21 и Gradle Wrapper.
 
-## Запуск бэкенда через Docker Compose
+## Окружения и `.env`
 
-Понадобится установленный [Docker](https://docs.docker.com/get-docker/) с плагином Compose
-(в Docker Desktop он уже есть). JDK и Gradle локально не нужны: jar собирается внутри образа.
+Все команды ниже выполняются из корня репозитория, если не указано иначе.
+Для контейнеров нужен Docker с Compose; JDK и Gradle на хосте не требуются.
 
-Все команды выполняются из корня репозитория.
+| Режим | Spring-профиль | Файл переменных | API / PostgreSQL на хосте |
+|---|---|---|---|
+| Локальный | `local` | `.env` из `.env.example` | `localhost:8080` / `localhost:5432` |
+| Production | `production` | `.env.production` из `.env.production.example` | `127.0.0.1:8080` / порт БД не публикуется |
+| Демо | `local` | Не нужен: значения заданы в Compose | `127.0.0.1:8081` / `127.0.0.1:5433` |
 
-### 1. Создать файл `.env`
+Spring-профилей два: `local` и `production`. Демо — отдельный Compose с тестовыми данными.
+Выбирайте один профиль; без профиля подключение к локальной БД не настроено, документация API закрыта.
 
-Скопируйте шаблон:
+Файлы `.env` и `.env.production` находятся **в корне**, исключены из Git и содержат секреты:
 
-```bash
-# Linux / macOS / Git Bash
-cp .env.example .env
-```
-
-```powershell
-# PowerShell
-Copy-Item .env.example .env
-```
-
-Затем откройте `.env` и проверьте значения:
-
-| Переменная | Назначение |
+| Переменные | Что задать |
 |---|---|
-| `JWT_SECRET` | Секрет для подписи JWT. **Сгенерируйте свой** — команды есть в комментарии в `.env.example`. При смене секрета все выданные токены станут недействительными |
-| `ADMIN_EMAIL`, `ADMIN_PASSWORD`, `ADMIN_PHONE`, `ADMIN_FIRST_NAME`, `ADMIN_LAST_NAME` | Первый администратор. Создаётся при старте, если пользователя с таким email ещё нет. **Смените пароль** |
-| `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_DB` | Учётные данные и имя базы. Используются и контейнером PostgreSQL, и бэкендом |
-| `SPRING_PROFILES_ACTIVE` | Для запуска из IDE / Java: `local` или `production`. Локальный Compose всегда задаёт `local` |
+| `JWT_SECRET` | Собственный секрет; команды генерации есть в `.env.example`. Смена секрета делает все выданные JWT недействительными |
+| `ADMIN_EMAIL`, `ADMIN_PASSWORD`, `ADMIN_PHONE`, `ADMIN_FIRST_NAME`, `ADMIN_LAST_NAME` | Первый администратор; создаётся при старте, если email ещё не занят. Изменение `.env` не меняет существующий аккаунт |
+| `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_DB` | Пользователь, пароль и имя БД; смена значений не обновляет уже инициализированную БД |
+| `FRONTEND_ORIGIN` | Для production: публичный origin фронтенда, например `https://chiron.example.com`, без пути и завершающего `/` |
 
-Адрес базы для бэкенда (`SPRING_DATASOURCE_URL`) задаётся в `docker/docker-compose.local.yaml` автоматически —
-внутри сети compose база доступна по имени сервиса `postgres`, а не по `localhost`.
-Параметр `--env-file .env` явно загружает переменные из корня репозитория; compose-файлы находятся в `docker/`.
+Compose явно выбирает профиль. `--env-file` нужен для подстановки значений в Compose;
+локальный Compose дополнительно передаёт `.env` бэкенду через `env_file`, production — через `environment`.
+Переменные текущего shell имеют приоритет над `--env-file`.
+**Spring Boot сам `.env` не читает**: при запуске из IDE или через Java переменные нужно передать процессу.
 
-### 2. Собрать и запустить
+## Локальный запуск
+
+Скопируйте `.env.example` в `.env` (`cp .env.example .env` в Linux/macOS/Git Bash
+или `Copy-Item .env.example .env` в PowerShell). Задайте свой JWT-секрет и пароль администратора, затем:
 
 ```bash
 docker compose --env-file .env -f docker/docker-compose.local.yaml up -d --build
+docker compose --env-file .env -f docker/docker-compose.local.yaml ps
 ```
 
-Поднимутся два контейнера:
+Поднимутся PostgreSQL и бэкенд. Flyway применит миграции автоматически.
+Проверка готовности: [health/readiness](http://localhost:8080/actuator/health/readiness),
+документация: [Scalar](http://localhost:8080/scalar.html).
+Для входа используйте `ADMIN_EMAIL` и `ADMIN_PASSWORD` из `.env`.
 
-| Контейнер | Что это | Порт на хосте |
-|---|---|---|
-| `chiron-postgres` | PostgreSQL 18 | `5432` |
-| `chiron-backend` | Spring Boot приложение | `8080` |
+### Бэкенд из IDE / Gradle
 
-Бэкенд стартует только после того, как база пройдёт healthcheck. Первая сборка образа занимает несколько минут
-(скачиваются зависимости Gradle), последующие — быстрее за счёт кэша слоёв.
-
-### 3. Проверить, что всё работает
+Нужен JDK 21. Поднимите только БД:
 
 ```bash
-docker compose --env-file .env -f docker/docker-compose.local.yaml ps
-docker compose --env-file .env -f docker/docker-compose.local.yaml logs -f backend
+docker compose --env-file .env -f docker/docker-compose.local.yaml up -d postgres
 ```
 
-У `chiron-backend` в колонке `STATUS` должно быть `(healthy)`: compose проверяет
-`GET /actuator/health/readiness`. Вручную состояние можно посмотреть на http://localhost:8080/actuator/health
-(ожидается `{"status":"UP"}`).
+Передайте процессу `JWT_SECRET` и `ADMIN_*` из `.env` и выберите `SPRING_PROFILES_ACTIVE=local`.
+Профиль использует `jdbc:postgresql://localhost:5432/chiron`, логин и пароль `postgres`.
+Если изменили `POSTGRES_*` или порт БД, задайте также `SPRING_DATASOURCE_URL`,
+`SPRING_DATASOURCE_USERNAME` и `SPRING_DATASOURCE_PASSWORD` с соответствующими значениями.
+Запустите приложение из IDE либо из каталога `chiron/`:
 
-Когда в логах появится `Started ...Application`, откройте http://localhost:8080/scalar.html
-(см. раздел [Документация](#документация)) и авторизуйтесь под администратором из `.env`.
+```bash
+./gradlew bootRun
+```
 
-### Полезные команды
+В PowerShell используйте `.\gradlew.bat bootRun`. Контейнер бэкенда при таком запуске должен быть остановлен,
+чтобы освободить порт `8080`.
 
-| Действие | Команда |
-|---|---|
-| Остановить контейнеры | `docker compose --env-file .env -f docker/docker-compose.local.yaml down` |
-| Остановить и **удалить данные БД** | `docker compose --env-file .env -f docker/docker-compose.local.yaml down -v` |
-| Пересобрать бэкенд после изменений в коде | `docker compose --env-file .env -f docker/docker-compose.local.yaml up -d --build backend` |
-| Поднять только базу (например, чтобы запускать бэкенд из IDE) | `docker compose --env-file .env -f docker/docker-compose.local.yaml up -d postgres` |
-| Подключиться к базе через psql | `docker exec -it chiron-postgres psql -U postgres -d chiron` |
+## Production
 
-Если порт `5432` или `8080` уже занят на вашей машине, поменяйте левую часть в секции `ports`
-в `docker/docker-compose.local.yaml` (например, `"5433:5432"`).
+Скопируйте `.env.production.example` в `.env.production` и заполните все пустые значения:
+отдельный JWT-секрет, уникальные пароли БД и администратора, `FRONTEND_ORIGIN`.
+На Linux ограничьте доступ к файлу: `chmod 600 .env.production`.
 
-## Демо с историей клиники
+```bash
+docker compose --env-file .env.production -f docker/docker-compose.production.yaml config --quiet
+docker compose --env-file .env.production -f docker/docker-compose.production.yaml up -d --build
+docker compose --env-file .env.production -f docker/docker-compose.production.yaml ps
+```
 
-`docker/docker-compose.demo.yaml` запускается самостоятельно: `.env` не нужен. У деморежима отдельные сеть,
-том базы и порты, поэтому локальная и production-базы не затрагиваются.
+Это самостоятельный Compose для одного сервера: БД и бэкенд с профилем `production`.
+Бэкенд слушает только `127.0.0.1:8080`; настройте HTTPS reverse proxy на этом же хосте.
+Фронтенд, reverse proxy и TLS в Compose не входят. Документация API отключена и заблокирована;
+CORS разрешает `FRONTEND_ORIGIN`.
+
+Для запуска без Docker соберите jar командой `./gradlew bootJar` из `chiron/` и запустите
+`java -jar build/libs/chiron-0.0.1-SNAPSHOT.jar --spring.profiles.active=production`.
+Передайте процессу `SPRING_DATASOURCE_URL`, `SPRING_DATASOURCE_USERNAME`, `SPRING_DATASOURCE_PASSWORD`,
+`FRONTEND_ORIGIN`, `JWT_SECRET` и `ADMIN_*`; PostgreSQL в этом случае запускается отдельно.
+
+Перед обновлением сделайте резервную копию БД; для обновления контейнеров повторите `up -d --build`.
+Не меняйте имя Compose-проекта `chiron-production`: к нему привязан том данных.
+Локальный и production Compose используют один порт `8080`, поэтому одновременно требуют смены порта.
+
+## Демо
+
+Отдельные база и том, вымышленные данные: 600 клиентов, 900 питомцев, восемь врачей,
+услуги, прививки, уведомления и двухлетняя история приёмов. `.env` не нужен.
 
 ```bash
 docker compose -f docker/docker-compose.demo.yaml up -d --build
 docker compose -f docker/docker-compose.demo.yaml logs -f seed
 ```
 
-После миграций Flyway и готовности бэкенда контейнер `seed` заполнит базу и завершится с кодом `0`.
-Дождитесь таблицы с итоговыми количествами в его логах, прежде чем открывать данные.
-При повторном запуске данные сохраняются: наличие контрольного демопользователя означает, что вся
-транзакция заполнения уже прошла успешно. История привязана к дате **первого заполнения**, а не перезапуска.
-
-В наборе 600 клиентов, 900 питомцев шести видов, восемь врачей, три специализации и 12 услуг
-(одна неактивная). За два года создаются более 10 тысяч приёмов с сезонностью и ростом загрузки,
-завершениями, отменами и неявками; ещё на 60 дней вперёд — подтверждённые и ожидающие записи.
-Есть повторные визиты, медицинские заметки, архивные питомцы, прививки с просроченными и близкими
-сроками ревакцинации, прочитанные и непрочитанные уведомления, отпуска и изменённые часы работы.
-Исторические цены ниже текущих. Объёмы приёмов зависят от даты заполнения.
+Дождитесь успешного завершения `seed` (код `0`). При следующих запусках данные сохраняются;
+история привязана к дате первого заполнения.
 
 | Доступ | Адрес / логин | Пароль |
 |---|---|---|
-| API и Scalar | http://localhost:8081/scalar.html | — |
+| API / Scalar | [localhost:8081/scalar.html](http://localhost:8081/scalar.html) | — |
 | Администратор | `admin@demo.chiron.local` | `demoAdmin123` |
 | Врачи | `vet1@seed.chiron.local` … `vet8@seed.chiron.local` | `password123` |
 | Клиенты | `client1@seed.chiron.local` … `client600@seed.chiron.local` | `password123` |
-| PostgreSQL | `localhost:5433`, база / пользователь `chiron_demo` | `demo_database_password` |
+| PostgreSQL | `localhost:5433`, база и пользователь `chiron_demo` | `demo_database_password` |
 
-Compose поднимает бэкенд и базу; интерфейс админки должен обращаться к API `http://localhost:8081`.
-Для графиков можно выбрать текущий месяц, год или весь двухлетний период. Все данные вымышленные;
-общеизвестные демопароли и JWT-секрет подходят только для локального запуска. Порты доступны с localhost.
+Демопорты доступны только с localhost; общеизвестные пароли и JWT-секрет предназначены для локального демо.
 
-```bash
-# Stop and keep the data
-docker compose -f docker/docker-compose.demo.yaml down
+## Фронтенд
 
-# Verify the generated history again
-docker compose -f docker/docker-compose.demo.yaml run --rm seed psql -X -v ON_ERROR_STOP=1 -f /seed/verify-test-data.sql
-
-# Recreate the history relative to today; deletes only this demo database
-docker compose -f docker/docker-compose.demo.yaml down -v
-docker compose -f docker/docker-compose.demo.yaml up -d --build
-```
-
-Существующий `chiron/scripts/seed-test-data.sql` также можно выполнять вручную после миграций
-через `psql -v ON_ERROR_STOP=1 -f ...`. Вместе с ним нужны `verify-test-data.sql` в той же папке и
-актуальная схема. Он повторно создаёт все строки с ID `5eed…` и зависимые от них записи, включая
-созданные вручную записи, связанные с демоданными. Это отличается от автоматического запуска
-`seed-demo.sql`, который пропускает уже заполненную базу. Проверки целостности выполняются до коммита.
-Ручное перезаполнение существующей истории может занимать несколько минут из-за каскадных связей.
-
-## Запуск бэкенда в production
-
-`docker/docker-compose.production.yaml` — самостоятельный файл для одного сервера с PostgreSQL и бэкендом.
-Он запускается отдельно от локального Compose, без объединения через несколько `-f`.
-Образ собирается на сервере из текущего исходного кода тем же Dockerfile.
-
-1. Скопируйте `.env.production.example` в `.env.production` и заполните пустые значения.
-   Сгенерируйте отдельный `JWT_SECRET` командами из `.env.example`, задайте уникальные пароли БД и администратора.
-   `FRONTEND_ORIGIN` — публичный origin фронтенда, например `https://chiron.example.com`, без пути и завершающего `/`.
-   `.env.production` исключён из Git; на Linux ограничьте доступ: `chmod 600 .env.production`.
-2. Проверьте конфигурацию и запустите контейнеры:
-
-   ```bash
-   docker compose --env-file .env.production -f docker/docker-compose.production.yaml config --quiet
-   docker compose --env-file .env.production -f docker/docker-compose.production.yaml up -d --build
-   ```
-
-3. Проверьте состояние и логи:
-
-   ```bash
-   docker compose --env-file .env.production -f docker/docker-compose.production.yaml ps
-   docker compose --env-file .env.production -f docker/docker-compose.production.yaml logs -f backend
-   ```
-
-Compose требует непустые секреты, учётные данные и `FRONTEND_ORIGIN`. Профиль `production` задан явно:
-документация API отключена, CORS использует указанный origin. Переменные передаются через `environment`;
-`--env-file .env.production` нужен во всех командах, чтобы не подставить локальные значения из `.env`.
-Переменные текущего shell имеют приоритет над `--env-file`, поэтому не экспортируйте локальные секреты на сервере.
-
-PostgreSQL не публикует порт на хосте. Бэкенд доступен только по `127.0.0.1:8080`:
-настройте HTTPS reverse proxy на этом же хосте с upstream `http://127.0.0.1:8080`.
-Фронтенд, reverse proxy и TLS в этот Compose не входят.
-
-Проект Compose называется `chiron-production`, данные хранятся в отдельном volume
-`chiron-production_postgres_data`. Не меняйте имя проекта при обновлении — другое имя создаст другой volume.
-Оба варианта используют порт хоста `8080`, поэтому одновременный запуск на одном хосте требует смены порта одного из них.
-
-Для обновления повторите команду `up -d --build`. Для остановки используйте:
+Нужны Node.js 20.9+ и npm. Из каталога `web-ui/`:
 
 ```bash
-docker compose --env-file .env.production -f docker/docker-compose.production.yaml down
+npm ci
+npm run dev
 ```
 
-Не добавляйте `-v`: это удалит данные БД. Перед первым запуском и обновлениями настройте резервное копирование
-существующей БД; смена `POSTGRES_*` не меняет учётные данные уже инициализированного volume.
+Страница откроется на [localhost:3000](http://localhost:3000).
+Для production-сборки: `npm run build`, затем `npm start`.
+Переменные подключения к API пока не реализованы; `.env` бэкенда фронтенд не использует.
 
-## Окружения
+## Логи и остановка
 
-Общие настройки находятся в `chiron/src/main/resources/application.yaml`, различия — в
-`application-local.yaml` и `application-production.yaml` рядом с ним.
-
-- `local`: локальная БД, CORS для localhost:3000 и localhost:5173, открытая документация API.
-- `production`: документация отключена и заблокирована. Production Compose задаёт подключение к своей БД
-  и передаёт `FRONTEND_ORIGIN`, `JWT_SECRET` и `ADMIN_*` из `.env.production`.
-  При запуске без Compose задайте `SPRING_DATASOURCE_URL`, `SPRING_DATASOURCE_USERNAME`,
-  `SPRING_DATASOURCE_PASSWORD`, `FRONTEND_ORIGIN`, `JWT_SECRET` и `ADMIN_*` самостоятельно.
-
-При запуске из IDE задайте `SPRING_PROFILES_ACTIVE=local` и переменные JWT / администратора в окружении
-конфигурации запуска. Spring Boot сам не загружает `.env`; локальный Compose использует `env_file`,
-production Compose — явный `environment`. Для production используйте `SPRING_PROFILES_ACTIVE=production`. Выбирайте один профиль.
-Без профиля локальные настройки БД не подставляются, документация закрыта.
-
-## HTTP-логи
-
-Бэкенд пишет на уровне INFO метод, путь, HTTP-статус и время обработки каждого запроса, например:
-`POST /api/v1/auth/login -> 200 (18 ms)`. Фильтр работает перед Spring Security и учитывает ответы `401/403`.
-Тела запросов и ответов, query-параметры и заголовки этим фильтром не логируются.
-В Docker записи доступны через `docker compose ... logs -f backend` с параметрами выбранного окружения.
+Для выбранного окружения используйте те же `--env-file` и `-f`, что при запуске, заменив
+`up -d --build` на `logs -f backend` для логов или на `down` для остановки.
+**`down -v` удаляет данные БД выбранного окружения.**
 
 ## Документация
 
-Подробное описание API: где открыть документацию, как авторизоваться и какие эндпоинты за что отвечают —
-в [`docs/api.md`](docs/api.md).
-
-После запуска бэкенда с профилем `local` документация доступна по адресам:
-
-| Что | Адрес |
-|---|---|
-| Scalar (основной вариант) | http://localhost:8080/scalar.html |
-| Swagger UI | http://localhost:8080/swagger-ui.html |
-| OpenAPI JSON (для Postman, генерации клиента) | http://localhost:8080/v3/api-docs |
-
-Прочее:
-
-- [`docs/usecase.excalidraw`](docs/usecase.excalidraw) — use case диаграмма; открывается на https://excalidraw.com
-  или в VS Code с расширением Excalidraw.
+- [Руководство по API](docs/api.md) — авторизация, роли, основные сценарии, ответы и уведомления.
+- В `local`: [Scalar](http://localhost:8080/scalar.html) (нужен интернет для CDN),
+  [Swagger UI](http://localhost:8080/swagger-ui.html), [OpenAPI JSON](http://localhost:8080/v3/api-docs).
+  В демо замените порт на `8081`.
+- [Use case диаграмма](docs/usecase.excalidraw) — открыть в [Excalidraw](https://excalidraw.com).
