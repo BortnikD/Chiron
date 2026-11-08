@@ -19,6 +19,17 @@ import kotlin.test.assertTrue
 class VeterinarianAvailabilityTest {
 
     @Test
+    fun `rescheduling excludes only the selected appointment from overlap checks`() {
+        val own = appointment("09:15", "09:45", AppointmentStatus.CONFIRMED)
+        val other = appointment("09:45", "10:00", AppointmentStatus.CONFIRMED)
+        val availability =
+            availability(schedules = listOf(schedule("09:00", "11:00")), appointments = listOf(own, other))
+        assertEquals(null, availability.unavailabilityReason(at("09:15"), at("09:45"), own.id))
+        assertNotNull(availability.unavailabilityReason(at("09:15"), at("09:45"), other.id))
+        assertNotNull(availability.unavailabilityReason(at("09:30"), at("10:00"), own.id))
+    }
+
+    @Test
     fun `free slots cover working hours on the slot grid`() {
         val availability = availability(schedules = listOf(schedule("09:00", "10:00")))
 

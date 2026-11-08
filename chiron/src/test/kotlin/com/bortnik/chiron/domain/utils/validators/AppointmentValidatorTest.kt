@@ -1,8 +1,12 @@
 package com.bortnik.chiron.domain.utils.validators
 
+import com.bortnik.chiron.domain.dto.Patch
 import com.bortnik.chiron.domain.dto.appointment.AppointmentFilter
 import com.bortnik.chiron.domain.dto.appointment.AvailableSlotFilter
+import com.bortnik.chiron.domain.dto.appointment.UpdateAppointmentDto
+import com.bortnik.chiron.domain.entities.enums.AppointmentStatus
 import com.bortnik.chiron.domain.exceptions.ValidationException
+import com.bortnik.chiron.support.TestEntities.appointment
 import org.junit.jupiter.api.Test
 import java.time.Instant
 import java.time.LocalDate
@@ -11,6 +15,41 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 
 class AppointmentValidatorTest {
+
+    @Test
+    fun `cancelled status requires both cancellation actor and time`() {
+        for (dto in listOf(
+            UpdateAppointmentDto(status = AppointmentStatus.CANCELLED),
+            UpdateAppointmentDto(status = AppointmentStatus.CANCELLED, cancelledBy = Patch.Value(appointment.petId)),
+            UpdateAppointmentDto(status = AppointmentStatus.CANCELLED, cancelledAt = Patch.Value(NOW)),
+        )) assertFailsWith<ValidationException> { AppointmentValidator.validate(appointment, dto) }
+        AppointmentValidator.validate(
+            appointment, UpdateAppointmentDto(
+                status = AppointmentStatus.CANCELLED,
+                cancelledBy = Patch.Value(appointment.petId),
+                cancelledAt = Patch.Value(NOW),
+            )
+        )
+    }
+
+    @Test
+    fun `non cancelled appointment rejects any cancellation field`() {
+        for (dto in listOf(
+            UpdateAppointmentDto(cancelledBy = Patch.Value(appointment.petId)),
+            UpdateAppointmentDto(cancelledAt = Patch.Value(NOW)),
+            UpdateAppointmentDto(cancelReason = Patch.Value("Reason")),
+        )) assertFailsWith<ValidationException> { AppointmentValidator.validate(appointment, dto) }
+    }
+
+    @Test
+    fun `partial time update is validated against the retained bound`() {
+        assertFailsWith<ValidationException> {
+            AppointmentValidator.validate(appointment, UpdateAppointmentDto(startAt = appointment.endAt))
+        }
+        assertFailsWith<ValidationException> {
+            AppointmentValidator.validate(appointment, UpdateAppointmentDto(endAt = appointment.startAt))
+        }
+    }
 
     @Test
     fun `filter without time bounds is accepted`() {
