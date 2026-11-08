@@ -80,6 +80,35 @@ export const userApi = {
       throw err;
     }
   },
+
+  changePassword: async (data: {
+    oldPassword?: string;
+    currentPassword?: string;
+    newPassword: string;
+  }): Promise<void> => {
+    const payload = {
+      currentPassword: data.currentPassword || data.oldPassword,
+      oldPassword: data.oldPassword || data.currentPassword,
+      newPassword: data.newPassword,
+    };
+    try {
+      await api.post('/api/v1/auth/change-password', payload);
+    } catch (err) {
+      if (err instanceof ApiError && (err.status === 404 || err.status === 405)) {
+        try {
+          await api.patch('/api/v1/users/me/password', payload);
+        } catch (err2) {
+          if (err2 instanceof ApiError && (err2.status === 404 || err2.status === 405)) {
+            await api.patch('/api/v1/users/password', payload);
+            return;
+          }
+          throw err2;
+        }
+        return;
+      }
+      throw err;
+    }
+  },
 };
 
 // ─── Публичные справочники клиники и расписание ────────────
