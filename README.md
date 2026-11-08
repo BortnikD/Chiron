@@ -84,20 +84,66 @@ docker compose -f docker-compose.local.yaml logs -f backend
 Если порт `5432` или `8080` уже занят на вашей машине, поменяйте левую часть в секции `ports`
 в `docker-compose.local.yaml` (например, `"5433:5432"`).
 
+## Запуск бэкенда в production
+
+`docker-compose.production.yaml` — самостоятельный файл для одного сервера с PostgreSQL и бэкендом.
+Он запускается отдельно от локального Compose, без объединения через несколько `-f`.
+Образ собирается на сервере из текущего исходного кода тем же Dockerfile.
+
+1. Скопируйте `.env.production.example` в `.env.production` и заполните пустые значения.
+   Сгенерируйте отдельный `JWT_SECRET` командами из `.env.example`, задайте уникальные пароли БД и администратора.
+   `FRONTEND_ORIGIN` — публичный origin фронтенда, например `https://chiron.example.com`, без пути и завершающего `/`.
+   `.env.production` исключён из Git; на Linux ограничьте доступ: `chmod 600 .env.production`.
+2. Проверьте конфигурацию и запустите контейнеры:
+
+   ```bash
+   docker compose --env-file .env.production -f docker-compose.production.yaml config --quiet
+   docker compose --env-file .env.production -f docker-compose.production.yaml up -d --build
+   ```
+
+3. Проверьте состояние и логи:
+
+   ```bash
+   docker compose --env-file .env.production -f docker-compose.production.yaml ps
+   docker compose --env-file .env.production -f docker-compose.production.yaml logs -f backend
+   ```
+
+Compose требует непустые секреты, учётные данные и `FRONTEND_ORIGIN`. Профиль `production` задан явно:
+документация API отключена, CORS использует указанный origin. Переменные передаются через `environment`;
+`--env-file .env.production` нужен во всех командах, чтобы не подставить локальные значения из `.env`.
+Переменные текущего shell имеют приоритет над `--env-file`, поэтому не экспортируйте локальные секреты на сервере.
+
+PostgreSQL не публикует порт на хосте. Бэкенд доступен только по `127.0.0.1:8080`:
+настройте HTTPS reverse proxy на этом же хосте с upstream `http://127.0.0.1:8080`.
+Фронтенд, reverse proxy и TLS в этот Compose не входят.
+
+Проект Compose называется `chiron-production`, данные хранятся в отдельном volume
+`chiron-production_postgres_data`. Не меняйте имя проекта при обновлении — другое имя создаст другой volume.
+Оба варианта используют порт хоста `8080`, поэтому одновременный запуск на одном хосте требует смены порта одного из них.
+
+Для обновления повторите команду `up -d --build`. Для остановки используйте:
+
+```bash
+docker compose --env-file .env.production -f docker-compose.production.yaml down
+```
+
+Не добавляйте `-v`: это удалит данные БД. Перед первым запуском и обновлениями настройте резервное копирование
+существующей БД; смена `POSTGRES_*` не меняет учётные данные уже инициализированного volume.
+
 ## Окружения
 
 Общие настройки находятся в `chiron/src/main/resources/application.yaml`, различия — в
 `application-local.yaml` и `application-production.yaml` рядом с ним.
 
 - `local`: локальная БД, CORS для localhost:3000 и localhost:5173, открытая документация API.
-- `production`: шаблон с плейсхолдерами БД и фронтенда, документация отключена и заблокирована.
-  Реального production-развёртывания нет. Для использования шаблона замените плейсхолдеры или задайте
-  `SPRING_DATASOURCE_URL`, `SPRING_DATASOURCE_USERNAME`, `SPRING_DATASOURCE_PASSWORD`, `FRONTEND_ORIGIN`.
-  `JWT_SECRET` и `ADMIN_*` передаются через окружение, как и в local; значения из `.env.example` — только примеры.
+- `production`: документация отключена и заблокирована. Production Compose задаёт подключение к своей БД
+  и передаёт `FRONTEND_ORIGIN`, `JWT_SECRET` и `ADMIN_*` из `.env.production`.
+  При запуске без Compose задайте `SPRING_DATASOURCE_URL`, `SPRING_DATASOURCE_USERNAME`,
+  `SPRING_DATASOURCE_PASSWORD`, `FRONTEND_ORIGIN`, `JWT_SECRET` и `ADMIN_*` самостоятельно.
 
 При запуске из IDE задайте `SPRING_PROFILES_ACTIVE=local` и переменные JWT / администратора в окружении
-конфигурации запуска. Spring Boot сам не загружает `.env`; в Docker это делает `env_file`.
-Для шаблона production используйте `SPRING_PROFILES_ACTIVE=production`. Выбирайте один профиль.
+конфигурации запуска. Spring Boot сам не загружает `.env`; локальный Compose использует `env_file`,
+production Compose — явный `environment`. Для production используйте `SPRING_PROFILES_ACTIVE=production`. Выбирайте один профиль.
 Без профиля локальные настройки БД не подставляются, документация закрыта.
 
 ## Документация
