@@ -10,5 +10,7 @@ interface VeterinarianSpeciesPermissionRepository {
 
     fun findAllByVeterinarianId(veterinarianId: UUID): List<VeterinarianSpeciesPermission>
 
+    fun findAllByVeterinarianIds(veterinarianIds: List<UUID>): List<VeterinarianSpeciesPermission>
+
     fun delete(veterinarianId: UUID, speciesId: UUID): Boolean
 }

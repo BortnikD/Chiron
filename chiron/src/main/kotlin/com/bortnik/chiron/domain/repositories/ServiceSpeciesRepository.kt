@@ -11,6 +11,8 @@ interface ServiceSpeciesRepository {
 
     fun findAllByServiceId(serviceId: UUID): List<ServiceSpecies>
 
+    fun findAllBySpeciesId(speciesId: UUID): List<ServiceSpecies>
+
     fun update(serviceId: UUID, speciesId: UUID, dto: UpdateServiceSpeciesDto): ServiceSpecies?
 
     fun deleteById(serviceId: UUID, speciesId: UUID): Boolean

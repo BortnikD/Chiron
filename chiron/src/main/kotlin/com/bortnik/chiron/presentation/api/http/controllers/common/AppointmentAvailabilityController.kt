@@ -29,6 +29,7 @@ class AppointmentAvailabilityController(
         description = """
             Returns true when the veterinarian can take the slot.
             Otherwise responds with AppointmentSlotUnavailableException whose message contains the reason.
+            endAt must be after startAt; invalid bounds return 400.
             A slot must start and end on the same day in the clinic time zone, start on the clinic slot grid,
             fit into the working hours (custom hours of a schedule exception take precedence over the weekly schedule),
             not overlap the break and not overlap another non-cancelled appointment.

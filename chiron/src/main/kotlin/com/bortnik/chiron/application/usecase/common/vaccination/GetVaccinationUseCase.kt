@@ -18,8 +18,6 @@ class GetVaccinationUseCase(private val vaccinationRepository: VaccinationReposi
 
     fun findById(id: UUID): Vaccination = vaccinationRepository.findById(id) ?: throw VaccinationNotFoundException(id)
 
-    fun findAllByPetId(petId: UUID): List<Vaccination> = vaccinationRepository.findAllByPetId(petId)
-
     fun findAll(filter: VaccinationFilter, pageRequest: PageRequest): Page<Vaccination> {
         VaccinationValidator.validate(filter)
         PageRequestValidator.validate(pageRequest)

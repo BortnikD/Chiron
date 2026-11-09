@@ -1,0 +1,16 @@
+spring:
+  datasource:
+    url: jdbc:postgresql://localhost:5432/chiron
+    username: postgres
+    password: postgres
+
+springdoc:
+  api-docs:
+    enabled: true
+  swagger-ui:
+    enabled: true
+
+cors:
+  allowed-origins:
+    - http://localhost:5173
+    - http://localhost:3000

@@ -8,6 +8,7 @@ import com.bortnik.chiron.application.usecase.client.pet.ClientUpdatePetUseCase
 import com.bortnik.chiron.presentation.api.http.ApiResponse
 import com.bortnik.chiron.presentation.api.http.dto.request.pet.ClientCreatePetRequest
 import com.bortnik.chiron.presentation.api.http.dto.request.pet.UpdatePetRequest
+import com.bortnik.chiron.presentation.api.http.dto.response.ClientPetResponse
 import com.bortnik.chiron.presentation.api.http.dto.response.PetResponse
 import com.bortnik.chiron.presentation.api.http.mappers.toDto
 import com.bortnik.chiron.presentation.api.http.mappers.toResponse
@@ -37,19 +38,28 @@ class ClientPetController(
     private val updatePetUseCase: ClientUpdatePetUseCase,
     private val deletePetUseCase: ClientDeletePetUseCase,
 ) {
-    @Operation(summary = "List own pets")
+    @Operation(
+        summary = "List own pets",
+        description = "withSummary=true adds visit counts, the next appointment and vaccination due status. " +
+            "By default summary is omitted and no summary queries are performed.",
+    )
     @GetMapping
     fun findAll(
         @AuthenticationPrincipal actor: Actor,
         @Parameter(description = "Return only archived (true) or only active (false) pets")
         @RequestParam(required = false) isArchived: Boolean?,
-    ): ApiResponse<List<PetResponse>> =
-        ApiResponse.success(getPetUseCase.findAll(actor, isArchived).map { it.toResponse() })
+        @RequestParam(defaultValue = "false") withSummary: Boolean,
+    ): ApiResponse<List<ClientPetResponse>> =
+        ApiResponse.success(getPetUseCase.findAll(actor, isArchived, withSummary).map { it.toResponse() })
 
-    @Operation(summary = "Get own pet by id")
+    @Operation(summary = "Get own pet by id", description = "withSummary=true includes the pet's summary.")
     @GetMapping("/{id}")
-    fun findById(@AuthenticationPrincipal actor: Actor, @PathVariable id: UUID): ApiResponse<PetResponse> =
-        ApiResponse.success(getPetUseCase.findById(actor, id).toResponse())
+    fun findById(
+        @AuthenticationPrincipal actor: Actor,
+        @PathVariable id: UUID,
+        @RequestParam(defaultValue = "false") withSummary: Boolean,
+    ): ApiResponse<ClientPetResponse> =
+        ApiResponse.success(getPetUseCase.findById(actor, id, withSummary).toResponse())
 
     @Operation(summary = "Create pet owned by the current user")
     @PostMapping

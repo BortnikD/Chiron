@@ -19,6 +19,17 @@ import kotlin.test.assertTrue
 class VeterinarianAvailabilityTest {
 
     @Test
+    fun `rescheduling excludes only the selected appointment from overlap checks`() {
+        val own = appointment("09:15", "09:45", AppointmentStatus.CONFIRMED)
+        val other = appointment("09:45", "10:00", AppointmentStatus.CONFIRMED)
+        val availability =
+            availability(schedules = listOf(schedule("09:00", "11:00")), appointments = listOf(own, other))
+        assertEquals(null, availability.unavailabilityReason(at("09:15"), at("09:45"), own.id))
+        assertNotNull(availability.unavailabilityReason(at("09:15"), at("09:45"), other.id))
+        assertNotNull(availability.unavailabilityReason(at("09:30"), at("10:00"), own.id))
+    }
+
+    @Test
     fun `free slots cover working hours on the slot grid`() {
         val availability = availability(schedules = listOf(schedule("09:00", "10:00")))
 
@@ -82,6 +93,27 @@ class VeterinarianAvailabilityTest {
         val start = at("09:10")
 
         assertNotNull(availability.unavailabilityReason(start, start + Duration.ofMinutes(15)))
+    }
+
+    @Test
+    fun `empty and reversed slots are unavailable even inside working hours`() {
+        val availability = availability(schedules = listOf(schedule("09:00", "18:00")))
+        assertNotNull(availability.unavailabilityReason(at("11:00"), at("11:00")))
+        assertNotNull(availability.unavailabilityReason(at("11:00"), at("10:00")))
+    }
+
+    @Test
+    fun `existing conflicting custom hours are reported instead of choosing one silently`() {
+        val availability = availability(
+            exceptions = listOf(
+                exception(ScheduleExceptionType.CUSTOM_HOURS, "09:00", "12:00"),
+                exception(ScheduleExceptionType.CUSTOM_HOURS, "14:00", "18:00"),
+            ),
+        )
+        assertEquals(
+            "conflicting custom working hours on $DATE",
+            availability.unavailabilityReason(at("10:00"), at("10:30")),
+        )
     }
 
     private companion object {

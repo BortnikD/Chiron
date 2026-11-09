@@ -1,11 +1,13 @@
 package com.bortnik.chiron.presentation.api.http.mappers
 
+import com.bortnik.chiron.domain.dto.user.ChangePasswordDto
 import com.bortnik.chiron.domain.dto.user.RegisterUserDto
 import com.bortnik.chiron.domain.dto.user.UpdateProfileDto
 import com.bortnik.chiron.domain.dto.user.UserFilter
 import com.bortnik.chiron.domain.entities.User
 import com.bortnik.chiron.domain.entities.enums.UserRole
 import com.bortnik.chiron.presentation.api.http.dto.request.auth.RegisterRequest
+import com.bortnik.chiron.presentation.api.http.dto.request.user.ChangePasswordRequest
 import com.bortnik.chiron.presentation.api.http.dto.request.user.CreateUserRequest
 import com.bortnik.chiron.presentation.api.http.dto.request.user.UpdateUserRequest
 import com.bortnik.chiron.presentation.api.http.dto.request.user.UserFilterRequest
@@ -50,6 +52,11 @@ fun UpdateUserRequest.toDto(): UpdateProfileDto = UpdateProfileDto(
     middleName = middleName.toPatch(),
     lastName = lastName,
     phone = phone,
+)
+
+fun ChangePasswordRequest.toDto(): ChangePasswordDto = ChangePasswordDto(
+    currentPassword = currentPassword,
+    newPassword = newPassword,
 )
 
 fun UserFilterRequest.toDto(): UserFilter = UserFilter(

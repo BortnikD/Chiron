@@ -14,4 +14,6 @@ data class ServiceResponse(
     val isActive: Boolean,
     val createdAt: Instant,
     val updatedAt: Instant,
+    val effectivePrice: Double? = null,
+    val effectiveDurationMin: Int? = null,
 )

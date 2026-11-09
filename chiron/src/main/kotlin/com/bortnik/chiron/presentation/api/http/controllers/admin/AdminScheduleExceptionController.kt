@@ -38,7 +38,8 @@ import java.util.UUID
         Deviations from a veterinarian's weekly work schedule for an inclusive date range.
         ABSENCE: the veterinarian is unavailable on every date of the range; startTime and endTime must be empty.
         CUSTOM_HOURS: startTime and endTime replace the weekly hours on those dates and are required;
-        the weekly break is not applied on such dates.
+        the weekly break is not applied on such dates. CUSTOM_HOURS date ranges for the same veterinarian
+        must not overlap, including their boundary dates; conflicting creates or updates return 400.
     """,
 )
 class AdminScheduleExceptionController(

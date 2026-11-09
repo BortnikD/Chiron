@@ -1,10 +1,6 @@
 spring:
   application:
     name: chiron
-  datasource:
-    url: jdbc:postgresql://localhost:5432/chiron
-    username: postgres
-    password: postgres
 
 clinic:
   zone: Europe/Moscow
@@ -55,8 +51,10 @@ springdoc:
   show-actuator: true
   default-produces-media-type: application/json
   api-docs:
+    enabled: false
     path: /v3/api-docs
   swagger-ui:
+    enabled: false
     path: /swagger-ui.html
     operations-sorter: method
     tags-sorter: alpha
@@ -68,8 +66,4 @@ logging:
     org.springdoc.core.utils.SpringDocUtils: error
 
 cors:
-  allowed-origins:
-    # React (Vite)
-    - http://localhost:5173
-    # Next.js
-    - http://localhost:3000
+  allowed-origins: [ ]

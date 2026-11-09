@@ -24,6 +24,7 @@ class VeterinarianAvailability(
 
     // Returns why the slot cannot be taken, or null when it is free.
     fun unavailabilityReason(startAt: Instant, endAt: Instant, excludeAppointmentId: UUID? = null): String? {
+        if (endAt <= startAt) return "end time must be after start time"
         val start = startAt.atZone(zone)
         val end = endAt.atZone(zone)
         val date = start.toLocalDate()
@@ -37,7 +38,9 @@ class VeterinarianAvailability(
         val exceptions = scheduleExceptions.filter { !date.isBefore(it.startDate) && !date.isAfter(it.endDate) }
         if (exceptions.any { it.type == ScheduleExceptionType.ABSENCE }) return "veterinarian is absent on $date"
 
-        val customHours = exceptions.firstOrNull { it.type == ScheduleExceptionType.CUSTOM_HOURS }
+        val customHoursExceptions = exceptions.filter { it.type == ScheduleExceptionType.CUSTOM_HOURS }
+        if (customHoursExceptions.size > 1) return "conflicting custom working hours on $date"
+        val customHours = customHoursExceptions.singleOrNull()
         if (customHours != null) {
             // CUSTOM_HOURS always carries both times (enforced by the CHECK constraint and the validator).
             if (!within(startTime, endTime, customHours.startTime!!, customHours.endTime!!)) {

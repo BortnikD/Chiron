@@ -40,7 +40,7 @@ dependencies {
     implementation("org.jetbrains.exposed:exposed-core:$exposedVersion")
     implementation("org.jetbrains.exposed:exposed-jdbc:$exposedVersion")
     implementation("org.jetbrains.exposed:exposed-java-time:$exposedVersion")
-    implementation("org.jetbrains.exposed:exposed-spring-boot-starter:$exposedVersion")
+    implementation("org.jetbrains.exposed:exposed-spring-boot4-starter:$exposedVersion")
     implementation("org.jetbrains.kotlin:kotlin-reflect")
     implementation("org.springdoc:springdoc-openapi-starter-webmvc-ui:3.1.1")
     implementation("io.jsonwebtoken:jjwt-api:$jjwtVersion")
@@ -54,6 +54,7 @@ dependencies {
     testImplementation("org.springframework.boot:spring-boot-starter-security-test")
     testImplementation("org.springframework.boot:spring-boot-starter-webmvc-test")
     testImplementation("org.jetbrains.kotlin:kotlin-test-junit5")
+    testImplementation("org.mockito:mockito-core")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
 }
 

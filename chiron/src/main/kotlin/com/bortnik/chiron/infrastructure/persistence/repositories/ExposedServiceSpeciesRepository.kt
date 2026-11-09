@@ -45,6 +45,12 @@ class ExposedServiceSpeciesRepository : ServiceSpeciesRepository {
             .map { it.toServiceSpecies() }
     }
 
+    override fun findAllBySpeciesId(speciesId: UUID): List<ServiceSpecies> = exposedSql {
+        ExposedServiceSpeciesTable.selectAll()
+            .where { ExposedServiceSpeciesTable.speciesId eq speciesId }
+            .map { it.toServiceSpecies() }
+    }
+
     override fun update(serviceId: UUID, speciesId: UUID, dto: UpdateServiceSpeciesDto): ServiceSpecies? = exposedSql {
         // Exposed rejects an UPDATE without columns, so an empty patch only reads the row.
         if (dto == UpdateServiceSpeciesDto()) return@exposedSql findById(serviceId, speciesId)

@@ -3,11 +3,14 @@ package com.bortnik.chiron.infrastructure.persistence.repositories
 import com.bortnik.chiron.domain.dto.ifPresent
 import com.bortnik.chiron.domain.dto.veterinarian.CreateVeterinarianDto
 import com.bortnik.chiron.domain.dto.veterinarian.UpdateVeterinarianDto
+import com.bortnik.chiron.domain.dto.veterinarian.VeterinarianDetailsDto
 import com.bortnik.chiron.domain.dto.veterinarian.VeterinarianFilter
 import com.bortnik.chiron.domain.entities.Veterinarian
 import com.bortnik.chiron.domain.repositories.VeterinarianRepository
 import com.bortnik.chiron.infrastructure.persistence.exposedSql
 import com.bortnik.chiron.infrastructure.persistence.mappers.toVeterinarian
+import com.bortnik.chiron.infrastructure.persistence.mappers.toVeterinarianDetailsDto
+import com.bortnik.chiron.infrastructure.persistence.models.ExposedUserTable
 import com.bortnik.chiron.infrastructure.persistence.models.ExposedVeterinarianSpeciesPermissionTable
 import com.bortnik.chiron.infrastructure.persistence.models.ExposedVeterinarianTable
 import org.jetbrains.exposed.v1.core.Op
@@ -61,6 +64,27 @@ class ExposedVeterinarianRepository : VeterinarianRepository {
             .map { it.toVeterinarian() }
     }
 
+    override fun findDetailsById(id: UUID): VeterinarianDetailsDto? = exposedSql {
+        selectWithUser()
+            .where { ExposedVeterinarianTable.id eq id }
+            .singleOrNull()
+            ?.toVeterinarianDetailsDto()
+    }
+
+    override fun findDetailsByUserId(userId: UUID): VeterinarianDetailsDto? = exposedSql {
+        selectWithUser()
+            .where { ExposedVeterinarianTable.userId eq userId }
+            .singleOrNull()
+            ?.toVeterinarianDetailsDto()
+    }
+
+    override fun findAllDetails(filter: VeterinarianFilter): List<VeterinarianDetailsDto> = exposedSql {
+        selectWithUser()
+            .where { filter.toCondition() }
+            .orderBy(ExposedVeterinarianTable.createdAt to SortOrder.ASC, ExposedVeterinarianTable.id to SortOrder.ASC)
+            .map { it.toVeterinarianDetailsDto() }
+    }
+
     override fun update(id: UUID, dto: UpdateVeterinarianDto): Veterinarian? = exposedSql {
         // An empty patch has nothing to write, so updatedAt is left untouched.
         if (dto == UpdateVeterinarianDto()) return@exposedSql findById(id)
@@ -78,14 +102,23 @@ class ExposedVeterinarianRepository : VeterinarianRepository {
         ExposedVeterinarianTable.deleteWhere { ExposedVeterinarianTable.id eq id } > 0
     }
 
+    private fun selectWithUser() = (ExposedVeterinarianTable innerJoin ExposedUserTable).select(
+        ExposedVeterinarianTable.columns + listOf(
+            ExposedUserTable.firstName,
+            ExposedUserTable.middleName,
+            ExposedUserTable.lastName,
+            ExposedUserTable.fullName,
+        ),
+    )
+
     private fun VeterinarianFilter.toCondition(): Op<Boolean> = Op.TRUE
         .andIfNotNull(specializationId?.let { ExposedVeterinarianTable.specializationId eq it })
         .andIfNotNull(
             speciesId?.let {
                 ExposedVeterinarianTable.id inSubQuery
-                    ExposedVeterinarianSpeciesPermissionTable.select(
-                        ExposedVeterinarianSpeciesPermissionTable.veterinarianId,
-                    ).where { ExposedVeterinarianSpeciesPermissionTable.speciesId eq it }
+                        ExposedVeterinarianSpeciesPermissionTable.select(
+                            ExposedVeterinarianSpeciesPermissionTable.veterinarianId,
+                        ).where { ExposedVeterinarianSpeciesPermissionTable.speciesId eq it }
             },
         )
         .andIfNotNull(isActive?.let { ExposedVeterinarianTable.isActive eq it })

@@ -1,8 +1,4 @@
-# CLAUDE.md
-
-Behavioral guidelines to reduce common LLM coding mistakes. Merge with project-specific instructions as needed.
-
-**Tradeoff:** These guidelines bias toward caution over speed. For trivial tasks, use judgment.
+# AGENTS.md
 
 ## 1. Think Before Coding
 
@@ -67,11 +63,6 @@ Strong success criteria let you loop independently. Weak criteria ("make it work
 
 ---
 
-**These guidelines are working if:** fewer unnecessary changes in diffs, fewer rewrites due to overcomplication, and
-clarifying questions come before implementation rather than after mistakes.
-
----
-
 # Project rules
 
 ## 5. Language
@@ -92,12 +83,33 @@ clarifying questions come before implementation rather than after mistakes.
 
 ## 7. Running things
 
-- **Always ask before running anything**: Gradle tasks (`build`, `test`, `bootRun`), the app, Docker / docker compose,
-  IDE run configurations, SQL against a database, scripts. If there is no answer, the answer is **no**.
-- Workflow: finish the work first, then ask whether it should be verified by running (build / tests / app).
+- **Ask before running** Gradle tasks (`build`, `bootRun`), the app, Docker / docker compose, IDE run configurations,
+  SQL against a database, scripts, and tests except for the device-specific permission below.
+  If there is no answer, the answer is **no**.
+- Workflow: finish the work first, then run permitted tests; ask before other execution.
 - Default verification without running: static analysis through IntelliJ IDEA (see section 8) —
   `get_file_problems` on every changed file, plus checking usages / symbol resolution where signatures changed.
 - Read-only commands (`git status`, `git diff`, `git log`, file search) do not need permission.
+
+### Tests on the user's Windows device
+
+- On the user's Windows device (account `C:\Users\dima1`, checkout `D:\code\univer\Chiron`), running the backend
+  tests through Gradle Wrapper is permitted without asking again, including targeted test runs and their required
+  compilation tasks. This permission does not extend to other devices or starting the app, Docker, or database scripts.
+- Use the installed JDK 21 at `C:\Users\dima1\.jdks\ms-21.0.10`. Set `JAVA_HOME` only for the current process;
+  do not change system settings. The shell may have neither `JAVA_HOME` nor Java on `PATH`.
+- From `D:\code\univer\Chiron\chiron`, run:
+
+  ```powershell
+  $env:JAVA_HOME = 'C:\Users\dima1\.jdks\ms-21.0.10'
+  .\gradlew.bat test
+  # Targeted example:
+  .\gradlew.bat test --tests '*VeterinarianResponseTest'
+  ```
+
+- Use the repository's `gradlew.bat`; no global Gradle installation is needed. The wrapper selects the version from
+  `gradle/wrapper/gradle-wrapper.properties`. Its distributions and dependency cache are under
+  `C:\Users\dima1\.gradle`; sandbox restrictions may require an access escalation for this directory.
 
 ## 8. IntelliJ IDEA MCP tools (`mcp__idea__*`)
 
@@ -126,9 +138,9 @@ Prefer the built-in `Read` / `Grep` / `Glob` / `Edit` when they are cheaper:
 Restrictions:
 
 - `build_project`, `execute_run_configuration`, `execute_terminal_command`, `execute_sql_query`, debugger tools
-  (`xdebug_*`) count as **running** — section 7 applies: ask first.
+  (`xdebug_*`) count as **running** — section 7 applies, including its device-specific test permission.
 - If IDEA tools are unavailable or fail (IDE closed, indexing), fall back to built-in tools and say so; do not run
-  Gradle as a substitute without permission.
+  Gradle as a substitute unless permitted by section 7.
 
 ## 9. Project conventions
 
@@ -137,7 +149,7 @@ Restrictions:
 Kotlin 2.3 (JVM 21), Spring Boot 4.1 (webmvc, security, validation, actuator, flyway), Exposed 1.5 (DSL, not DAO,
 `org.jetbrains.exposed.v1.*` packages), PostgreSQL, jjwt, Jackson 3 (`tools.jackson`), springdoc-openapi, JUnit 5 +
 `kotlin.test`. Build: Gradle Kotlin DSL. Repository root (`..`) also holds `web-ui` (Next.js), `docs/`,
-`docker-compose.local.yaml`, `.env.example`, `README.md`.
+`docker/docker-compose.local.yaml`, `.env.example`, `README.md`.
 
 ### Architecture (clean architecture, package `com.bortnik.chiron`)
 

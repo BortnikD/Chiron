@@ -6,6 +6,7 @@ import com.bortnik.chiron.domain.dto.appointment.UpdateAppointmentDto
 import com.bortnik.chiron.domain.dto.pagination.Page
 import com.bortnik.chiron.domain.dto.pagination.PageRequest
 import com.bortnik.chiron.domain.entities.Appointment
+import java.time.Instant
 import java.util.UUID
 
 interface AppointmentRepository {
@@ -17,7 +18,7 @@ interface AppointmentRepository {
 
     fun findAll(filter: AppointmentFilter, pageRequest: PageRequest): Page<Appointment>
 
-    fun findAllByVeterinarianId(veterinarianId: UUID): List<Appointment>
+    fun findOverlapping(veterinarianId: UUID, from: Instant, to: Instant): List<Appointment>
 
     fun findAllByPetId(petId: UUID): List<Appointment>
 

@@ -2,7 +2,7 @@ package com.bortnik.chiron.application.usecase.admin.veterinarian
 
 import com.bortnik.chiron.application.security.Actor
 import com.bortnik.chiron.domain.dto.veterinarian.CreateVeterinarianDto
-import com.bortnik.chiron.domain.entities.Veterinarian
+import com.bortnik.chiron.domain.dto.veterinarian.VeterinarianDetailsDto
 import com.bortnik.chiron.domain.entities.enums.UserRole
 import com.bortnik.chiron.domain.exceptions.alreadyexists.VeterinarianAlreadyExistsException
 import com.bortnik.chiron.domain.exceptions.notfound.UserNotFoundException
@@ -23,7 +23,7 @@ class AdminCreateVeterinarianUseCase(
 
     private val log = LoggerFactory.getLogger(javaClass)
 
-    fun create(actor: Actor, dto: CreateVeterinarianDto): Veterinarian {
+    fun create(actor: Actor, dto: CreateVeterinarianDto): VeterinarianDetailsDto {
         VeterinarianValidator.validate(dto)
         val user = userRepository.findById(dto.userId) ?: throw UserNotFoundException(dto.userId)
         if (user.role != UserRole.VETERINARIAN) throw UserRoleMismatchException(
@@ -43,6 +43,12 @@ class AdminCreateVeterinarianUseCase(
             user.id,
             user.fullName,
         )
-        return veterinarian
+        return VeterinarianDetailsDto(
+            veterinarian = veterinarian,
+            firstName = user.firstName,
+            middleName = user.middleName,
+            lastName = user.lastName,
+            fullName = user.fullName,
+        )
     }
 }

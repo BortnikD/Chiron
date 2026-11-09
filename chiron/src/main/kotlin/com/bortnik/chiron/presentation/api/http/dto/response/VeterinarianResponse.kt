@@ -6,6 +6,10 @@ import java.util.UUID
 data class VeterinarianResponse(
     val id: UUID,
     val userId: UUID,
+    val firstName: String,
+    val middleName: String?,
+    val lastName: String,
+    val fullName: String,
     val specializationId: UUID,
     val bio: String?,
     val photoUrl: String?,
@@ -13,4 +17,5 @@ data class VeterinarianResponse(
     val isActive: Boolean,
     val createdAt: Instant,
     val updatedAt: Instant,
+    val speciesIds: List<UUID> = emptyList(),
 )
