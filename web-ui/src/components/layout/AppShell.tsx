@@ -139,7 +139,25 @@ function SidebarNavLinksFallback({ navGroups, collapsed, pathname, onItemClick }
   );
 }
 
-interface AppShellProps {
+export interface ShellHeaderData {
+  title?: string;
+  subtitle?: string;
+  actions?: React.ReactNode;
+  currentSection?: string;
+  crumbGroup?: string;
+  crumb?: string;
+}
+
+interface AppShellContextType {
+  insideShell: boolean;
+  setHeaderData: React.Dispatch<React.SetStateAction<ShellHeaderData>>;
+}
+
+export const AppShellContext = React.createContext<AppShellContextType | null>(null);
+
+export const useAppShell = () => React.useContext(AppShellContext);
+
+export interface AppShellProps {
   children: React.ReactNode;
   title?: string;
   subtitle?: string;
@@ -149,7 +167,34 @@ interface AppShellProps {
   crumb?: string;
 }
 
-export const AppShell: React.FC<AppShellProps> = ({
+const NestedAppShell: React.FC<AppShellProps & { setHeaderData: React.Dispatch<React.SetStateAction<ShellHeaderData>> }> = ({
+  children,
+  title,
+  subtitle,
+  actions,
+  currentSection,
+  crumbGroup,
+  crumb,
+  setHeaderData,
+}) => {
+  useEffect(() => {
+    setHeaderData({
+      title,
+      subtitle,
+      actions,
+      currentSection,
+      crumbGroup,
+      crumb,
+    });
+    return () => {
+      setHeaderData({});
+    };
+  }, [title, subtitle, actions, currentSection, crumbGroup, crumb, setHeaderData]);
+
+  return <>{children}</>;
+};
+
+const RootAppShell: React.FC<AppShellProps> = ({
   children,
   title,
   subtitle,
@@ -158,6 +203,7 @@ export const AppShell: React.FC<AppShellProps> = ({
   crumbGroup,
   crumb,
 }) => {
+  const [headerData, setHeaderData] = useState<ShellHeaderData>({});
   const { user, role, isAuthenticated, isLoading, logout } = useAuth();
   const { resolvedTheme } = useTheme();
   const pathname = usePathname();
@@ -397,10 +443,16 @@ export const AppShell: React.FC<AppShellProps> = ({
   const homeHref =
     role === 'ADMIN' ? '/admin/dashboard' : role === 'VETERINARIAN' ? '/vet/dashboard' : '/client/dashboard';
 
+  const effectiveCrumbGroup = headerData.crumbGroup || crumbGroup;
+  const effectiveCrumb = headerData.crumb || crumb;
+  const effectiveSection = headerData.currentSection || currentSection;
+  const effectiveTitle = headerData.title || title;
+  const effectiveActions = headerData.actions || actions;
+
   // Определение хлебных крошек согласно таблице TITLES прототипа
   const getBreadcrumbs = (): [string, string] => {
-    if (crumbGroup && (crumb || title || currentSection)) {
-      return [crumbGroup, (crumb || currentSection || title)!];
+    if (effectiveCrumbGroup && (effectiveCrumb || effectiveTitle || effectiveSection)) {
+      return [effectiveCrumbGroup, (effectiveCrumb || effectiveSection || effectiveTitle)!];
     }
 
     // Разделы администратора
@@ -416,7 +468,7 @@ export const AppShell: React.FC<AppShellProps> = ({
       if (pathname.includes('/schedules')) return ['Персонал', 'Расписания'];
       if (pathname.includes('/veterinarians')) return ['Персонал', 'Врачи'];
       if (pathname.includes('/services')) return ['Справочники', 'Услуги'];
-      return ['Обзор', currentSection || title || 'Дашборд'];
+      return ['Обзор', effectiveSection || effectiveTitle || 'Дашборд'];
     }
 
     // Разделы врача
@@ -431,7 +483,7 @@ export const AppShell: React.FC<AppShellProps> = ({
       if (pathname.includes('/schedule')) return ['Врач', 'Мой график'];
       if (pathname.includes('/services')) return ['Клиника', 'Услуги клиники'];
       if (pathname.includes('/veterinarians')) return ['Клиника', 'Коллеги'];
-      return ['Врач', currentSection || title || 'Сегодня'];
+      return ['Врач', effectiveSection || effectiveTitle || 'Сегодня'];
     }
 
     // Разделы клиента
@@ -445,7 +497,7 @@ export const AppShell: React.FC<AppShellProps> = ({
     if (pathname.includes('/vaccinations')) return ['Кабинет', 'Прививки'];
     if (pathname.includes('/services')) return ['Кабинет', 'Услуги'];
     if (pathname.includes('/veterinarians')) return ['Кабинет', 'Врачи'];
-    return ['Кабинет', currentSection || title || 'Главная'];
+    return ['Кабинет', effectiveSection || effectiveTitle || 'Главная'];
   };
 
   const [resolvedGroup, resolvedCrumb] = getBreadcrumbs();
@@ -472,7 +524,8 @@ export const AppShell: React.FC<AppShellProps> = ({
   }
 
   return (
-    <div className="app" data-theme={resolvedTheme}>
+    <AppShellContext.Provider value={{ insideShell: true, setHeaderData }}>
+      <div className="app" data-theme={resolvedTheme}>
       {/* Затемнение фона мобильного меню */}
       {mobileOpen && (
         <div
@@ -572,9 +625,9 @@ export const AppShell: React.FC<AppShellProps> = ({
 
             {/* Хлебные крошки согласно прототипу */}
             <nav className="crumbs" aria-label="Хлебные крошки">
-              <span>{crumbGroup || resolvedGroup}</span>
+              <span>{effectiveCrumbGroup || resolvedGroup}</span>
               <ChevronRight className="ic" style={{ width: '14px', height: '14px' }} />
-              <span className="cur">{crumb || currentSection || resolvedCrumb}</span>
+              <span className="cur">{effectiveCrumb || effectiveSection || resolvedCrumb}</span>
             </nav>
           </div>
 
@@ -582,7 +635,7 @@ export const AppShell: React.FC<AppShellProps> = ({
 
           {/* Панель действий справа */}
           <div className="flex items-center gap-2 shrink-0">
-            {actions}
+            {effectiveActions}
 
             {/* Быстрый поиск (Ctrl+K) */}
             <button
@@ -920,5 +973,16 @@ export const AppShell: React.FC<AppShellProps> = ({
         role={role}
       />
     </div>
+    </AppShellContext.Provider>
   );
+};
+
+export const AppShell: React.FC<AppShellProps> = (props) => {
+  const parentShell = React.useContext(AppShellContext);
+
+  if (parentShell?.insideShell) {
+    return <NestedAppShell {...props} setHeaderData={parentShell.setHeaderData} />;
+  }
+
+  return <RootAppShell {...props} />;
 };

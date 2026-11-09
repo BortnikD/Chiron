@@ -4,6 +4,15 @@ import React from 'react';
 
 export type SpeciesIconType = 'cat' | 'dog' | 'rab' | 'par' | string;
 
+export function getSpeciesTone(idOrName?: string | null): string {
+  if (!idOrName) return 'tone-cat';
+  const norm = idOrName.toLowerCase();
+  if (norm.includes('dog') || norm.includes('соб') || norm.includes('000000000002')) return 'tone-dog';
+  if (norm.includes('rab') || norm.includes('крол') || norm.includes('000000000003')) return 'tone-rab';
+  if (norm.includes('par') || norm.includes('попуг') || norm.includes('птиц') || norm.includes('000000000004')) return 'tone-par';
+  return 'tone-cat';
+}
+
 interface SpeciesIconProps extends React.SVGProps<SVGSVGElement> {
   species?: SpeciesIconType;
   size?: number;

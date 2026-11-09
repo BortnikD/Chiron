@@ -6,6 +6,7 @@
 
 export interface DoctorDisplayInfo {
   name: string;
+  fullName: string;
   initials: string;
   specName: string;
   title: string;
@@ -13,28 +14,32 @@ export interface DoctorDisplayInfo {
 
 export const KNOWN_DOCTORS: Record<
   string,
-  { fullName: string; initials: string; title: string; specName: string }
+  { fullName: string; shortName: string; initials: string; title: string; specName: string }
 > = {
   '5eed0006-0000-0000-0000-000000000001': {
     fullName: 'Анна Сергеевна Иванова',
+    shortName: 'Анна Иванова',
     initials: 'АИ',
     title: 'Ведущий терапевт',
     specName: 'Терапия',
   },
   '5eed0006-0000-0000-0000-000000000002': {
     fullName: 'Павел Петров',
+    shortName: 'Павел Петров',
     initials: 'ПП',
     title: 'Ветеринарный врач-терапевт',
     specName: 'Терапия',
   },
   '5eed0006-0000-0000-0000-000000000003': {
     fullName: 'Елена Викторовна Смирнова',
+    shortName: 'Елена Смирнова',
     initials: 'ЕС',
     title: 'Ведущий хирург',
     specName: 'Хирургия',
   },
   '5eed0006-0000-0000-0000-000000000004': {
     fullName: 'Олег Кузнецов',
+    shortName: 'Олег Кузнецов',
     initials: 'ОК',
     title: 'Ветеринарный стоматолог',
     specName: 'Стоматология',
@@ -67,6 +72,7 @@ export function getDoctorDisplay(
   if (!vet) {
     return {
       name: 'Ветеринарный врач',
+      fullName: 'Ветеринарный врач',
       initials: 'ВР',
       specName: 'Терапия',
       title: 'Ветеринарный врач',
@@ -75,15 +81,26 @@ export function getDoctorDisplay(
 
   const known = vet.id ? KNOWN_DOCTORS[vet.id] : undefined;
 
-  let name =
-    vet.user?.fullName ||
-    [vet.user?.firstName, vet.user?.lastName].filter(Boolean).join(' ').trim();
+  // Полное ФИО врача (для детального острова, модальных окон и медкарт)
+  let fullName =
+    (vet.user?.firstName && vet.user?.lastName
+      ? [vet.user.firstName, vet.user.middleName, vet.user.lastName].filter(Boolean).join(' ')
+      : vet.user?.fullName) ||
+    known?.fullName ||
+    'Ветеринарный врач';
 
-  if (!name && known) {
-    name = known.fullName;
-  }
-  if (!name) {
-    name = 'Ветеринарный врач';
+  // Компактное имя для карточек ("Имя Фамилия", 12-14 символов)
+  // Исключает перенос отчества вниз на 2-ю строку при сжатии карточки (открытие бокового острова)
+  let name =
+    (vet.user?.firstName && vet.user?.lastName
+      ? `${vet.user.firstName} ${vet.user.lastName}`.trim()
+      : known?.shortName) ||
+    fullName;
+
+  // Если имя из API содержит отчество (3 слова), сокращаем для карточки до "Имя Фамилия"
+  const nameParts = name.split(/\s+/).filter(Boolean);
+  if (nameParts.length >= 3) {
+    name = `${nameParts[0]} ${nameParts[nameParts.length - 1]}`;
   }
 
   let initials = '';
@@ -107,6 +124,7 @@ export function getDoctorDisplay(
 
   return {
     name,
+    fullName,
     initials,
     specName,
     title,
