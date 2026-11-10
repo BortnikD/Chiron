@@ -5,6 +5,10 @@ import Link from 'next/link';
 import { LogIn, Eye, EyeOff } from 'lucide-react';
 import { LoginFormProps } from './types';
 
+const IS_DEMO_BACKEND = Boolean(process.env.NEXT_PUBLIC_API_PROXY_TARGET?.includes(':8081'));
+const DEV_ADMIN_EMAIL = IS_DEMO_BACKEND ? 'admin@demo.chiron.local' : 'admin@chiron.local';
+const DEV_ADMIN_PASSWORD = IS_DEMO_BACKEND ? 'demoAdmin123' : 'admin123';
+
 export function LoginForm({
   email,
   setEmail,
@@ -37,14 +41,9 @@ export function LoginForm({
         </div>
 
         <div className="field">
-          <div className="flex items-center justify-between">
-            <label className="field-label" htmlFor="l-pass">
-              Пароль
-            </label>
-            <span className="text-[11px] text-[var(--muted-foreground)]">
-              пароль: password123 (admin123 для админа)
-            </span>
-          </div>
+          <label className="field-label" htmlFor="l-pass">
+            Пароль
+          </label>
           <div className="relative">
             <input
               id="l-pass"
@@ -52,6 +51,7 @@ export function LoginForm({
               className="input pr-10"
               required
               autoComplete="current-password"
+              aria-describedby={isDev ? 'l-pass-hint' : undefined}
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               placeholder="••••••••"
@@ -66,6 +66,11 @@ export function LoginForm({
               {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
             </button>
           </div>
+          {isDev && (
+            <span id="l-pass-hint" className="field-hint">
+              Пароль для тестовых аккаунтов: password123 ({DEV_ADMIN_PASSWORD} для админа)
+            </span>
+          )}
         </div>
 
         <button
@@ -85,8 +90,8 @@ export function LoginForm({
       </form>
 
       {isDev && (
-        <p className="small muted" style={{ marginTop: '14px' }}>
-          Демо-аккаунты: client1@seed.chiron.local (клиент), vet2@seed.chiron.local (врач), admin@chiron.local (админ) — пароль password123 (admin123 для админа).
+        <p className="small muted">
+          Демо-аккаунты: client1@seed.chiron.local (клиент), vet2@seed.chiron.local (врач), {DEV_ADMIN_EMAIL} (админ).
         </p>
       )}
 

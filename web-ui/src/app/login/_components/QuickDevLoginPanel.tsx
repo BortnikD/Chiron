@@ -5,6 +5,10 @@ import Link from 'next/link';
 import { ClipboardList } from 'lucide-react';
 import { DevAccount, QuickDevLoginPanelProps } from './types';
 
+const IS_DEMO_BACKEND = Boolean(process.env.NEXT_PUBLIC_API_PROXY_TARGET?.includes(':8081'));
+const DEV_ADMIN_EMAIL = IS_DEMO_BACKEND ? 'admin@demo.chiron.local' : 'admin@chiron.local';
+const DEV_ADMIN_PASSWORD = IS_DEMO_BACKEND ? 'demoAdmin123' : 'admin123';
+
 export const DEV_ACCOUNTS: DevAccount[] = [
   {
     id: 'client',
@@ -27,8 +31,8 @@ export const DEV_ACCOUNTS: DevAccount[] = [
     roleName: 'Администратор',
     subTitle: 'Администратор клиники',
     initials: 'АД',
-    email: 'admin@chiron.local',
-    password: 'admin123',
+    email: DEV_ADMIN_EMAIL,
+    password: DEV_ADMIN_PASSWORD,
   },
 ];
 

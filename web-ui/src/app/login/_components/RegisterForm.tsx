@@ -1,9 +1,10 @@
 'use client';
 
-import React, { useState } from 'react';
+import React from 'react';
 import Link from 'next/link';
 import { Eye, EyeOff } from 'lucide-react';
-import { RegisterFormData, RegisterFormProps } from './types';
+import { useRegisterForm } from '@/app/register/_hooks/useRegisterForm';
+import type { RegisterFormProps } from './types';
 
 export function RegisterForm({
   loading,
@@ -11,49 +12,15 @@ export function RegisterForm({
   onSwitchToLogin,
   setError,
 }: RegisterFormProps) {
-  const [form, setForm] = useState<RegisterFormData>({
-    firstName: '',
-    lastName: '',
-    middleName: '',
-    email: '',
-    phone: '',
-    password: '',
-    confirmPassword: '',
-  });
-  const [showPassword, setShowPassword] = useState(false);
-  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    setError(null);
-
-    if (!form.firstName.trim() || !form.lastName.trim()) {
-      setError('Укажите имя и фамилию');
-      return;
-    }
-    if (!form.email.trim() || !form.phone.trim()) {
-      setError('Укажите email и номер телефона');
-      return;
-    }
-    if (form.password.length < 8) {
-      setError('Пароль должен содержать не менее 8 символов');
-      return;
-    }
-    if (form.password !== form.confirmPassword) {
-      setError('Пароли не совпадают');
-      return;
-    }
-
-    const { confirmPassword: _, ...payload } = form;
-    onSubmit({
-      firstName: payload.firstName.trim(),
-      lastName: payload.lastName.trim(),
-      ...(payload.middleName?.trim() ? { middleName: payload.middleName.trim() } : {}),
-      email: payload.email.trim(),
-      phone: payload.phone.trim(),
-      password: payload.password,
-    });
-  };
+  const {
+    form,
+    setField,
+    showPassword,
+    toggleShowPassword,
+    showConfirmPassword,
+    toggleShowConfirmPassword,
+    handleSubmit,
+  } = useRegisterForm({ onSubmit, setError });
 
   return (
     <>
@@ -69,7 +36,7 @@ export function RegisterForm({
               className="input"
               required
               value={form.email}
-              onChange={(e) => setForm({ ...form, email: e.target.value })}
+              onChange={(e) => setField('email', e.target.value)}
               placeholder="client@mail.ru"
             />
           </div>
@@ -84,7 +51,7 @@ export function RegisterForm({
               className="input"
               required
               value={form.firstName}
-              onChange={(e) => setForm({ ...form, firstName: e.target.value })}
+              onChange={(e) => setField('firstName', e.target.value)}
               placeholder="Иван"
             />
           </div>
@@ -99,7 +66,7 @@ export function RegisterForm({
               className="input"
               required
               value={form.lastName}
-              onChange={(e) => setForm({ ...form, lastName: e.target.value })}
+              onChange={(e) => setField('lastName', e.target.value)}
               placeholder="Иванов"
             />
           </div>
@@ -113,7 +80,7 @@ export function RegisterForm({
               type="text"
               className="input"
               value={form.middleName}
-              onChange={(e) => setForm({ ...form, middleName: e.target.value })}
+              onChange={(e) => setField('middleName', e.target.value)}
               placeholder="Иванович"
             />
           </div>
@@ -128,7 +95,7 @@ export function RegisterForm({
               className="input"
               required
               value={form.phone}
-              onChange={(e) => setForm({ ...form, phone: e.target.value })}
+              onChange={(e) => setField('phone', e.target.value)}
               placeholder="+7 900 000-00-00"
             />
           </div>
@@ -144,21 +111,22 @@ export function RegisterForm({
                 className="input pr-10"
                 required
                 minLength={8}
+                aria-describedby="r-pass-hint"
                 value={form.password}
-                onChange={(e) => setForm({ ...form, password: e.target.value })}
+                onChange={(e) => setField('password', e.target.value)}
                 placeholder="••••••••"
               />
               <button
                 type="button"
                 className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[var(--muted-foreground)] hover:text-[var(--foreground)] transition-colors p-1"
-                onClick={() => setShowPassword((prev) => !prev)}
+                onClick={toggleShowPassword}
                 title={showPassword ? 'Скрыть пароль' : 'Показать пароль'}
                 aria-label={showPassword ? 'Скрыть пароль' : 'Показать пароль'}
               >
                 {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
               </button>
             </div>
-            <span className="field-hint">Не меньше 8 символов</span>
+            <span id="r-pass-hint" className="field-hint">Не меньше 8 символов</span>
           </div>
 
           <div className="field span-2">
@@ -173,13 +141,13 @@ export function RegisterForm({
                 required
                 minLength={8}
                 value={form.confirmPassword}
-                onChange={(e) => setForm({ ...form, confirmPassword: e.target.value })}
+                onChange={(e) => setField('confirmPassword', e.target.value)}
                 placeholder="••••••••"
               />
               <button
                 type="button"
                 className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[var(--muted-foreground)] hover:text-[var(--foreground)] transition-colors p-1"
-                onClick={() => setShowConfirmPassword((prev) => !prev)}
+                onClick={toggleShowConfirmPassword}
                 title={showConfirmPassword ? 'Скрыть пароль' : 'Показать пароль'}
                 aria-label={showConfirmPassword ? 'Скрыть пароль' : 'Показать пароль'}
               >
