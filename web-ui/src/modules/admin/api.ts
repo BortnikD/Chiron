@@ -1,35 +1,38 @@
-import { api } from '../../api/client';
-import {
-  User,
+import { api } from '@/shared/api/client';
+import type { AppointmentStatus, User, PageResponse, StatisticsGranularity } from '@/shared/types';
+import type {
+  Veterinarian,
+  Service,
+  Species,
+  Specialization,
+  ServiceSpecies,
+  VeterinarianSpeciesPermission,
+} from '@/modules/clinic/types';
+import type {
   Appointment,
-  AdminCreateAppointmentRequest,
-  AdminUpdateAppointmentRequest,
   Pet,
   CreatePetRequest,
   UpdatePetRequest,
+  Vaccination,
+  CreateVaccinationRequest,
+  UpdateVaccinationRequest,
+} from '@/modules/client/types';
+import type {
   WorkSchedule,
   CreateWorkScheduleRequest,
   UpdateWorkScheduleRequest,
   ScheduleException,
   CreateScheduleExceptionRequest,
-  VeterinarianSpeciesPermission,
-  ServiceSpecies,
+  UpdateScheduleExceptionRequest,
+  AdminCreateAppointmentRequest,
+  AdminUpdateAppointmentRequest,
   CreateServiceSpeciesRequest,
-  Vaccination,
-  CreateVaccinationRequest,
-  UpdateVaccinationRequest,
-  Veterinarian,
-  Service,
-  Species,
-  Specialization,
   OverviewStatistics,
   TimelinePoint,
   VeterinarianStatistics,
   ServiceStatistics,
   SpeciesStatistics,
-  StatisticsGranularity,
-  PageResponse,
-} from '../../types';
+} from './types';
 
 // ─── Административные операции ────────────────────────────
 
@@ -65,13 +68,21 @@ export const adminApi = {
       petId?: string;
       ownerId?: string;
       serviceId?: string;
-      status?: string;
+      status?: AppointmentStatus | AppointmentStatus[] | string;
       from?: string;
       to?: string;
     }
   ) => {
     const params = new URLSearchParams({ page: page.toString(), size: size.toString() });
-    if (filter?.status) params.append('status', filter.status);
+    if (filter?.status) {
+      if (Array.isArray(filter.status)) {
+        filter.status.forEach((s) => {
+          if (s) params.append('status', s);
+        });
+      } else {
+        params.append('status', filter.status);
+      }
+    }
     if (filter?.veterinarianId) params.append('veterinarianId', filter.veterinarianId);
     if (filter?.petId) params.append('petId', filter.petId);
     if (filter?.ownerId) params.append('ownerId', filter.ownerId);
@@ -138,6 +149,9 @@ export const adminApi = {
 
   createScheduleException: (data: CreateScheduleExceptionRequest) =>
     api.post<ScheduleException>('/api/v1/admin/schedule-exceptions', data),
+
+  updateScheduleException: (id: string, data: UpdateScheduleExceptionRequest) =>
+    api.patch<ScheduleException>(`/api/v1/admin/schedule-exceptions/${id}`, data),
 
   deleteScheduleException: (id: string) =>
     api.delete<void>(`/api/v1/admin/schedule-exceptions/${id}`),
@@ -213,7 +227,14 @@ export const adminApi = {
   deleteVeterinarian: (id: string) =>
     api.delete<void>(`/api/v1/admin/veterinarians/${id}`),
 
-  getServices: () => api.get<Service[]>('/api/v1/admin/services'),
+  getServices: (filter?: { specializationId?: string; speciesId?: string; isActive?: boolean }) => {
+    const params = new URLSearchParams();
+    if (filter?.specializationId) params.append('specializationId', filter.specializationId);
+    if (filter?.speciesId) params.append('speciesId', filter.speciesId);
+    if (filter?.isActive !== undefined) params.append('isActive', String(filter.isActive));
+    const query = params.toString() ? `?${params.toString()}` : '';
+    return api.get<Service[]>(`/api/v1/admin/services${query}`);
+  },
 
   createService: (data: Omit<Service, 'id' | 'createdAt' | 'updatedAt'>) =>
     api.post<Service>('/api/v1/admin/services', data),

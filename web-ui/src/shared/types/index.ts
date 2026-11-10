@@ -9,7 +9,6 @@ export type Gender = 'MALE' | 'FEMALE';
 export type AppointmentStatus =
   | 'PENDING'
   | 'CONFIRMED'
-  | 'IN_PROGRESS'
   | 'COMPLETED'
   | 'CANCELLED'
   | 'NO_SHOW';
@@ -45,9 +44,10 @@ export interface ApiResponse<T> {
 }
 
 export interface ApiErrorResponse {
-  exception: string;
+  exception?: string;
+  name?: string;
   message: string;
-  status: number;
+  status: number | string;
   path: string;
   violations?: FieldViolation[];
 }

@@ -1,41 +1,25 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
-import { useTheme, Theme } from '../../context/ThemeContext';
-import { useAuth } from '../../context/AuthContext';
+import { useTheme, Theme } from '@/context/ThemeContext';
+import { useAuth } from '@/context/AuthContext';
 import { useRouter } from 'next/navigation';
-import { userApi } from '../../api';
+import { userApi } from '@/shared/api';
+import { formatApiError, getUtf8ByteLength } from '@/shared/lib';
 import { Sun, Moon, Monitor, Check, Lock, Info, ChevronRight, X, AlertCircle } from 'lucide-react';
+
+const THEMES: { id: Theme; label: string; icon: React.ReactNode; previewCls: string }[] = [
+  { id: 'system', label: 'Системная', icon: <Monitor className="ic" />, previewCls: 'tp-i-monitor' },
+  { id: 'light', label: 'Светлая', icon: <Sun className="ic" />, previewCls: 'tp-i-sun' },
+  { id: 'dark', label: 'Тёмная', icon: <Moon className="ic" />, previewCls: 'tp-i-moon' },
+];
 
 export const AppSettingsView: React.FC = () => {
   const { theme, setTheme } = useTheme();
   const { logout } = useAuth();
   const router = useRouter();
 
-  // Порядок тем в строгом соответствии с прототипом: Системная -> Светлая -> Тёмная
-  const themes: { id: Theme; label: string; icon: React.ReactNode; previewCls: string }[] = [
-    {
-      id: 'system',
-      label: 'Системная',
-      icon: <Monitor className="ic" style={{ width: '16px', height: '16px' }} />,
-      previewCls: 'tp-i-monitor',
-    },
-    {
-      id: 'light',
-      label: 'Светлая',
-      icon: <Sun className="ic" style={{ width: '16px', height: '16px' }} />,
-      previewCls: 'tp-i-sun',
-    },
-    {
-      id: 'dark',
-      label: 'Тёмная',
-      icon: <Moon className="ic" style={{ width: '16px', height: '16px' }} />,
-      previewCls: 'tp-i-moon',
-    },
-  ];
-
-  // Состояние модального окна смены пароля
   const [passwordModalOpen, setPasswordModalOpen] = useState(false);
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
@@ -43,6 +27,26 @@ export const AppSettingsView: React.FC = () => {
   const [passwordSaving, setPasswordSaving] = useState(false);
   const [passwordError, setPasswordError] = useState<string | null>(null);
   const [passwordSuccess, setPasswordSuccess] = useState<string | null>(null);
+  const closeTimerRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (closeTimerRef.current !== null) {
+        window.clearTimeout(closeTimerRef.current);
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!passwordModalOpen) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && !passwordSaving) {
+        setPasswordModalOpen(false);
+      }
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [passwordModalOpen, passwordSaving]);
 
   const handleLogout = () => {
     logout();
@@ -54,8 +58,18 @@ export const AppSettingsView: React.FC = () => {
     setPasswordError(null);
     setPasswordSuccess(null);
 
+    if (currentPassword.length > 512) {
+      setPasswordError('Текущий пароль не должен превышать 512 символов');
+      return;
+    }
+
     if (newPassword.length < 8) {
       setPasswordError('Новый пароль должен содержать не менее 8 символов');
+      return;
+    }
+
+    if (getUtf8ByteLength(newPassword) > 72) {
+      setPasswordError('Новый пароль не должен превышать 72 байта в UTF-8');
       return;
     }
 
@@ -66,20 +80,19 @@ export const AppSettingsView: React.FC = () => {
 
     setPasswordSaving(true);
     try {
-      await userApi.changePassword({
-        currentPassword,
-        newPassword,
-      });
+      await userApi.changePassword({ currentPassword, newPassword });
       setPasswordSuccess('Пароль успешно изменён');
-      setTimeout(() => {
+      closeTimerRef.current = window.setTimeout(() => {
         setPasswordModalOpen(false);
         setCurrentPassword('');
         setNewPassword('');
         setConfirmPassword('');
         setPasswordSuccess(null);
       }, 1500);
-    } catch (err: any) {
-      setPasswordError(err?.message || 'Не удалось изменить пароль. Проверьте правильность текущего пароля.');
+    } catch (err) {
+      setPasswordError(
+        formatApiError(err, 'Не удалось изменить пароль. Проверьте правильность текущего пароля.')
+      );
     } finally {
       setPasswordSaving(false);
     }
@@ -87,7 +100,6 @@ export const AppSettingsView: React.FC = () => {
 
   return (
     <div className="set-grid">
-      {/* 1. Оформление (во всю ширину) */}
       <section className="island set-span">
         <div className="island-head">
           <span className="island-title">
@@ -98,7 +110,7 @@ export const AppSettingsView: React.FC = () => {
         </div>
         <div className="island-body" style={{ paddingTop: 0 }}>
           <div className="theme-tiles">
-            {themes.map((t) => {
+            {THEMES.map((t) => {
               const isSelected = theme === t.id;
               return (
                 <button
@@ -113,14 +125,14 @@ export const AppSettingsView: React.FC = () => {
                     <i />
                     <i />
                   </span>
-                  <span className="row" style={{ gap: '8px', alignItems: 'center' }}>
+                  <span className="row" style={{ gap: '8px' }}>
                     {t.icon}
                     <span className="cell-main grow" style={{ textAlign: 'left', fontSize: '13px' }}>
                       {t.label}
                     </span>
                     {isSelected && (
                       <span className="tcard-check">
-                        <Check className="ic" style={{ strokeWidth: 3 }} />
+                        <Check className="ic" />
                       </span>
                     )}
                   </span>
@@ -134,7 +146,6 @@ export const AppSettingsView: React.FC = () => {
         </div>
       </section>
 
-      {/* 2. Безопасность */}
       <section className="island">
         <div className="island-head">
           <span className="island-title">
@@ -175,7 +186,6 @@ export const AppSettingsView: React.FC = () => {
         </div>
       </section>
 
-      {/* 3. О приложении */}
       <section className="island">
         <div className="island-head">
           <span className="island-title">
@@ -194,15 +204,14 @@ export const AppSettingsView: React.FC = () => {
           <div className="set-row">
             <span className="col grow" style={{ gap: '2px' }}>
               <b>Версия</b>
-              <span className="small muted">Прототип интерфейса · 2026.10</span>
+              <span className="small muted">Веб-клиент · Chiron</span>
             </span>
           </div>
         </div>
       </section>
 
-      {/* Модальное окно смены пароля */}
       {passwordModalOpen && (
-        <div className="overlay" onClick={() => setPasswordModalOpen(false)}>
+        <div className="overlay" onClick={() => !passwordSaving && setPasswordModalOpen(false)}>
           <div
             className="dialog dialog-sm"
             role="dialog"
@@ -211,18 +220,19 @@ export const AppSettingsView: React.FC = () => {
             onClick={(e) => e.stopPropagation()}
           >
             <div className="dialog-head">
-              <div className="row between" style={{ alignItems: 'center' }}>
-                <span className="dialog-title row" style={{ gap: '8px', alignItems: 'center' }}>
-                  <Lock className="ic" style={{ width: '18px', height: '18px' }} />
+              <div className="row between">
+                <span className="dialog-title row" style={{ gap: '8px' }}>
+                  <Lock className="ic" />
                   <span>Смена пароля</span>
                 </span>
                 <button
                   type="button"
                   className="btn btn-ghost btn-icon btn-sm"
-                  onClick={() => setPasswordModalOpen(false)}
+                  onClick={() => !passwordSaving && setPasswordModalOpen(false)}
+                  disabled={passwordSaving}
                   aria-label="Закрыть"
                 >
-                  <X className="ic" style={{ width: '16px', height: '16px' }} />
+                  <X className="ic" />
                 </button>
               </div>
               <span className="dialog-desc">
@@ -230,44 +240,21 @@ export const AppSettingsView: React.FC = () => {
               </span>
             </div>
 
-            <form onSubmit={handlePasswordSubmit} style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
+            <form
+              onSubmit={handlePasswordSubmit}
+              style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}
+            >
               <div className="dialog-body">
                 {passwordError && (
-                  <div
-                    className="alert"
-                    style={{
-                      padding: '10px 14px',
-                      borderRadius: '8px',
-                      background: 'rgba(239, 68, 68, 0.12)',
-                      border: '1px solid rgba(239, 68, 68, 0.3)',
-                      color: '#ef4444',
-                      fontSize: '13px',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '8px',
-                    }}
-                  >
-                    <AlertCircle className="ic" style={{ width: '16px', height: '16px', flexShrink: 0 }} />
+                  <div className="alert alert-destructive" role="alert">
+                    <AlertCircle className="ic" />
                     <span>{passwordError}</span>
                   </div>
                 )}
 
                 {passwordSuccess && (
-                  <div
-                    className="alert"
-                    style={{
-                      padding: '10px 14px',
-                      borderRadius: '8px',
-                      background: 'rgba(34, 197, 94, 0.12)',
-                      border: '1px solid rgba(34, 197, 94, 0.3)',
-                      color: '#22c55e',
-                      fontSize: '13px',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '8px',
-                    }}
-                  >
-                    <Check className="ic" style={{ width: '16px', height: '16px', flexShrink: 0 }} />
+                  <div className="alert alert-success" role="status">
+                    <Check className="ic" />
                     <span>{passwordSuccess}</span>
                   </div>
                 )}
@@ -332,11 +319,7 @@ export const AppSettingsView: React.FC = () => {
                 >
                   Отмена
                 </button>
-                <button
-                  type="submit"
-                  className="btn btn-primary"
-                  disabled={passwordSaving}
-                >
+                <button type="submit" className="btn btn-primary" disabled={passwordSaving}>
                   {passwordSaving ? 'Сохранение...' : 'Обновить пароль'}
                 </button>
               </div>

@@ -1,15 +1,15 @@
-import { api } from '../../api/client';
-import {
+import { api } from '@/shared/api/client';
+import type {
   Service,
   Veterinarian,
   Species,
   Specialization,
   ServiceSpecies,
   VeterinarianSpeciesPermission,
+  AvailableSlotResponse,
   WorkSchedule,
   ScheduleException,
-  AvailableSlotResponse,
-} from '../../types';
+} from './types';
 
 // ─── Публичные справочники клиники и расписание ────────────
 

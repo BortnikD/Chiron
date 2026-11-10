@@ -1,10 +1,12 @@
-import { api, ApiError } from '../../api/client';
+import { api } from './client';
 import {
   AuthResult,
   User,
   AppNotification,
   PageResponse,
-} from '../../types';
+} from '@/shared/types';
+
+export { ApiError, tokenStorage, request, api } from './client';
 
 // ─── Авторизация ──────────────────────────────────────────
 
@@ -25,59 +27,20 @@ export const authApi = {
 // ─── Профиль текущего пользователя ────────────────────────
 
 export const userApi = {
-  getMe: async (): Promise<User> => {
-    try {
-      return await api.get<User>('/api/v1/users/me');
-    } catch (err) {
-      if (err instanceof ApiError && err.status === 404) {
-        // Запасной путь для совместимости со старыми версиями бэкенда
-        return await api.get<User>('/api/v1/auth/me');
-      }
-      throw err;
-    }
-  },
+  getMe: (): Promise<User> => api.get<User>('/api/v1/users/me'),
 
-  updateMe: async (
+  updateMe: (
     data: Partial<Pick<User, 'firstName' | 'lastName' | 'middleName' | 'email' | 'phone'>>
-  ): Promise<User> => {
-    try {
-      return await api.patch<User>('/api/v1/users/me', data);
-    } catch (err) {
-      if (err instanceof ApiError && err.status === 404) {
-        return await api.patch<User>('/api/v1/auth/me', data);
-      }
-      throw err;
-    }
-  },
+  ): Promise<User> => api.patch<User>('/api/v1/users/me', data),
 
-  changePassword: async (data: {
-    oldPassword?: string;
-    currentPassword?: string;
+  changePassword: (data: {
+    currentPassword: string;
     newPassword: string;
-  }): Promise<void> => {
-    const payload = {
-      currentPassword: data.currentPassword || data.oldPassword,
-      oldPassword: data.oldPassword || data.currentPassword,
+  }): Promise<void> =>
+    api.post<void>('/api/v1/users/me/password', {
+      currentPassword: data.currentPassword,
       newPassword: data.newPassword,
-    };
-    try {
-      await api.post('/api/v1/auth/change-password', payload);
-    } catch (err) {
-      if (err instanceof ApiError && (err.status === 404 || err.status === 405)) {
-        try {
-          await api.patch('/api/v1/users/me/password', payload);
-        } catch (err2) {
-          if (err2 instanceof ApiError && (err2.status === 404 || err2.status === 405)) {
-            await api.patch('/api/v1/users/password', payload);
-            return;
-          }
-          throw err2;
-        }
-        return;
-      }
-      throw err;
-    }
-  },
+    }),
 };
 
 // ─── Уведомления ──────────────────────────────────────────

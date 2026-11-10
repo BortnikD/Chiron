@@ -1,25 +1,18 @@
 'use client';
 
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import { clinicApi } from '../../api';
-import { Service, Veterinarian, UserRole } from '../../types';
+import { clinicApi } from '@/modules/clinic/api';
+import type { Service, Veterinarian } from '@/modules/clinic/types';
+import type { UserRole } from '@/shared/types';
+import { formatCurrency } from '@/shared/lib';
+import { getDoctorDisplay } from '@/utils/doctorHelpers';
+import { getNavGroups } from './shell/navConfig';
 import {
   Search,
-  Home,
   Calendar,
   ClipboardList,
   Stethoscope,
-  Syringe,
-  Bell,
-  User as UserIcon,
-  Settings,
-  Users,
-  Clock,
-  Layers,
-  ChevronRight,
-  PawPrint,
-  X,
 } from 'lucide-react';
 
 interface CommandPaletteModalProps {
@@ -41,6 +34,39 @@ interface PaletteGroup {
   items: PaletteItem[];
 }
 
+const ROUTE_HINTS: Record<string, string> = {
+  '/admin/dashboard': 'Раздел',
+  '/admin/appointments': 'Журнал',
+  '/admin/pets': 'Картотека',
+  '/admin/vaccinations': 'Журнал',
+  '/admin/users': 'Управление',
+  '/admin/veterinarians': 'Персонал',
+  '/admin/schedules': 'Графики',
+  '/admin/schedules?tab=exc': 'Исключения',
+  '/admin/services': 'Каталог',
+  '/admin/services?tab=species': 'Справочник',
+  '/admin/services?tab=specs': 'Справочник',
+  '/admin/notifications': 'Оповещения',
+  '/admin/profile': 'Аккаунт',
+  '/admin/settings': 'Параметры',
+  '/vet/dashboard': 'Кабинет',
+  '/vet/patients': 'Картотека',
+  '/vet/schedule': 'График',
+  '/vet/profile': 'Профиль',
+  '/vet/notifications': 'Оповещения',
+  '/vet/settings': 'Параметры',
+  '/client/dashboard': 'Обзор',
+  '/client/pets': 'Питомцы',
+  '/client/appointments': 'Записи',
+  '/client/vaccinations': 'Прививки',
+  '/client/book': 'Мастер записи',
+  '/client/notifications': 'История',
+  '/client/profile': 'Контакты',
+  '/client/settings': 'Параметры',
+  '/services': 'Каталог',
+  '/veterinarians': 'Врачи',
+};
+
 export const CommandPaletteModal: React.FC<CommandPaletteModalProps> = ({
   isOpen,
   onClose,
@@ -53,27 +79,35 @@ export const CommandPaletteModal: React.FC<CommandPaletteModalProps> = ({
   const [selectedIndex, setSelectedIndex] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  // Фокус на поле ввода при открытии
   useEffect(() => {
-    if (isOpen) {
-      setQuery('');
-      setSelectedIndex(0);
-      setTimeout(() => inputRef.current?.focus(), 50);
-    }
+    if (!isOpen) return;
+    setQuery('');
+    setSelectedIndex(0);
+    const timer = window.setTimeout(() => inputRef.current?.focus(), 50);
+    return () => window.clearTimeout(timer);
   }, [isOpen]);
 
-  // Загрузка услуг и врачей для быстрого поиска
   useEffect(() => {
-    if (isOpen && services.length === 0) {
-      clinicApi.getServices().then((data) => setServices(data || [])).catch(() => {});
-      clinicApi.getVeterinarians().then((data) => setVets(data || [])).catch(() => {});
+    if (!isOpen) return;
+    let cancelled = false;
+    if (services.length === 0) {
+      clinicApi.getServices().then((data) => {
+        if (!cancelled) setServices(data || []);
+      }).catch(() => {});
     }
-  }, [isOpen, services.length]);
+    if (vets.length === 0) {
+      clinicApi.getVeterinarians().then((data) => {
+        if (!cancelled) setVets(data || []);
+      }).catch(() => {});
+    }
+    return () => {
+      cancelled = true;
+    };
+  }, [isOpen, services.length, vets.length]);
 
-  // Закрытие по Escape
   useEffect(() => {
+    if (!isOpen) return;
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (!isOpen) return;
       if (e.key === 'Escape') {
         e.preventDefault();
         onClose();
@@ -83,77 +117,61 @@ export const CommandPaletteModal: React.FC<CommandPaletteModalProps> = ({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isOpen, onClose]);
 
-  const navigateTo = (url: string) => {
-    onClose();
-    router.push(url);
-  };
+  const navigateTo = useCallback(
+    (url: string) => {
+      onClose();
+      router.push(url);
+    },
+    [onClose, router]
+  );
 
-  // Формирование разделов в зависимости от роли (БЕЗ питомцев и записей)
   const navItems: PaletteItem[] = useMemo(() => {
+    const groups = getNavGroups(role ?? null, 0);
     const items: PaletteItem[] = [];
 
-    if (role === 'ADMIN') {
-      items.push(
-        { id: 'admin-dash', label: 'Дашборд и аналитика', hint: 'Раздел', icon: <Home className="ic" />, action: () => navigateTo('/admin/dashboard') },
-        { id: 'admin-users', label: 'Пользователи клиники', hint: 'Управление', icon: <Users className="ic" />, action: () => navigateTo('/admin/users') },
-        { id: 'admin-vets', label: 'Врачи и персонал', hint: 'Справочник', icon: <Stethoscope className="ic" />, action: () => navigateTo('/admin/veterinarians') },
-        { id: 'admin-sched', label: 'Расписания врачей', hint: 'Графики', icon: <Clock className="ic" />, action: () => navigateTo('/admin/schedules') },
-        { id: 'admin-services', label: 'Услуги и прейскурант', hint: 'Каталог', icon: <ClipboardList className="ic" />, action: () => navigateTo('/admin/services') },
-        { id: 'admin-species', label: 'Виды животных', hint: 'Справочник', icon: <PawPrint className="ic" />, action: () => navigateTo('/admin/services?tab=species') },
-        { id: 'admin-specs', label: 'Специализации врачей', hint: 'Справочник', icon: <Layers className="ic" />, action: () => navigateTo('/admin/services?tab=specs') },
-        { id: 'admin-vacc', label: 'Реестр вакцинации', hint: 'Журнал', icon: <Syringe className="ic" />, action: () => navigateTo('/admin/vaccinations') },
-        { id: 'admin-notifs', label: 'Системные уведомления', hint: 'Журнал', icon: <Bell className="ic" />, action: () => navigateTo('/admin/notifications') },
-        { id: 'admin-prof', label: 'Профиль администратора', hint: 'Аккаунт', icon: <UserIcon className="ic" />, action: () => navigateTo('/admin/profile') },
-        { id: 'admin-set', label: 'Настройки системы', hint: 'Параметры', icon: <Settings className="ic" />, action: () => navigateTo('/admin/settings') },
-      );
-    } else if (role === 'VETERINARIAN') {
-      items.push(
-        { id: 'vet-today', label: 'Сегодня — расписание и приёмы', hint: 'Кабинет', icon: <Clock className="ic" />, action: () => navigateTo('/vet/dashboard') },
-        { id: 'vet-patients', label: 'Пациенты клиники', hint: 'Картотека', icon: <PawPrint className="ic" />, action: () => navigateTo('/vet/patients') },
-        { id: 'vet-services', label: 'Каталог услуг', hint: 'Справочник', icon: <ClipboardList className="ic" />, action: () => navigateTo('/services') },
-        { id: 'vet-colleagues', label: 'Врачи клиники', hint: 'Коллеги', icon: <Stethoscope className="ic" />, action: () => navigateTo('/veterinarians') },
-        { id: 'vet-notifs', label: 'Уведомления врача', hint: 'Оповещения', icon: <Bell className="ic" />, action: () => navigateTo('/vet/notifications') },
-        { id: 'vet-prof', label: 'Профиль специалиста', hint: 'Публичные данные', icon: <UserIcon className="ic" />, action: () => navigateTo('/vet/profile') },
-        { id: 'vet-set', label: 'Настройки кабинета', hint: 'Параметры', icon: <Settings className="ic" />, action: () => navigateTo('/vet/settings') },
-      );
-    } else {
-      // CLIENT
-      items.push(
-        { id: 'cl-home', label: 'Главная страница кабинета', hint: 'Обзор', icon: <Home className="ic" />, action: () => navigateTo('/client/dashboard') },
-        { id: 'cl-book', label: 'Записаться на приём', hint: 'Мастер записи', icon: <Calendar className="ic" />, action: () => navigateTo('/client/book') },
-        { id: 'cl-services', label: 'Услуги и цены', hint: 'Каталог', icon: <ClipboardList className="ic" />, action: () => navigateTo('/services') },
-        { id: 'cl-vets', label: 'Врачи клиники', hint: 'Специалисты', icon: <Stethoscope className="ic" />, action: () => navigateTo('/veterinarians') },
-        { id: 'cl-vacc', label: 'Вакцинация и ветпаспорт', hint: 'Прививки', icon: <Syringe className="ic" />, action: () => navigateTo('/client/vaccinations') },
-        { id: 'cl-notifs', label: 'Центр уведомлений', hint: 'История', icon: <Bell className="ic" />, action: () => navigateTo('/client/notifications') },
-        { id: 'cl-prof', label: 'Личный профиль', hint: 'Контакты', icon: <UserIcon className="ic" />, action: () => navigateTo('/client/profile') },
-        { id: 'cl-set', label: 'Настройки оформления', hint: 'Тема и каналы', icon: <Settings className="ic" />, action: () => navigateTo('/client/settings') },
-      );
+    if (!role || role === 'CLIENT') {
+      items.push({
+        id: 'nav-client-book',
+        label: 'Записаться на приём',
+        hint: ROUTE_HINTS['/client/book'],
+        icon: <Calendar className="ic" />,
+        action: () => navigateTo('/client/book'),
+      });
+    }
+
+    for (const g of groups) {
+      for (const item of g.items) {
+        items.push({
+          id: `nav-${item.href}`,
+          label: item.label,
+          hint: ROUTE_HINTS[item.href] || g.label || 'Раздел',
+          icon: item.icon,
+          action: () => navigateTo(item.href),
+        });
+      }
     }
 
     return items;
-  }, [role]);
+  }, [role, navigateTo]);
 
-  // Фильтрация групп по запросу
   const cmdGroups: PaletteGroup[] = useMemo(() => {
     const q = query.trim().toLowerCase();
-    const match = (text?: string | null) => !q || (text && text.toLowerCase().includes(q));
+    const match = (text?: string | null) => !q || Boolean(text && text.toLowerCase().includes(q));
 
     const groups: PaletteGroup[] = [];
 
-    // Группа 1: Разделы
     const matchedNav = navItems.filter((item) => match(item.label) || match(item.hint));
     if (matchedNav.length > 0) {
       groups.push({ label: 'Разделы', items: matchedNav });
     }
 
-    // Группа 2: Услуги клиники
     const matchedServices = services
       .filter((s) => match(s.name) || match(s.description))
       .slice(0, 6)
       .map((s) => ({
         id: `svc-${s.id}`,
         label: s.name,
-        hint: `${s.basePrice?.toLocaleString('ru-RU')} ₽ · ${s.baseDurationMin} мин`,
+        hint: `${formatCurrency(s.basePrice)} · ${s.baseDurationMin} мин`,
         icon: <ClipboardList className="ic" />,
         action: () => {
           if (role === 'CLIENT') {
@@ -170,19 +188,18 @@ export const CommandPaletteModal: React.FC<CommandPaletteModalProps> = ({
       groups.push({ label: 'Услуги клиники', items: matchedServices });
     }
 
-    // Группа 3: Врачи клиники
     const matchedVets = vets
       .filter((v) => {
-        const name = v.user?.fullName || `${v.user?.firstName || ''} ${v.user?.lastName || ''}`;
-        return match(name) || match(v.specialization?.name);
+        const display = getDoctorDisplay(v);
+        return match(display.fullName) || match(display.name) || match(display.specName);
       })
       .slice(0, 5)
       .map((v) => {
-        const name = v.user?.fullName || `${v.user?.firstName || ''} ${v.user?.lastName || ''}`.trim() || 'Ветеринарный врач';
+        const display = getDoctorDisplay(v);
         return {
           id: `vet-${v.id}`,
-          label: name,
-          hint: v.specialization?.name || 'Терапевт',
+          label: display.fullName,
+          hint: display.specName,
           icon: <Stethoscope className="ic" />,
           action: () => {
             if (role === 'CLIENT') {
@@ -201,15 +218,24 @@ export const CommandPaletteModal: React.FC<CommandPaletteModalProps> = ({
     }
 
     return groups;
-  }, [query, navItems, services, vets, role]);
+  }, [query, navItems, services, vets, role, navigateTo]);
 
-  // Плоский список элементов для навигации стрелками клавиатуры
-  const flatItems = useMemo(() => {
-    return cmdGroups.flatMap((g) => g.items);
+  const { indexedGroups, flatItems } = useMemo(() => {
+    let idx = 0;
+    const flat: PaletteItem[] = [];
+    const mapped = cmdGroups.map((g) => ({
+      label: g.label,
+      items: g.items.map((item) => {
+        const itemIndex = idx++;
+        flat.push(item);
+        return { item, itemIndex };
+      }),
+    }));
+    return { indexedGroups: mapped, flatItems: flat };
   }, [cmdGroups]);
 
-  // Обработка клавиш Enter, ArrowUp, ArrowDown
   const handleInputKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (flatItems.length === 0) return;
     if (e.key === 'ArrowDown') {
       e.preventDefault();
       setSelectedIndex((prev) => (prev + 1 < flatItems.length ? prev + 1 : 0));
@@ -218,53 +244,23 @@ export const CommandPaletteModal: React.FC<CommandPaletteModalProps> = ({
       setSelectedIndex((prev) => (prev - 1 >= 0 ? prev - 1 : flatItems.length - 1));
     } else if (e.key === 'Enter') {
       e.preventDefault();
-      if (flatItems[selectedIndex]) {
-        flatItems[selectedIndex].action();
-      }
+      flatItems[selectedIndex]?.action();
     }
   };
 
   if (!isOpen) return null;
 
-  let currentIndex = 0;
-
   return (
-    <div
-      className="overlay"
-      style={{
-        alignItems: 'flex-start',
-        paddingTop: '90px',
-        zIndex: 200,
-        backgroundColor: 'rgba(0, 0, 0, 0.55)',
-        backdropFilter: 'blur(3px)',
-      }}
-      onClick={onClose}
-    >
+    <div className="overlay overlay-top" onClick={onClose}>
       <div
         className="dialog cmd"
         role="dialog"
         aria-modal="true"
         aria-label="Быстрый поиск"
         onClick={(e) => e.stopPropagation()}
-        style={{
-          boxShadow: '0 20px 45px rgba(0, 0, 0, 0.35)',
-          overflow: 'hidden',
-          borderRadius: '14px',
-        }}
       >
-        <div className="rel" style={{ position: 'relative' }}>
-          <Search
-            className="ic"
-            style={{
-              position: 'absolute',
-              left: '16px',
-              top: '16px',
-              width: '18px',
-              height: '18px',
-              color: 'var(--muted-foreground)',
-              pointerEvents: 'none',
-            }}
-          />
+        <div className="cmd-search-wrap">
+          <Search className="ic cmd-search-ic" />
           <input
             ref={inputRef}
             className="cmd-input"
@@ -284,63 +280,28 @@ export const CommandPaletteModal: React.FC<CommandPaletteModalProps> = ({
         </div>
 
         <div className="cmd-list">
-          {cmdGroups.length === 0 ? (
-            <div className="empty" style={{ padding: '28px 16px', textAlign: 'center' }}>
+          {indexedGroups.length === 0 ? (
+            <div className="empty">
               <span className="small muted">Ничего не найдено</span>
             </div>
           ) : (
-            cmdGroups.map((g) => (
-              <div key={g.label} className="col" style={{ gap: '2px', marginBottom: '8px' }}>
-                <div
-                  className="menu-label"
-                  style={{
-                    padding: '6px 10px 4px',
-                    fontSize: '11px',
-                    fontWeight: 700,
-                    textTransform: 'uppercase',
-                    letterSpacing: '0.5px',
-                    color: 'var(--muted-foreground)',
-                  }}
-                >
-                  {g.label}
-                </div>
-                {g.items.map((item) => {
-                  const itemIndex = currentIndex++;
-                  const isSelected = itemIndex === selectedIndex;
-                  return (
-                    <button
-                      key={item.id}
-                      type="button"
-                      className={`menu-item ${isSelected ? 'active' : ''}`}
-                      style={{
-                        width: '100%',
-                        textAlign: 'left',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '10px',
-                        padding: '8px 12px',
-                        borderRadius: '8px',
-                        background: isSelected ? 'var(--muted)' : 'transparent',
-                        cursor: 'pointer',
-                        border: 'none',
-                      }}
-                      onMouseEnter={() => setSelectedIndex(itemIndex)}
-                      onClick={item.action}
-                    >
-                      <span style={{ color: 'var(--muted-foreground)', display: 'flex', alignItems: 'center' }}>
-                        {item.icon}
-                      </span>
-                      <span className="cell-main grow" style={{ fontSize: '13px', fontWeight: 500 }}>
-                        {item.label}
-                      </span>
-                      {item.hint && (
-                        <span className="small muted" style={{ fontSize: '11px', marginLeft: 'auto' }}>
-                          {item.hint}
-                        </span>
-                      )}
-                    </button>
-                  );
-                })}
+            indexedGroups.map((g) => (
+              <div key={g.label} className="col" style={{ gap: '2px', marginBottom: '6px' }}>
+                <div className="menu-label">{g.label}</div>
+                {g.items.map(({ item, itemIndex }) => (
+                  <button
+                    key={item.id}
+                    type="button"
+                    className={`menu-item ${itemIndex === selectedIndex ? 'active' : ''}`}
+                    style={{ width: '100%' }}
+                    onMouseEnter={() => setSelectedIndex(itemIndex)}
+                    onClick={item.action}
+                  >
+                    {item.icon}
+                    <span className="mi-label">{item.label}</span>
+                    {item.hint && <span className="small muted mi-hint">{item.hint}</span>}
+                  </button>
+                ))}
               </div>
             ))
           )}

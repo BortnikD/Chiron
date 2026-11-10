@@ -1,9 +1,24 @@
-import { Gender, AppointmentStatus } from '../../shared/types';
-import { Service, Veterinarian } from '../clinic/types';
+import { Gender, AppointmentStatus } from '@/shared/types';
+import { Service, Species, Veterinarian } from '@/modules/clinic/types';
 
 /**
  * Типы сущностей и запросов для личного кабинета клиента.
  */
+
+export interface PetNextAppointmentSummary {
+  id: string;
+  startAt: string;
+  serviceId: string;
+}
+
+export interface PetSummary {
+  completedVisits: number;
+  appointmentsCount: number;
+  vaccinationsCount: number;
+  nextAppointment?: PetNextAppointmentSummary | null;
+  nextVaccinationDueOn?: string | null;
+  hasOverdueVaccination: boolean;
+}
 
 export interface Pet {
   id: string;
@@ -11,7 +26,7 @@ export interface Pet {
   ownerId: string;
   speciesId: string;
   speciesName?: string;
-  species?: any;
+  species?: Species;
   breed?: string | null;
   chipNumber?: string | null;
   birthDate?: string | null;
@@ -19,6 +34,7 @@ export interface Pet {
   gender: Gender;
   notes?: string | null;
   isArchived: boolean;
+  summary?: PetSummary | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -111,4 +127,14 @@ export interface UpdateVaccinationRequest {
   name?: string;
   administeredOn?: string;
   nextDueOn?: string | null;
+}
+
+export interface ClientSummary {
+  activePets: number;
+  upcomingAppointments: number;
+  completedAppointments: number;
+  vaccinationsDue: number;
+  vaccinationsOverdue: number;
+  unreadNotifications: number;
+  nextAppointment?: Appointment | null;
 }

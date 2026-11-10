@@ -1,4 +1,4 @@
-import { User } from '../../shared/types';
+import { DayOfWeek, ScheduleExceptionType, User } from '@/shared/types';
 
 /**
  * Типы общеклинических сущностей (справочники, услуги, врачи).
@@ -23,13 +23,14 @@ export interface Service {
   basePrice: number;
   baseDurationMin: number;
   bufferAfterMin: number;
+  effectivePrice?: number | null;
+  effectiveDurationMin?: number | null;
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
   // Псевдонимы полей для обратной совместимости
   price?: number;
   durationMin?: number;
-  baseDurationMinutes?: number;
 }
 
 export interface ServiceSpecies {
@@ -42,6 +43,11 @@ export interface ServiceSpecies {
 export interface Veterinarian {
   id: string;
   userId: string;
+  firstName?: string;
+  middleName?: string | null;
+  lastName?: string;
+  fullName?: string;
+  speciesIds?: string[];
   user?: User;
   specializationId: string;
   specialization?: Specialization;
@@ -64,4 +70,23 @@ export interface AvailableSlotResponse {
   veterinarianIds: string[];
 }
 
-export type AvailabilitySlot = AvailableSlotResponse;
+export interface WorkSchedule {
+  id: string;
+  veterinarianId: string;
+  dayOfWeek: DayOfWeek;
+  startTime: string;
+  endTime: string;
+  breakStart?: string | null;
+  breakEnd?: string | null;
+}
+
+export interface ScheduleException {
+  id: string;
+  veterinarianId: string;
+  type: ScheduleExceptionType;
+  startDate: string;
+  endDate: string;
+  startTime?: string | null;
+  endTime?: string | null;
+  reason?: string | null;
+}

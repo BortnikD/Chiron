@@ -1,22 +1,21 @@
-import { api } from '../../api/client';
-import {
-  Veterinarian,
+import { api } from '@/shared/api/client';
+import type { AppointmentStatus, PageResponse } from '@/shared/types';
+import type { Veterinarian } from '@/modules/clinic/types';
+import type {
   Appointment,
-  AppointmentStatus,
-  CreateFollowUpRequest,
   Pet,
   Vaccination,
   CreateVaccinationRequest,
   UpdateVaccinationRequest,
-  PageResponse,
-} from '../../types';
+} from '@/modules/client/types';
+import type { CreateFollowUpRequest, UpdateVetProfileRequest } from './types';
 
 // ─── Врачебные операции ───────────────────────────────────
 
 export const vetApi = {
   getProfile: () => api.get<Veterinarian>('/api/v1/veterinarian/profile'),
 
-  updateProfile: (data: { bio?: string | null; photoUrl?: string | null; experienceYears?: number }) =>
+  updateProfile: (data: UpdateVetProfileRequest) =>
     api.patch<Veterinarian>('/api/v1/veterinarian/profile', data),
 
   getAppointments: (page = 0, size = 20, status?: string) => {
@@ -59,17 +58,13 @@ export const vetApi = {
   getPatientPet: (id: string) => api.get<Pet>(`/api/v1/veterinarian/pets/${id}`),
 
   getPatients: async (): Promise<Pet[]> => {
-    try {
-      const appts = await vetApi.getAppointments(0, 100);
-      const petIds = Array.from(new Set((appts.items || []).map((a) => a.petId)));
-      if (petIds.length === 0) return [];
-      const pets = await Promise.all(
-        petIds.map((id) => api.get<Pet>(`/api/v1/veterinarian/pets/${id}`).catch(() => null))
-      );
-      return pets.filter((p): p is Pet => p !== null);
-    } catch {
-      return [];
-    }
+    const appts = await vetApi.getAppointments(0, 100);
+    const petIds = Array.from(new Set((appts.items || []).map((a) => a.petId)));
+    if (petIds.length === 0) return [];
+    const pets = await Promise.all(
+      petIds.map((id) => vetApi.getPatientPet(id).catch(() => null))
+    );
+    return pets.filter((p): p is Pet => p !== null);
   },
 
   getVaccinations: (page = 0, size = 20, petId?: string) => {

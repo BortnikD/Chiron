@@ -50,14 +50,24 @@ export const SPECIALIZATION_NAMES_RU: Record<string, string> = {
   Therapy: 'Терапия',
   Surgery: 'Хирургия',
   Dentistry: 'Стоматология',
+  Dermatology: 'Дерматология',
+  Ophthalmology: 'Офтальмология',
+  Preventive: 'Профилактика',
   '5eed0002-0000-0000-0000-000000000001': 'Терапия',
   '5eed0002-0000-0000-0000-000000000002': 'Хирургия',
   '5eed0002-0000-0000-0000-000000000003': 'Стоматология',
+  '5eed0002-0000-0000-0000-000000000004': 'Дерматология',
+  '5eed0002-0000-0000-0000-000000000005': 'Офтальмология',
+  '5eed0002-0000-0000-0000-000000000006': 'Профилактика',
 };
 
 export function getDoctorDisplay(
   vet?: {
     id?: string;
+    firstName?: string | null;
+    middleName?: string | null;
+    lastName?: string | null;
+    fullName?: string | null;
     user?: {
       firstName?: string | null;
       lastName?: string | null;
@@ -80,20 +90,24 @@ export function getDoctorDisplay(
   }
 
   const known = vet.id ? KNOWN_DOCTORS[vet.id] : undefined;
+  const fName = vet.user?.firstName || vet.firstName || null;
+  const mName = vet.user?.middleName ?? vet.middleName ?? null;
+  const lName = vet.user?.lastName || vet.lastName || null;
+  const rawFull = vet.user?.fullName || vet.fullName || null;
 
   // Полное ФИО врача (для детального острова, модальных окон и медкарт)
-  let fullName =
-    (vet.user?.firstName && vet.user?.lastName
-      ? [vet.user.firstName, vet.user.middleName, vet.user.lastName].filter(Boolean).join(' ')
-      : vet.user?.fullName) ||
+  const fullName =
+    (fName && lName
+      ? [fName, mName, lName].filter(Boolean).join(' ')
+      : rawFull) ||
     known?.fullName ||
     'Ветеринарный врач';
 
   // Компактное имя для карточек ("Имя Фамилия", 12-14 символов)
   // Исключает перенос отчества вниз на 2-ю строку при сжатии карточки (открытие бокового острова)
   let name =
-    (vet.user?.firstName && vet.user?.lastName
-      ? `${vet.user.firstName} ${vet.user.lastName}`.trim()
+    (fName && lName
+      ? `${fName} ${lName}`.trim()
       : known?.shortName) ||
     fullName;
 
@@ -104,8 +118,17 @@ export function getDoctorDisplay(
   }
 
   let initials = '';
-  if (vet.user?.firstName && vet.user?.lastName) {
-    initials = `${vet.user.firstName.charAt(0)}${vet.user.lastName.charAt(0)}`.toUpperCase();
+  if (fName && lName) {
+    initials = `${fName.charAt(0)}${lName.charAt(0)}`.toUpperCase();
+  } else if (rawFull) {
+    const parts = rawFull.replace(/\./g, '').trim().split(/\s+/).filter(Boolean);
+    if (parts.length >= 2) {
+      initials = `${parts[0].charAt(0)}${parts[parts.length - 1].charAt(0)}`.toUpperCase();
+    } else if (known) {
+      initials = known.initials;
+    } else {
+      initials = 'ВР';
+    }
   } else if (known) {
     initials = known.initials;
   } else {

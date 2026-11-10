@@ -1,9 +1,17 @@
 'use client';
 
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { User, UserRole } from '../types';
-import { authApi, userApi } from '../api';
-import { tokenStorage, ApiError } from '../api/client';
+import React, { createContext, useContext, useState, useEffect, useCallback, useMemo, ReactNode } from 'react';
+import { User, UserRole } from '@/shared/types';
+import { authApi, userApi, tokenStorage, ApiError } from '@/shared/api';
+
+interface RegisterInput {
+  email: string;
+  password: string;
+  firstName: string;
+  lastName: string;
+  phone: string;
+  middleName?: string;
+}
 
 interface AuthContextType {
   user: User | null;
@@ -11,15 +19,9 @@ interface AuthContextType {
   token: string | null;
   isAuthenticated: boolean;
   isLoading: boolean;
+  authError: string | null;
   login: (data: { email: string; password: string }) => Promise<void>;
-  register: (data: {
-    email: string;
-    password: string;
-    firstName: string;
-    lastName: string;
-    phone: string;
-    middleName?: string;
-  }) => Promise<void>;
+  register: (data: RegisterInput) => Promise<void>;
   logout: () => void;
   refreshUser: () => Promise<void>;
 }
@@ -30,8 +32,10 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const [user, setUser] = useState<User | null>(null);
   const [token, setToken] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [authError, setAuthError] = useState<string | null>(null);
 
-  const fetchCurrentUser = async () => {
+  const fetchCurrentUser = useCallback(async () => {
+    setAuthError(null);
     try {
       const me = await userApi.getMe();
       setUser(me);
@@ -40,11 +44,15 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         tokenStorage.clear();
         setToken(null);
         setUser(null);
+      } else {
+        setAuthError(
+          err instanceof Error ? err.message : 'Не удалось проверить текущую сессию'
+        );
       }
     } finally {
       setIsLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
     const savedToken = tokenStorage.get();
@@ -54,10 +62,11 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     } else {
       setIsLoading(false);
     }
-  }, []);
+  }, [fetchCurrentUser]);
 
-  const login = async (credentials: { email: string; password: string }) => {
+  const login = useCallback(async (credentials: { email: string; password: string }) => {
     setIsLoading(true);
+    setAuthError(null);
     try {
       const res = await authApi.login(credentials);
       tokenStorage.set(res.accessToken);
@@ -66,17 +75,11 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     } finally {
       setIsLoading(false);
     }
-  };
+  }, []);
 
-  const register = async (data: {
-    email: string;
-    password: string;
-    firstName: string;
-    lastName: string;
-    phone: string;
-    middleName?: string;
-  }) => {
+  const register = useCallback(async (data: RegisterInput) => {
     setIsLoading(true);
+    setAuthError(null);
     try {
       const res = await authApi.register(data);
       tokenStorage.set(res.accessToken);
@@ -85,37 +88,38 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     } finally {
       setIsLoading(false);
     }
-  };
+  }, []);
 
-  const logout = () => {
+  const logout = useCallback(() => {
     tokenStorage.clear();
     setToken(null);
     setUser(null);
-  };
+    setAuthError(null);
+  }, []);
 
-  const refreshUser = async () => {
+  const refreshUser = useCallback(async () => {
     if (tokenStorage.get()) {
       await fetchCurrentUser();
     }
-  };
+  }, [fetchCurrentUser]);
 
-  return (
-    <AuthContext.Provider
-      value={{
-        user,
-        role: user?.role || null,
-        token,
-        isAuthenticated: !!user,
-        isLoading,
-        login,
-        register,
-        logout,
-        refreshUser,
-      }}
-    >
-      {children}
-    </AuthContext.Provider>
+  const value = useMemo<AuthContextType>(
+    () => ({
+      user,
+      role: user?.role || null,
+      token,
+      isAuthenticated: !!user,
+      isLoading,
+      authError,
+      login,
+      register,
+      logout,
+      refreshUser,
+    }),
+    [user, token, isLoading, authError, login, register, logout, refreshUser]
   );
+
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };
 
 export const useAuth = (): AuthContextType => {
