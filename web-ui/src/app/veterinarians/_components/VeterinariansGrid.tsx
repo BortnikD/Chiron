@@ -2,10 +2,10 @@
 
 import React from 'react';
 import { Stethoscope, Inbox } from 'lucide-react';
-import { VeterinariansGridProps } from './types';
-import { getDoctorDisplay } from '../../../utils/doctorHelpers';
-import { getDoctorCardName, getSpecTone, getSpeciesTone } from './utils';
-import { SpeciesIcon } from '../../../components/ui/SpeciesIcon';
+import { getDoctorDisplay } from '@/utils/doctorHelpers';
+import { getSpecTone, getSpeciesTone, pluralRu } from '@/shared/lib';
+import { SpeciesIcon } from '@/components/ui/SpeciesIcon';
+import type { VeterinariansGridProps } from './types';
 
 export const VeterinariansGrid: React.FC<VeterinariansGridProps> = ({
   vets,
@@ -37,8 +37,7 @@ export const VeterinariansGrid: React.FC<VeterinariansGridProps> = ({
             {vets.map((v) => {
               const isSel = selectedVet?.id === v.id;
               const tone = getSpecTone(v.specializationId);
-              const { initials, specName } = getDoctorDisplay(v, specsMap);
-              const compactName = getDoctorCardName(v, specsMap);
+              const { name, fullName, initials, specName } = getDoctorDisplay(v, specsMap);
               const perms = vetPermissions[v.id] || [];
 
               return (
@@ -82,9 +81,9 @@ export const VeterinariansGrid: React.FC<VeterinariansGridProps> = ({
                           minWidth: 0,
                           display: 'block',
                         }}
-                        title={compactName}
+                        title={fullName}
                       >
-                        {compactName}
+                        {name}
                       </span>
                       <span
                         className="cell-sub"
@@ -95,7 +94,7 @@ export const VeterinariansGrid: React.FC<VeterinariansGridProps> = ({
                           minWidth: 0,
                         }}
                       >
-                        стаж {v.experienceYears} лет
+                        стаж {v.experienceYears} {pluralRu(v.experienceYears, 'год', 'года', 'лет')}
                       </span>
                     </span>
                   </div>
@@ -135,16 +134,7 @@ export const VeterinariansGrid: React.FC<VeterinariansGridProps> = ({
                           );
                         })
                       ) : (
-                        <>
-                          <span className="sp-chip tone-cat">
-                            <SpeciesIcon species="cat" size={14} />
-                            Кошка
-                          </span>
-                          <span className="sp-chip tone-dog">
-                            <SpeciesIcon species="dog" size={14} />
-                            Собака
-                          </span>
-                        </>
+                        <span className="small muted">Виды не указаны</span>
                       )}
                     </div>
                   </div>

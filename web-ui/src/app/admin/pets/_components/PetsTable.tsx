@@ -2,9 +2,9 @@
 
 import React from 'react';
 import { PawPrint } from 'lucide-react';
-import { SpeciesIcon, getSpeciesTone } from '../../../../components/ui/SpeciesIcon';
-import { PetsTableProps } from './types';
-import { calculateAge, formatPetWeight, getOwnerName, getSpeciesName } from './utils';
+import { calculateAgeRu, getSpeciesTone } from '@/shared/lib';
+import { SpeciesIcon } from '@/components/ui/SpeciesIcon';
+import type { PetsTableProps } from './types';
 
 /**
  * Таблица списка питомцев с поддержкой выбора активной строки,
@@ -49,8 +49,11 @@ export const PetsTable: React.FC<PetsTableProps> = ({
 
           {pets.map((p) => {
             const isSelected = selectedPet?.id === p.id;
-            const age = calculateAge(p.birthDate);
-            const weight = formatPetWeight(p.weightKg);
+            const speciesName = speciesList.find((s) => s.id === p.speciesId)?.name || '—';
+            const ownerName = users.find((u) => u.id === p.ownerId)?.fullName || '—';
+            const age = calculateAgeRu(p.birthDate);
+            const weight = p.weightKg != null ? `${String(p.weightKg).replace('.', ',')} кг` : '—';
+            const tone = getSpeciesTone(p.species?.name || speciesName || p.speciesId, speciesList);
 
             return (
               <button
@@ -60,19 +63,19 @@ export const PetsTable: React.FC<PetsTableProps> = ({
                 onClick={() => onSelectPet(p)}
               >
                 <span className="pet-cell">
-                  <span className={`t-ava sm ${getSpeciesTone(p.speciesId)}`}>
-                    <SpeciesIcon species={getSpeciesTone(p.speciesId)} size={14} />
+                  <span className={`t-ava sm tone-${tone}`}>
+                    <SpeciesIcon species={tone} size={14} />
                   </span>
                   <span className="col" style={{ gap: 0, textAlign: 'left', minWidth: 0 }}>
                     <span className="cell-main">{p.name}</span>
                     {p.breed && <span className="cell-sub">{p.breed}</span>}
                   </span>
                 </span>
-                <span>{getSpeciesName(speciesList, p.speciesId)}</span>
+                <span>{speciesName}</span>
                 <span>{p.gender === 'MALE' ? 'Самец' : 'Самка'}</span>
                 <span className="tnum">{age}</span>
                 <span className="tnum">{weight}</span>
-                <span className="muted">{getOwnerName(users, p.ownerId)}</span>
+                <span className="muted">{ownerName}</span>
                 <span>
                   <span className={`badge ${p.isArchived ? 'badge-outline' : 'badge-accent'}`}>
                     {p.isArchived ? 'Архив' : 'Активен'}
@@ -82,6 +85,13 @@ export const PetsTable: React.FC<PetsTableProps> = ({
             );
           })}
         </div>
+
+        {loading && pets.length === 0 && (
+          <div className="empty">
+            <span className="spinner" aria-hidden="true" />
+            <span className="small muted">Загрузка питомцев…</span>
+          </div>
+        )}
 
         {pets.length === 0 && !loading && (
           <div className="empty">

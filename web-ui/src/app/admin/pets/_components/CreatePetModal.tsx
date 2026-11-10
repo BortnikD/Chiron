@@ -1,10 +1,9 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { AlertCircle } from 'lucide-react';
-import { adminApi } from '../../../../api';
-import { CreatePetRequest } from '../../../../types';
-import { CreatePetModalProps, CreatePetFormData } from './types';
+import { AlertCircle, X } from 'lucide-react';
+import { formatApiError } from '@/shared/lib';
+import type { CreatePetModalProps, CreatePetFormData } from './types';
 import { DEFAULT_CREATE_FORM } from './constants';
 
 /**
@@ -13,7 +12,7 @@ import { DEFAULT_CREATE_FORM } from './constants';
 export const CreatePetModal: React.FC<CreatePetModalProps> = ({
   isOpen,
   onClose,
-  onSuccess,
+  onCreate,
   speciesList,
   users,
 }) => {
@@ -32,6 +31,15 @@ export const CreatePetModal: React.FC<CreatePetModalProps> = ({
     }
   }, [isOpen, speciesList, users]);
 
+  useEffect(() => {
+    if (!isOpen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && !creating) onClose();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [isOpen, creating, onClose]);
+
   if (!isOpen) return null;
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -45,186 +53,176 @@ export const CreatePetModal: React.FC<CreatePetModalProps> = ({
     setCreateError(null);
 
     try {
-      const payload: CreatePetRequest = {
+      await onCreate({
         name: form.name.trim(),
         speciesId: form.speciesId,
         ownerId: form.ownerId,
         gender: form.gender,
         birthDate: form.birthDate || null,
         weightKg: form.weightKg ? parseFloat(form.weightKg) : null,
-        notes: form.notes || null,
-      };
-
-      const created = await adminApi.createPet(payload);
+        notes: form.notes.trim() || null,
+      });
       setForm(DEFAULT_CREATE_FORM);
-      onSuccess(created);
       onClose();
-    } catch (err: any) {
-      setCreateError(err?.response?.data?.message || err?.message || 'Ошибка создания питомца');
+    } catch (err: unknown) {
+      setCreateError(formatApiError(err, 'Ошибка создания питомца'));
     } finally {
       setCreating(false);
     }
   };
 
   return (
-    <div
-      className="overlay"
-      onClick={onClose}
-      style={{
-        position: 'fixed',
-        inset: 0,
-        background: 'rgba(0,0,0,0.5)',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        zIndex: 1000,
-      }}
-    >
+    <div className="overlay" onClick={() => !creating && onClose()}>
       <div
-        className="dialog dialog-md"
-        style={{ width: 480 }}
+        className="dialog"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="cr-pet-title"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="dialog-head">
-          <span className="dialog-title">Добавить питомца</span>
-          <span className="dialog-desc">Регистрация питомца за клиентом клиники</span>
+          <div className="row between" style={{ alignItems: 'flex-start' }}>
+            <div>
+              <h2 id="cr-pet-title" className="dialog-title">Добавить питомца</h2>
+              <p className="dialog-desc">Регистрация питомца за клиентом клиники</p>
+            </div>
+            <button
+              type="button"
+              className="btn btn-ghost btn-icon btn-sm"
+              onClick={onClose}
+              disabled={creating}
+              aria-label="Закрыть"
+            >
+              <X size={16} />
+            </button>
+          </div>
         </div>
 
-        <form onSubmit={handleSubmit} className="col" style={{ gap: 14 }}>
-          <div className="field">
-            <span className="field-label">
-              Владелец <span className="req">*</span>
-            </span>
-            <select
-              className="select"
-              value={form.ownerId}
-              onChange={(e) => setForm({ ...form, ownerId: e.target.value })}
-              required
-            >
-              <option value="">Выберите владельца…</option>
-              {users.map((u) => (
-                <option key={u.id} value={u.id}>
-                  {u.fullName} ({u.email})
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div className="form-grid">
+        <form onSubmit={handleSubmit}>
+          <div className="dialog-body">
             <div className="field">
-              <label className="field-label" htmlFor="cr-pname">
-                Кличка <span className="req">*</span>
+              <label className="field-label" htmlFor="cr-powner">
+                Владелец <span className="req">*</span>
               </label>
-              <input
-                id="cr-pname"
-                className="input"
-                value={form.name}
-                onChange={(e) => setForm({ ...form, name: e.target.value })}
-                required
-              />
-            </div>
-
-            <div className="field">
-              <span className="field-label">
-                Вид <span className="req">*</span>
-              </span>
               <select
+                id="cr-powner"
                 className="select"
-                value={form.speciesId}
-                onChange={(e) => setForm({ ...form, speciesId: e.target.value })}
+                value={form.ownerId}
+                onChange={(e) => setForm({ ...form, ownerId: e.target.value })}
                 required
               >
-                <option value="">Выберите вид…</option>
-                {speciesList.map((s) => (
-                  <option key={s.id} value={s.id}>
-                    {s.name}
+                <option value="">Выберите владельца…</option>
+                {users.map((u) => (
+                  <option key={u.id} value={u.id}>
+                    {u.fullName} ({u.email})
                   </option>
                 ))}
               </select>
             </div>
 
-            <div className="field">
-              <span className="field-label">Пол</span>
-              <div className="seg">
-                <button
-                  type="button"
-                  className={`seg-item ${form.gender === 'MALE' ? 'on' : ''}`}
-                  onClick={() => setForm({ ...form, gender: 'MALE' })}
+            <div className="form-grid">
+              <div className="field">
+                <label className="field-label" htmlFor="cr-pname">
+                  Кличка <span className="req">*</span>
+                </label>
+                <input
+                  id="cr-pname"
+                  className="input"
+                  value={form.name}
+                  onChange={(e) => setForm({ ...form, name: e.target.value })}
+                  required
+                />
+              </div>
+
+              <div className="field">
+                <label className="field-label" htmlFor="cr-pspecies">
+                  Вид <span className="req">*</span>
+                </label>
+                <select
+                  id="cr-pspecies"
+                  className="select"
+                  value={form.speciesId}
+                  onChange={(e) => setForm({ ...form, speciesId: e.target.value })}
+                  required
                 >
-                  Самец
-                </button>
-                <button
-                  type="button"
-                  className={`seg-item ${form.gender === 'FEMALE' ? 'on' : ''}`}
-                  onClick={() => setForm({ ...form, gender: 'FEMALE' })}
-                >
-                  Самка
-                </button>
+                  <option value="">Выберите вид…</option>
+                  {speciesList.map((s) => (
+                    <option key={s.id} value={s.id}>
+                      {s.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="field">
+                <span className="field-label">Пол</span>
+                <div className="seg">
+                  <button
+                    type="button"
+                    className={`seg-item ${form.gender === 'MALE' ? 'on' : ''}`}
+                    onClick={() => setForm({ ...form, gender: 'MALE' })}
+                  >
+                    Самец
+                  </button>
+                  <button
+                    type="button"
+                    className={`seg-item ${form.gender === 'FEMALE' ? 'on' : ''}`}
+                    onClick={() => setForm({ ...form, gender: 'FEMALE' })}
+                  >
+                    Самка
+                  </button>
+                </div>
+              </div>
+
+              <div className="field">
+                <label className="field-label" htmlFor="cr-pweight">Вес, кг</label>
+                <input
+                  id="cr-pweight"
+                  type="number"
+                  step="0.1"
+                  min="0"
+                  className="input"
+                  value={form.weightKg}
+                  onChange={(e) => setForm({ ...form, weightKg: e.target.value })}
+                />
+              </div>
+
+              <div className="field span-2">
+                <label className="field-label" htmlFor="cr-pbirth">Дата рождения</label>
+                <input
+                  id="cr-pbirth"
+                  type="date"
+                  className="input"
+                  value={form.birthDate}
+                  onChange={(e) => setForm({ ...form, birthDate: e.target.value })}
+                />
+              </div>
+
+              <div className="field span-2">
+                <label className="field-label" htmlFor="cr-pnotes">Заметки</label>
+                <textarea
+                  id="cr-pnotes"
+                  className="textarea"
+                  rows={2}
+                  value={form.notes}
+                  onChange={(e) => setForm({ ...form, notes: e.target.value })}
+                />
               </div>
             </div>
 
-            <div className="field">
-              <label className="field-label" htmlFor="cr-pweight">
-                Вес, кг
-              </label>
-              <input
-                id="cr-pweight"
-                type="number"
-                step="0.1"
-                min="0"
-                className="input"
-                value={form.weightKg}
-                onChange={(e) => setForm({ ...form, weightKg: e.target.value })}
-              />
-            </div>
-
-            <div className="field span-2">
-              <label className="field-label" htmlFor="cr-pbirth">
-                Дата рождения
-              </label>
-              <input
-                id="cr-pbirth"
-                type="date"
-                className="input"
-                value={form.birthDate}
-                onChange={(e) => setForm({ ...form, birthDate: e.target.value })}
-              />
-            </div>
-
-            <div className="field span-2">
-              <label className="field-label" htmlFor="cr-pnotes">
-                Заметки
-              </label>
-              <textarea
-                id="cr-pnotes"
-                className="textarea"
-                rows={2}
-                value={form.notes}
-                onChange={(e) => setForm({ ...form, notes: e.target.value })}
-              />
-            </div>
+            {createError && (
+              <div className="alert alert-destructive" role="alert">
+                <AlertCircle className="ic" size={16} />
+                <span>{createError}</span>
+              </div>
+            )}
           </div>
 
-          {createError && (
-            <div className="alert" role="alert">
-              <AlertCircle size={16} />
-              <div>{createError}</div>
-            </div>
-          )}
-
           <div className="dialog-foot">
-            <button
-              type="button"
-              className="btn btn-outline"
-              onClick={onClose}
-            >
+            <button type="button" className="btn btn-outline" onClick={onClose} disabled={creating}>
               Отмена
             </button>
-            <button
-              type="submit"
-              className="btn btn-primary"
-              disabled={creating}
-            >
+            <button type="submit" className="btn btn-primary" disabled={creating}>
               {creating ? 'Создание…' : 'Добавить'}
             </button>
           </div>

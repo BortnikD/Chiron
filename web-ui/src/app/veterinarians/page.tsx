@@ -1,101 +1,47 @@
 'use client';
 
-import React, { useEffect, useState, useMemo, Suspense } from 'react';
+import React, { Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { useAuth } from '../../context/AuthContext';
-import { useTheme } from '../../context/ThemeContext';
-import { PublicHeader } from '../../components/layout/PublicHeader';
-import { AppShell } from '../../components/layout/AppShell';
-import { clinicApi } from '../../api';
-import { Veterinarian, Specialization, Species, WorkSchedule, ScheduleException } from '../../types';
-import {
-  VeterinariansFilters,
-  VeterinariansGrid,
-  VeterinarianDetailIsland,
-  SPEC_TONES,
-  toIdNameMap,
-  filterVeterinarians,
-} from './_components';
+import { AlertCircle } from 'lucide-react';
+import { useAuth } from '@/context/AuthContext';
+import { useTheme } from '@/context/ThemeContext';
+import { PublicHeader } from '@/components/layout/PublicHeader';
+import { AppShell } from '@/components/layout/AppShell';
+import { useVeterinariansCatalog } from './_hooks/useVeterinariansCatalog';
+import { VeterinariansFilters } from './_components/VeterinariansFilters';
+import { VeterinariansGrid } from './_components/VeterinariansGrid';
+import { VeterinarianDetailIsland } from './_components/VeterinarianDetailIsland';
 
 function VeterinariansContent() {
   const { resolvedTheme } = useTheme();
   const searchParams = useSearchParams();
-  const specParam = searchParams.get('spec');
   const { isAuthenticated, role } = useAuth();
 
-  const [vets, setVets] = useState<Veterinarian[]>([]);
-  const [specializations, setSpecializations] = useState<Specialization[]>([]);
-  const [speciesList, setSpeciesList] = useState<Species[]>([]);
-  const [vetPermissions, setVetPermissions] = useState<Record<string, string[]>>({});
-  const [selectedSpec, setSelectedSpec] = useState<string>('ALL');
-  const [selectedSpecies, setSelectedSpecies] = useState<string>('ALL');
-  const [searchQuery, setSearchQuery] = useState<string>('');
-  const [selectedVet, setSelectedVet] = useState<Veterinarian | null>(null);
-  const [vetSchedules, setVetSchedules] = useState<WorkSchedule[]>([]);
-  const [vetExceptions, setVetExceptions] = useState<ScheduleException[]>([]);
-
-  useEffect(() => {
-    Promise.all([clinicApi.getVeterinarians(), clinicApi.getSpecializations(), clinicApi.getSpecies()])
-      .then(async ([vetsData, specData, spList]) => {
-        const safeVets = Array.isArray(vetsData) ? vetsData : [];
-        const safeSpec = Array.isArray(specData) ? specData : [];
-        setVets(safeVets);
-        setSpecializations(safeSpec);
-        setSpeciesList(Array.isArray(spList) ? spList : []);
-
-        if (specParam) {
-          const match = safeSpec.find((s) => s.id === specParam || SPEC_TONES[s.id] === specParam);
-          if (match) setSelectedSpec(match.id);
-        }
-
-        const permMap: Record<string, string[]> = {};
-        for (const v of safeVets) {
-          try {
-            const perms = await clinicApi.getVetSpeciesPermissions(v.id);
-            permMap[v.id] = Array.isArray(perms) ? perms.map((p) => p.speciesId) : [];
-          } catch {
-            permMap[v.id] = [];
-          }
-        }
-        setVetPermissions(permMap);
-      })
-      .catch((err) => console.error(err));
-  }, [specParam]);
-
-  useEffect(() => {
-    if (!selectedVet) {
-      setVetSchedules([]);
-      setVetExceptions([]);
-      return;
-    }
-    Promise.all([clinicApi.getWorkSchedules(selectedVet.id), clinicApi.getScheduleExceptions(selectedVet.id)])
-      .then(([schedRes, excRes]) => {
-        setVetSchedules(Array.isArray(schedRes) ? schedRes : []);
-        setVetExceptions(Array.isArray(excRes) ? excRes : []);
-      })
-      .catch(() => {
-        setVetSchedules([]);
-        setVetExceptions([]);
-      });
-  }, [selectedVet?.id]);
-
-  const specsMap = useMemo(() => toIdNameMap(specializations), [specializations]);
-  const speciesMap = useMemo(() => toIdNameMap(speciesList), [speciesList]);
-  const hasFilters = selectedSpec !== 'ALL' || selectedSpecies !== 'ALL' || searchQuery.trim() !== '';
-
-  const resetFilters = () => {
-    setSelectedSpec('ALL');
-    setSelectedSpecies('ALL');
-    setSearchQuery('');
-  };
-
-  const filteredVets = useMemo(
-    () => filterVeterinarians(vets, selectedSpec, selectedSpecies, searchQuery, vetPermissions, specsMap),
-    [vets, selectedSpec, selectedSpecies, searchQuery, vetPermissions, specsMap]
-  );
+  const {
+    specializations,
+    speciesList,
+    vetPermissions,
+    selectedSpec,
+    setSelectedSpec,
+    selectedSpecies,
+    setSelectedSpecies,
+    searchQuery,
+    setSearchQuery,
+    selectedVet,
+    setSelectedVet,
+    vetSchedules,
+    vetExceptions,
+    error,
+    reload,
+    specsMap,
+    speciesMap,
+    hasFilters,
+    resetFilters,
+    filteredVets,
+  } = useVeterinariansCatalog(searchParams.get('spec'));
 
   const content = (
-    <div className="scroll-col grow">
+    <div className="content-col grow">
       <VeterinariansFilters
         specializations={specializations}
         speciesList={speciesList}
@@ -108,6 +54,19 @@ function VeterinariansContent() {
         onResetFilters={resetFilters}
         hasFilters={hasFilters}
       />
+
+      {error && (
+        <div className="alert alert-destructive" role="alert">
+          <AlertCircle className="ic" />
+          <div className="row between wrap grow" style={{ gap: '8px', alignItems: 'center' }}>
+            <span>{error}</span>
+            <button type="button" className="btn btn-outline btn-sm" onClick={reload}>
+              Повторить
+            </button>
+          </div>
+        </div>
+      )}
+
       <div className="content-row">
         <VeterinariansGrid
           vets={filteredVets}
@@ -155,7 +114,13 @@ function VeterinariansContent() {
 
 export default function VeterinariansPage() {
   return (
-    <Suspense fallback={<div className="p-8 text-center text-xs text-[var(--muted-foreground)]">Загрузка каталога врачей...</div>}>
+    <Suspense
+      fallback={
+        <div className="p-8 text-center text-xs text-[var(--muted-foreground)]">
+          Загрузка каталога врачей...
+        </div>
+      }
+    >
       <VeterinariansContent />
     </Suspense>
   );

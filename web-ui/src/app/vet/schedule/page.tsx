@@ -1,170 +1,147 @@
 'use client';
 
-import React, { useEffect, useState, useCallback, Suspense } from 'react';
-import { useAuth } from '../../../context/AuthContext';
-import { clinicApi, vetApi, adminApi } from '../../../api';
-import { WorkSchedule, ScheduleException, Appointment } from '../../../types';
-import { AppShell } from '../../../components/layout/AppShell';
-import {
-  VetWeeklyScheduleTable,
-  VetExceptionsList,
-  VetExceptionModal,
-  VetScheduleDetailIsland,
-} from './_components';
+import { AlertCircle, X } from 'lucide-react';
+import { ConfirmModal } from '@/shared/components/ConfirmModal';
+import { formatIsoDateDisplay } from '@/shared/lib';
+import { useVetSchedule } from './_hooks/useVetSchedule';
+import { VetWeeklyScheduleTable } from './_components/VetWeeklyScheduleTable';
+import { VetExceptionsList } from './_components/VetExceptionsList';
+import { VetExceptionModal } from './_components/VetExceptionModal';
+import { VetScheduleDetailIsland } from './_components/VetScheduleDetailIsland';
 
-function VetScheduleContent() {
-  const { user } = useAuth();
+export default function VetSchedulePage() {
+  const {
+    vetId,
+    schedules,
+    exceptions,
+    appointments,
+    services,
+    pets,
+    loading,
+    error,
+    clearError,
+    reload,
+    weekOffset,
+    goPrevWeek,
+    goNextWeek,
+    goCurrentWeek,
+    selectedAppt,
+    selectedException,
+    isModalOpen,
+    openExceptionModal,
+    closeExceptionModal,
+    handleCreateException,
+    handleSelectAppt,
+    handleSelectException,
+    handleCloseDetail,
+    exceptionToDelete,
+    deletingException,
+    deleteExceptionError,
+    requestDeleteException,
+    cancelDeleteException,
+    confirmDeleteException,
+  } = useVetSchedule();
 
-  const [vetId, setVetId] = useState<string>('');
-  const [schedules, setSchedules] = useState<WorkSchedule[]>([]);
-  const [exceptions, setExceptions] = useState<ScheduleException[]>([]);
-  const [appointments, setAppointments] = useState<Appointment[]>([]);
-  const [services, setServices] = useState<Record<string, string>>({});
-  const [pets, setPets] = useState<Record<string, string>>({});
-  const [loading, setLoading] = useState(true);
-  const [weekOffset, setWeekOffset] = useState<number>(0);
-
-  // Выбранные сущности для просмотра в правом острове
-  const [selectedAppt, setSelectedAppt] = useState<Appointment | null>(null);
-  const [selectedException, setSelectedException] = useState<ScheduleException | null>(null);
-  const [isModalOpen, setIsModalOpen] = useState(false);
-
-  const loadExceptions = useCallback(async (targetVetId: string) => {
-    try {
-      const excRes = await clinicApi.getScheduleExceptions(targetVetId);
-      setExceptions(Array.isArray(excRes) ? excRes : []);
-    } catch (err) {
-      console.error('Failed to load schedule exceptions', err);
-    }
-  }, []);
-
-  useEffect(() => {
-    const init = async () => {
-      setLoading(true);
-      try {
-        const [vetsRes, svcRes, apptsRes, patientsRes] = await Promise.all([
-          clinicApi.getVeterinarians(),
-          clinicApi.getServices(),
-          vetApi.getAppointments(0, 100),
-          vetApi.getPatients().catch(() => []),
-        ]);
-
-        const svcMap: Record<string, string> = {};
-        if (Array.isArray(svcRes)) {
-          svcRes.forEach((s) => { svcMap[s.id] = s.name; });
-        }
-        setServices(svcMap);
-
-        const petMap: Record<string, string> = {};
-        if (Array.isArray(patientsRes)) {
-          patientsRes.forEach((p) => { petMap[p.id] = p.name; });
-        }
-        setPets(petMap);
-
-        setAppointments(apptsRes?.items ?? (Array.isArray(apptsRes) ? apptsRes : []));
-
-        const vetList = Array.isArray(vetsRes) ? vetsRes : [];
-        const myVet = vetList.find((v) => v.userId === user?.id) || vetList[0];
-
-        if (myVet) {
-          setVetId(myVet.id);
-          const [schedRes, excRes] = await Promise.all([
-            clinicApi.getWorkSchedules(myVet.id).catch(() => []),
-            clinicApi.getScheduleExceptions(myVet.id).catch(() => []),
-          ]);
-          setSchedules(Array.isArray(schedRes) ? schedRes : []);
-          setExceptions(Array.isArray(excRes) ? excRes : []);
-        }
-      } catch (err) {
-        console.error('Failed to load vet schedule data', err);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    init();
-  }, [user]);
-
-  const handleDeleteException = async (exc: ScheduleException) => {
-    if (!confirm('Вы действительно хотите удалить это исключение?')) return;
-    try {
-      await adminApi.deleteScheduleException(exc.id);
-      setSelectedException(null);
-      if (vetId) await loadExceptions(vetId);
-    } catch (err) {
-      console.error('Failed to delete exception', err);
-      alert('Не удалось удалить исключение');
-    }
-  };
-
-  const handleSelectAppt = (appt: Appointment) => {
-    setSelectedAppt(appt);
-    setSelectedException(null);
-  };
-
-  const handleSelectException = (exc: ScheduleException) => {
-    setSelectedException(exc);
-    setSelectedAppt(null);
-  };
-
-  const handleCloseDetail = () => {
-    setSelectedAppt(null);
-    setSelectedException(null);
-  };
+  const hasDetail = Boolean(selectedAppt || selectedException);
 
   return (
-    <AppShell crumbGroup="Врач" crumb="Мой график">
-      <div className="content-row">
-        <VetWeeklyScheduleTable
-          loading={loading}
-          schedules={schedules}
-          exceptions={exceptions}
-          appointments={appointments}
-          services={services}
-          pets={pets}
-          selectedAppt={selectedAppt}
-          onSelectAppt={handleSelectAppt}
-          selectedException={selectedException}
-          onSelectException={handleSelectException}
-          weekOffset={weekOffset}
-          onPrevWeek={() => setWeekOffset((prev) => prev - 1)}
-          onNextWeek={() => setWeekOffset((prev) => prev + 1)}
-          onCurrentWeek={() => setWeekOffset(0)}
-        />
+    <>
+      <div className="content-col grow">
+        {error && (
+          <div className="alert alert-destructive row between items-center" role="alert">
+            <div className="row items-center" style={{ gap: '8px' }}>
+              <AlertCircle className="ic" />
+              <span>{error}</span>
+            </div>
+            <div className="row items-center" style={{ gap: '6px' }}>
+              <button type="button" className="btn btn-outline btn-sm" onClick={() => reload()}>
+                Повторить
+              </button>
+              <button
+                type="button"
+                className="btn btn-ghost btn-icon btn-sm"
+                onClick={clearError}
+                aria-label="Скрыть ошибку"
+              >
+                <X className="ic" />
+              </button>
+            </div>
+          </div>
+        )}
 
-        <VetExceptionsList
-          exceptions={exceptions}
-          schedules={schedules}
-          selectedException={selectedException}
-          onSelectException={handleSelectException}
-          onAddException={() => setIsModalOpen(true)}
-          loading={loading}
-        />
+        <div className="content-row">
+          <div
+            className={
+              hasDetail
+                ? 'flex-1 flex flex-col lg:flex-row xl:flex-col 2xl:flex-row gap-2 min-w-0 min-h-0'
+                : 'flex-1 flex flex-col lg:flex-row gap-2 min-w-0 min-h-0'
+            }
+          >
+            <VetWeeklyScheduleTable
+              loading={loading}
+              schedules={schedules}
+              exceptions={exceptions}
+              appointments={appointments}
+              services={services}
+              pets={pets}
+              selectedAppt={selectedAppt}
+              onSelectAppt={handleSelectAppt}
+              onSelectException={handleSelectException}
+              weekOffset={weekOffset}
+              onPrevWeek={goPrevWeek}
+              onNextWeek={goNextWeek}
+              onCurrentWeek={goCurrentWeek}
+            />
 
-        <VetScheduleDetailIsland
-          selectedAppt={selectedAppt}
-          selectedException={selectedException}
-          onClose={handleCloseDetail}
-          pets={pets}
-          services={services}
-          onDeleteException={handleDeleteException}
-        />
+            <VetExceptionsList
+              exceptions={exceptions}
+              schedules={schedules}
+              selectedException={selectedException}
+              onSelectException={handleSelectException}
+              onAddException={openExceptionModal}
+              loading={loading}
+              hasDetail={hasDetail}
+            />
+          </div>
+
+          <VetScheduleDetailIsland
+            selectedAppt={selectedAppt}
+            selectedException={selectedException}
+            onClose={handleCloseDetail}
+            pets={pets}
+            services={services}
+            onDeleteException={requestDeleteException}
+          />
+        </div>
       </div>
 
       <VetExceptionModal
         isOpen={isModalOpen}
         vetId={vetId}
-        onClose={() => setIsModalOpen(false)}
-        onSuccess={() => { if (vetId) loadExceptions(vetId); }}
+        onClose={closeExceptionModal}
+        onSave={handleCreateException}
       />
-    </AppShell>
-  );
-}
 
-export default function VetSchedulePage() {
-  return (
-    <Suspense fallback={<div className="skeleton" style={{ height: '200px', margin: '24px' }} />}>
-      <VetScheduleContent />
-    </Suspense>
+      <ConfirmModal
+        isOpen={!!exceptionToDelete}
+        title="Удалить исключение?"
+        description={
+          exceptionToDelete
+            ? `Период: ${
+                exceptionToDelete.startDate === exceptionToDelete.endDate
+                  ? formatIsoDateDisplay(exceptionToDelete.startDate)
+                  : `${formatIsoDateDisplay(exceptionToDelete.startDate)} – ${formatIsoDateDisplay(exceptionToDelete.endDate)}`
+              }${exceptionToDelete.reason ? ` · ${exceptionToDelete.reason}` : ''}`
+            : undefined
+        }
+        confirmLabel="Удалить"
+        cancelLabel="Отмена"
+        tone="destructive"
+        loading={deletingException}
+        error={deleteExceptionError}
+        onConfirm={confirmDeleteException}
+        onClose={cancelDeleteException}
+      />
+    </>
   );
 }

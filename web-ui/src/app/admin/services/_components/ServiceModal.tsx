@@ -1,16 +1,17 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { AlertCircle } from 'lucide-react';
-import { adminApi } from '../../../../api';
-import { Service, Specialization } from '../../../../types';
+import { AlertCircle, X } from 'lucide-react';
+import type { Service, Specialization } from '@/modules/clinic/types';
+import { formatApiError } from '@/shared/lib';
+import type { SaveServiceInput } from '../_hooks/useAdminServices';
 
 export interface ServiceModalProps {
   isOpen: boolean;
   onClose: () => void;
   specializations: Specialization[];
   service?: Service | null;
-  onSuccess: (savedService?: Service) => Promise<void> | void;
+  onSave: (data: SaveServiceInput, id?: string) => Promise<Service>;
 }
 
 export const ServiceModal: React.FC<ServiceModalProps> = ({
@@ -18,7 +19,7 @@ export const ServiceModal: React.FC<ServiceModalProps> = ({
   onClose,
   specializations,
   service,
-  onSuccess,
+  onSave,
 }) => {
   const [form, setForm] = useState({
     name: '',
@@ -34,7 +35,6 @@ export const ServiceModal: React.FC<ServiceModalProps> = ({
 
   useEffect(() => {
     if (!isOpen) return;
-
     if (service) {
       setForm({
         name: service.name,
@@ -59,6 +59,15 @@ export const ServiceModal: React.FC<ServiceModalProps> = ({
     setError(null);
   }, [isOpen, service, specializations]);
 
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && !saving) onClose();
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, saving, onClose]);
+
   if (!isOpen) return null;
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -71,30 +80,22 @@ export const ServiceModal: React.FC<ServiceModalProps> = ({
     setSaving(true);
     setError(null);
     try {
-      const payload = {
-        name: form.name.trim(),
-        specializationId: form.specializationId,
-        description: form.description.trim(),
-        basePrice: Number(form.basePrice),
-        baseDurationMin: Number(form.baseDurationMin),
-        bufferAfterMin: Number(form.bufferAfterMin),
-        isActive: form.isActive,
-      };
-
-      let result: Service | undefined;
-      if (service) {
-        result = await adminApi.updateService(service.id, payload);
-      } else {
-        result = await adminApi.createService(payload);
-      }
-
-      await onSuccess(result);
+      await onSave(
+        {
+          name: form.name.trim(),
+          specializationId: form.specializationId,
+          description: form.description.trim(),
+          basePrice: Number(form.basePrice),
+          baseDurationMin: Number(form.baseDurationMin),
+          bufferAfterMin: Number(form.bufferAfterMin),
+          isActive: form.isActive,
+        },
+        service?.id
+      );
       onClose();
-    } catch (err: any) {
+    } catch (err: unknown) {
       setError(
-        err?.response?.data?.message ||
-          err?.message ||
-          (service ? 'Ошибка сохранения услуги' : 'Ошибка создания услуги')
+        formatApiError(err, service ? 'Ошибка сохранения услуги' : 'Ошибка создания услуги')
       );
     } finally {
       setSaving(false);
@@ -102,35 +103,44 @@ export const ServiceModal: React.FC<ServiceModalProps> = ({
   };
 
   return (
-    <div className="overlay" onClick={onClose}>
-      <div
-        className="dialog dialog-md"
-        style={{ width: 480 }}
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="dialog-head">
-          <span className="dialog-title">
-            {service ? 'Редактировать услугу' : 'Новая услуга'}
-          </span>
-          <span className="dialog-desc">
-            {service
-              ? 'Изменение параметров ветеринарной услуги'
-              : 'Создание ветеринарной услуги клиники'}
-          </span>
+    <div
+      className="overlay"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="service-modal-title"
+      onClick={() => !saving && onClose()}
+    >
+      <div className="dialog" onClick={(e) => e.stopPropagation()}>
+        <div className="dialog-head" style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+          <div className="col" style={{ gap: 4 }}>
+            <span id="service-modal-title" className="dialog-title">
+              {service ? 'Редактировать услугу' : 'Новая услуга'}
+            </span>
+            <span className="dialog-desc">
+              {service ? 'Изменение параметров ветеринарной услуги' : 'Создание ветеринарной услуги клиники'}
+            </span>
+          </div>
+          <button
+            type="button"
+            className="btn btn-ghost btn-icon btn-sm"
+            aria-label="Закрыть"
+            onClick={() => !saving && onClose()}
+          >
+            <X size={16} />
+          </button>
         </div>
 
-        <form onSubmit={handleSubmit}>
+        <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', minHeight: 0, flex: 1 }}>
           <div className="dialog-body">
             <div className="field">
-              <span className="field-label">
+              <label className="field-label" htmlFor="cr-sspec">
                 Специализация <span className="req">*</span>
-              </span>
+              </label>
               <select
+                id="cr-sspec"
                 className="select"
                 value={form.specializationId}
-                onChange={(e) =>
-                  setForm({ ...form, specializationId: e.target.value })
-                }
+                onChange={(e) => setForm({ ...form, specializationId: e.target.value })}
                 required
               >
                 {specializations.map((s) => (
@@ -163,16 +173,11 @@ export const ServiceModal: React.FC<ServiceModalProps> = ({
                 className="textarea"
                 rows={2}
                 value={form.description}
-                onChange={(e) =>
-                  setForm({ ...form, description: e.target.value })
-                }
+                onChange={(e) => setForm({ ...form, description: e.target.value })}
               />
             </div>
 
-            <div
-              className="form-grid"
-              style={{ gridTemplateColumns: 'repeat(3, minmax(0, 1fr))' }}
-            >
+            <div className="form-grid" style={{ gridTemplateColumns: 'repeat(3, minmax(0, 1fr))' }}>
               <div className="field">
                 <label className="field-label" htmlFor="cr-sprice">
                   Цена, ₽
@@ -183,12 +188,10 @@ export const ServiceModal: React.FC<ServiceModalProps> = ({
                   min="0"
                   className="input"
                   value={form.basePrice}
-                  onChange={(e) =>
-                    setForm({
-                      ...form,
-                      basePrice: parseInt(e.target.value) || 0,
-                    })
-                  }
+                  onChange={(e) => {
+                    const parsed = Number.parseInt(e.target.value, 10);
+                    setForm({ ...form, basePrice: Number.isNaN(parsed) ? 0 : parsed });
+                  }}
                 />
               </div>
               <div className="field">
@@ -202,12 +205,10 @@ export const ServiceModal: React.FC<ServiceModalProps> = ({
                   max="1440"
                   className="input"
                   value={form.baseDurationMin}
-                  onChange={(e) =>
-                    setForm({
-                      ...form,
-                      baseDurationMin: parseInt(e.target.value) || 30,
-                    })
-                  }
+                  onChange={(e) => {
+                    const parsed = Number.parseInt(e.target.value, 10);
+                    setForm({ ...form, baseDurationMin: Number.isNaN(parsed) ? 30 : parsed });
+                  }}
                 />
               </div>
               <div className="field">
@@ -221,12 +222,10 @@ export const ServiceModal: React.FC<ServiceModalProps> = ({
                   max="240"
                   className="input"
                   value={form.bufferAfterMin}
-                  onChange={(e) =>
-                    setForm({
-                      ...form,
-                      bufferAfterMin: parseInt(e.target.value) || 0,
-                    })
-                  }
+                  onChange={(e) => {
+                    const parsed = Number.parseInt(e.target.value, 10);
+                    setForm({ ...form, bufferAfterMin: Number.isNaN(parsed) ? 0 : parsed });
+                  }}
                 />
               </div>
             </div>
@@ -244,34 +243,19 @@ export const ServiceModal: React.FC<ServiceModalProps> = ({
             </div>
 
             {error && (
-              <div className="alert" role="alert">
-                <AlertCircle size={16} />
+              <div className="alert alert-destructive" role="alert">
+                <AlertCircle size={16} className="ic" />
                 <div>{error}</div>
               </div>
             )}
           </div>
 
           <div className="dialog-foot">
-            <button
-              type="button"
-              className="btn btn-outline"
-              onClick={onClose}
-              disabled={saving}
-            >
+            <button type="button" className="btn btn-outline" onClick={onClose} disabled={saving}>
               Отмена
             </button>
-            <button
-              type="submit"
-              className="btn btn-primary"
-              disabled={saving}
-            >
-              {saving
-                ? service
-                  ? 'Сохранение…'
-                  : 'Создание…'
-                : service
-                ? 'Сохранить'
-                : 'Создать'}
+            <button type="submit" className="btn btn-primary" disabled={saving}>
+              {saving ? (service ? 'Сохранение…' : 'Создание…') : service ? 'Сохранить' : 'Создать'}
             </button>
           </div>
         </form>

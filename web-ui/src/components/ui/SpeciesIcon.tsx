@@ -1,17 +1,9 @@
 'use client';
 
 import React from 'react';
+import { getSpeciesTone } from '@/shared/lib';
 
 export type SpeciesIconType = 'cat' | 'dog' | 'rab' | 'par' | string;
-
-export function getSpeciesTone(idOrName?: string | null): string {
-  if (!idOrName) return 'tone-cat';
-  const norm = idOrName.toLowerCase();
-  if (norm.includes('dog') || norm.includes('соб') || norm.includes('000000000002')) return 'tone-dog';
-  if (norm.includes('rab') || norm.includes('крол') || norm.includes('000000000003')) return 'tone-rab';
-  if (norm.includes('par') || norm.includes('попуг') || norm.includes('птиц') || norm.includes('000000000004')) return 'tone-par';
-  return 'tone-cat';
-}
 
 interface SpeciesIconProps extends React.SVGProps<SVGSVGElement> {
   species?: SpeciesIconType;
@@ -25,9 +17,9 @@ export const SpeciesIcon: React.FC<SpeciesIconProps> = ({
   style,
   ...props
 }) => {
-  const norm = species.toLowerCase();
+  const tone = getSpeciesTone(species);
 
-  if (norm.includes('dog') || norm.includes('соб') || norm.includes('5eed0001-0000-0000-0000-000000000002')) {
+  if (tone === 'dog') {
     return (
       <svg
         viewBox="0 0 24 24"
@@ -51,7 +43,7 @@ export const SpeciesIcon: React.FC<SpeciesIconProps> = ({
     );
   }
 
-  if (norm.includes('rab') || norm.includes('крол') || norm.includes('5eed0001-0000-0000-0000-000000000003')) {
+  if (tone === 'rab') {
     return (
       <svg
         viewBox="0 0 24 24"
@@ -75,7 +67,7 @@ export const SpeciesIcon: React.FC<SpeciesIconProps> = ({
     );
   }
 
-  if (norm.includes('par') || norm.includes('попуг') || norm.includes('птиц') || norm.includes('5eed0001-0000-0000-0000-000000000004')) {
+  if (tone === 'par') {
     return (
       <svg
         viewBox="0 0 24 24"

@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
-import { Service, Specialization } from '../../../../types';
-import { Clock, Check } from 'lucide-react';
-import { SPEC_TONES } from './constants';
+import { Clock, Check, Loader2 } from 'lucide-react';
+import type { Service, Specialization } from '@/modules/clinic/types';
+import { formatCurrency, getSpecTone } from '@/shared/lib';
 
 export interface StepServiceSelectionProps {
   services: Service[];
@@ -10,6 +10,7 @@ export interface StepServiceSelectionProps {
   onSelectService: (service: Service) => void;
   specsMap: Record<string, string>;
   speciesName?: string;
+  loading?: boolean;
 }
 
 /**
@@ -23,16 +24,15 @@ export const StepServiceSelection: React.FC<StepServiceSelectionProps> = ({
   onSelectService,
   specsMap,
   speciesName,
+  loading = false,
 }) => {
   const [selectedSpecId, setSelectedSpecId] = useState<string>('ALL');
 
-  // Уникальные специализации, представленные в каталоге услуг
   const activeSpecializations = useMemo(() => {
     const specIdsWithServices = new Set(services.map((s) => s.specializationId));
     return specializations.filter((sp) => specIdsWithServices.has(sp.id));
   }, [services, specializations]);
 
-  // Фильтрация услуг по выбранной специализации
   const filteredServices = useMemo(() => {
     if (selectedSpecId === 'ALL') return services;
     return services.filter((s) => s.specializationId === selectedSpecId);
@@ -47,7 +47,6 @@ export const StepServiceSelection: React.FC<StepServiceSelectionProps> = ({
         <span className="small muted">Цена и длительность — для этого вида</span>
       </div>
 
-      {/* Вкладки специализаций */}
       {activeSpecializations.length > 1 && (
         <div className="seg wrap" style={{ gap: '4px' }}>
           <button
@@ -73,8 +72,12 @@ export const StepServiceSelection: React.FC<StepServiceSelectionProps> = ({
         </div>
       )}
 
-      {/* Список карточек услуг */}
-      {filteredServices.length === 0 ? (
+      {loading ? (
+        <div className="p-8 text-center text-xs text-[var(--muted-foreground)] flex items-center justify-center gap-2">
+          <Loader2 className="w-4 h-4 animate-spin text-[var(--primary-text)]" />
+          <span>Загрузка услуг для выбранного вида...</span>
+        </div>
+      ) : filteredServices.length === 0 ? (
         <div className="empty" style={{ padding: '32px 16px' }}>
           <span className="empty-title">В этой категории нет доступных услуг</span>
           <span className="muted">Выберите другую специализацию</span>
@@ -83,9 +86,10 @@ export const StepServiceSelection: React.FC<StepServiceSelectionProps> = ({
         <div className="cards">
           {filteredServices.map((svc) => {
             const isSel = selectedService?.id === svc.id;
-            const tone = SPEC_TONES[svc.specializationId] || 'ther';
+            const tone = getSpecTone(svc.specializationId);
             const specName = specsMap[svc.specializationId] || 'Терапия';
-            const duration = svc.baseDurationMin || svc.durationMin || 30;
+            const duration = svc.effectiveDurationMin ?? svc.baseDurationMin ?? svc.durationMin ?? 30;
+            const price = svc.effectivePrice ?? svc.basePrice;
 
             return (
               <button
@@ -110,7 +114,7 @@ export const StepServiceSelection: React.FC<StepServiceSelectionProps> = ({
                     {duration} мин
                   </span>
                   <span className="tcard-price">
-                    {svc.basePrice?.toLocaleString('ru-RU')} ₽
+                    {price != null ? formatCurrency(price) : '—'}
                   </span>
                 </div>
               </button>

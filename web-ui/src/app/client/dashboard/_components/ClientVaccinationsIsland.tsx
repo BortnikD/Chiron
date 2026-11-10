@@ -3,8 +3,13 @@
 import React from 'react';
 import Link from 'next/link';
 import { Syringe, ChevronRight } from 'lucide-react';
-import { ClientVaccinationsIslandProps } from './types';
+import type { Vaccination, Pet } from '@/modules/client/types';
 import { getDueInfo } from './utils';
+
+export interface ClientVaccinationsIslandProps {
+  vaccinations: Vaccination[];
+  pets: Pet[];
+}
 
 export function ClientVaccinationsIsland({
   vaccinations,
@@ -17,7 +22,7 @@ export function ClientVaccinationsIsland({
           <Syringe className="ic" />
           Вакцинация
         </span>
-        <Link href="/client/appointments?tab=VACC" className="btn btn-ghost btn-sm" style={{ textDecoration: 'none' }}>
+        <Link href="/client/vaccinations" className="btn btn-ghost btn-sm" style={{ textDecoration: 'none' }}>
           <span>Все</span>
           <ChevronRight className="ic" />
         </Link>
@@ -30,7 +35,7 @@ export function ClientVaccinationsIsland({
         ) : (
           vaccinations.slice(0, 4).map((v) => {
             const pet = pets.find((p) => p.id === v.petId);
-            const dueInfo = getDueInfo(v.nextDueOn);
+            const dueInfo = getDueInfo(v.nextDueOn || v.validUntil);
 
             return (
               <div

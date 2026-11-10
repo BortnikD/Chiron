@@ -1,5 +1,3 @@
-import { Vaccination, Pet } from '../../../../types';
-
 export type VaccinationStatusTone = 'all' | 'overdue' | 'soon' | 'ok';
 
 export interface VaccinationStatusInfo {
@@ -13,8 +11,4 @@ export interface VaccinationFormData {
   name: string;
   administeredOn: string;
   nextDueOn: string;
-  batchNumber: string;
-  notes: string;
 }
-
-export type { Vaccination, Pet };

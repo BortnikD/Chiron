@@ -1,155 +1,100 @@
 'use client';
 
-import React, { useEffect, useState, useMemo } from 'react';
-import { adminApi } from '../../../api';
-import { User, UserRole } from '../../../types';
-import { AppShell } from '../../../components/layout/AppShell';
-import {
-  AdminUsersFilters,
-  AdminUsersTable,
-  AdminUserDetailIsland,
-  AdminCreateUserModal,
-  AdminEditUserModal,
-  AdminDeleteUserModal,
-} from './_components';
+import { AlertCircle } from 'lucide-react';
+import { ConfirmModal } from '@/shared/components/ConfirmModal';
+import { useAdminUsers } from './_hooks/useAdminUsers';
+import { AdminUsersFilters } from './_components/AdminUsersFilters';
+import { AdminUsersTable } from './_components/AdminUsersTable';
+import { AdminUserDetailIsland } from './_components/AdminUserDetailIsland';
+import { AdminCreateUserModal } from './_components/AdminCreateUserModal';
+import { AdminEditUserModal } from './_components/AdminEditUserModal';
 
 /**
  * Страница управления пользователями администратором клиники.
- * Реализует поиск, фильтрацию по ролям, создание, просмотр деталей и удаление аккаунтов.
  */
 export default function AdminUsersPage() {
-  const [users, setUsers] = useState<User[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  // Filters
-  const [roleFilter, setRoleFilter] = useState<string>('ALL');
-  const [search, setSearch] = useState('');
-
-  // Selected User for Master-Detail panel
-  const [selectedUser, setSelectedUser] = useState<User | null>(null);
-
-  // Modals state
-  const [isCreateOpen, setIsCreateOpen] = useState(false);
-  const [isEditOpen, setIsEditOpen] = useState(false);
-  const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
-  const [deleting, setDeleting] = useState(false);
-
-  const loadUsers = async () => {
-    setLoading(true);
-    try {
-      const res = await adminApi.getUsers(
-        0,
-        100,
-        roleFilter !== 'ALL' ? (roleFilter as UserRole) : undefined
-      );
-      const items = res?.items || [];
-      setUsers(items);
-
-      if (selectedUser) {
-        const updated = items.find((u: User) => u.id === selectedUser.id);
-        if (updated) setSelectedUser(updated);
-      }
-    } catch (err) {
-      console.error('Failed to load users', err);
-      setUsers([]);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    loadUsers();
-  }, [roleFilter]);
-
-  const handleDeleteUser = async () => {
-    if (!selectedUser) return;
-    setDeleting(true);
-    try {
-      await adminApi.deleteUser(selectedUser.id);
-      setIsDeleteConfirmOpen(false);
-      setSelectedUser(null);
-      await loadUsers();
-    } catch (err: any) {
-      alert(err?.response?.data?.message || err?.message || 'Ошибка при удалении пользователя');
-    } finally {
-      setDeleting(false);
-    }
-  };
-
-  const handleUserCreated = async (created: User) => {
-    await loadUsers();
-    if (created) setSelectedUser(created);
-  };
-
-  const handleUserUpdated = async () => {
-    await loadUsers();
-  };
-
-  const filteredUsers = useMemo(() => {
-    if (!search) return users;
-    const q = search.toLowerCase();
-    return users.filter((u) => {
-      const name = (u.fullName || `${u.firstName} ${u.lastName}`).toLowerCase();
-      const email = (u.email || '').toLowerCase();
-      const phone = (u.phone || '').toLowerCase();
-      return name.includes(q) || email.includes(q) || phone.includes(q);
-    });
-  }, [users, search]);
+  const vm = useAdminUsers();
 
   return (
-    <AppShell crumbGroup="Клиника" crumb="Пользователи">
+    <>
+      {vm.error && (
+        <div
+          className="alert alert-destructive row between"
+          role="alert"
+          style={{ alignItems: 'center', marginBottom: 'var(--gap)' }}
+        >
+          <div className="row" style={{ gap: 8, alignItems: 'center' }}>
+            <AlertCircle size={16} className="ic" />
+            <span>{vm.error}</span>
+          </div>
+          <button type="button" className="btn btn-outline btn-sm" onClick={() => void vm.reload()}>
+            Повторить
+          </button>
+        </div>
+      )}
+
       <div className="content-row">
-        {/* Left Column: Filters + Table */}
         <div className="content-col grow">
           <AdminUsersFilters
-            roleFilter={roleFilter}
-            onRoleFilterChange={setRoleFilter}
-            search={search}
-            onSearchChange={setSearch}
-            onCreateClick={() => setIsCreateOpen(true)}
+            roleFilter={vm.roleFilter}
+            onRoleFilterChange={vm.setRoleFilter}
+            search={vm.search}
+            onSearchChange={vm.setSearch}
+            onCreateClick={() => vm.setIsCreateOpen(true)}
           />
 
           <AdminUsersTable
-            users={filteredUsers}
-            selectedUser={selectedUser}
-            loading={loading}
-            onSelectUser={setSelectedUser}
+            users={vm.users}
+            selectedUser={vm.selectedUser}
+            loading={vm.loading}
+            onSelectUser={vm.setSelectedUser}
           />
         </div>
 
-        {/* Right Column: Master-Detail Island */}
-        {selectedUser && (
+        {vm.selectedUser && (
           <AdminUserDetailIsland
-            user={selectedUser}
-            onClose={() => setSelectedUser(null)}
-            onDeleteClick={() => setIsDeleteConfirmOpen(true)}
-            onEditClick={() => setIsEditOpen(true)}
-            onUserUpdated={handleUserUpdated}
+            user={vm.selectedUser}
+            pets={vm.userPets}
+            appointments={vm.userAppointments}
+            loadingDetails={vm.loadingDetails}
+            detailsError={vm.detailsError}
+            onClose={() => vm.setSelectedUser(null)}
+            onDeleteClick={vm.openDeleteConfirm}
+            onEditClick={() => vm.setIsEditOpen(true)}
+            onSaveProfile={vm.updateUser}
           />
         )}
       </div>
 
-      {/* Modals */}
       <AdminCreateUserModal
-        isOpen={isCreateOpen}
-        onClose={() => setIsCreateOpen(false)}
-        onSuccess={handleUserCreated}
+        isOpen={vm.isCreateOpen}
+        onClose={() => vm.setIsCreateOpen(false)}
+        onCreateUser={vm.createUser}
       />
 
       <AdminEditUserModal
-        isOpen={isEditOpen}
-        user={selectedUser}
-        onClose={() => setIsEditOpen(false)}
-        onSuccess={handleUserUpdated}
+        isOpen={vm.isEditOpen}
+        user={vm.selectedUser}
+        onClose={() => vm.setIsEditOpen(false)}
+        onUpdateUser={vm.updateUser}
       />
 
-      <AdminDeleteUserModal
-        isOpen={isDeleteConfirmOpen}
-        user={selectedUser}
-        deleting={deleting}
-        onClose={() => setIsDeleteConfirmOpen(false)}
-        onConfirm={handleDeleteUser}
+      <ConfirmModal
+        isOpen={vm.isDeleteConfirmOpen && Boolean(vm.selectedUser)}
+        title="Удалить пользователя?"
+        description={
+          vm.selectedUser
+            ? `Пользователь «${vm.selectedUser.fullName || vm.selectedUser.email}» будет безвозвратно удалён. Связанные данные могут стать недоступны.`
+            : undefined
+        }
+        confirmLabel="Удалить"
+        cancelLabel="Отмена"
+        tone="destructive"
+        loading={vm.deleting}
+        error={vm.deleteError}
+        onClose={vm.closeDeleteConfirm}
+        onConfirm={vm.handleDeleteUser}
       />
-    </AppShell>
+    </>
   );
 }

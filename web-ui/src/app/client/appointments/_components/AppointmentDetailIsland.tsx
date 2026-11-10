@@ -2,9 +2,16 @@
 
 import React from 'react';
 import { X, XCircle, AlertCircle } from 'lucide-react';
-import { Appointment, Pet, Service, Veterinarian } from '../../../../types';
-import { getDoctorDisplay } from '../../../../utils/doctorHelpers';
-import { STATUS_SHORT } from './constants';
+import type { Appointment, Pet } from '@/modules/client/types';
+import type { Service, Veterinarian } from '@/modules/clinic/types';
+import { getDoctorDisplay } from '@/utils/doctorHelpers';
+import {
+  APPOINTMENT_STATUS_META,
+  formatCurrency,
+  formatDateRu,
+  formatDateShort,
+  formatSlotTime,
+} from '@/shared/lib';
 
 export interface AppointmentDetailIslandProps {
   /** Выбранная запись для детального просмотра */
@@ -34,11 +41,11 @@ export function AppointmentDetailIsland({
   onClose,
   onRequestCancel,
 }: AppointmentDetailIslandProps) {
-  // Определение имени врача из словаря либо из свойств записи
-  const doctorName =
-    (veterinariansMap && appointment.veterinarianId && veterinariansMap[appointment.veterinarianId]
-      ? getDoctorDisplay(veterinariansMap[appointment.veterinarianId]).name
-      : appointment.veterinarianName || appointment.veterinarian?.user?.fullName) || null;
+  const vet =
+    (veterinariansMap && appointment.veterinarianId && veterinariansMap[appointment.veterinarianId]) ||
+    appointment.veterinarian;
+  const doctorName = vet ? getDoctorDisplay(vet).name : appointment.veterinarianName || null;
+  const statusShort = APPOINTMENT_STATUS_META[appointment.status]?.short || appointment.status;
 
   return (
     <section
@@ -52,17 +59,7 @@ export function AppointmentDetailIsland({
             {servicesMap[appointment.serviceId]?.name || 'Приём'}
           </span>
           <span className="cell-sub">
-            {new Date(appointment.startAt).toLocaleDateString('ru-RU', {
-              day: 'numeric',
-              month: 'long',
-              year: 'numeric',
-            })}
-            , в{' '}
-            {new Date(appointment.startAt).toLocaleTimeString('ru-RU', {
-              hour: '2-digit',
-              minute: '2-digit',
-              timeZone: 'Europe/Moscow',
-            })}
+            {formatDateRu(appointment.startAt)}, в {formatSlotTime(appointment.startAt)}
           </span>
         </div>
         <button
@@ -78,9 +75,7 @@ export function AppointmentDetailIsland({
       <div className="island-body">
         <div className="col" style={{ gap: '16px' }}>
           <div className="row wrap">
-            <span className={`badge st badge-${appointment.status}`}>
-              {STATUS_SHORT[appointment.status] || appointment.status}
-            </span>
+            <span className={`badge st badge-${appointment.status}`}>{statusShort}</span>
           </div>
 
           <dl className="kv" style={{ margin: 0 }}>
@@ -96,18 +91,12 @@ export function AppointmentDetailIsland({
 
             <dt>Дата и время</dt>
             <dd className="tnum">
-              {new Date(appointment.startAt).toLocaleDateString('ru-RU')} в{' '}
-              {new Date(appointment.startAt).toLocaleTimeString('ru-RU', {
-                hour: '2-digit',
-                minute: '2-digit',
-              })}
+              {formatDateShort(appointment.startAt)} в {formatSlotTime(appointment.startAt)}
             </dd>
 
             <dt>Стоимость</dt>
             <dd className="cell-main tnum">
-              {appointment.priceSnapshot
-                ? `${appointment.priceSnapshot.toLocaleString('ru-RU')} ₽`
-                : '—'}
+              {appointment.priceSnapshot != null ? formatCurrency(appointment.priceSnapshot) : '—'}
             </dd>
           </dl>
 
@@ -137,7 +126,6 @@ export function AppointmentDetailIsland({
         </div>
       </div>
 
-      {/* Возможность отмены записи до начала приёма */}
       {(appointment.status === 'PENDING' || appointment.status === 'CONFIRMED') && (
         <div className="island-foot">
           <span className="small muted">Отмена доступна до начала приёма</span>

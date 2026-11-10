@@ -1,9 +1,14 @@
 'use client';
 
 import React, { useState } from 'react';
-import { PawPrint, Edit2, Archive, Trash2, Syringe, X } from 'lucide-react';
-import { PetDetailIslandProps, PetDetailTab } from './types';
-import { calculateAge, formatPetWeight, formatAppointmentDate, getOwnerName, getSpeciesName } from './utils';
+import { PawPrint, Edit2, Archive, Trash2, Syringe, X, AlertCircle } from 'lucide-react';
+import {
+  APPOINTMENT_STATUS_META,
+  calculateAgeRu,
+  formatDateTimeCompact,
+  formatIsoDateDisplay,
+} from '@/shared/lib';
+import type { PetDetailIslandProps, PetDetailTab } from './types';
 
 /**
  * Правая панель детального просмотра питомца:
@@ -15,6 +20,8 @@ export const PetDetailIsland: React.FC<PetDetailIslandProps> = ({
   users,
   appointments,
   vaccinations,
+  loadingDetails,
+  detailsError,
   onClose,
   onEdit,
   onToggleArchive,
@@ -23,8 +30,12 @@ export const PetDetailIsland: React.FC<PetDetailIslandProps> = ({
 }) => {
   const [activeTab, setActiveTab] = useState<PetDetailTab>('overview');
 
+  const speciesName = speciesList.find((s) => s.id === pet.speciesId)?.name || '—';
+  const ownerName = users.find((u) => u.id === pet.ownerId)?.fullName || '—';
+  const weightText = pet.weightKg != null ? `${String(pet.weightKg).replace('.', ',')} кг` : '—';
+
   return (
-    <section className="island detail-island" style={{ width: 460 }} aria-label="Питомец">
+    <section className="island detail-island" aria-label="Питомец">
       <div className="island-head">
         <div className="row">
           <span className="pet-ava">
@@ -33,9 +44,9 @@ export const PetDetailIsland: React.FC<PetDetailIslandProps> = ({
           <div className="col" style={{ gap: 0 }}>
             <span className="h2">{pet.name}</span>
             <span className="cell-sub">
-              {getSpeciesName(speciesList, pet.speciesId)} ·{' '}
+              {speciesName} ·{' '}
               {pet.gender === 'MALE' ? 'Самец' : 'Самка'} ·{' '}
-              {calculateAge(pet.birthDate)}
+              {calculateAgeRu(pet.birthDate)}
             </span>
           </div>
         </div>
@@ -95,20 +106,34 @@ export const PetDetailIsland: React.FC<PetDetailIslandProps> = ({
       </div>
 
       <div className="island-body" style={{ paddingTop: 14 }}>
+        {detailsError && (
+          <div className="alert alert-destructive" role="alert" style={{ marginBottom: 12 }}>
+            <AlertCircle className="ic" size={16} />
+            <span>{detailsError}</span>
+          </div>
+        )}
+        {loadingDetails && (activeTab === 'appointments' || activeTab === 'vaccinations') && (
+          <div className="row" style={{ gap: 8, marginBottom: 12, alignItems: 'center' }}>
+            <span className="spinner" aria-hidden="true" />
+            <span className="small muted">Загружаем историю…</span>
+          </div>
+        )}
         {/* Tab 1: Overview */}
         {activeTab === 'overview' && (
           <div className="col" style={{ gap: 14 }}>
             <dl className="kv" style={{ margin: 0 }}>
               <dt>Владелец</dt>
-              <dd>{getOwnerName(users, pet.ownerId)}</dd>
+              <dd>{ownerName}</dd>
               <dt>Вид</dt>
-              <dd>{getSpeciesName(speciesList, pet.speciesId)}</dd>
+              <dd>{speciesName}</dd>
               <dt>Пол</dt>
               <dd>{pet.gender === 'MALE' ? 'Самец' : 'Самка'}</dd>
               <dt>Дата рождения</dt>
-              <dd className="tnum">{pet.birthDate || 'Не указана'}</dd>
+              <dd className="tnum">
+                {pet.birthDate ? formatIsoDateDisplay(pet.birthDate.slice(0, 10)) : 'Не указана'}
+              </dd>
               <dt>Вес</dt>
-              <dd className="tnum">{formatPetWeight(pet.weightKg)}</dd>
+              <dd className="tnum">{weightText}</dd>
               <dt>Заметки</dt>
               <dd>{pet.notes || '—'}</dd>
               <dt>Статус</dt>
@@ -121,7 +146,9 @@ export const PetDetailIsland: React.FC<PetDetailIslandProps> = ({
         {activeTab === 'appointments' && (
           <div className="col" style={{ gap: 4, margin: '0 -10px' }}>
             {appointments.map((a) => {
-              const { day, month, time } = formatAppointmentDate(a.startAt);
+              const dt = formatDateTimeCompact(a.startAt);
+              const [day, month] = dt.date.split(' ');
+              const stMeta = APPOINTMENT_STATUS_META[a.status];
 
               return (
                 <div key={a.id} className="lrow">
@@ -130,10 +157,12 @@ export const PetDetailIsland: React.FC<PetDetailIslandProps> = ({
                     <span>{month}</span>
                   </span>
                   <span className="col" style={{ gap: 1 }}>
-                    <span className="cell-main">{a.service?.name || 'Услуга'}</span>
-                    <span className="cell-sub">{time}</span>
+                    <span className="cell-main">{a.service?.name || a.serviceName || 'Услуга'}</span>
+                    <span className="cell-sub">{dt.time}</span>
                   </span>
-                  <span className={`badge st badge-${a.status}`}>{a.status}</span>
+                  <span className={`badge st ${stMeta?.cls || `badge-${a.status}`}`}>
+                    {stMeta?.short || a.status}
+                  </span>
                 </div>
               );
             })}
@@ -170,10 +199,14 @@ export const PetDetailIsland: React.FC<PetDetailIslandProps> = ({
                   </span>
                   <span className="col" style={{ gap: 1 }}>
                     <span className="cell-main">{v.name}</span>
-                    <span className="cell-sub">Введена {v.administeredOn}</span>
+                    <span className="cell-sub">
+                      Введена {formatIsoDateDisplay(v.administeredOn.slice(0, 10))}
+                    </span>
                   </span>
                   {v.nextDueOn && (
-                    <span className="badge badge-accent">до {v.nextDueOn}</span>
+                    <span className="badge badge-accent">
+                      до {formatIsoDateDisplay(v.nextDueOn.slice(0, 10))}
+                    </span>
                   )}
                 </div>
               ))}

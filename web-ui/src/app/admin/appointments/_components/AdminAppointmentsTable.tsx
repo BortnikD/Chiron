@@ -1,18 +1,17 @@
 'use client';
 
 import React from 'react';
-import { Appointment, Veterinarian, Service, Pet, User } from '../../../../types';
-import { Calendar, Repeat, Edit2, XCircle, Trash2 } from 'lucide-react';
-import { getSpeciesTone } from '../../../../components/ui/SpeciesIcon';
+import { Calendar, Repeat, Edit2, XCircle, Trash2, ChevronLeft, ChevronRight } from 'lucide-react';
+import type { Appointment, Pet } from '@/modules/client/types';
+import type { Veterinarian, Service } from '@/modules/clinic/types';
+import type { User } from '@/shared/types';
 import {
-  STATUS_MAP,
-  getVetName,
-  getServiceName,
-  getPet,
-  getOwnerName,
-  formatDateTime,
-  formatPrice,
-} from './utils';
+  APPOINTMENT_STATUS_META,
+  formatCurrency,
+  formatDateTimeCompact,
+  getSpeciesTone,
+} from '@/shared/lib';
+import { getDoctorDisplay } from '@/utils/doctorHelpers';
 
 export interface AdminAppointmentsTableProps {
   appointments: Appointment[];
@@ -22,6 +21,10 @@ export interface AdminAppointmentsTableProps {
   users: User[];
   selectedAppt: Appointment | null;
   loading: boolean;
+  page?: number;
+  totalPages?: number;
+  totalElements?: number;
+  onPageChange?: (page: number) => void;
   onSelect: (appt: Appointment) => void;
   onEdit?: (appt: Appointment) => void;
   onCancel?: (appt: Appointment) => void;
@@ -39,6 +42,10 @@ export const AdminAppointmentsTable: React.FC<AdminAppointmentsTableProps> = ({
   users,
   selectedAppt,
   loading,
+  page = 0,
+  totalPages = 1,
+  totalElements,
+  onPageChange,
   onSelect,
   onEdit,
   onCancel,
@@ -49,7 +56,10 @@ export const AdminAppointmentsTable: React.FC<AdminAppointmentsTableProps> = ({
       <div className="island-head">
         <span className="island-title">
           <Calendar size={18} />
-          Записи <span className="count">Найдено: {appointments.length}</span>
+          Записи{' '}
+          <span className="count">
+            Найдено: {totalElements !== undefined && totalPages > 1 ? `${appointments.length} (всего ${totalElements})` : appointments.length}
+          </span>
         </span>
       </div>
 
@@ -76,9 +86,13 @@ export const AdminAppointmentsTable: React.FC<AdminAppointmentsTableProps> = ({
 
           {appointments.map((a) => {
             const isSelected = selectedAppt?.id === a.id;
-            const dt = formatDateTime(a.startAt);
-            const p = getPet(a.petId, pets);
-            const sInfo = STATUS_MAP[a.status] || {
+            const dt = formatDateTimeCompact(a.startAt);
+            const p = pets.find((item) => item.id === a.petId);
+            const ownerName = (p?.ownerId && users.find((u) => u.id === p.ownerId)?.fullName) || '—';
+            const serviceName = services.find((s) => s.id === a.serviceId)?.name || 'Услуга клиники';
+            const rawVet = veterinarians.find((v) => v.id === a.veterinarianId);
+            const vetName = getDoctorDisplay(rawVet).fullName;
+            const sInfo = APPOINTMENT_STATUS_META[a.status] || {
               label: a.status,
               short: a.status,
               cls: 'badge-outline',
@@ -112,19 +126,19 @@ export const AdminAppointmentsTable: React.FC<AdminAppointmentsTableProps> = ({
                 </span>
 
                 <span className="pet-cell">
-                  <span className={`t-ava xs ${getSpeciesTone(p?.speciesId)}`}>
+                  <span className={`t-ava xs tone-${getSpeciesTone(p?.species?.name || p?.speciesId)}`}>
                     {p?.name ? p.name.slice(0, 2).toUpperCase() : 'ПТ'}
                   </span>
                   <span>{p?.name || 'Питомец'}</span>
                 </span>
 
-                <span className="muted">{getOwnerName(p?.ownerId, users)}</span>
-                <span>{getServiceName(a.serviceId, services)}</span>
-                <span>{getVetName(a.veterinarianId, veterinarians, users)}</span>
+                <span className="muted">{ownerName}</span>
+                <span>{serviceName}</span>
+                <span>{vetName}</span>
                 <span>
                   <span className={`badge st ${sInfo.cls}`}>{sInfo.short}</span>
                 </span>
-                <span className="right tnum">{formatPrice(a.priceSnapshot || a.price)}</span>
+                <span className="right tnum">{formatCurrency(a.priceSnapshot || a.price)}</span>
 
                 <span
                   className="right row"
@@ -172,7 +186,8 @@ export const AdminAppointmentsTable: React.FC<AdminAppointmentsTableProps> = ({
 
         {loading && appointments.length === 0 && (
           <div className="empty">
-            <span className="empty-title">Загрузка записей…</span>
+            <span className="spinner" aria-hidden="true" />
+            <span className="muted">Загрузка записей…</span>
           </div>
         )}
 
@@ -182,6 +197,55 @@ export const AdminAppointmentsTable: React.FC<AdminAppointmentsTableProps> = ({
           </div>
         )}
       </div>
+
+      {onPageChange && totalPages > 1 && (
+        <div
+          className="row between"
+          style={{
+            padding: '12px 16px',
+            borderTop: '1px solid var(--border)',
+            alignItems: 'center',
+          }}
+        >
+          <span className="small muted">
+            Страница {page + 1} из {totalPages}
+          </span>
+
+          <div className="pager">
+            <button
+              type="button"
+              className="btn btn-ghost btn-sm btn-icon"
+              disabled={page <= 0 || loading}
+              onClick={() => onPageChange(Math.max(0, page - 1))}
+              aria-label="Предыдущая страница"
+            >
+              <ChevronLeft className="ic" />
+            </button>
+
+            {Array.from({ length: totalPages }, (_, idx) => idx).map((p) => (
+              <button
+                key={p}
+                type="button"
+                className={`btn btn-sm ${p === page ? 'on' : 'btn-ghost'}`}
+                disabled={loading}
+                onClick={() => onPageChange(p)}
+              >
+                {p + 1}
+              </button>
+            ))}
+
+            <button
+              type="button"
+              className="btn btn-ghost btn-sm btn-icon"
+              disabled={page >= totalPages - 1 || loading}
+              onClick={() => onPageChange(Math.min(totalPages - 1, page + 1))}
+              aria-label="Следующая страница"
+            >
+              <ChevronRight className="ic" />
+            </button>
+          </div>
+        </div>
+      )}
     </section>
   );
 };

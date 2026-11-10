@@ -1,17 +1,19 @@
 'use client';
 
 import React from 'react';
-import { Appointment, Veterinarian, Service, Pet, User } from '../../../../types';
 import { X, Trash2, Edit2, AlertCircle } from 'lucide-react';
+import type { Appointment, Pet } from '@/modules/client/types';
+import type { Veterinarian, Service } from '@/modules/clinic/types';
+import type { User } from '@/shared/types';
 import {
-  STATUS_MAP,
-  getVetName,
-  getServiceName,
-  getPet,
-  getOwnerName,
-  formatDateTime,
-  formatPrice,
-} from './utils';
+  APPOINTMENT_STATUS_META,
+  canTransitionAppointmentStatus,
+  formatCurrency,
+  formatDateShort,
+  formatDateTimeCompact,
+  formatSlotTime,
+} from '@/shared/lib';
+import { getDoctorDisplay } from '@/utils/doctorHelpers';
 
 export interface AdminAppointmentDetailIslandProps {
   appointment: Appointment;
@@ -39,20 +41,25 @@ export const AdminAppointmentDetailIsland: React.FC<AdminAppointmentDetailIsland
   onCancel,
   onDelete,
 }) => {
-  const pet = getPet(appointment.petId, pets);
-  const serviceName = getServiceName(appointment.serviceId, services);
-  const vetName = getVetName(appointment.veterinarianId, veterinarians, users);
-  const ownerName = getOwnerName(pet?.ownerId, users);
-  const dtStart = formatDateTime(appointment.startAt);
-  const dtEnd = formatDateTime(appointment.endAt);
-  const sInfo = STATUS_MAP[appointment.status] || {
+  const pet = pets.find((p) => p.id === appointment.petId);
+  const serviceName = services.find((s) => s.id === appointment.serviceId)?.name || 'Услуга клиники';
+  const rawVet = veterinarians.find((v) => v.id === appointment.veterinarianId);
+  const vetName = getDoctorDisplay(rawVet).fullName;
+  const ownerName = (pet?.ownerId && users.find((u) => u.id === pet.ownerId)?.fullName) || '—';
+  const cancelledByName =
+    (appointment.cancelledBy && users.find((u) => u.id === appointment.cancelledBy)?.fullName) ||
+    appointment.cancelledBy ||
+    '—';
+  const dtStart = formatDateTimeCompact(appointment.startAt);
+  const dtEnd = formatDateTimeCompact(appointment.endAt);
+  const sInfo = APPOINTMENT_STATUS_META[appointment.status] || {
     label: appointment.status,
     short: appointment.status,
     cls: 'badge-outline',
   };
 
   return (
-    <section className="island detail-island" style={{ width: 440 }} aria-label="Запись">
+    <section className="island detail-island" aria-label="Запись">
       <div className="island-head">
         <div className="col" style={{ gap: 2 }}>
           <span className="h2" style={{ wordBreak: 'break-word' }}>
@@ -96,7 +103,7 @@ export const AdminAppointmentDetailIsland: React.FC<AdminAppointmentDetailIsland
             </dd>
             <dt>Цена</dt>
             <dd className="tnum">
-              {formatPrice(appointment.priceSnapshot || appointment.price)}
+              {formatCurrency(appointment.priceSnapshot || appointment.price)}
             </dd>
             {appointment.followUpOf && (
               <>
@@ -121,11 +128,11 @@ export const AdminAppointmentDetailIsland: React.FC<AdminAppointmentDetailIsland
           {appointment.status === 'CANCELLED' && (
             <dl className="kv" style={{ margin: 0 }}>
               <dt>Отменил</dt>
-              <dd>{appointment.cancelledBy || '—'}</dd>
+              <dd>{cancelledByName}</dd>
               <dt>Когда</dt>
               <dd className="tnum">
                 {appointment.cancelledAt
-                  ? appointment.cancelledAt.slice(0, 16).replace('T', ' ')
+                  ? `${formatDateShort(appointment.cancelledAt)}, ${formatSlotTime(appointment.cancelledAt)}`
                   : '—'}
               </dd>
               <dt>Причина</dt>
@@ -146,16 +153,17 @@ export const AdminAppointmentDetailIsland: React.FC<AdminAppointmentDetailIsland
           <Trash2 size={14} />
           Удалить
         </button>
-        {appointment.status !== 'CANCELLED' && (
-          <button
-            type="button"
-            className="btn btn-outline btn-sm"
-            onClick={() => onCancel(appointment)}
-          >
-            <AlertCircle size={14} />
-            Отменить
-          </button>
-        )}
+        {appointment.status !== 'CANCELLED' &&
+          canTransitionAppointmentStatus(appointment.status, 'CANCELLED') && (
+            <button
+              type="button"
+              className="btn btn-outline btn-sm"
+              onClick={() => onCancel(appointment)}
+            >
+              <AlertCircle size={14} />
+              Отменить
+            </button>
+          )}
         <button
           type="button"
           className="btn btn-primary btn-sm"

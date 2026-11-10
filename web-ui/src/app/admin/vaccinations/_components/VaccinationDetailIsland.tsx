@@ -1,8 +1,9 @@
 'use client';
 
 import React from 'react';
-import { X, Edit2, Trash2, Syringe, Calendar, PawPrint } from 'lucide-react';
-import { Vaccination, Pet } from './types';
+import { X, Edit2, Trash2 } from 'lucide-react';
+import type { Vaccination, Pet } from '@/modules/client/types';
+import { formatIsoDateDisplay } from '@/shared/lib';
 import { calculateVaccinationStatus } from './utils';
 
 export interface VaccinationDetailIslandProps {
@@ -26,9 +27,11 @@ export const VaccinationDetailIsland: React.FC<VaccinationDetailIslandProps> = (
 }) => {
   const vaxName = vaccination.name || vaccination.vaccineName || 'Вакцинация';
   const petName = pet?.name || 'Питомец';
-  const adminDate = vaccination.administeredOn || vaccination.administeredAt || '—';
-  const nextDue = vaccination.nextDueOn || vaccination.validUntil;
-  const status = calculateVaccinationStatus(nextDue);
+  const adminRaw = vaccination.administeredOn || vaccination.administeredAt;
+  const nextDueRaw = vaccination.nextDueOn || vaccination.validUntil;
+  const adminDate = formatIsoDateDisplay(adminRaw ? adminRaw.slice(0, 10) : null);
+  const nextDue = nextDueRaw ? formatIsoDateDisplay(nextDueRaw.slice(0, 10)) : null;
+  const status = calculateVaccinationStatus(nextDueRaw);
 
   return (
     <section className="island detail-island" aria-label="Детали вакцинации">
@@ -82,7 +85,7 @@ export const VaccinationDetailIsland: React.FC<VaccinationDetailIslandProps> = (
             {pet?.birthDate && (
               <>
                 <dt>Дата рождения</dt>
-                <dd className="tnum font-mono">{pet.birthDate}</dd>
+                <dd className="tnum font-mono">{formatIsoDateDisplay(pet.birthDate.slice(0, 10))}</dd>
               </>
             )}
 

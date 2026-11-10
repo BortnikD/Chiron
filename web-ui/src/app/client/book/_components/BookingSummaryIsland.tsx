@@ -1,5 +1,5 @@
 import React from 'react';
-import { formatSlotTime } from './constants';
+import { formatCurrency, formatDateShort, formatSlotTime } from '@/shared/lib';
 
 export interface BookingSummaryIslandProps {
   petName?: string;
@@ -24,7 +24,7 @@ export const BookingSummaryIsland: React.FC<BookingSummaryIslandProps> = ({
   return (
     <aside
       className="island"
-      style={{ width: '320px', flex: 'none' }}
+      style={{ flex: '0 1 320px', width: 'clamp(220px, 26vw, 320px)' }}
       aria-label="Сводка записи"
     >
       <div className="island-head">
@@ -50,14 +50,14 @@ export const BookingSummaryIsland: React.FC<BookingSummaryIslandProps> = ({
             <span className="small muted">Дата и время</span>
             <span className="cell-main">
               {selectedSlotStartAt
-                ? `${new Date(selectedSlotStartAt).toLocaleDateString('ru-RU')} в ${formatSlotTime(selectedSlotStartAt)}`
+                ? `${formatDateShort(selectedSlotStartAt)} в ${formatSlotTime(selectedSlotStartAt)}`
                 : '—'}
             </span>
           </div>
           <div className="col" style={{ gap: '2px' }}>
             <span className="small muted">Стоимость</span>
             <span className="cell-main" style={{ fontSize: '16px', fontWeight: 700 }}>
-              {servicePrice != null ? `${servicePrice.toLocaleString('ru-RU')} ₽` : '—'}
+              {servicePrice != null ? formatCurrency(servicePrice) : '—'}
             </span>
           </div>
         </div>

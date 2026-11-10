@@ -1,9 +1,16 @@
 'use client';
 
 import React from 'react';
-import { Appointment, ScheduleException } from '../../../../types';
-import { X } from 'lucide-react';
-import { STATUS_SHORT, formatIsoDisplay } from './utils';
+import { Trash2, X } from 'lucide-react';
+import type { Appointment } from '@/modules/client/types';
+import type { ScheduleException } from '@/modules/admin/types';
+import {
+  APPOINTMENT_STATUS_META,
+  formatCurrency,
+  formatDateShort,
+  formatIsoDateDisplay,
+  formatSlotTime,
+} from '@/shared/lib';
 
 export interface VetScheduleDetailIslandProps {
   selectedAppt: Appointment | null;
@@ -28,22 +35,16 @@ export const VetScheduleDetailIsland: React.FC<VetScheduleDetailIslandProps> = (
   if (selectedAppt) {
     const petName = pets[selectedAppt.petId] || 'Пациент';
     const svcName = services[selectedAppt.serviceId] || 'Приём';
-    const startDate = new Date(selectedAppt.startAt);
-    const endDate = new Date(selectedAppt.endAt);
 
     return (
-      <section className="island detail-island" style={{ width: '420px' }} aria-label="Детали приёма">
+      <section className="island detail-island" aria-label="Детали приёма">
         <div className="island-head">
-          <div className="col" style={{ gap: '2px' }}>
+          <div className="col" style={{ gap: '2px', minWidth: 0 }}>
             <span className="h2" style={{ wordBreak: 'break-word' }}>
               {petName} — {svcName}
             </span>
             <span className="cell-sub tnum">
-              {startDate.toLocaleDateString('ru-RU')} в{' '}
-              {startDate.toLocaleTimeString('ru-RU', {
-                hour: '2-digit',
-                minute: '2-digit',
-              })}
+              {formatDateShort(selectedAppt.startAt)} в {formatSlotTime(selectedAppt.startAt)}
             </span>
           </div>
           <button
@@ -60,12 +61,10 @@ export const VetScheduleDetailIsland: React.FC<VetScheduleDetailIslandProps> = (
           <div className="col" style={{ gap: '14px' }}>
             <div className="row wrap">
               <span className={`badge st badge-${selectedAppt.status}`}>
-                {STATUS_SHORT[selectedAppt.status] || selectedAppt.status}
+                {APPOINTMENT_STATUS_META[selectedAppt.status]?.short || selectedAppt.status}
               </span>
-              {selectedAppt.priceSnapshot && (
-                <span className="cell-main tnum">
-                  {selectedAppt.priceSnapshot.toLocaleString('ru-RU')} ₽
-                </span>
+              {selectedAppt.priceSnapshot != null && (
+                <span className="cell-main tnum">{formatCurrency(selectedAppt.priceSnapshot)}</span>
               )}
             </div>
 
@@ -76,15 +75,7 @@ export const VetScheduleDetailIsland: React.FC<VetScheduleDetailIslandProps> = (
               <dd>{svcName}</dd>
               <dt>Время</dt>
               <dd className="tnum">
-                {startDate.toLocaleTimeString('ru-RU', {
-                  hour: '2-digit',
-                  minute: '2-digit',
-                })}
-                –
-                {endDate.toLocaleTimeString('ru-RU', {
-                  hour: '2-digit',
-                  minute: '2-digit',
-                })}
+                {formatSlotTime(selectedAppt.startAt)}–{formatSlotTime(selectedAppt.endAt)}
               </dd>
             </dl>
 
@@ -104,13 +95,13 @@ export const VetScheduleDetailIsland: React.FC<VetScheduleDetailIslandProps> = (
     const isAbsence = selectedException.type === 'ABSENCE';
     const rangeText =
       selectedException.startDate === selectedException.endDate
-        ? formatIsoDisplay(selectedException.startDate)
-        : `${formatIsoDisplay(selectedException.startDate)} – ${formatIsoDisplay(selectedException.endDate)}`;
+        ? formatIsoDateDisplay(selectedException.startDate)
+        : `${formatIsoDateDisplay(selectedException.startDate)} – ${formatIsoDateDisplay(selectedException.endDate)}`;
 
     return (
-      <section className="island detail-island" style={{ width: '420px' }} aria-label="Детали исключения">
+      <section className="island detail-island" aria-label="Детали исключения">
         <div className="island-head">
-          <div className="col" style={{ gap: '2px' }}>
+          <div className="col" style={{ gap: '2px', minWidth: 0 }}>
             <span className="h2" style={{ wordBreak: 'break-word' }}>
               {isAbsence ? 'Отсутствие врача' : 'Особый график работы'}
             </span>
@@ -155,10 +146,11 @@ export const VetScheduleDetailIsland: React.FC<VetScheduleDetailIslandProps> = (
               <div style={{ marginTop: '12px' }}>
                 <button
                   type="button"
-                  className="btn btn-outline btn-sm btn-destructive"
+                  className="btn btn-destructive-outline btn-sm"
                   onClick={() => onDeleteException(selectedException)}
                 >
-                  Удалить исключение
+                  <Trash2 size={14} className="ic" />
+                  <span>Удалить исключение</span>
                 </button>
               </div>
             )}

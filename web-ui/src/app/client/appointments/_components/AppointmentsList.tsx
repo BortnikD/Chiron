@@ -2,9 +2,16 @@
 
 import React from 'react';
 import { Calendar } from 'lucide-react';
-import { Appointment, Pet, Service } from '../../../../types';
-import { SpeciesIcon, getSpeciesTone } from '../../../../components/ui/SpeciesIcon';
-import { STATUS_SHORT } from './constants';
+import type { Appointment, Pet } from '@/modules/client/types';
+import type { Service } from '@/modules/clinic/types';
+import { SpeciesIcon } from '@/components/ui/SpeciesIcon';
+import {
+  APPOINTMENT_STATUS_META,
+  formatCurrency,
+  formatDateShort,
+  formatSlotTime,
+  getSpeciesTone,
+} from '@/shared/lib';
 
 export interface AppointmentsListProps {
   /** Отфильтрованный список записей на приём */
@@ -17,6 +24,16 @@ export interface AppointmentsListProps {
   petsMap: Record<string, Pet>;
   /** Словарь услуг клиники по ID */
   servicesMap: Record<string, Service>;
+  /** Словарь видов животных по ID */
+  speciesMap?: Record<string, string>;
+  /** Общее количество записей по текущим фильтрам */
+  totalElements?: number;
+  /** Общее количество страниц */
+  totalPages?: number;
+  /** Текущая страница (0-based) */
+  page?: number;
+  /** Колбэк смены страницы */
+  onPageChange?: (page: number) => void;
 }
 
 /**
@@ -30,13 +47,18 @@ export function AppointmentsList({
   onSelectAppointment,
   petsMap,
   servicesMap,
+  speciesMap = {},
+  totalElements,
+  totalPages = 0,
+  page = 0,
+  onPageChange,
 }: AppointmentsListProps) {
   return (
     <section className="island grow" aria-label="Список записей">
       <div className="island-head">
         <span className="island-title">
           <Calendar className="ic" />
-          Записи <span className="count">Найдено: {appointments.length}</span>
+          Записи <span className="count">Найдено: {totalElements ?? appointments.length}</span>
         </span>
       </div>
 
@@ -65,17 +87,8 @@ export function AppointmentsList({
               const isSel = selectedAppointment?.id === a.id;
               const pet = petsMap[a.petId];
               const svc = servicesMap[a.serviceId];
-
-              const dateStr = new Date(a.startAt).toLocaleDateString('ru-RU', {
-                day: '2-digit',
-                month: '2-digit',
-                year: 'numeric',
-              });
-              const timeStr = new Date(a.startAt).toLocaleTimeString('ru-RU', {
-                hour: '2-digit',
-                minute: '2-digit',
-                timeZone: 'Europe/Moscow',
-              });
+              const tone = getSpeciesTone(pet?.species?.name || pet?.speciesId, speciesMap);
+              const statusShort = APPOINTMENT_STATUS_META[a.status]?.short || a.status;
 
               return (
                 <button
@@ -86,23 +99,21 @@ export function AppointmentsList({
                   style={{ textAlign: 'left', cursor: 'pointer' }}
                 >
                   <span className="row" style={{ gap: '6px' }}>
-                    <span className="cell-main tnum">{dateStr}</span>
-                    <span className="muted tnum">{timeStr}</span>
+                    <span className="cell-main tnum">{formatDateShort(a.startAt)}</span>
+                    <span className="muted tnum">{formatSlotTime(a.startAt)}</span>
                   </span>
                   <span className="pet-cell">
-                    <span className={`t-ava xs ${getSpeciesTone(pet?.speciesId)}`}>
-                      <SpeciesIcon species={pet?.speciesId || 'cat'} size={14} />
+                    <span className={`t-ava xs tone-${tone}`}>
+                      <SpeciesIcon species={tone} size={14} />
                     </span>
                     <span>{pet?.name || 'Питомец'}</span>
                   </span>
                   <span>{svc?.name || 'Услуга'}</span>
                   <span>
-                    <span className={`badge st badge-${a.status}`}>
-                      {STATUS_SHORT[a.status] || a.status}
-                    </span>
+                    <span className={`badge st badge-${a.status}`}>{statusShort}</span>
                   </span>
                   <span className="right tnum">
-                    {a.priceSnapshot ? `${a.priceSnapshot.toLocaleString('ru-RU')} ₽` : '—'}
+                    {a.priceSnapshot != null ? formatCurrency(a.priceSnapshot) : '—'}
                   </span>
                 </button>
               );
@@ -110,6 +121,32 @@ export function AppointmentsList({
           )}
         </div>
       </div>
+
+      {totalPages > 1 && onPageChange && (
+        <div className="island-foot">
+          <span className="small muted">
+            Страница {page + 1} из {totalPages}
+          </span>
+          <div className="row" style={{ gap: '8px' }}>
+            <button
+              type="button"
+              className="btn btn-outline btn-sm"
+              disabled={page <= 0}
+              onClick={() => onPageChange(page - 1)}
+            >
+              Назад
+            </button>
+            <button
+              type="button"
+              className="btn btn-outline btn-sm"
+              disabled={page + 1 >= totalPages}
+              onClick={() => onPageChange(page + 1)}
+            >
+              Вперёд
+            </button>
+          </div>
+        </div>
+      )}
     </section>
   );
 }

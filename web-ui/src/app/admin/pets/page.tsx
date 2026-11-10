@@ -1,169 +1,104 @@
 'use client';
 
-import React, { useEffect, useState, useMemo } from 'react';
-import { adminApi, clinicApi } from '../../../api';
-import { Pet, Species, User, Appointment, Vaccination } from '../../../types';
-import { AppShell } from '../../../components/layout/AppShell';
-import {
-  PetsFilters,
-  PetsTable,
-  PetDetailIsland,
-  CreatePetModal,
-  EditPetModal,
-  DeletePetModal,
-  AddVaccinationModal,
-  GenderFilter,
-  StatusFilter,
-  getOwnerName,
-} from './_components';
+import { AlertCircle, RefreshCw, X } from 'lucide-react';
+import { ConfirmModal } from '@/shared/components/ConfirmModal';
+import { useAdminPets } from './_hooks/useAdminPets';
+import { PetsFilters } from './_components/PetsFilters';
+import { PetsTable } from './_components/PetsTable';
+import { PetDetailIsland } from './_components/PetDetailIsland';
+import { CreatePetModal } from './_components/CreatePetModal';
+import { EditPetModal } from './_components/EditPetModal';
+import { AddVaccinationModal } from './_components/AddVaccinationModal';
 
 /**
  * Страница управления питомцами администратором клиники.
- * Поиск, фильтрация по виду, полу и статусу, создание, редактирование,
- * удаление, детальный просмотр истории визитов и вакцинаций.
  */
 export default function AdminPetsPage() {
-  const [pets, setPets] = useState<Pet[]>([]);
-  const [speciesList, setSpeciesList] = useState<Species[]>([]);
-  const [users, setUsers] = useState<User[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  // Фильтры и выбор
-  const [search, setSearch] = useState('');
-  const [speciesFilter, setSpeciesFilter] = useState('ALL');
-  const [genderFilter, setGenderFilter] = useState<GenderFilter>('ALL');
-  const [statusFilter, setStatusFilter] = useState<StatusFilter>('ALL');
-  const [selectedPet, setSelectedPet] = useState<Pet | null>(null);
-  const [petAppointments, setPetAppointments] = useState<Appointment[]>([]);
-  const [petVaccinations, setPetVaccinations] = useState<Vaccination[]>([]);
-
-  // Модальные окна
-  const [isCreateOpen, setIsCreateOpen] = useState(false);
-  const [isEditOpen, setIsEditOpen] = useState(false);
-  const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
-  const [isAddVacOpen, setIsAddVacOpen] = useState(false);
-  const [deleting, setDeleting] = useState(false);
-
-  const loadData = async () => {
-    setLoading(true);
-    try {
-      const isArchived = statusFilter === 'ACTIVE' ? false : statusFilter === 'ARCHIVED' ? true : undefined;
-      const [petsRes, speciesRes, usersRes] = await Promise.all([
-        adminApi.getPets(0, 100, { speciesId: speciesFilter !== 'ALL' ? speciesFilter : undefined, isArchived }).catch(() => ({ items: [] })),
-        clinicApi.getSpecies().catch(() => [] as Species[]),
-        adminApi.getUsers(0, 100).catch(() => ({ items: [] })),
-      ]);
-      const safePets = petsRes?.items || [];
-      setPets(safePets);
-      setSpeciesList(Array.isArray(speciesRes) ? speciesRes : []);
-      setUsers(usersRes?.items || []);
-      if (selectedPet) {
-        const updated = safePets.find((p: Pet) => p.id === selectedPet.id);
-        if (updated) setSelectedPet(updated);
-      }
-    } catch (err) {
-      console.error('Failed to load pets data', err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const loadPetDetails = async (petId: string) => {
-    try {
-      const [apptsRes, vacRes] = await Promise.all([
-        adminApi.getAppointments(0, 50, { petId }).catch(() => ({ items: [] })),
-        adminApi.getVaccinations({ petId }).catch(() => ({ items: [] })),
-      ]);
-      setPetAppointments(apptsRes?.items || []);
-      setPetVaccinations(vacRes?.items || []);
-    } catch (err) {
-      console.error('Failed to load pet details', err);
-    }
-  };
-
-  useEffect(() => { loadData(); }, [speciesFilter, statusFilter]);
-
-  useEffect(() => {
-    if (selectedPet) loadPetDetails(selectedPet.id);
-    else { setPetAppointments([]); setPetVaccinations([]); }
-  }, [selectedPet?.id]);
-
-  const handleToggleArchive = async () => {
-    if (!selectedPet) return;
-    try {
-      await adminApi.updatePet(selectedPet.id, { isArchived: !selectedPet.isArchived });
-      await loadData();
-    } catch (err: any) {
-      alert(err?.response?.data?.message || err?.message || 'Ошибка обновления статуса питомца');
-    }
-  };
-
-  const handleDeletePet = async () => {
-    if (!selectedPet) return;
-    setDeleting(true);
-    try {
-      await adminApi.deletePet(selectedPet.id);
-      setIsDeleteConfirmOpen(false);
-      setSelectedPet(null);
-      await loadData();
-    } catch (err: any) {
-      alert(err?.response?.data?.message || err?.message || 'Ошибка при удалении питомца');
-    } finally {
-      setDeleting(false);
-    }
-  };
-
-  const handlePetCreated = async (created: Pet) => {
-    await loadData();
-    if (created) setSelectedPet(created);
-  };
-
-  const filteredPets = useMemo(() => {
-    return pets.filter((p) => {
-      if (genderFilter !== 'ALL' && p.gender !== genderFilter) return false;
-      if (search) {
-        const q = search.toLowerCase();
-        const pName = p.name.toLowerCase();
-        const oName = getOwnerName(users, p.ownerId).toLowerCase();
-        if (!pName.includes(q) && !oName.includes(q)) return false;
-      }
-      return true;
-    });
-  }, [pets, genderFilter, search, users]);
+  const vm = useAdminPets();
 
   return (
-    <AppShell crumbGroup="Клиника" crumb="Питомцы">
+    <>
+      {vm.error && (
+        <div className="alert alert-destructive" role="alert" style={{ marginBottom: '8px', alignItems: 'center' }}>
+          <AlertCircle className="ic" size={16} />
+          <span className="grow">{vm.error}</span>
+          <button type="button" className="btn btn-outline btn-sm" onClick={vm.reload}>
+            <RefreshCw size={14} />
+            Повторить
+          </button>
+        </div>
+      )}
+
+      {vm.actionError && (
+        <div className="alert alert-destructive row between items-center" role="alert" style={{ marginBottom: '8px' }}>
+          <div className="row items-center" style={{ gap: '8px' }}>
+            <AlertCircle className="ic" size={16} />
+            <span>{vm.actionError}</span>
+          </div>
+          <button
+            type="button"
+            className="btn btn-ghost btn-icon btn-sm"
+            onClick={vm.clearActionError}
+            aria-label="Скрыть ошибку"
+          >
+            <X className="ic" size={16} />
+          </button>
+        </div>
+      )}
+
       <div className="content-row">
         <div className="content-col grow">
           <PetsFilters
-            speciesFilter={speciesFilter} onSpeciesFilterChange={setSpeciesFilter}
-            genderFilter={genderFilter} onGenderFilterChange={setGenderFilter}
-            statusFilter={statusFilter} onStatusFilterChange={setStatusFilter}
-            search={search} onSearchChange={setSearch}
-            speciesList={speciesList} onOpenCreate={() => setIsCreateOpen(true)}
+            speciesFilter={vm.speciesFilter} onSpeciesFilterChange={vm.setSpeciesFilter}
+            genderFilter={vm.genderFilter} onGenderFilterChange={vm.setGenderFilter}
+            statusFilter={vm.statusFilter} onStatusFilterChange={vm.setStatusFilter}
+            search={vm.search} onSearchChange={vm.setSearch}
+            speciesList={vm.speciesList} onOpenCreate={() => vm.setIsCreateOpen(true)}
           />
           <PetsTable
-            pets={filteredPets} selectedPet={selectedPet}
-            speciesList={speciesList} users={users}
-            loading={loading} onSelectPet={setSelectedPet}
+            pets={vm.pets} selectedPet={vm.selectedPet}
+            speciesList={vm.speciesList} users={vm.users}
+            loading={vm.loading} onSelectPet={vm.setSelectedPet}
           />
         </div>
 
-        {selectedPet && (
+        {vm.selectedPet && (
           <PetDetailIsland
-            pet={selectedPet} speciesList={speciesList} users={users}
-            appointments={petAppointments} vaccinations={petVaccinations}
-            onClose={() => setSelectedPet(null)} onEdit={() => setIsEditOpen(true)}
-            onToggleArchive={handleToggleArchive} onDelete={() => setIsDeleteConfirmOpen(true)}
-            onAddVaccination={() => setIsAddVacOpen(true)}
+            pet={vm.selectedPet} speciesList={vm.speciesList} users={vm.users}
+            appointments={vm.petAppointments} vaccinations={vm.petVaccinations}
+            loadingDetails={vm.loadingDetails} detailsError={vm.detailsError}
+            onClose={() => vm.setSelectedPet(null)} onEdit={() => vm.setIsEditOpen(true)}
+            onToggleArchive={vm.handleToggleArchive} onDelete={vm.openDeleteConfirm}
+            onAddVaccination={() => vm.setIsAddVacOpen(true)}
           />
         )}
       </div>
 
-      <CreatePetModal isOpen={isCreateOpen} onClose={() => setIsCreateOpen(false)} onSuccess={handlePetCreated} speciesList={speciesList} users={users} />
-      <EditPetModal isOpen={isEditOpen} pet={selectedPet} speciesList={speciesList} onClose={() => setIsEditOpen(false)} onSuccess={loadData} />
-      <DeletePetModal isOpen={isDeleteConfirmOpen} pet={selectedPet} deleting={deleting} onClose={() => setIsDeleteConfirmOpen(false)} onConfirm={handleDeletePet} />
-      <AddVaccinationModal isOpen={isAddVacOpen} pet={selectedPet} onClose={() => setIsAddVacOpen(false)} onSuccess={() => selectedPet && loadPetDetails(selectedPet.id)} />
-    </AppShell>
+      <CreatePetModal
+        isOpen={vm.isCreateOpen} onClose={() => vm.setIsCreateOpen(false)}
+        onCreate={vm.createPet} speciesList={vm.speciesList} users={vm.users}
+      />
+      <EditPetModal
+        isOpen={vm.isEditOpen} pet={vm.selectedPet} speciesList={vm.speciesList}
+        onClose={() => vm.setIsEditOpen(false)} onUpdate={vm.updatePet}
+      />
+      <ConfirmModal
+        isOpen={vm.isDeleteConfirmOpen && Boolean(vm.selectedPet)}
+        title="Удалить питомца?"
+        description={vm.selectedPet ? `Питомец «${vm.selectedPet.name}» будет безвозвратно удалён из базы клиники.` : undefined}
+        confirmLabel="Удалить"
+        cancelLabel="Отмена"
+        tone="destructive"
+        loading={vm.deleting}
+        error={vm.deleteError}
+        onClose={vm.closeDeleteConfirm}
+        onConfirm={vm.handleDeletePet}
+      />
+      <AddVaccinationModal
+        isOpen={vm.isAddVacOpen} pet={vm.selectedPet}
+        onClose={() => vm.setIsAddVacOpen(false)}
+        onCreate={vm.createVaccination}
+      />
+    </>
   );
 }

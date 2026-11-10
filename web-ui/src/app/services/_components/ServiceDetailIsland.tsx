@@ -3,9 +3,10 @@
 import React, { useMemo } from 'react';
 import Link from 'next/link';
 import { X, CalendarPlus, AlertCircle } from 'lucide-react';
-import { ServiceDetailIslandProps } from './types';
+import { formatCurrency, formatSlotTime, pluralRu } from '@/shared/lib';
+import { getDoctorDisplay } from '@/utils/doctorHelpers';
+import type { ServiceDetailIslandProps } from './types';
 import { SPECIALIZATION_CONTRAINDICATIONS, DEFAULT_CONTRAINDICATION } from './constants';
-import { getDoctorDisplay } from '../../../utils/doctorHelpers';
 
 export function ServiceDetailIsland({
   service,
@@ -23,8 +24,29 @@ export function ServiceDetailIsland({
 }: ServiceDetailIslandProps) {
   const assignedVets = useMemo(() => {
     if (!veterinarians || !service) return [];
-    return veterinarians.filter((v) => v.specializationId === service.specializationId && v.isActive);
-  }, [veterinarians, service]);
+    const specVets = veterinarians.filter(
+      (v) => v.specializationId === service.specializationId && v.isActive
+    );
+    if (!activeSpeciesTab) return specVets;
+    const hasSpeciesInfo = specVets.some((v) => Array.isArray(v.speciesIds));
+    if (!hasSpeciesInfo) return specVets;
+    return specVets.filter((v) =>
+      Array.isArray(v.speciesIds) ? v.speciesIds.includes(activeSpeciesTab) : true
+    );
+  }, [veterinarians, service, activeSpeciesTab]);
+
+  const detailSpeciesList = useMemo(
+    () =>
+      serviceSpeciesList.length > 0
+        ? speciesList.filter((sp) => serviceSpeciesList.some((ss) => ss.speciesId === sp.id))
+        : speciesList,
+    [serviceSpeciesList, speciesList]
+  );
+
+  const hasSpeciesDiff =
+    (service.effectivePrice != null && service.effectivePrice !== service.basePrice) ||
+    (service.effectiveDurationMin != null &&
+      service.effectiveDurationMin !== service.baseDurationMin);
 
   const contraindicationsText =
     SPECIALIZATION_CONTRAINDICATIONS[service.specializationId] || DEFAULT_CONTRAINDICATION;
@@ -62,15 +84,24 @@ export function ServiceDetailIsland({
           <dl className="kv" style={{ margin: 0 }}>
             <dt>Базовая цена</dt>
             <dd className="tnum">
-              {service.basePrice?.toLocaleString('ru-RU')} ₽
+              {formatCurrency(service.basePrice)}
             </dd>
             <dt>Длительность</dt>
             <dd className="tnum">
-              {service.baseDurationMin || 30} мин
+              {service.baseDurationMin ?? 30} мин
             </dd>
+            {hasSpeciesDiff && (
+              <>
+                <dt>Для выбранного вида</dt>
+                <dd className="tnum">
+                  {formatCurrency(service.effectivePrice ?? service.basePrice)} ·{' '}
+                  {service.effectiveDurationMin ?? service.baseDurationMin ?? 30} мин
+                </dd>
+              </>
+            )}
             <dt>Буфер после</dt>
             <dd className="tnum">
-              {service.bufferAfterMin || 10} мин
+              {service.bufferAfterMin ?? 10} мин
             </dd>
           </dl>
 
@@ -128,7 +159,8 @@ export function ServiceDetailIsland({
                             {name}
                           </span>
                           <span className="cell-sub" style={{ fontSize: '11px' }}>
-                            {title || `Стаж ${v.experienceYears} лет`}
+                            {title ||
+                              `Стаж ${v.experienceYears} ${pluralRu(v.experienceYears, 'год', 'года', 'лет')}`}
                           </span>
                         </div>
                       </div>
@@ -168,7 +200,7 @@ export function ServiceDetailIsland({
                       {ss.durationMin || service.baseDurationMin || 30} мин
                     </span>
                     <span className="right tnum">
-                      {(ss.price || service.basePrice)?.toLocaleString('ru-RU')} ₽
+                      {formatCurrency(ss.price ?? service.basePrice)}
                     </span>
                   </div>
                 ))
@@ -180,7 +212,7 @@ export function ServiceDetailIsland({
                       {service.baseDurationMin || 30} мин
                     </span>
                     <span className="right tnum">
-                      {service.basePrice?.toLocaleString('ru-RU')} ₽
+                      {formatCurrency(service.basePrice)}
                     </span>
                   </div>
                 ))
@@ -193,7 +225,7 @@ export function ServiceDetailIsland({
             <div className="row between wrap">
               <span className="section-title">Ближайшие свободные окна</span>
               <div className="seg">
-                {speciesList.map((sp) => (
+                {detailSpeciesList.map((sp) => (
                   <button
                     key={sp.id}
                     type="button"
@@ -213,11 +245,7 @@ export function ServiceDetailIsland({
               {nearestSlots.length > 0 ? (
                 <div className="chips">
                   {nearestSlots.map((slot) => {
-                    const timeStr = new Date(slot.startAt).toLocaleTimeString('ru-RU', {
-                      hour: '2-digit',
-                      minute: '2-digit',
-                      timeZone: 'Europe/Moscow',
-                    });
+                    const timeStr = formatSlotTime(slot.startAt);
                     if (!isAuthenticated) {
                       return (
                         <Link
@@ -234,7 +262,7 @@ export function ServiceDetailIsland({
                       return (
                         <Link
                           key={slot.startAt}
-                          href={`/client/book?serviceId=${service.id}&slot=${slot.startAt}`}
+                          href={`/client/book?serviceId=${service.id}&slot=${encodeURIComponent(slot.startAt)}`}
                           className="slot"
                           title="Записаться на это время"
                         >

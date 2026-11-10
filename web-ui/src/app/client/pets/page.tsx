@@ -1,170 +1,123 @@
 'use client';
 
-import React, { useEffect, useState, useMemo, useCallback, Suspense } from 'react';
+import React, { Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { clientApi, clinicApi } from '../../../api';
-import { Pet, Species, Vaccination, Appointment } from '../../../types';
-import { AppShell } from '../../../components/layout/AppShell';
-import {
-  PetsList, PetDetailIsland, PetModal, PetFormData, ArchivePetModal, PetsFilters, ArchiveFilter,
-} from './_components';
+import { Archive, AlertCircle } from 'lucide-react';
+import { ConfirmModal } from '@/shared/components/ConfirmModal';
+import { useClientPets } from './_hooks/useClientPets';
+import { PetsFilters } from './_components/PetsFilters';
+import { PetsList } from './_components/PetsList';
+import { PetDetailIsland } from './_components/PetDetailIsland';
+import { PetModal } from './_components/PetModal';
 
 function PetsContent() {
   const searchParams = useSearchParams();
-  const actionParam = searchParams.get('action');
-
-  const [pets, setPets] = useState<Pet[]>([]);
-  const [speciesList, setSpeciesList] = useState<Species[]>([]);
-  const [vaccinations, setVaccinations] = useState<Vaccination[]>([]);
-  const [appointments, setAppointments] = useState<Appointment[]>([]);
-  const [archiveFilter, setArchiveFilter] = useState<ArchiveFilter>('ACTIVE');
-  const [searchQuery, setSearchQuery] = useState('');
-  const [selectedPet, setSelectedPet] = useState<Pet | null>(null);
-
-  // Состояния модальных окон
-  const [isPetModalOpen, setIsPetModalOpen] = useState(false);
-  const [editingPet, setEditingPet] = useState<Pet | null>(null);
-  const [modalSaving, setModalSaving] = useState(false);
-  const [modalError, setModalError] = useState<string | null>(null);
-  const [archivingPet, setArchivingPet] = useState<Pet | null>(null);
-  const [archiveLoading, setArchiveLoading] = useState(false);
-  const [archiveError, setArchiveError] = useState<string | null>(null);
-
-  const loadAll = useCallback(async () => {
-    try {
-      const [petsData, speciesData, apptsData] = await Promise.all([
-        clientApi.getPets(), clinicApi.getSpecies(), clientApi.getAppointments(0, 50),
-      ]);
-      const safePets: Pet[] = Array.isArray(petsData) ? petsData : [];
-      setPets(safePets);
-      setSpeciesList(Array.isArray(speciesData) ? speciesData : []);
-      setAppointments(apptsData?.items ?? (Array.isArray(apptsData) ? apptsData : []));
-
-      if (safePets.length > 0) {
-        const vacResults = await Promise.all(safePets.map((p) => clientApi.getVaccinations(p.id).catch(() => [])));
-        setVaccinations(vacResults.flat());
-        if (!selectedPet && typeof window !== 'undefined' && window.innerWidth >= 1280) setSelectedPet(safePets[0]);
-      }
-    } catch (err) {
-      console.error('Ошибка загрузки данных питомцев:', err);
-    }
-  }, [selectedPet]);
-
-  useEffect(() => { loadAll(); }, []);
-
-  const openCreate = useCallback(() => {
-    setEditingPet(null);
-    setModalError(null);
-    setIsPetModalOpen(true);
-  }, []);
-
-  useEffect(() => {
-    if (actionParam === 'create') openCreate();
-  }, [actionParam, openCreate]);
-
-  const speciesMap = useMemo(() => Object.fromEntries(speciesList.map((s) => [s.id, s.name])), [speciesList]);
-
-  const openEdit = (pet: Pet) => {
-    setEditingPet(pet);
-    setModalError(null);
-    setIsPetModalOpen(true);
-  };
-
-  const handleSavePet = async (payload: PetFormData) => {
-    setModalSaving(true);
-    setModalError(null);
-    try {
-      if (editingPet) await clientApi.updatePet(editingPet.id, payload);
-      else await clientApi.createPet(payload);
-      setIsPetModalOpen(false);
-      await loadAll();
-    } catch (err: any) {
-      setModalError(err?.message || 'Не удалось сохранить данные питомца');
-    } finally {
-      setModalSaving(false);
-    }
-  };
-
-  const handleConfirmArchive = async () => {
-    if (!archivingPet) return;
-    setArchiveLoading(true);
-    setArchiveError(null);
-    try {
-      await clientApi.updatePet(archivingPet.id, { isArchived: !archivingPet.isArchived });
-      await loadAll();
-      if (selectedPet?.id === archivingPet.id) {
-        setSelectedPet((prev) => (prev ? { ...prev, isArchived: !prev.isArchived } : null));
-      }
-      setArchivingPet(null);
-    } catch (err: any) {
-      setArchiveError(err?.message || 'Ошибка изменения статуса архива');
-    } finally {
-      setArchiveLoading(false);
-    }
-  };
-
-  const handleDeletePet = async (pet: Pet) => {
-    if (!confirm(`Вы действительно хотите удалить профиль питомца ${pet.name}?`)) return;
-    try {
-      await clientApi.deletePet(pet.id);
-      if (selectedPet?.id === pet.id) setSelectedPet(null);
-      await loadAll();
-    } catch (err: any) {
-      alert(err?.message || 'Не удалось удалить питомца');
-    }
-  };
-
-  const filteredPets = useMemo(() => {
-    const q = searchQuery.trim().toLowerCase();
-    return pets.filter((p) => {
-      if (archiveFilter === 'ACTIVE' && p.isArchived) return false;
-      if (archiveFilter === 'ARCHIVED' && !p.isArchived) return false;
-      if (!q) return true;
-      const sp = (speciesMap[p.speciesId] || '').toLowerCase();
-      return p.name.toLowerCase().includes(q) || sp.includes(q) || (p.notes?.toLowerCase().includes(q) ?? false);
-    });
-  }, [pets, archiveFilter, searchQuery, speciesMap]);
+  const state = useClientPets(searchParams.get('action'));
+  const isArchiving = state.archivingPet ? !state.archivingPet.isArchived : true;
 
   return (
-    <AppShell title="Мои питомцы" currentSection="Питомцы">
-      <div className="content-col grow">
-        <PetsFilters
-          searchQuery={searchQuery} onSearchChange={setSearchQuery}
-          archiveFilter={archiveFilter} onArchiveFilterChange={setArchiveFilter}
-          onAddPet={openCreate}
+    <div className="content-col grow">
+      <PetsFilters
+        searchQuery={state.searchQuery}
+        onSearchChange={state.setSearchQuery}
+        archiveFilter={state.archiveFilter}
+        onArchiveFilterChange={state.setArchiveFilter}
+        onAddPet={state.openCreate}
+      />
+
+      {state.error && (
+        <div className="alert alert-destructive">
+          <AlertCircle className="ic" />
+          <div className="grow">{state.error}</div>
+          <button type="button" className="btn btn-outline btn-sm" onClick={state.reload}>
+            Повторить
+          </button>
+        </div>
+      )}
+
+      <div className="content-row">
+        <PetsList
+          pets={state.filteredPets}
+          selectedPet={state.selectedPet}
+          onSelectPet={state.setSelectedPet}
+          speciesMap={state.speciesMap}
+          appointments={state.appointments}
+          vaccinations={state.vaccinations}
+          onAddPet={state.openCreate}
         />
 
-        <div className="content-row">
-          <PetsList
-            pets={filteredPets} selectedPet={selectedPet} onSelectPet={setSelectedPet}
-            speciesMap={speciesMap} appointments={appointments} vaccinations={vaccinations}
-            onAddPet={openCreate}
+        {state.selectedPet && (
+          <PetDetailIsland
+            pet={state.selectedPet}
+            speciesMap={state.speciesMap}
+            appointments={state.appointments}
+            vaccinations={state.vaccinations}
+            loadingAppts={state.loadingAppts}
+            onClose={() => state.setSelectedPet(null)}
+            onEdit={state.openEdit}
+            onToggleArchive={state.openArchiveModal}
+            onDelete={state.openDeleteModal}
           />
-
-          {selectedPet && (
-            <PetDetailIsland
-              pet={selectedPet} speciesMap={speciesMap}
-              appointments={appointments} vaccinations={vaccinations}
-              onClose={() => setSelectedPet(null)} onEdit={openEdit}
-              onToggleArchive={(pet) => { setArchivingPet(pet); setArchiveError(null); }}
-              onDelete={handleDeletePet}
-            />
-          )}
-        </div>
+        )}
       </div>
 
       <PetModal
-        isOpen={isPetModalOpen} pet={editingPet} speciesList={speciesList}
-        onSave={handleSavePet} onClose={() => setIsPetModalOpen(false)}
-        saving={modalSaving} error={modalError}
+        isOpen={state.isPetModalOpen}
+        pet={state.editingPet}
+        speciesList={state.speciesList}
+        onSave={state.handleSavePet}
+        onClose={state.closePetModal}
+        saving={state.modalSaving}
+        error={state.modalError}
       />
 
-      <ArchivePetModal
-        isOpen={!!archivingPet} pet={archivingPet}
-        onConfirm={handleConfirmArchive} onClose={() => setArchivingPet(null)}
-        loading={archiveLoading} error={archiveError}
+      <ConfirmModal
+        isOpen={!!state.archivingPet}
+        title={isArchiving ? 'Архивация питомца' : 'Восстановление из архива'}
+        description={
+          state.archivingPet
+            ? isArchiving
+              ? `Вы уверены, что хотите переместить профиль «${state.archivingPet.name}» в архив?`
+              : `Вы уверены, что хотите восстановить профиль «${state.archivingPet.name}» из архива?`
+            : undefined
+        }
+        confirmLabel={isArchiving ? 'В архив' : 'Восстановить'}
+        cancelLabel="Отмена"
+        tone={isArchiving ? 'destructive' : 'primary'}
+        size="sm"
+        loading={state.archiveLoading}
+        error={state.archiveError}
+        onConfirm={state.handleConfirmArchive}
+        onClose={state.closeArchiveModal}
+      >
+        <div className="alert alert-info">
+          <Archive className="ic" />
+          <div>
+            {isArchiving
+              ? 'Питомец будет перемещён во вкладку «В архиве». История визитов и вакцинаций сохранится, но создание новых записей будет заблокировано.'
+              : 'Питомец вернётся в список активных, и для него снова станет доступна онлайн-запись на приём.'}
+          </div>
+        </div>
+      </ConfirmModal>
+
+      <ConfirmModal
+        isOpen={!!state.deletingPet}
+        title="Удаление питомца"
+        description={
+          state.deletingPet
+            ? `Вы действительно хотите удалить профиль питомца «${state.deletingPet.name}»?`
+            : undefined
+        }
+        confirmLabel="Удалить"
+        cancelLabel="Отмена"
+        tone="destructive"
+        size="sm"
+        loading={state.deleteLoading}
+        error={state.deleteError}
+        onConfirm={state.handleConfirmDelete}
+        onClose={state.closeDeleteModal}
       />
-    </AppShell>
+    </div>
   );
 }
 

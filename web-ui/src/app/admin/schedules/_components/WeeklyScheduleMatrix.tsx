@@ -1,17 +1,17 @@
 'use client';
 
 import React, { useMemo } from 'react';
-import { Veterinarian, WorkSchedule } from '../../../../types';
 import { CalendarDays, RefreshCw, Pencil, Trash2, Plus } from 'lucide-react';
+import type { WorkSchedule } from '@/modules/admin/types';
+import type { Veterinarian } from '@/modules/clinic/types';
 import {
-  DOWS,
-  DOWS_FULL,
-  INDEX_TO_DOW,
-  tm,
-  pctX,
-  pctW,
-  fmtH,
-} from './utils';
+  DOW_SHORT,
+  DOW_FULL,
+  DOW_ORDER,
+  timeToMinutes,
+  formatDurationMinutes,
+} from '@/shared/lib';
+import { getDoctorDisplay } from '@/utils/doctorHelpers';
 
 export interface WeeklyScheduleMatrixProps {
   vets: Veterinarian[];
@@ -27,11 +27,21 @@ export interface WeeklyScheduleMatrixProps {
   onDeleteDay: (scheduleId: string, dowName: string) => void;
 }
 
-/**
- * Матричная сетка недельного расписания врача (Пн-Вс).
- * Отображает шкалу времени от 08:00 до 20:00, слоты приёма и перерывов,
- * суммарные часы за день/неделю, а также кнопки добавления/редактирования/удаления.
- */
+const H0 = 8;
+const H1 = 20;
+const RANGE_MIN = (H1 - H0) * 60;
+const HOURS = Array.from({ length: H1 - H0 + 1 }, (_, i) => H0 + i);
+
+function pctX(t: string): string {
+  const p = ((timeToMinutes(t) - H0 * 60) / RANGE_MIN) * 100;
+  return `${Math.max(0, Math.min(100, p))}%`;
+}
+
+function pctW(a: string, b: string): string {
+  const p = ((timeToMinutes(b) - timeToMinutes(a)) / RANGE_MIN) * 100;
+  return `${Math.max(0, Math.min(100, p))}%`;
+}
+
 export const WeeklyScheduleMatrix: React.FC<WeeklyScheduleMatrixProps> = ({
   vets,
   selectedVetId,
@@ -45,23 +55,20 @@ export const WeeklyScheduleMatrix: React.FC<WeeklyScheduleMatrixProps> = ({
   onEditDay,
   onDeleteDay,
 }) => {
-  // Вычисление данных строк расписания на 7 дней недели
   const scheduleRows = useMemo(() => {
-    return DOWS.map((shortName, i) => {
-      const dowEnum = INDEX_TO_DOW[i];
-      const ws = schedules.find((s) => s.dayOfWeek === dowEnum);
-
+    return DOW_SHORT.map((shortName, i) => {
+      const ws = schedules.find((s) => s.dayOfWeek === DOW_ORDER[i]);
       if (!ws) {
         return {
           dayIndex: i,
           dowShort: shortName,
-          dowFull: DOWS_FULL[i],
+          dowFull: DOW_FULL[i],
           hasSchedule: false,
           totalHours: '—',
           mins: 0,
           rowCls: 'off',
-          ws: null,
-          segments: [],
+          ws: null as WorkSchedule | null,
+          segments: [] as { left: string; width: string; cls: string; label: string }[],
         };
       }
 
@@ -70,64 +77,48 @@ export const WeeklyScheduleMatrix: React.FC<WeeklyScheduleMatrixProps> = ({
       const bs = ws.breakStart ? ws.breakStart.slice(0, 5) : '';
       const be = ws.breakEnd ? ws.breakEnd.slice(0, 5) : '';
 
-      const durMins = tm(end) - tm(start) - (bs && be ? tm(be) - tm(bs) : 0);
-      const isWeekend = i >= 5;
+      const durMins =
+        timeToMinutes(end) -
+        timeToMinutes(start) -
+        (bs && be ? timeToMinutes(be) - timeToMinutes(bs) : 0);
 
-      const segments: { left: string; width: string; cls: string; label: string }[] = [];
+      const seg = (a: string, b: string, kind: 'work' | 'brk', label: string) => ({
+        left: pctX(a),
+        width: pctW(a, b),
+        cls: `${kind} ${timeToMinutes(b) - timeToMinutes(a) < 90 ? 'narrow' : ''}`,
+        label,
+      });
 
-      if (bs && be) {
-        // Интервал работы до обеденного перерыва
-        segments.push({
-          left: pctX(start),
-          width: pctW(start, bs),
-          cls: `work ${tm(bs) - tm(start) < 90 ? 'narrow' : ''}`,
-          label: `${start}–${bs}`,
-        });
-        // Интервал перерыва
-        segments.push({
-          left: pctX(bs),
-          width: pctW(bs, be),
-          cls: `brk ${tm(be) - tm(bs) < 90 ? 'narrow' : ''}`,
-          label: 'перерыв',
-        });
-        // Интервал работы после перерыва
-        segments.push({
-          left: pctX(be),
-          width: pctW(be, end),
-          cls: `work ${tm(end) - tm(be) < 90 ? 'narrow' : ''}`,
-          label: `${be}–${end}`,
-        });
-      } else {
-        segments.push({
-          left: pctX(start),
-          width: pctW(start, end),
-          cls: `work ${tm(end) - tm(start) < 90 ? 'narrow' : ''}`,
-          label: `${start}–${end}`,
-        });
-      }
+      const segments =
+        bs && be
+          ? [
+              seg(start, bs, 'work', `${start}–${bs}`),
+              seg(bs, be, 'brk', 'перерыв'),
+              seg(be, end, 'work', `${be}–${end}`),
+            ]
+          : [seg(start, end, 'work', `${start}–${end}`)];
 
       return {
         dayIndex: i,
         dowShort: shortName,
-        dowFull: DOWS_FULL[i],
+        dowFull: DOW_FULL[i],
         hasSchedule: true,
-        totalHours: fmtH(durMins),
+        totalHours: formatDurationMinutes(durMins),
         mins: durMins,
-        rowCls: isWeekend ? 'we' : '',
+        rowCls: i >= 5 ? 'we' : '',
         ws,
         segments,
       };
     });
   }, [schedules]);
 
-  // Суммарное количество отработанных минут за всю неделю
-  const totalWeekMins = useMemo(() => {
-    return scheduleRows.reduce((acc, r) => acc + r.mins, 0);
-  }, [scheduleRows]);
+  const totalWeekMins = useMemo(
+    () => scheduleRows.reduce((acc, r) => acc + r.mins, 0),
+    [scheduleRows]
+  );
 
   return (
     <>
-      {/* Панель выбора врача */}
       <section className="island filters" aria-label="Врач">
         <div className="field" style={{ width: '320px' }}>
           <span className="field-label">Врач</span>
@@ -139,7 +130,7 @@ export const WeeklyScheduleMatrix: React.FC<WeeklyScheduleMatrixProps> = ({
           >
             {vets.map((v) => (
               <option key={v.id} value={v.id}>
-                {v.user?.fullName || `Врач (${v.id.substring(0, 6)})`}
+                {getDoctorDisplay(v).fullName}
               </option>
             ))}
           </select>
@@ -151,13 +142,13 @@ export const WeeklyScheduleMatrix: React.FC<WeeklyScheduleMatrixProps> = ({
           type="button"
           className="btn btn-ghost btn-icon btn-sm"
           onClick={onRefresh}
+          aria-label="Обновить график"
           title="Обновить график"
         >
           <RefreshCw className={`ic ${loadingSchedule ? 'animate-spin' : ''}`} />
         </button>
       </section>
 
-      {/* Основной остров с визуальным расписанием .sch */}
       <section className="island grow" style={{ display: 'flex', flexDirection: 'column' }}>
         <div className="island-head">
           <span className="island-title">
@@ -182,32 +173,22 @@ export const WeeklyScheduleMatrix: React.FC<WeeklyScheduleMatrixProps> = ({
             </div>
           ) : (
             <div className="sch" style={{ minWidth: '680px' }}>
-              {/* Шкала времени от 08:00 до 20:00 (13 делений) */}
               <div className="sch-row sch-head">
                 <span className="sch-day" />
                 <div className="sch-scale">
-                  <span className="first" style={{ left: '0%' }}>
-                    08:00
-                  </span>
-                  <span style={{ left: '8.333%' }}>09:00</span>
-                  <span style={{ left: '16.666%' }}>10:00</span>
-                  <span style={{ left: '25%' }}>11:00</span>
-                  <span style={{ left: '33.333%' }}>12:00</span>
-                  <span style={{ left: '41.666%' }}>13:00</span>
-                  <span style={{ left: '50%' }}>14:00</span>
-                  <span style={{ left: '58.333%' }}>15:00</span>
-                  <span style={{ left: '66.666%' }}>16:00</span>
-                  <span style={{ left: '75%' }}>17:00</span>
-                  <span style={{ left: '83.333%' }}>18:00</span>
-                  <span style={{ left: '91.666%' }}>19:00</span>
-                  <span className="last" style={{ left: '100%' }}>
-                    20:00
-                  </span>
+                  {HOURS.map((h, idx) => (
+                    <span
+                      key={h}
+                      className={idx === 0 ? 'first' : idx === HOURS.length - 1 ? 'last' : undefined}
+                      style={{ left: `${(idx / (HOURS.length - 1)) * 100}%` }}
+                    >
+                      {`${String(h).padStart(2, '0')}:00`}
+                    </span>
+                  ))}
                 </div>
                 <span className="sch-act" />
               </div>
 
-              {/* 7 строк по дням недели */}
               {scheduleRows.map((r) => (
                 <div key={r.dayIndex} className={`sch-row ${r.rowCls}`}>
                   <div className="sch-day">
@@ -269,7 +250,6 @@ export const WeeklyScheduleMatrix: React.FC<WeeklyScheduleMatrixProps> = ({
                 </div>
               ))}
 
-              {/* Подвал с легендой и итоговыми часами */}
               <div className="sch-foot">
                 <span className="legend">
                   <span>
@@ -282,7 +262,7 @@ export const WeeklyScheduleMatrix: React.FC<WeeklyScheduleMatrixProps> = ({
                   </span>
                 </span>
                 <span className="small">
-                  Итого за неделю: <b>{fmtH(totalWeekMins)}</b>
+                  Итого за неделю: <b>{formatDurationMinutes(totalWeekMins)}</b>
                 </span>
               </div>
             </div>

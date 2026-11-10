@@ -50,9 +50,12 @@ export function ServicesFilters({
 
       {/* Селектор вида животного */}
       <div className="field">
-        <span className="field-label">Вид животного</span>
+        <label className="field-label" htmlFor="sf-species">
+          Вид животного
+        </label>
         <div className="dd" style={{ position: 'relative' }}>
           <select
+            id="sf-species"
             className="select dd-btn"
             value={selectedSpecies}
             onChange={(e) => onSelectSpecies(e.target.value)}

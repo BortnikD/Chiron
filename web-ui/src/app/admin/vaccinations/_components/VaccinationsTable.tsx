@@ -2,7 +2,8 @@
 
 import React, { useMemo } from 'react';
 import { Syringe, Edit2, Trash2 } from 'lucide-react';
-import { Vaccination, Pet } from './types';
+import type { Vaccination, Pet } from '@/modules/client/types';
+import { formatIsoDateDisplay } from '@/shared/lib';
 import { calculateVaccinationStatus } from './utils';
 import { VACCINATIONS_TABLE_COLS } from './constants';
 
@@ -63,29 +64,17 @@ export const VaccinationsTable: React.FC<VaccinationsTableProps> = ({
             <span className="right">Действия</span>
           </div>
 
-          {loading ? (
-            <div
-              style={{ padding: '36px', textAlign: 'center', gridColumn: '1 / -1' }}
-              className="muted text-xs"
-            >
-              Загрузка данных реестра...
-            </div>
-          ) : vaccinations.length === 0 ? (
-            <div
-              style={{ padding: '36px', textAlign: 'center', gridColumn: '1 / -1' }}
-              className="muted text-xs"
-            >
-              Записей по заданным критериям не найдено
-            </div>
-          ) : (
+          {!loading &&
             vaccinations.map((v) => {
               const isSelected = selectedVaccination?.id === v.id;
               const pet = petMap.get(v.petId);
               const petName = pet?.name || 'Питомец';
               const vaxName = v.name || v.vaccineName || 'Вакцинация';
-              const adminDate = v.administeredOn || v.administeredAt || '—';
-              const nextDue = v.nextDueOn || v.validUntil;
-              const status = calculateVaccinationStatus(nextDue);
+              const adminRaw = v.administeredOn || v.administeredAt;
+              const nextDueRaw = v.nextDueOn || v.validUntil;
+              const adminDate = formatIsoDateDisplay(adminRaw ? adminRaw.slice(0, 10) : null);
+              const nextDue = nextDueRaw ? formatIsoDateDisplay(nextDueRaw.slice(0, 10)) : '—';
+              const status = calculateVaccinationStatus(nextDueRaw);
 
               return (
                 <div
@@ -121,32 +110,46 @@ export const VaccinationsTable: React.FC<VaccinationsTableProps> = ({
                     <button
                       type="button"
                       className="btn btn-ghost btn-icon btn-sm"
+                      aria-label={`Редактировать вакцинацию «${vaxName}»`}
+                      title="Редактировать"
                       onClick={(e) => {
                         e.stopPropagation();
                         onEdit(v);
                       }}
-                      title="Редактировать"
                     >
                       <Edit2 className="ic" style={{ width: '13px', height: '13px' }} />
                     </button>
                     <button
                       type="button"
                       className="btn btn-ghost btn-icon btn-sm"
+                      aria-label={`Удалить вакцинацию «${vaxName}»`}
+                      title="Удалить"
+                      style={{ color: 'var(--destructive)' }}
                       onClick={(e) => {
                         e.stopPropagation();
                         onDelete(v.id);
                       }}
-                      title="Удалить"
-                      style={{ color: 'var(--destructive)' }}
                     >
                       <Trash2 className="ic" style={{ width: '13px', height: '13px' }} />
                     </button>
                   </span>
                 </div>
               );
-            })
-          )}
+            })}
         </div>
+
+        {loading && (
+          <div className="empty">
+            <span className="spinner" aria-hidden="true" />
+            <span className="muted">Загрузка данных реестра…</span>
+          </div>
+        )}
+
+        {!loading && vaccinations.length === 0 && (
+          <div className="empty">
+            <span className="empty-title">Записей по заданным критериям не найдено</span>
+          </div>
+        )}
       </div>
     </section>
   );

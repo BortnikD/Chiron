@@ -2,14 +2,13 @@
 
 import React, { useState, useEffect } from 'react';
 import { AlertCircle } from 'lucide-react';
-import { vetApi } from '../../../../api';
-import { Pet, CreateVaccinationRequest } from '../../../../types';
+import type { CreateVaccinationRequest, Pet } from '@/modules/client/types';
+import { formatApiError, getMoscowTodayIso } from '@/shared/lib';
 
 export interface VaccinationFormData {
   name: string;
   administeredOn: string;
   nextDueOn: string;
-  notes: string;
 }
 
 export interface VetAddVaccinationModalProps {
@@ -19,36 +18,31 @@ export interface VetAddVaccinationModalProps {
   patient: Pet | null;
   /** Обработчик закрытия модального окна */
   onClose: () => void;
-  /** Обработчик успешного добавления вакцинации */
-  onSuccess: () => void;
-  /** Опциональный кастомный обработчик сохранения */
-  onSave?: (payload: CreateVaccinationRequest) => Promise<void>;
+  /** Обработчик сохранения вакцинации */
+  onSubmit: (payload: CreateVaccinationRequest) => Promise<void>;
 }
 
 const getInitialForm = (): VaccinationFormData => ({
   name: '',
-  administeredOn: new Date().toISOString().substring(0, 10),
-  nextDueOn: new Date(Date.now() + 365 * 86400000).toISOString().substring(0, 10),
-  notes: '',
+  administeredOn: getMoscowTodayIso(),
+  nextDueOn: getMoscowTodayIso(365),
 });
 
 /**
  * Модальное окно добавления вакцинации пациенту:
  * содержит форму с названием вакцины, датами введения и следующей ревакцинации,
- * заметками, валидацией и отображением ошибок API.
+ * валидацией и отображением ошибок API.
  */
 export function VetAddVaccinationModal({
   isOpen,
   patient,
   onClose,
-  onSuccess,
-  onSave,
+  onSubmit,
 }: VetAddVaccinationModalProps) {
-  const [vacForm, setVacForm] = useState<VaccinationFormData>(getInitialForm());
+  const [vacForm, setVacForm] = useState<VaccinationFormData>(getInitialForm);
   const [savingVac, setSavingVac] = useState(false);
   const [vacError, setVacError] = useState<string | null>(null);
 
-  // Сброс формы при открытии модального окна
   useEffect(() => {
     if (isOpen) {
       setVacForm(getInitialForm());
@@ -57,11 +51,22 @@ export function VetAddVaccinationModal({
     }
   }, [isOpen]);
 
+  useEffect(() => {
+    if (!isOpen) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && !savingVac) onClose();
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [isOpen, savingVac, onClose]);
+
   if (!isOpen || !patient) {
     return null;
   }
 
-  const handleAddVaccination = async (e: React.FormEvent) => {
+  const todayIso = getMoscowTodayIso();
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!vacForm.name.trim()) return;
 
@@ -74,19 +79,12 @@ export function VetAddVaccinationModal({
         name: vacForm.name.trim(),
         administeredOn: vacForm.administeredOn,
         nextDueOn: vacForm.nextDueOn || null,
-        notes: vacForm.notes.trim() || null,
       };
 
-      if (onSave) {
-        await onSave(payload);
-      } else {
-        await vetApi.createVaccination(payload);
-      }
-
-      onSuccess();
+      await onSubmit(payload);
       onClose();
-    } catch (err: any) {
-      setVacError(err?.response?.data?.message || err?.message || 'Ошибка сохранения прививки');
+    } catch (err: unknown) {
+      setVacError(formatApiError(err, 'Ошибка сохранения прививки'));
     } finally {
       setSavingVac(false);
     }
@@ -95,20 +93,26 @@ export function VetAddVaccinationModal({
   return (
     <div
       className="overlay"
-      onClick={onClose}
+      role="dialog"
+      aria-modal="true"
+      aria-label="Внести прививку"
+      onClick={() => !savingVac && onClose()}
     >
-      <div
-        className="dialog dialog-sm"
-        style={{ width: 420 }}
-        onClick={(e) => e.stopPropagation()}
-      >
+      <div className="dialog dialog-sm" onClick={(e) => e.stopPropagation()}>
         <div className="dialog-head">
           <span className="dialog-title">Внести прививку</span>
           <span className="dialog-desc">Запись вакцинации для «{patient.name}»</span>
         </div>
 
-        <form onSubmit={handleAddVaccination}>
+        <form onSubmit={handleSubmit}>
           <div className="dialog-body">
+            {vacError && (
+              <div className="alert alert-destructive" role="alert">
+                <AlertCircle className="ic" />
+                <div>{vacError}</div>
+              </div>
+            )}
+
             <div className="field">
               <label className="field-label" htmlFor="vet-vac-name">
                 Название вакцины <span className="req">*</span>
@@ -119,6 +123,7 @@ export function VetAddVaccinationModal({
                 placeholder="Нобивак DHPPi…"
                 value={vacForm.name}
                 onChange={(e) => setVacForm({ ...vacForm, name: e.target.value })}
+                disabled={savingVac}
                 required
               />
             </div>
@@ -132,10 +137,12 @@ export function VetAddVaccinationModal({
                   id="vet-vac-adm"
                   type="date"
                   className="input"
+                  max={todayIso}
                   value={vacForm.administeredOn}
                   onChange={(e) =>
                     setVacForm({ ...vacForm, administeredOn: e.target.value })
                   }
+                  disabled={savingVac}
                   required
                 />
               </div>
@@ -150,29 +157,10 @@ export function VetAddVaccinationModal({
                   className="input"
                   value={vacForm.nextDueOn}
                   onChange={(e) => setVacForm({ ...vacForm, nextDueOn: e.target.value })}
+                  disabled={savingVac}
                 />
               </div>
             </div>
-
-            <div className="field">
-              <label className="field-label" htmlFor="vet-vac-notes">
-                Заметки
-              </label>
-              <textarea
-                id="vet-vac-notes"
-                className="textarea"
-                rows={2}
-                value={vacForm.notes}
-                onChange={(e) => setVacForm({ ...vacForm, notes: e.target.value })}
-              />
-            </div>
-
-            {vacError && (
-              <div className="alert" role="alert">
-                <AlertCircle size={16} />
-                <div>{vacError}</div>
-              </div>
-            )}
           </div>
 
           <div className="dialog-foot">
@@ -180,14 +168,11 @@ export function VetAddVaccinationModal({
               type="button"
               className="btn btn-outline"
               onClick={onClose}
+              disabled={savingVac}
             >
               Отмена
             </button>
-            <button
-              type="submit"
-              className="btn btn-primary"
-              disabled={savingVac}
-            >
+            <button type="submit" className="btn btn-primary" disabled={savingVac}>
               {savingVac ? 'Сохранение…' : 'Внести'}
             </button>
           </div>

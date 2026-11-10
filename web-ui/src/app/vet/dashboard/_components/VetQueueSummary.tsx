@@ -1,43 +1,48 @@
 'use client';
 
 import React from 'react';
-import { Clock, Stethoscope, ChevronRight, CheckCircle2, UserCheck } from 'lucide-react';
-import { VetQueueSummaryProps } from './types';
-import { formatSlotTime, getPetName } from './utils';
-import { SpeciesIcon } from '../../../../components/ui/SpeciesIcon';
+import { Clock, ChevronRight, UserCheck } from 'lucide-react';
+import { formatDateRu, formatSlotTime, getSpeciesTone } from '@/shared/lib';
+import { SpeciesIcon } from '@/components/ui/SpeciesIcon';
+import type { VetQueueSummaryProps } from './types';
+import { getPetName } from './utils';
 
 /**
  * Сводка смены врача:
- * отображает дату смены, текущего/следующего пациента на приёме,
- * число ожидающих в очереди и завершённых приёмов.
+ * отображает дату смены, следующего пациента в очереди,
+ * число ожидающих и завершённых приёмов.
  */
 export const VetQueueSummary: React.FC<VetQueueSummaryProps> = ({
   todayAppointments,
   nextAppointment,
-  currentAppointment,
   servicesMap,
   petsMap,
+  speciesMap,
   onSelectAppointment,
 }) => {
   const completedCount = todayAppointments.filter((a) => a.status === 'COMPLETED').length;
-  const inProgressAppt =
-    currentAppointment || todayAppointments.find((a) => a.status === 'IN_PROGRESS') || null;
   const waitingCount = todayAppointments.filter(
     (a) => a.status === 'PENDING' || a.status === 'CONFIRMED'
   ).length;
 
-  // Активный пациент: тот, кто сейчас на приёме, либо следующий в очереди
-  const activeAppt = inProgressAppt || nextAppointment;
+  const activeAppt = nextAppointment;
 
-  const todayDateFormatted = new Date().toLocaleDateString('ru-RU', {
+  const todayDateFormatted = formatDateRu(new Date().toISOString(), {
     weekday: 'long',
     day: 'numeric',
     month: 'long',
     year: 'numeric',
   });
 
+  const activePet =
+    activeAppt?.pet || (activeAppt?.petId ? petsMap?.[activeAppt.petId] : undefined);
+  const activeTone = getSpeciesTone(
+    activePet?.species?.name || activePet?.speciesName || activePet?.speciesId || 'cat',
+    speciesMap
+  );
+
   return (
-    <section className="island" aria-label="Сводка смены" style={{ width: '100%' }}>
+    <section className="island" aria-label="Сводка смены" style={{ flex: 'none', width: '100%' }}>
       <div className="island-head">
         <span className="island-title">
           <Clock className="ic" />
@@ -68,31 +73,17 @@ export const VetQueueSummary: React.FC<VetQueueSummaryProps> = ({
               background: 'var(--muted)',
               borderRadius: 'var(--radius)',
               gap: '10px',
-              border: activeAppt.status === 'IN_PROGRESS' ? '1px solid var(--primary)' : '1px solid var(--border)',
+              border: '1px solid var(--border)',
             }}
           >
             <div className="row items-center wrap" style={{ gap: '10px' }}>
-              <span
-                className={`badge ${
-                  activeAppt.status === 'IN_PROGRESS' ? 'badge-accent' : 'badge-outline'
-                }`}
-                style={{ height: '22px' }}
-              >
-                {activeAppt.status === 'IN_PROGRESS' ? (
-                  <>
-                    <Stethoscope size={13} className="ic" style={{ marginRight: '4px' }} />
-                    Идёт приём
-                  </>
-                ) : (
-                  <>
-                    <UserCheck size={13} className="ic" style={{ marginRight: '4px' }} />
-                    Следующий пациент
-                  </>
-                )}
+              <span className="badge badge-outline" style={{ height: '22px' }}>
+                <UserCheck size={13} className="ic" style={{ marginRight: '4px' }} />
+                Следующий пациент
               </span>
 
-              <span className="pet-ava" style={{ width: '24px', height: '24px' }}>
-                <SpeciesIcon species="cat" size={16} />
+              <span className={`t-ava sm tone-${activeTone}`}>
+                <SpeciesIcon species={activeTone} size={16} />
               </span>
 
               <span className="cell-main" style={{ fontWeight: 650 }}>
@@ -111,17 +102,21 @@ export const VetQueueSummary: React.FC<VetQueueSummaryProps> = ({
             {onSelectAppointment && (
               <button
                 type="button"
-                className="btn btn-outline btn-xs"
+                className="btn btn-outline btn-sm"
                 onClick={() => onSelectAppointment(activeAppt)}
-                style={{ cursor: 'pointer' }}
               >
-                <span>{activeAppt.status === 'IN_PROGRESS' ? 'Открыть протокол' : 'Пригласить в кабинет'}</span>
+                <span>
+                  {activeAppt.status === 'CONFIRMED' ? 'Открыть протокол' : 'Открыть запись'}
+                </span>
                 <ChevronRight size={14} className="ic" />
               </button>
             )}
           </div>
         ) : (
-          <div className="row items-center between" style={{ padding: '6px 0', color: 'var(--muted-foreground)' }}>
+          <div
+            className="row items-center between"
+            style={{ padding: '6px 0', color: 'var(--muted-foreground)' }}
+          >
             <span className="small">
               {todayAppointments.length === 0
                 ? 'На сегодня приёмов нет. Свободный график.'

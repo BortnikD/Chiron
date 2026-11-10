@@ -10,10 +10,20 @@ import {
   Trash2,
   Syringe,
 } from 'lucide-react';
-import { Pet, Appointment, Vaccination } from '../../../../types';
-import { SpeciesIcon } from '../../../../components/ui/SpeciesIcon';
-import { getSpeciesTone, getPetAge } from './utils';
-import { DetailTab } from './types';
+import type { Pet, Appointment, Vaccination } from '@/modules/client/types';
+import { SpeciesIcon } from '@/components/ui/SpeciesIcon';
+import {
+  APPOINTMENT_STATUS_META,
+  calculateAgeRu,
+  formatCurrency,
+  formatDateRu,
+  formatDateShort,
+  formatIsoDateDisplay,
+  formatSlotTime,
+  getMoscowDateKey,
+  getSpeciesTone,
+} from '@/shared/lib';
+import type { DetailTab } from './types';
 
 export interface PetDetailIslandProps {
   /** Выбранный питомец */
@@ -24,6 +34,8 @@ export interface PetDetailIslandProps {
   appointments: Appointment[];
   /** Список вакцинаций для фильтрации истории */
   vaccinations: Vaccination[];
+  /** Флаг загрузки истории приёмов выбранного питомца */
+  loadingAppts?: boolean;
   /** Функция закрытия острова */
   onClose: () => void;
   /** Функция вызова модального окна редактирования питомца */
@@ -42,6 +54,7 @@ export function PetDetailIsland({
   speciesMap,
   appointments,
   vaccinations,
+  loadingAppts = false,
   onClose,
   onEdit,
   onToggleArchive,
@@ -51,10 +64,12 @@ export function PetDetailIsland({
 
   const petAppts = appointments.filter((a) => a.petId === pet.id);
   const petVaccs = vaccinations.filter((v) => v.petId === pet.id);
+  const apptsCount = pet.summary?.appointmentsCount ?? petAppts.length;
+  const vaccsCount = pet.summary?.vaccinationsCount ?? petVaccs.length;
 
   const tone = getSpeciesTone(pet.speciesId, speciesMap);
   const spName = speciesMap[pet.speciesId] || 'Питомец';
-  const age = getPetAge(pet.birthDate);
+  const age = calculateAgeRu(pet.birthDate, 'возраст не указан');
 
   return (
     <section
@@ -134,14 +149,14 @@ export function PetDetailIsland({
           className={`tab-line ${detailTab === 'APPTS' ? 'on' : ''}`}
           onClick={() => setDetailTab('APPTS')}
         >
-          Записи <span className="small muted">{petAppts.length}</span>
+          Записи <span className="small muted">{apptsCount}</span>
         </button>
         <button
           type="button"
           className={`tab-line ${detailTab === 'VACC' ? 'on' : ''}`}
           onClick={() => setDetailTab('VACC')}
         >
-          Прививки <span className="small muted">{petVaccs.length}</span>
+          Прививки <span className="small muted">{vaccsCount}</span>
         </button>
       </div>
 
@@ -162,9 +177,7 @@ export function PetDetailIsland({
               <dd>{pet.gender === 'MALE' ? 'Самец' : 'Самка'}</dd>
               <dt>Дата рождения</dt>
               <dd className="tnum">
-                {pet.birthDate
-                  ? `${new Date(pet.birthDate).toLocaleDateString('ru-RU')} (${age})`
-                  : '—'}
+                {pet.birthDate ? `${formatDateShort(pet.birthDate)} (${age})` : '—'}
               </dd>
               <dt>Вес</dt>
               <dd className="tnum">
@@ -178,7 +191,9 @@ export function PetDetailIsland({
 
         {detailTab === 'APPTS' && (
           <div className="col" style={{ gap: '8px' }}>
-            {petAppts.length === 0 ? (
+            {loadingAppts && petAppts.length === 0 ? (
+              <span className="small muted">Загрузка истории записей...</span>
+            ) : petAppts.length === 0 ? (
               <span className="small muted">Записей на приём пока нет</span>
             ) : (
               petAppts.map((a) => (
@@ -188,23 +203,18 @@ export function PetDetailIsland({
                   style={{ padding: '8px 0', borderBottom: '1px solid var(--border)' }}
                 >
                   <span className="datebox">
-                    <b>{new Date(a.startAt).getDate()}</b>
-                    <span>
-                      {new Date(a.startAt).toLocaleDateString('ru-RU', { month: 'short' })}
-                    </span>
+                    <b>{formatDateRu(a.startAt, { day: 'numeric' })}</b>
+                    <span>{formatDateRu(a.startAt, { month: 'short' })}</span>
                   </span>
                   <span className="col" style={{ gap: 0, minWidth: 0, flex: 1 }}>
-                    <span className="cell-main tnum">
-                      {new Date(a.startAt).toLocaleTimeString('ru-RU', {
-                        hour: '2-digit',
-                        minute: '2-digit',
-                      })}
-                    </span>
+                    <span className="cell-main tnum">{formatSlotTime(a.startAt)}</span>
                     <span className="cell-sub">
-                      {a.priceSnapshot ? `${a.priceSnapshot.toLocaleString('ru-RU')} ₽` : 'Приём'}
+                      {a.priceSnapshot != null ? formatCurrency(a.priceSnapshot) : 'Приём'}
                     </span>
                   </span>
-                  <span className={`badge st badge-${a.status}`}>{a.status}</span>
+                  <span className={`badge st badge-${a.status}`}>
+                    {APPOINTMENT_STATUS_META[a.status]?.short || a.status}
+                  </span>
                 </div>
               ))
             )}
@@ -228,8 +238,10 @@ export function PetDetailIsland({
                   <span className="col" style={{ gap: 0, minWidth: 0, flex: 1 }}>
                     <span className="cell-main">{v.name}</span>
                     <span className="cell-sub tnum">
-                      Сделана: {v.administeredOn}
-                      {v.nextDueOn ? ` · След.: ${v.nextDueOn}` : ''}
+                      Сделана: {formatIsoDateDisplay(getMoscowDateKey(v.administeredOn) || v.administeredOn)}
+                      {v.nextDueOn
+                        ? ` · След.: ${formatIsoDateDisplay(getMoscowDateKey(v.nextDueOn) || v.nextDueOn)}`
+                        : ''}
                     </span>
                   </span>
                   <span className="badge badge-outline">

@@ -1,9 +1,9 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { AlertCircle } from 'lucide-react';
-import { adminApi } from '../../../../api';
-import { Service, Species, ServiceSpecies } from '../../../../types';
+import { AlertCircle, X } from 'lucide-react';
+import type { Service, Species, ServiceSpecies } from '@/modules/clinic/types';
+import { formatApiError, formatCurrency } from '@/shared/lib';
 
 export interface ServiceSpeciesModalProps {
   isOpen: boolean;
@@ -12,7 +12,12 @@ export interface ServiceSpeciesModalProps {
   speciesList: Species[];
   existingOverride?: ServiceSpecies | null;
   attachedSpeciesIds?: string[];
-  onSuccess: () => Promise<void> | void;
+  onSave: (
+    serviceId: string,
+    speciesId: string,
+    data: { durationMin: number | null; price: number | null },
+    isEdit: boolean
+  ) => Promise<void>;
 }
 
 export const ServiceSpeciesModal: React.FC<ServiceSpeciesModalProps> = ({
@@ -22,7 +27,7 @@ export const ServiceSpeciesModal: React.FC<ServiceSpeciesModalProps> = ({
   speciesList,
   existingOverride,
   attachedSpeciesIds = [],
-  onSuccess,
+  onSave,
 }) => {
   const [speciesId, setSpeciesId] = useState('');
   const [durationMin, setDurationMin] = useState<number | ''>('');
@@ -36,17 +41,12 @@ export const ServiceSpeciesModal: React.FC<ServiceSpeciesModalProps> = ({
 
   useEffect(() => {
     if (!isOpen) return;
-
     if (existingOverride) {
       setSpeciesId(existingOverride.speciesId);
-      setDurationMin(
-        existingOverride.durationMin != null ? existingOverride.durationMin : ''
-      );
+      setDurationMin(existingOverride.durationMin != null ? existingOverride.durationMin : '');
       setPrice(existingOverride.price != null ? existingOverride.price : '');
     } else {
-      const firstAvailable = speciesList.find(
-        (sp) => !attachedSpeciesIds.includes(sp.id)
-      );
+      const firstAvailable = speciesList.find((sp) => !attachedSpeciesIds.includes(sp.id));
       setSpeciesId(firstAvailable?.id || '');
       setDurationMin('');
       setPrice('');
@@ -54,16 +54,26 @@ export const ServiceSpeciesModal: React.FC<ServiceSpeciesModalProps> = ({
     setError(null);
   }, [isOpen, existingOverride, speciesList, attachedSpeciesIds]);
 
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && !saving) onClose();
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, saving, onClose]);
+
   if (!isOpen || !service) return null;
 
-  const isEditing = !!existingOverride;
+  const isEditing = Boolean(existingOverride);
   const currentSpecies = speciesList.find(
-    (s) => s.id === (isEditing ? existingOverride.speciesId : speciesId)
+    (s) => s.id === (existingOverride ? existingOverride.speciesId : speciesId)
   );
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!speciesId) {
+    const targetSpeciesId = existingOverride ? existingOverride.speciesId : speciesId;
+    if (!targetSpeciesId) {
       setError('Выберите вид животного');
       return;
     }
@@ -71,63 +81,62 @@ export const ServiceSpeciesModal: React.FC<ServiceSpeciesModalProps> = ({
     setSaving(true);
     setError(null);
     try {
-      const dur = durationMin !== '' ? Number(durationMin) : null;
-      const pr = price !== '' ? Number(price) : null;
-
-      if (isEditing) {
-        // PATCH: обновление переопределений
-        await adminApi.updateServiceSpecies(service.id, existingOverride.speciesId, {
-          durationMin: dur,
-          price: pr,
-        });
-      } else {
-        // POST: создание переопределения
-        await adminApi.createServiceSpecies(service.id, {
-          speciesId,
-          durationMin: dur,
-          price: pr,
-        });
-      }
-
-      await onSuccess();
-      onClose();
-    } catch (err: any) {
-      setError(
-        err?.response?.data?.message ||
-          err?.message ||
-          'Ошибка сохранения переопределения услуги'
+      await onSave(
+        service.id,
+        targetSpeciesId,
+        {
+          durationMin: durationMin !== '' ? Number(durationMin) : null,
+          price: price !== '' ? Number(price) : null,
+        },
+        isEditing
       );
+      onClose();
+    } catch (err: unknown) {
+      setError(formatApiError(err, 'Ошибка сохранения переопределения услуги'));
     } finally {
       setSaving(false);
     }
   };
 
   return (
-    <div className="overlay" onClick={onClose}>
-      <div
-        className="dialog dialog-sm"
-        style={{ width: 440 }}
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="dialog-head">
-          <span className="dialog-title">
-            {isEditing
-              ? `Переопределение: ${currentSpecies?.name || 'Вид'}`
-              : 'Добавить переопределение для вида'}
-          </span>
-          <span className="dialog-desc">
-            Индивидуальные параметры длительности и цены услуги «{service.name}»
-          </span>
+    <div
+      className="overlay"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="ssm-modal-title"
+      onClick={() => !saving && onClose()}
+    >
+      <div className="dialog dialog-sm" onClick={(e) => e.stopPropagation()}>
+        <div className="dialog-head" style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+          <div className="col" style={{ gap: 4 }}>
+            <span id="ssm-modal-title" className="dialog-title">
+              {isEditing
+                ? `Переопределение: ${currentSpecies?.name || 'Вид'}`
+                : 'Добавить переопределение для вида'}
+            </span>
+            <span className="dialog-desc">
+              Индивидуальные параметры длительности и цены услуги «{service.name}»
+            </span>
+          </div>
+          <button
+            type="button"
+            className="btn btn-ghost btn-icon btn-sm"
+            aria-label="Закрыть"
+            onClick={() => !saving && onClose()}
+          >
+            <X size={16} />
+          </button>
         </div>
 
-        <form onSubmit={handleSubmit}>
+        <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', minHeight: 0, flex: 1 }}>
           <div className="dialog-body">
             {!isEditing ? (
               <div className="field">
-                <span className="field-label">
+                <label className="field-label" htmlFor="ssm-species">
                   Вид животного <span className="req">*</span>
-                </span>
+                </label>
                 <select
+                  id="ssm-species"
                   className="select"
                   value={speciesId}
                   onChange={(e) => setSpeciesId(e.target.value)}
@@ -143,19 +152,19 @@ export const ServiceSpeciesModal: React.FC<ServiceSpeciesModalProps> = ({
               </div>
             ) : (
               <div className="field">
-                <span className="field-label">Вид животного</span>
+                <label className="field-label" htmlFor="ssm-species-ro">
+                  Вид животного
+                </label>
                 <input
+                  id="ssm-species-ro"
                   className="input"
-                  value={currentSpecies?.name || existingOverride.speciesId}
+                  value={currentSpecies?.name || existingOverride?.speciesId || ''}
                   disabled
                 />
               </div>
             )}
 
-            <div
-              className="form-grid"
-              style={{ gridTemplateColumns: 'repeat(2, minmax(0, 1fr))' }}
-            >
+            <div className="form-grid" style={{ gridTemplateColumns: 'repeat(2, minmax(0, 1fr))' }}>
               <div className="field">
                 <label className="field-label" htmlFor="ssm-dur">
                   Длительность, мин
@@ -168,11 +177,10 @@ export const ServiceSpeciesModal: React.FC<ServiceSpeciesModalProps> = ({
                   className="input"
                   placeholder={`Базовая: ${service.baseDurationMin} мин`}
                   value={durationMin}
-                  onChange={(e) =>
-                    setDurationMin(
-                      e.target.value === '' ? '' : parseInt(e.target.value) || 0
-                    )
-                  }
+                  onChange={(e) => {
+                    const parsed = Number.parseInt(e.target.value, 10);
+                    setDurationMin(e.target.value === '' || Number.isNaN(parsed) ? '' : parsed);
+                  }}
                 />
               </div>
               <div className="field">
@@ -184,49 +192,35 @@ export const ServiceSpeciesModal: React.FC<ServiceSpeciesModalProps> = ({
                   type="number"
                   min="0"
                   className="input"
-                  placeholder={`Базовая: ${service.basePrice} ₽`}
+                  placeholder={`Базовая: ${formatCurrency(service.basePrice)}`}
                   value={price}
-                  onChange={(e) =>
-                    setPrice(
-                      e.target.value === '' ? '' : parseInt(e.target.value) || 0
-                    )
-                  }
+                  onChange={(e) => {
+                    const parsed = Number.parseInt(e.target.value, 10);
+                    setPrice(e.target.value === '' || Number.isNaN(parsed) ? '' : parsed);
+                  }}
                 />
               </div>
             </div>
 
             <span className="small muted">
               Пустые поля означают использование базовых параметров услуги (
-              {service.baseDurationMin} мин, {service.basePrice} ₽).
+              {service.baseDurationMin} мин, {formatCurrency(service.basePrice)}).
             </span>
 
             {error && (
-              <div className="alert" role="alert">
-                <AlertCircle size={16} />
+              <div className="alert alert-destructive" role="alert">
+                <AlertCircle size={16} className="ic" />
                 <div>{error}</div>
               </div>
             )}
           </div>
 
           <div className="dialog-foot">
-            <button
-              type="button"
-              className="btn btn-outline"
-              onClick={onClose}
-              disabled={saving}
-            >
+            <button type="button" className="btn btn-outline" onClick={onClose} disabled={saving}>
               Отмена
             </button>
-            <button
-              type="submit"
-              className="btn btn-primary"
-              disabled={saving}
-            >
-              {saving
-                ? 'Сохранение…'
-                : isEditing
-                ? 'Сохранить'
-                : 'Добавить'}
+            <button type="submit" className="btn btn-primary" disabled={saving}>
+              {saving ? 'Сохранение…' : isEditing ? 'Сохранить' : 'Добавить'}
             </button>
           </div>
         </form>

@@ -3,10 +3,11 @@
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { useAuth } from '../../context/AuthContext';
-import { ChironLogo } from '../ui/ChironLogo';
-import { ThemeToggle } from '../ui/ThemeToggle';
-import { isDevMode } from '../../utils/env';
+import { useAuth } from '@/context/AuthContext';
+import { ChironLogo } from '@/components/ui/ChironLogo';
+import { ThemeToggle } from '@/components/ui/ThemeToggle';
+import { getHomeByRole } from '@/shared/lib';
+import { isDevMode } from '@/utils/env';
 import { Info, ClipboardList, Stethoscope, LogIn, ChevronLeft } from 'lucide-react';
 
 export const PublicHeader: React.FC = () => {
@@ -18,12 +19,7 @@ export const PublicHeader: React.FC = () => {
     setIsDev(isDevMode());
   }, []);
 
-  const cabinetHref =
-    role === 'ADMIN'
-      ? '/admin/dashboard'
-      : role === 'VETERINARIAN'
-      ? '/vet/dashboard'
-      : '/client/dashboard';
+  const cabinetHref = getHomeByRole(role);
 
   const isAbout = pathname === '/';
   const isSvc = pathname === '/services';
@@ -32,7 +28,7 @@ export const PublicHeader: React.FC = () => {
   return (
     <header className="island topbar" style={{ flex: 'none' }}>
       {/* Логотип Chiron */}
-      <Link href="/" className="brand" style={{ padding: 0, textDecoration: 'none' }}>
+      <Link href="/" className="brand" style={{ padding: 0 }}>
         <div className="brand-mark">
           <ChironLogo size={20} />
         </div>
@@ -41,28 +37,16 @@ export const PublicHeader: React.FC = () => {
 
       {/* Сегментированная навигация каталога */}
       <nav className="seg" aria-label="Разделы каталога" style={{ marginLeft: '12px' }}>
-        <Link
-          href="/"
-          className={`seg-item ${isAbout ? 'on' : ''}`}
-          style={{ textDecoration: 'none' }}
-        >
-          <Info className="ic" style={{ width: '15px', height: '15px' }} />
+        <Link href="/" className={`seg-item ${isAbout ? 'on' : ''}`}>
+          <Info className="ic" />
           <span>О клинике</span>
         </Link>
-        <Link
-          href="/services"
-          className={`seg-item ${isSvc ? 'on' : ''}`}
-          style={{ textDecoration: 'none' }}
-        >
-          <ClipboardList className="ic" style={{ width: '15px', height: '15px' }} />
+        <Link href="/services" className={`seg-item ${isSvc ? 'on' : ''}`}>
+          <ClipboardList className="ic" />
           <span>Услуги</span>
         </Link>
-        <Link
-          href="/veterinarians"
-          className={`seg-item ${isVets ? 'on' : ''}`}
-          style={{ textDecoration: 'none' }}
-        >
-          <Stethoscope className="ic" style={{ width: '15px', height: '15px' }} />
+        <Link href="/veterinarians" className={`seg-item ${isVets ? 'on' : ''}`}>
+          <Stethoscope className="ic" />
           <span>Врачи</span>
         </Link>
       </nav>
@@ -86,17 +70,17 @@ export const PublicHeader: React.FC = () => {
 
       {/* Кнопки входа / возврата в личный кабинет */}
       {isAuthenticated ? (
-        <Link href={cabinetHref} className="btn btn-primary" style={{ textDecoration: 'none' }}>
-          <ChevronLeft className="ic" style={{ width: '15px', height: '15px' }} />
+        <Link href={cabinetHref} className="btn btn-primary">
+          <ChevronLeft className="ic" />
           <span>Вернуться в кабинет</span>
         </Link>
       ) : (
         <>
-          <Link href="/register" className="btn btn-outline" style={{ textDecoration: 'none' }}>
+          <Link href="/register" className="btn btn-outline">
             <span>Регистрация</span>
           </Link>
-          <Link href="/login" className="btn btn-primary" style={{ textDecoration: 'none' }}>
-            <LogIn className="ic" style={{ width: '15px', height: '15px' }} />
+          <Link href="/login" className="btn btn-primary">
+            <LogIn className="ic" />
             <span>Войти</span>
           </Link>
         </>

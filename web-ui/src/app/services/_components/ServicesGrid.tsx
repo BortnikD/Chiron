@@ -2,8 +2,8 @@
 
 import React from 'react';
 import { ClipboardList, Clock, Inbox } from 'lucide-react';
-import { ServicesGridProps } from './types';
-import { SPEC_TONES, DEFAULT_SPEC_TONE } from './constants';
+import { formatCurrency, getSpecTone } from '@/shared/lib';
+import type { ServicesGridProps } from './types';
 
 export function ServicesGrid({
   services,
@@ -39,9 +39,10 @@ export function ServicesGrid({
           <div className="cards">
             {services.map((svc) => {
               const isSel = selectedService?.id === svc.id;
-              const tone = SPEC_TONES[svc.specializationId] || DEFAULT_SPEC_TONE;
+              const tone = getSpecTone(svc.specializationId);
               const specName = specsMap[svc.specializationId] || 'Терапия';
-              const duration = svc.baseDurationMin || svc.durationMin || 30;
+              const duration = svc.effectiveDurationMin ?? svc.baseDurationMin ?? svc.durationMin ?? 30;
+              const price = svc.effectivePrice ?? svc.basePrice;
 
               return (
                 <button
@@ -64,7 +65,7 @@ export function ServicesGrid({
                       {duration} мин
                     </span>
                     <span className="tcard-price">
-                      от {svc.basePrice?.toLocaleString('ru-RU')} ₽
+                      {svc.effectivePrice != null ? formatCurrency(price) : `от ${formatCurrency(price)}`}
                     </span>
                   </div>
                 </button>

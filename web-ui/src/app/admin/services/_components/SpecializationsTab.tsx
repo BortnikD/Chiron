@@ -1,56 +1,77 @@
 'use client';
 
-import React, { useState } from 'react';
-import { Tags, Plus, Edit2, Trash2 } from 'lucide-react';
-import { adminApi } from '../../../../api';
-import { Specialization } from '../../../../types';
+import React, { useState, useEffect } from 'react';
+import { Tags, Plus, Edit2, Trash2, AlertCircle, X } from 'lucide-react';
+import type { Specialization } from '@/modules/clinic/types';
+import { formatApiError } from '@/shared/lib';
+import { ConfirmModal } from '@/shared/components/ConfirmModal';
 
 export interface SpecializationsTabProps {
   specializations: Specialization[];
-  onRefresh: () => Promise<void>;
+  onSaveSpecialization: (data: { name: string; description: string }, id?: string) => Promise<void>;
+  onDeleteSpecialization: (id: string) => Promise<void>;
 }
 
 export const SpecializationsTab: React.FC<SpecializationsTabProps> = ({
   specializations,
-  onRefresh,
+  onSaveSpecialization,
+  onDeleteSpecialization,
 }) => {
   const [isSpecModalOpen, setIsSpecModalOpen] = useState(false);
   const [specForm, setSpecForm] = useState({ id: '', name: '', description: '' });
   const [savingSpec, setSavingSpec] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+
+  const [deleteTarget, setDeleteTarget] = useState<Specialization | null>(null);
+  const [deletingSpec, setDeletingSpec] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!isSpecModalOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && !savingSpec) setIsSpecModalOpen(false);
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isSpecModalOpen, savingSpec]);
 
   const handleSaveSpec = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!specForm.name.trim()) return;
+    const trimmedName = specForm.name.trim();
+    if (!trimmedName) {
+      setSaveError('Введите название специализации');
+      return;
+    }
     setSavingSpec(true);
+    setSaveError(null);
     try {
-      if (specForm.id) {
-        await adminApi.updateSpecialization(specForm.id, {
-          name: specForm.name.trim(),
+      await onSaveSpecialization(
+        {
+          name: trimmedName,
           description: specForm.description.trim(),
-        });
-      } else {
-        await adminApi.createSpecialization({
-          name: specForm.name.trim(),
-          description: specForm.description.trim(),
-        });
-      }
+        },
+        specForm.id || undefined
+      );
       setIsSpecModalOpen(false);
       setSpecForm({ id: '', name: '', description: '' });
-      await onRefresh();
-    } catch (err: any) {
-      alert(err?.response?.data?.message || err?.message || 'Ошибка сохранения специализации');
+    } catch (err: unknown) {
+      setSaveError(formatApiError(err, 'Ошибка сохранения специализации'));
     } finally {
       setSavingSpec(false);
     }
   };
 
-  const handleDeleteSpec = async (id: string) => {
-    if (!confirm('Удалить специализацию?')) return;
+  const handleDeleteSpec = async () => {
+    if (!deleteTarget) return;
+    setDeletingSpec(true);
+    setDeleteError(null);
     try {
-      await adminApi.deleteSpecialization(id);
-      await onRefresh();
-    } catch (err: any) {
-      alert(err?.response?.data?.message || err?.message || 'Ошибка удаления специализации');
+      await onDeleteSpecialization(deleteTarget.id);
+      setDeleteTarget(null);
+    } catch (err: unknown) {
+      setDeleteError(formatApiError(err, 'Ошибка удаления специализации'));
+    } finally {
+      setDeletingSpec(false);
     }
   };
 
@@ -67,6 +88,7 @@ export const SpecializationsTab: React.FC<SpecializationsTabProps> = ({
             className="btn btn-primary btn-sm"
             onClick={() => {
               setSpecForm({ id: '', name: '', description: '' });
+              setSaveError(null);
               setIsSpecModalOpen(true);
             }}
           >
@@ -94,12 +116,11 @@ export const SpecializationsTab: React.FC<SpecializationsTabProps> = ({
                   <button
                     type="button"
                     className="btn btn-ghost btn-icon btn-sm"
+                    aria-label={`Редактировать специализацию «${sp.name}»`}
+                    title="Редактировать"
                     onClick={() => {
-                      setSpecForm({
-                        id: sp.id,
-                        name: sp.name,
-                        description: sp.description || '',
-                      });
+                      setSpecForm({ id: sp.id, name: sp.name, description: sp.description || '' });
+                      setSaveError(null);
                       setIsSpecModalOpen(true);
                     }}
                   >
@@ -108,7 +129,12 @@ export const SpecializationsTab: React.FC<SpecializationsTabProps> = ({
                   <button
                     type="button"
                     className="btn btn-ghost btn-icon btn-sm"
-                    onClick={() => handleDeleteSpec(sp.id)}
+                    aria-label={`Удалить специализацию «${sp.name}»`}
+                    title="Удалить"
+                    onClick={() => {
+                      setDeleteError(null);
+                      setDeleteTarget(sp);
+                    }}
                   >
                     <Trash2 size={14} />
                   </button>
@@ -119,24 +145,30 @@ export const SpecializationsTab: React.FC<SpecializationsTabProps> = ({
         </div>
       </section>
 
-      {/* Modal: Specialization Form */}
       {isSpecModalOpen && (
         <div
           className="overlay"
-          onClick={() => setIsSpecModalOpen(false)}
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="spec-modal-title"
+          onClick={() => !savingSpec && setIsSpecModalOpen(false)}
         >
-          <div
-            className="dialog dialog-sm"
-            style={{ width: 440 }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="dialog-head">
-              <span className="dialog-title">
+          <div className="dialog dialog-sm" onClick={(e) => e.stopPropagation()}>
+            <div className="dialog-head" style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span id="spec-modal-title" className="dialog-title">
                 {specForm.id ? 'Редактировать специализацию' : 'Новая специализация'}
               </span>
+              <button
+                type="button"
+                className="btn btn-ghost btn-icon btn-sm"
+                aria-label="Закрыть"
+                onClick={() => !savingSpec && setIsSpecModalOpen(false)}
+              >
+                <X size={16} />
+              </button>
             </div>
 
-            <form onSubmit={handleSaveSpec}>
+            <form onSubmit={handleSaveSpec} style={{ display: 'flex', flexDirection: 'column', minHeight: 0, flex: 1 }}>
               <div className="dialog-body">
                 <div className="field">
                   <label className="field-label" htmlFor="spec-name">
@@ -164,21 +196,25 @@ export const SpecializationsTab: React.FC<SpecializationsTabProps> = ({
                     onChange={(e) => setSpecForm({ ...specForm, description: e.target.value })}
                   />
                 </div>
+
+                {saveError && (
+                  <div className="alert alert-destructive" role="alert">
+                    <AlertCircle size={16} className="ic" />
+                    <div>{saveError}</div>
+                  </div>
+                )}
               </div>
 
               <div className="dialog-foot">
                 <button
                   type="button"
                   className="btn btn-outline"
+                  disabled={savingSpec}
                   onClick={() => setIsSpecModalOpen(false)}
                 >
                   Отмена
                 </button>
-                <button
-                  type="submit"
-                  className="btn btn-primary"
-                  disabled={savingSpec}
-                >
+                <button type="submit" className="btn btn-primary" disabled={savingSpec}>
                   {savingSpec ? 'Сохранение…' : 'Сохранить'}
                 </button>
               </div>
@@ -186,6 +222,19 @@ export const SpecializationsTab: React.FC<SpecializationsTabProps> = ({
           </div>
         </div>
       )}
+
+      <ConfirmModal
+        isOpen={Boolean(deleteTarget)}
+        title="Удалить специализацию?"
+        description={
+          deleteTarget ? `Специализация «${deleteTarget.name}» будет удалена.` : ''
+        }
+        confirmLabel="Удалить"
+        loading={deletingSpec}
+        error={deleteError}
+        onClose={() => !deletingSpec && setDeleteTarget(null)}
+        onConfirm={handleDeleteSpec}
+      />
     </>
   );
 };

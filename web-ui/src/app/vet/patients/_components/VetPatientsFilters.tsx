@@ -58,12 +58,12 @@ export function VetPatientsFilters({
               </button>
             </div>
           )}
-          <div className="input-icon" style={{ width: 260 }}>
+          <div className="input-icon w-full sm:w-[260px]">
             <Search size={14} className="ic" />
             <input
               type="text"
               className="input input-sm"
-              placeholder="Кличка…"
+              placeholder="Кличка или вид…"
               value={search}
               onChange={(e) => onSearchChange(e.target.value)}
             />

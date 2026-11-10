@@ -3,7 +3,7 @@
 import React from 'react';
 import Link from 'next/link';
 import { ShieldCheck, CalendarPlus, Phone } from 'lucide-react';
-import { SpeciesIcon } from '../../components/ui/SpeciesIcon';
+import { SpeciesIcon } from '@/components/ui/SpeciesIcon';
 
 export const LandingCtaSection: React.FC = () => {
   return (

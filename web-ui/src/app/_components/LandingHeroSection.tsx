@@ -11,7 +11,7 @@ import {
   FileText,
   ShieldCheck,
 } from 'lucide-react';
-import { HeroIllustration } from '../../components/home/HeroIllustration';
+import { HeroIllustration } from '@/components/home/HeroIllustration';
 import { LandingHeroSectionProps, AdvantageChip } from './types';
 
 const ADVANTAGES: AdvantageChip[] = [

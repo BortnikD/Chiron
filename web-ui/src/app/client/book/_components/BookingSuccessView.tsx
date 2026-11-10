@@ -15,6 +15,7 @@ export interface BookingSuccessViewProps {
 export const BookingSuccessView: React.FC<BookingSuccessViewProps> = ({
   petName,
   serviceName,
+  appointmentId,
   onNewBooking,
 }) => {
   return (
@@ -30,6 +31,11 @@ export const BookingSuccessView: React.FC<BookingSuccessViewProps> = ({
         Питомец: <b>{petName || 'Питомец'}</b>
         {serviceName ? ` · ${serviceName}` : ''}
       </span>
+      {appointmentId && (
+        <span className="small muted mono">
+          Номер записи: #{appointmentId.slice(0, 8).toUpperCase()}
+        </span>
+      )}
       <span className="badge st badge-PENDING">Ожидает подтверждения</span>
       <div className="row wrap" style={{ gap: '8px', marginTop: '14px', justifyContent: 'center' }}>
         <Link

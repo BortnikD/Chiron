@@ -1,10 +1,11 @@
 'use client';
 
-import React from 'react';
+import React, { useMemo } from 'react';
 import { Stethoscope } from 'lucide-react';
-import { Veterinarian, User, Specialization, Species } from '../../../../types';
-import { getSpeciesTone } from '../../../../components/ui/SpeciesIcon';
-import { getSpecTone, getUserName, getUserInitials, getSpecName } from './utils';
+import type { Veterinarian, Specialization, Species } from '@/modules/clinic/types';
+import type { User } from '@/shared/types';
+import { getSpecTone, getSpeciesTone, toIdNameMap } from '@/shared/lib';
+import { getDoctorDisplay } from '@/utils/doctorHelpers';
 
 export interface AdminVetsTableProps {
   vets: Veterinarian[];
@@ -27,6 +28,12 @@ export const AdminVetsTable: React.FC<AdminVetsTableProps> = ({
   vetPermMap,
   loading,
 }) => {
+  const usersMap = useMemo(
+    () => Object.fromEntries(users.map((u) => [u.id, u])),
+    [users]
+  );
+  const specsMap = useMemo(() => toIdNameMap(specializations), [specializations]);
+
   return (
     <section className="island grow">
       <div className="island-head">
@@ -55,7 +62,8 @@ export const AdminVetsTable: React.FC<AdminVetsTableProps> = ({
           </div>
 
           {vets.map((v) => {
-            const specName = getSpecName(v.specializationId, specializations);
+            const doc = getDoctorDisplay({ ...v, user: v.user || usersMap[v.userId] }, specsMap);
+            const specName = v.specializationId ? doc.specName : 'Не указана';
             const isSelected = selectedVet?.id === v.id;
             const perms = vetPermMap[v.id] || [];
             const permittedSpecies = speciesList.filter((sp) => perms.includes(sp.id));
@@ -63,14 +71,15 @@ export const AdminVetsTable: React.FC<AdminVetsTableProps> = ({
             return (
               <button
                 key={v.id}
+                type="button"
                 className={`trow ${isSelected ? 'sel' : ''}`}
                 onClick={() => onSelectVet(v)}
               >
                 <span className="row" style={{ gap: 8 }}>
                   <span className={`t-ava sm round tone-${getSpecTone(v.specializationId)}`}>
-                    {getUserInitials(v.userId, users)}
+                    {doc.initials}
                   </span>
-                  <span className="cell-main">{getUserName(v.userId, users)}</span>
+                  <span className="cell-main">{doc.fullName}</span>
                 </span>
                 <span>
                   <span className={`t-badge tone-${getSpecTone(v.specializationId)}`}>{specName}</span>
@@ -81,7 +90,7 @@ export const AdminVetsTable: React.FC<AdminVetsTableProps> = ({
                 <span className="chips">
                   {permittedSpecies.length > 0 ? (
                     permittedSpecies.map((sp) => (
-                      <span key={sp.id} className={`sp-chip ${getSpeciesTone(sp.id)}`}>
+                      <span key={sp.id} className={`sp-chip tone-${getSpeciesTone(sp.name)}`}>
                         {sp.name}
                       </span>
                     ))
@@ -98,6 +107,13 @@ export const AdminVetsTable: React.FC<AdminVetsTableProps> = ({
             );
           })}
         </div>
+
+        {loading && vets.length === 0 && (
+          <div className="empty">
+            <span className="spinner" aria-hidden="true" />
+            <span className="muted">Загрузка врачей…</span>
+          </div>
+        )}
 
         {vets.length === 0 && !loading && (
           <div className="empty">

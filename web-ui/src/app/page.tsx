@@ -1,55 +1,30 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { PublicHeader } from '../components/layout/PublicHeader';
-import { clinicApi } from '../api';
-import { Service, Veterinarian, Specialization } from '../types';
-import { useTheme } from '../context/ThemeContext';
-import { useAuth } from '../context/AuthContext';
-import {
-  LandingHeroSection,
-  LandingDoctorsSection,
-  LandingServicesSection,
-  LandingCtaSection,
-  LandingFooter,
-} from './_components';
+import { PublicHeader } from '@/components/layout/PublicHeader';
+import { getHomeByRole } from '@/shared/lib';
+import { useTheme } from '@/context/ThemeContext';
+import { useAuth } from '@/context/AuthContext';
+import { useLandingData } from './_hooks/useLandingData';
+import { LandingHeroSection } from './_components/LandingHeroSection';
+import { LandingDoctorsSection } from './_components/LandingDoctorsSection';
+import { LandingServicesSection } from './_components/LandingServicesSection';
+import { LandingCtaSection } from './_components/LandingCtaSection';
+import { LandingFooter } from './_components/LandingFooter';
 
 export default function HomePage() {
   const { resolvedTheme } = useTheme();
   const { isAuthenticated, role, isLoading } = useAuth();
   const router = useRouter();
-
-  const [services, setServices] = useState<Service[]>([]);
-  const [vets, setVets] = useState<Veterinarian[]>([]);
-  const [specs, setSpecs] = useState<Specialization[]>([]);
+  const { services, vets, specs, error } = useLandingData();
 
   // Автоматический редирект авторизованного пользователя в соответствующий дашборд
   useEffect(() => {
     if (!isLoading && isAuthenticated && role) {
-      if (role === 'ADMIN') {
-        router.replace('/admin/dashboard');
-      } else if (role === 'VETERINARIAN') {
-        router.replace('/vet/dashboard');
-      } else {
-        router.replace('/client/dashboard');
-      }
+      router.replace(getHomeByRole(role));
     }
   }, [isLoading, isAuthenticated, role, router]);
-
-  useEffect(() => {
-    Promise.all([
-      clinicApi.getServices(),
-      clinicApi.getVeterinarians(),
-      clinicApi.getSpecializations(),
-    ])
-      .then(([svc, vt, sp]) => {
-        setServices(Array.isArray(svc) ? svc : []);
-        setVets(Array.isArray(vt) ? vt : []);
-        setSpecs(Array.isArray(sp) ? sp : []);
-      })
-      .catch((err) => console.error(err));
-  }, []);
 
   if (!isLoading && isAuthenticated) {
     return (
@@ -86,7 +61,7 @@ export default function HomePage() {
             servicesCount={services.length}
           />
           <LandingDoctorsSection vets={vets} specializations={specs} />
-          <LandingServicesSection services={services} />
+          <LandingServicesSection services={services} specializations={specs} error={error} />
           <LandingCtaSection />
           <LandingFooter />
         </div>

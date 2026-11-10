@@ -3,10 +3,10 @@
 import React from 'react';
 import Link from 'next/link';
 import { X, CalendarPlus } from 'lucide-react';
-import { VeterinarianDetailIslandProps } from './types';
-import { DAY_ORDER, DAY_SHORT } from './constants';
-import { getDoctorDisplay } from '../../../utils/doctorHelpers';
-import { getDoctorFullName, formatTime } from './utils';
+import { getDoctorDisplay } from '@/utils/doctorHelpers';
+import { DOW_ORDER, DOW_LABELS, formatIsoDateDisplay, formatTime, getSpeciesTone, pluralRu } from '@/shared/lib';
+import { SpeciesIcon } from '@/components/ui/SpeciesIcon';
+import type { VeterinarianDetailIslandProps } from './types';
 
 export const VeterinarianDetailIsland: React.FC<VeterinarianDetailIslandProps> = ({
   vet,
@@ -19,8 +19,7 @@ export const VeterinarianDetailIsland: React.FC<VeterinarianDetailIslandProps> =
   isAuthenticated,
   role,
 }) => {
-  const { initials, specName } = getDoctorDisplay(vet, specsMap);
-  const fullName = getDoctorFullName(vet, specsMap);
+  const { fullName, initials, specName } = getDoctorDisplay(vet, specsMap);
 
   return (
     <section
@@ -46,7 +45,7 @@ export const VeterinarianDetailIsland: React.FC<VeterinarianDetailIslandProps> =
               {fullName}
             </span>
             <span className="cell-sub">
-              {specName} · стаж {vet.experienceYears} лет
+              {specName} · стаж {vet.experienceYears} {pluralRu(vet.experienceYears, 'год', 'года', 'лет')}
             </span>
           </div>
         </div>
@@ -69,13 +68,18 @@ export const VeterinarianDetailIsland: React.FC<VeterinarianDetailIslandProps> =
             <span className="section-title">Лечит</span>
             <div className="chips">
               {permissions.length > 0 ? (
-                permissions.map((spId) => (
-                  <span key={spId} className="badge badge-outline">
-                    {speciesMap[spId] || 'Животное'}
-                  </span>
-                ))
+                permissions.map((spId) => {
+                  const spName = speciesMap[spId] || 'Животное';
+                  const spTone = getSpeciesTone(spName);
+                  return (
+                    <span key={spId} className={`sp-chip tone-${spTone}`}>
+                      <SpeciesIcon species={spTone} size={14} />
+                      {spName}
+                    </span>
+                  );
+                })
               ) : (
-                <span className="small muted">Все виды животных</span>
+                <span className="small muted">Виды не указаны</span>
               )}
             </div>
           </div>
@@ -84,9 +88,9 @@ export const VeterinarianDetailIsland: React.FC<VeterinarianDetailIslandProps> =
           <div className="col" style={{ gap: '8px' }}>
             <span className="section-title">Недельный график</span>
             <div className="dtable" style={{ '--cols': '44px 1fr 1.4fr' } as React.CSSProperties}>
-              {DAY_ORDER.map((dow) => {
+              {DOW_ORDER.map((dow) => {
                 const sched = schedules.find((s) => s.dayOfWeek === dow);
-                const dayLabel = DAY_SHORT[dow] || dow;
+                const dayLabel = DOW_LABELS[dow] || dow;
 
                 if (!sched) {
                   return (
@@ -127,7 +131,10 @@ export const VeterinarianDetailIsland: React.FC<VeterinarianDetailIslandProps> =
                 >
                   <div className="col" style={{ gap: 0 }}>
                     <span className="cell-main tnum">
-                      {exc.startDate} {exc.endDate && exc.endDate !== exc.startDate ? `— ${exc.endDate}` : ''}
+                      {formatIsoDateDisplay(exc.startDate)}
+                      {exc.endDate && exc.endDate !== exc.startDate
+                        ? ` — ${formatIsoDateDisplay(exc.endDate)}`
+                        : ''}
                     </span>
                     <span className="cell-sub">
                       {exc.reason || (exc.type === 'ABSENCE' ? 'Отпуск / больничный' : 'Особый график')}

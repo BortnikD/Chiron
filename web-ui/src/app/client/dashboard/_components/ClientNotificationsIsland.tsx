@@ -3,7 +3,12 @@
 import React from 'react';
 import Link from 'next/link';
 import { Bell, ChevronRight } from 'lucide-react';
-import { ClientNotificationsIslandProps } from './types';
+import type { AppNotification } from '@/shared/types';
+import { formatSlotTime } from '@/shared/lib';
+
+export interface ClientNotificationsIslandProps {
+  notifications: AppNotification[];
+}
 
 export function ClientNotificationsIsland({
   notifications,
@@ -17,7 +22,7 @@ export function ClientNotificationsIsland({
           <Bell className="ic" />
           Уведомления {unreadNotifsCount > 0 && <span className="count">{unreadNotifsCount} новых</span>}
         </span>
-        <Link href="/client/dashboard" className="btn btn-ghost btn-sm" style={{ textDecoration: 'none' }}>
+        <Link href="/client/notifications" className="btn btn-ghost btn-sm" style={{ textDecoration: 'none' }}>
           <span>Все</span>
           <ChevronRight className="ic" />
         </Link>
@@ -45,11 +50,7 @@ export function ClientNotificationsIsland({
               </span>
               {n.createdAt && (
                 <span className="notif-time">
-                  {new Date(n.createdAt).toLocaleTimeString('ru-RU', {
-                    hour: '2-digit',
-                    minute: '2-digit',
-                    timeZone: 'Europe/Moscow',
-                  })}
+                  {formatSlotTime(n.createdAt)}
                   {!n.readAt && <span className="dot accent" />}
                 </span>
               )}

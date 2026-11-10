@@ -3,7 +3,14 @@
 import React from 'react';
 import Link from 'next/link';
 import { Calendar, PawPrint, Syringe, Bell, CalendarPlus } from 'lucide-react';
-import { ClientQuickActionsProps } from './types';
+import { pluralRu } from '@/shared/lib';
+
+export interface ClientQuickActionsProps {
+  upcomingCount: number;
+  petsCount: number;
+  vacAttnCount: number;
+  unreadNotifsCount: number;
+}
 
 export function ClientQuickActions({
   upcomingCount,
@@ -24,13 +31,7 @@ export function ClientQuickActions({
           </span>
           <span className="hm-stat-txt">
             <b>{upcomingCount}</b>
-            <span>
-              {upcomingCount === 1
-                ? 'запись впереди'
-                : upcomingCount < 5
-                ? 'записи впереди'
-                : 'записей впереди'}
-            </span>
+            <span>{pluralRu(upcomingCount, 'запись впереди', 'записи впереди', 'записей впереди')}</span>
           </span>
         </Link>
 
@@ -44,12 +45,12 @@ export function ClientQuickActions({
           </span>
           <span className="hm-stat-txt">
             <b>{petsCount}</b>
-            <span>{petsCount === 1 ? 'питомец' : petsCount < 5 ? 'питомца' : 'питомцев'}</span>
+            <span>{pluralRu(petsCount, 'питомец', 'питомца', 'питомцев')}</span>
           </span>
         </Link>
 
         <Link
-          href="/client/appointments?tab=VACC"
+          href="/client/vaccinations"
           className="hm-stat"
           style={{
             '--tone': vacAttnCount > 0 ? 'var(--st-noshow-fg)' : 'var(--muted-foreground)',
@@ -61,7 +62,7 @@ export function ClientQuickActions({
           </span>
           <span className="hm-stat-txt">
             <b>{vacAttnCount}</b>
-            <span>прививки к сроку</span>
+            <span>{pluralRu(vacAttnCount, 'прививка к сроку', 'прививки к сроку', 'прививок к сроку')}</span>
           </span>
         </Link>
 
@@ -75,13 +76,7 @@ export function ClientQuickActions({
           </span>
           <span className="hm-stat-txt">
             <b>{unreadNotifsCount}</b>
-            <span>
-              {unreadNotifsCount === 1
-                ? 'новое событие'
-                : unreadNotifsCount < 5
-                ? 'новых события'
-                : 'новых событий'}
-            </span>
+            <span>{pluralRu(unreadNotifsCount, 'новое событие', 'новых события', 'новых событий')}</span>
           </span>
         </Link>
       </div>

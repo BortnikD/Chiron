@@ -2,24 +2,28 @@
 
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { adminApi } from '../../../../api';
-import { User, Pet, Appointment } from '../../../../types';
-import { ROLE_META, getUserInitials } from './utils';
 import {
   X,
   Trash2,
   Stethoscope,
-  PawPrint,
   AlertCircle,
   Check,
   Edit2,
 } from 'lucide-react';
+import type { Pet, Appointment } from '@/modules/client/types';
+import type { User } from '@/shared/types';
+import { USER_ROLE_META, formatApiError, formatDateShort, getUserInitials } from '@/shared/lib';
+import { UserRelationsTabs } from './UserRelationsTabs';
 
 export interface AdminUserDetailIslandProps {
   user: User;
+  pets: Pet[];
+  appointments: Appointment[];
+  loadingDetails: boolean;
+  detailsError: string | null;
   onClose: () => void;
   onDeleteClick: () => void;
-  onUserUpdated?: () => Promise<void> | void;
+  onSaveProfile: (id: string, data: Partial<User>) => Promise<User>;
   onEditClick?: (user: User) => void;
 }
 
@@ -28,16 +32,17 @@ export interface AdminUserDetailIslandProps {
  */
 export const AdminUserDetailIsland: React.FC<AdminUserDetailIslandProps> = ({
   user,
+  pets,
+  appointments,
+  loadingDetails,
+  detailsError,
   onClose,
   onDeleteClick,
-  onUserUpdated,
+  onSaveProfile,
   onEditClick,
 }) => {
   const [activeTab, setActiveTab] = useState<'profile' | 'pets' | 'appointments'>('profile');
-  const [userPets, setUserPets] = useState<Pet[]>([]);
-  const [userAppointments, setUserAppointments] = useState<Appointment[]>([]);
 
-  // Profile Edit State
   const [editForm, setEditForm] = useState({
     firstName: '',
     middleName: '',
@@ -49,7 +54,6 @@ export const AdminUserDetailIsland: React.FC<AdminUserDetailIslandProps> = ({
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  // When user changes, populate edit form and load pets & appointments
   useEffect(() => {
     setEditForm({
       firstName: user.firstName || '',
@@ -60,61 +64,54 @@ export const AdminUserDetailIsland: React.FC<AdminUserDetailIslandProps> = ({
     });
     setSaveSuccess(false);
     setErrorMessage(null);
-
-    Promise.all([
-      adminApi.getPets(0, 50).catch(() => ({ items: [] })),
-      adminApi.getAppointments(0, 50).catch(() => ({ items: [] })),
-    ]).then(([petsRes, apptsRes]) => {
-      const allPets: Pet[] = petsRes?.items || [];
-      const userPetList = allPets.filter((p) => p.ownerId === user.id);
-      setUserPets(userPetList);
-
-      const userPetIds = new Set(userPetList.map((p) => p.id));
-      const allAppts: Appointment[] = apptsRes?.items || [];
-      const userApptList = allAppts.filter((a) => userPetIds.has(a.petId));
-      setUserAppointments(userApptList);
-    });
   }, [user]);
 
   const handleSaveProfile = async () => {
+    const normalizedPhone = editForm.phone.replace(/[\s()-]/g, '').trim();
+    if (!editForm.firstName.trim() || !editForm.lastName.trim() || !editForm.email.trim()) {
+      setErrorMessage('Заполните обязательные поля: имя, фамилия и email');
+      setActiveTab('profile');
+      return;
+    }
+    if (normalizedPhone && !/^\+?\d{10,15}$/.test(normalizedPhone)) {
+      setErrorMessage('Телефон должен содержать от 10 до 15 цифр (например, +79001234567)');
+      setActiveTab('profile');
+      return;
+    }
+
     setSavingUser(true);
     setErrorMessage(null);
     setSaveSuccess(false);
     try {
-      await adminApi.updateUser(user.id, {
+      await onSaveProfile(user.id, {
         firstName: editForm.firstName.trim(),
         middleName: editForm.middleName.trim() || null,
         lastName: editForm.lastName.trim(),
         email: editForm.email.trim(),
-        phone: editForm.phone.trim(),
+        phone: normalizedPhone,
       });
       setSaveSuccess(true);
       setTimeout(() => setSaveSuccess(false), 2500);
-      await onUserUpdated?.();
-    } catch (err: any) {
-      setErrorMessage(
-        err?.response?.data?.message || err?.message || 'Ошибка обновления пользователя'
-      );
+    } catch (err: unknown) {
+      setErrorMessage(formatApiError(err, 'Ошибка обновления пользователя'));
+      setActiveTab('profile');
     } finally {
       setSavingUser(false);
     }
   };
 
-  const rInfo = ROLE_META[user.role] || { label: user.role, cls: 'badge-outline' };
+  const rInfo = USER_ROLE_META[user.role] || { label: user.role, cls: 'badge-outline' };
 
   return (
-    <section className="island detail-island" style={{ width: 460 }} aria-label="Пользователь">
+    <section className="island detail-island" aria-label="Пользователь">
       <div className="island-head">
         <div className="row">
-          <span className="avatar avatar-lg">{getUserInitials(user)}</span>
+          <span className="avatar avatar-lg">{getUserInitials(user, 'ПЛ')}</span>
           <div className="col" style={{ gap: 2 }}>
             <span className="h2">
               {user.fullName || `${user.firstName} ${user.lastName}`}
             </span>
-            <span
-              className={`badge ${rInfo.cls}`}
-              style={{ alignSelf: 'flex-start' }}
-            >
+            <span className={`badge ${rInfo.cls}`} style={{ alignSelf: 'flex-start' }}>
               {rInfo.label}
             </span>
           </div>
@@ -155,25 +152,24 @@ export const AdminUserDetailIsland: React.FC<AdminUserDetailIslandProps> = ({
           className={`tab-line ${activeTab === 'pets' ? 'on' : ''}`}
           onClick={() => setActiveTab('pets')}
         >
-          Питомцы <span className="small muted">{userPets.length}</span>
+          Питомцы <span className="small muted">{pets.length}</span>
         </button>
         <button
           type="button"
           className={`tab-line ${activeTab === 'appointments' ? 'on' : ''}`}
           onClick={() => setActiveTab('appointments')}
         >
-          Записи <span className="small muted">{userAppointments.length}</span>
+          Записи <span className="small muted">{appointments.length}</span>
         </button>
       </div>
 
       <div className="island-body" style={{ paddingTop: 14 }}>
-        {/* Tab 1: Profile */}
         {activeTab === 'profile' && (
           <div className="col" style={{ gap: 14 }}>
             <div className="form-grid">
               <div className="field">
                 <label className="field-label" htmlFor="ud-first">
-                  Имя
+                  Имя <span className="req">*</span>
                 </label>
                 <input
                   id="ud-first"
@@ -195,7 +191,7 @@ export const AdminUserDetailIsland: React.FC<AdminUserDetailIslandProps> = ({
               </div>
               <div className="field span-2">
                 <label className="field-label" htmlFor="ud-last">
-                  Фамилия
+                  Фамилия <span className="req">*</span>
                 </label>
                 <input
                   id="ud-last"
@@ -206,7 +202,7 @@ export const AdminUserDetailIsland: React.FC<AdminUserDetailIslandProps> = ({
               </div>
               <div className="field span-2">
                 <label className="field-label" htmlFor="ud-email">
-                  Email
+                  Email <span className="req">*</span>
                 </label>
                 <input
                   id="ud-email"
@@ -231,12 +227,13 @@ export const AdminUserDetailIsland: React.FC<AdminUserDetailIslandProps> = ({
             </div>
 
             <span className="small muted">
-              fullName собирает сервер · зарегистрирован {user.createdAt ? user.createdAt.slice(0, 10) : '—'}
+              fullName собирает сервер · зарегистрирован{' '}
+              {user.createdAt ? formatDateShort(user.createdAt) : '—'}
             </span>
 
             {user.role === 'VETERINARIAN' && (
               <div className="alert alert-info">
-                <Stethoscope size={16} />
+                <Stethoscope size={16} className="ic" />
                 <div className="col" style={{ gap: 6 }}>
                   <span>
                     Пользователь имеет роль ВЕТЕРИНАР. График работы, специализация и допуски к видам
@@ -254,89 +251,29 @@ export const AdminUserDetailIsland: React.FC<AdminUserDetailIslandProps> = ({
             )}
 
             {errorMessage && (
-              <div className="alert" role="alert">
-                <AlertCircle size={16} />
+              <div className="alert alert-destructive" role="alert">
+                <AlertCircle size={16} className="ic" />
                 <div>{errorMessage}</div>
               </div>
             )}
 
             {saveSuccess && (
-              <div className="alert alert-info" style={{ borderColor: 'var(--primary)' }}>
-                <Check size={16} style={{ color: 'var(--primary)' }} />
+              <div className="alert alert-success" role="status">
+                <Check size={16} className="ic" />
                 <div>Данные пользователя сохранены</div>
               </div>
             )}
           </div>
         )}
 
-        {/* Tab 2: Pets */}
-        {activeTab === 'pets' && (
-          <div className="col" style={{ gap: 4, margin: '0 -10px' }}>
-            {userPets.map((p) => (
-              <Link
-                key={p.id}
-                href={`/admin/pets`}
-                className="lrow"
-              >
-                <span
-                  className="pet-ava"
-                  style={{ width: 36, height: 36, borderRadius: 10 }}
-                >
-                  <PawPrint size={16} />
-                </span>
-                <span className="col" style={{ gap: 1 }}>
-                  <span className="cell-main">{p.name}</span>
-                  <span className="cell-sub">{p.gender === 'MALE' ? 'Самец' : 'Самка'}</span>
-                </span>
-                {p.isArchived && <span className="badge">Архив</span>}
-              </Link>
-            ))}
-
-            {userPets.length === 0 && (
-              <div className="empty" style={{ padding: 24 }}>
-                Питомцев нет
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* Tab 3: Appointments */}
-        {activeTab === 'appointments' && (
-          <div className="col" style={{ gap: 4, margin: '0 -10px' }}>
-            {userAppointments.map((a) => {
-              const d = new Date(a.startAt);
-              const dd = d.getDate();
-              const mon = d.toLocaleDateString('ru-RU', { month: 'short' });
-              const time = d.toLocaleTimeString('ru-RU', {
-                hour: '2-digit',
-                minute: '2-digit',
-              });
-
-              return (
-                <Link
-                  key={a.id}
-                  href="/admin/appointments"
-                  className="lrow"
-                >
-                  <span className="datebox">
-                    <b>{dd}</b>
-                    <span>{mon}</span>
-                  </span>
-                  <span className="col" style={{ gap: 1 }}>
-                    <span className="cell-main">{a.service?.name || 'Услуга'}</span>
-                    <span className="cell-sub">{time}</span>
-                  </span>
-                  <span className={`badge st badge-${a.status}`}>{a.status}</span>
-                </Link>
-              );
-            })}
-
-            {userAppointments.length === 0 && (
-              <div className="empty" style={{ padding: 24 }}>
-                Записей нет
-              </div>
-            )}
-          </div>
+        {(activeTab === 'pets' || activeTab === 'appointments') && (
+          <UserRelationsTabs
+            activeTab={activeTab}
+            pets={pets}
+            appointments={appointments}
+            loading={loadingDetails}
+            error={detailsError}
+          />
         )}
       </div>
 

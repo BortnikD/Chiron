@@ -1,20 +1,16 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { adminApi } from '../../../../api';
-import {
-  ScheduleExceptionType,
-  CreateScheduleExceptionRequest,
-} from '../../../../types';
 import { X, AlertCircle } from 'lucide-react';
-import { tm } from './utils';
+import type { CreateScheduleExceptionRequest } from '@/modules/admin/types';
+import type { ScheduleExceptionType } from '@/shared/types';
+import { formatApiError, getMoscowTodayIso, timeToMinutes } from '@/shared/lib';
 
 export interface VetExceptionModalProps {
   isOpen: boolean;
   vetId: string;
   onClose: () => void;
-  onSuccess: () => void;
-  onSave?: (data: CreateScheduleExceptionRequest) => Promise<void>;
+  onSave: (data: CreateScheduleExceptionRequest) => Promise<void>;
 }
 
 /**
@@ -24,14 +20,11 @@ export const VetExceptionModal: React.FC<VetExceptionModalProps> = ({
   isOpen,
   vetId,
   onClose,
-  onSuccess,
   onSave,
 }) => {
-  const defaultToday = new Date().toISOString().split('T')[0];
-
   const [type, setType] = useState<ScheduleExceptionType>('ABSENCE');
-  const [startDate, setStartDate] = useState(defaultToday);
-  const [endDate, setEndDate] = useState(defaultToday);
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
   const [startTime, setStartTime] = useState('09:00');
   const [endTime, setEndTime] = useState('18:00');
   const [reason, setReason] = useState('');
@@ -40,16 +33,26 @@ export const VetExceptionModal: React.FC<VetExceptionModalProps> = ({
 
   useEffect(() => {
     if (isOpen) {
+      const today = getMoscowTodayIso();
       setType('ABSENCE');
-      setStartDate(defaultToday);
-      setEndDate(defaultToday);
+      setStartDate(today);
+      setEndDate(today);
       setStartTime('09:00');
       setEndTime('18:00');
       setReason('');
       setError(null);
       setSaving(false);
     }
-  }, [isOpen, defaultToday]);
+  }, [isOpen]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && !saving) onClose();
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [isOpen, saving, onClose]);
 
   if (!isOpen) return null;
 
@@ -68,7 +71,7 @@ export const VetExceptionModal: React.FC<VetExceptionModalProps> = ({
 
     if (
       type === 'CUSTOM_HOURS' &&
-      (!startTime || !endTime || tm(endTime) <= tm(startTime))
+      (!startTime || !endTime || timeToMinutes(endTime) <= timeToMinutes(startTime))
     ) {
       setError('Для особых часов укажите корректное время начала и окончания');
       return;
@@ -84,7 +87,7 @@ export const VetExceptionModal: React.FC<VetExceptionModalProps> = ({
         type === 'CUSTOM_HOURS' ? `${endTime.slice(0, 5)}:00` : null;
       const trimmedReason = reason.trim() || null;
 
-      const payload: CreateScheduleExceptionRequest = {
+      await onSave({
         veterinarianId: vetId,
         type,
         startDate,
@@ -92,26 +95,25 @@ export const VetExceptionModal: React.FC<VetExceptionModalProps> = ({
         startTime: formattedStartTime,
         endTime: formattedEndTime,
         reason: trimmedReason,
-      };
+      });
 
-      if (onSave) {
-        await onSave(payload);
-      } else {
-        await adminApi.createScheduleException(payload);
-      }
-
-      onSuccess();
       onClose();
-    } catch (err: any) {
-      setError(err?.message || 'Не удалось сохранить исключение');
+    } catch (err: unknown) {
+      setError(formatApiError(err, 'Не удалось сохранить исключение'));
     } finally {
       setSaving(false);
     }
   };
 
   return (
-    <div className="overlay">
-      <div className="dialog dialog-sm" role="dialog" aria-modal="true">
+    <div
+      className="overlay"
+      role="dialog"
+      aria-modal="true"
+      aria-label="Новое исключение"
+      onClick={() => !saving && onClose()}
+    >
+      <div className="dialog dialog-sm" onClick={(e) => e.stopPropagation()}>
         <div className="dialog-head">
           <div className="row between" style={{ alignItems: 'center' }}>
             <span className="dialog-title">Новое исключение</span>
@@ -133,7 +135,7 @@ export const VetExceptionModal: React.FC<VetExceptionModalProps> = ({
         <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', flex: 1 }}>
           <div className="dialog-body">
             {error && (
-              <div className="alert alert-err" style={{ marginBottom: '12px' }}>
+              <div className="alert alert-destructive" role="alert">
                 <AlertCircle className="ic" />
                 <span>{error}</span>
               </div>
@@ -164,10 +166,11 @@ export const VetExceptionModal: React.FC<VetExceptionModalProps> = ({
 
               <div className="form-grid">
                 <div className="field">
-                  <label className="field-label">
+                  <label className="field-label" htmlFor="vet-exc-start">
                     С даты <span className="req">*</span>
                   </label>
                   <input
+                    id="vet-exc-start"
                     type="date"
                     className="input"
                     value={startDate}
@@ -178,10 +181,11 @@ export const VetExceptionModal: React.FC<VetExceptionModalProps> = ({
                 </div>
 
                 <div className="field">
-                  <label className="field-label">
+                  <label className="field-label" htmlFor="vet-exc-end">
                     По дату <span className="req">*</span>
                   </label>
                   <input
+                    id="vet-exc-end"
                     type="date"
                     className="input"
                     value={endDate}
@@ -194,10 +198,11 @@ export const VetExceptionModal: React.FC<VetExceptionModalProps> = ({
                 {type === 'CUSTOM_HOURS' && (
                   <>
                     <div className="field">
-                      <label className="field-label">
+                      <label className="field-label" htmlFor="vet-exc-stime">
                         Время с <span className="req">*</span>
                       </label>
                       <input
+                        id="vet-exc-stime"
                         type="time"
                         step={900}
                         className="input"
@@ -209,10 +214,11 @@ export const VetExceptionModal: React.FC<VetExceptionModalProps> = ({
                     </div>
 
                     <div className="field">
-                      <label className="field-label">
+                      <label className="field-label" htmlFor="vet-exc-etime">
                         Время по <span className="req">*</span>
                       </label>
                       <input
+                        id="vet-exc-etime"
                         type="time"
                         step={900}
                         className="input"
@@ -227,8 +233,11 @@ export const VetExceptionModal: React.FC<VetExceptionModalProps> = ({
               </div>
 
               <div className="field">
-                <label className="field-label">Причина</label>
+                <label className="field-label" htmlFor="vet-exc-reason">
+                  Причина
+                </label>
                 <textarea
+                  id="vet-exc-reason"
                   className="textarea"
                   placeholder="Например: Ежегодный отпуск, Обучение, Дежурство"
                   value={reason}

@@ -1,7 +1,8 @@
 import React from 'react';
-import { Pet, Service, AvailableSlotResponse } from '../../../../types';
 import { AlertCircle } from 'lucide-react';
-import { formatSlotTime } from './constants';
+import type { Pet } from '@/modules/client/types';
+import type { Service, AvailableSlotResponse } from '@/modules/clinic/types';
+import { formatCurrency, formatDateShort, formatSlotTime } from '@/shared/lib';
 
 export interface StepConfirmationProps {
   pet: Pet | null;
@@ -40,12 +41,14 @@ export const StepConfirmation: React.FC<StepConfirmationProps> = ({
         <dt>Дата и время</dt>
         <dd className="tnum">
           {selectedSlot
-            ? `${new Date(selectedSlot.startAt).toLocaleDateString('ru-RU')} в ${formatSlotTime(selectedSlot.startAt)}`
+            ? `${formatDateShort(selectedSlot.startAt)} в ${formatSlotTime(selectedSlot.startAt)}`
             : '—'}
         </dd>
         <dt>Стоимость</dt>
         <dd className="cell-main tnum">
-          {service?.basePrice != null ? `${service.basePrice.toLocaleString('ru-RU')} ₽` : '—'}
+          {(service?.effectivePrice ?? service?.basePrice) != null
+            ? formatCurrency(service?.effectivePrice ?? service?.basePrice)
+            : '—'}
         </dd>
       </dl>
 

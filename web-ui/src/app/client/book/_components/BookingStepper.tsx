@@ -1,5 +1,16 @@
 import React from 'react';
-import { StepItem, DEFAULT_BOOKING_STEPS } from './constants';
+
+export interface StepItem {
+  n: number;
+  label: string;
+}
+
+const DEFAULT_BOOKING_STEPS: StepItem[] = [
+  { n: 1, label: 'Кого' },
+  { n: 2, label: 'Услуга' },
+  { n: 3, label: 'Врач и время' },
+  { n: 4, label: 'Готово' },
+];
 
 export interface BookingStepperProps {
   currentStep: number;

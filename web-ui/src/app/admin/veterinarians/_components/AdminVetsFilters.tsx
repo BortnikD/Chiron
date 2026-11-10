@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { Plus } from 'lucide-react';
-import { Specialization, Species } from '../../../../types';
+import type { Specialization, Species } from '@/modules/clinic/types';
 
 export interface AdminVetsFiltersProps {
   filterSpec: string;
@@ -63,10 +63,7 @@ export const AdminVetsFilters: React.FC<AdminVetsFiltersProps> = ({
 
       <div className="spacer" />
 
-      <button
-        className="btn btn-primary"
-        onClick={onCreateClick}
-      >
+      <button type="button" className="btn btn-primary" onClick={onCreateClick}>
         <Plus size={16} />
         Создать профиль врача
       </button>

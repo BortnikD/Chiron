@@ -1,16 +1,12 @@
 'use client';
 
-import React, { useEffect, useState, useMemo } from 'react';
-import { vetApi, clinicApi } from '../../../api';
-import { Pet, Vaccination, Appointment, Species } from '../../../types';
-import { AppShell } from '../../../components/layout/AppShell';
-import {
-  VetPatientsFilters,
-  VetPatientsList,
-  VetPatientDetailIsland,
-  VetAddVaccinationModal,
-  getSpeciesName,
-} from './_components';
+import { AlertCircle } from 'lucide-react';
+import { useShellHeader } from '@/components/layout/AppShell';
+import { useVetPatients } from './_hooks/useVetPatients';
+import { VetPatientsFilters } from './_components/VetPatientsFilters';
+import { VetPatientsList } from './_components/VetPatientsList';
+import { VetPatientDetailIsland } from './_components/VetPatientDetailIsland';
+import { VetAddVaccinationModal } from './_components/VetAddVaccinationModal';
 
 /**
  * Страница пациентов врача Chiron:
@@ -18,91 +14,45 @@ import {
  * правого master-detail острова и модального окна добавления вакцинаций.
  */
 export default function VetPatientsPage() {
-  const [patients, setPatients] = useState<Pet[]>([]);
-  const [appointments, setAppointments] = useState<Appointment[]>([]);
-  const [speciesList, setSpeciesList] = useState<Species[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [search, setSearch] = useState('');
-  const [viewMode, setViewMode] = useState<'table' | 'cards'>('table');
+  useShellHeader({ crumbGroup: 'Пациенты', crumb: 'Список' });
 
-  // Выбранный пациент для правого master-detail острова
-  const [selectedPatient, setSelectedPatient] = useState<Pet | null>(null);
-  const [patientVacs, setPatientVacs] = useState<Vaccination[]>([]);
-
-  // Состояние модального окна добавления вакцинации
-  const [isAddVacOpen, setIsAddVacOpen] = useState(false);
-
-  // Загрузка первичных данных врача
-  const loadData = async () => {
-    setLoading(true);
-    try {
-      const [patientsData, apptsData, speciesData] = await Promise.all([
-        vetApi.getPatients().catch(() => [] as Pet[]),
-        vetApi.getAppointments(0, 100).catch(() => ({ items: [] as Appointment[] })),
-        clinicApi.getSpecies().catch(() => [] as Species[]),
-      ]);
-
-      const safePatients = Array.isArray(patientsData) ? patientsData : [];
-      const safeAppts = apptsData?.items || [];
-      const safeSpecies = Array.isArray(speciesData) ? speciesData : [];
-
-      setPatients(safePatients);
-      setAppointments(safeAppts);
-      setSpeciesList(safeSpecies);
-
-      if (selectedPatient) {
-        const updated = safePatients.find((p: Pet) => p.id === selectedPatient.id);
-        if (updated) setSelectedPatient(updated);
-      }
-    } catch (err) {
-      console.error('Failed to load vet patients data', err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    loadData();
-  }, []);
-
-  // Загрузка вакцинаций выбранного пациента
-  const loadPatientVaccinations = async (petId: string) => {
-    try {
-      const res = await vetApi.getVaccinations(0, 50, petId);
-      setPatientVacs(res?.items || []);
-    } catch {
-      setPatientVacs([]);
-    }
-  };
-
-  useEffect(() => {
-    if (!selectedPatient) return;
-    loadPatientVaccinations(selectedPatient.id);
-  }, [selectedPatient]);
-
-  // Обработчик успешного добавления новой вакцинации
-  const handleVaccinationSuccess = async () => {
-    if (selectedPatient) {
-      await loadPatientVaccinations(selectedPatient.id);
-    }
-  };
-
-  // Фильтрация пациентов по кличке или виду
-  const filteredPatients = useMemo(() => {
-    if (!search.trim()) return patients;
-    const q = search.toLowerCase().trim();
-    return patients.filter((p) => {
-      const pName = p.name.toLowerCase();
-      const sName = getSpeciesName(speciesList, p.speciesId).toLowerCase();
-      return pName.includes(q) || sName.includes(q);
-    });
-  }, [patients, search, speciesList]);
+  const {
+    filteredPatients,
+    appointments,
+    speciesList,
+    servicesMap,
+    loading,
+    error,
+    reload,
+    search,
+    setSearch,
+    viewMode,
+    setViewMode,
+    selectedPatient,
+    setSelectedPatient,
+    patientVacs,
+    vacsError,
+    isAddVacOpen,
+    setIsAddVacOpen,
+    handleAddVaccination,
+  } = useVetPatients();
 
   return (
-    <AppShell crumbGroup="Пациенты" crumb="Список">
-      <div className="content-row">
-        {/* Left Column: Table / Cards */}
-        <div className="content-col grow">
+    <>
+      <div className="content-col grow">
+        {error && (
+          <div className="alert alert-destructive row between items-center" role="alert">
+            <div className="row items-center" style={{ gap: '8px' }}>
+              <AlertCircle className="ic" />
+              <span>{error}</span>
+            </div>
+            <button type="button" className="btn btn-outline btn-sm" onClick={() => reload()}>
+              Повторить
+            </button>
+          </div>
+        )}
+
+        <div className="content-row">
           <section className="island grow">
             <VetPatientsFilters
               search={search}
@@ -122,28 +72,28 @@ export default function VetPatientsPage() {
               viewMode={viewMode}
             />
           </section>
-        </div>
 
-        {/* Right Column: Master-Detail Island (460px) */}
-        {selectedPatient && (
-          <VetPatientDetailIsland
-            patient={selectedPatient}
-            speciesList={speciesList}
-            appointments={appointments}
-            vaccinations={patientVacs}
-            onClose={() => setSelectedPatient(null)}
-            onAddVaccination={() => setIsAddVacOpen(true)}
-          />
-        )}
+          {selectedPatient && (
+            <VetPatientDetailIsland
+              patient={selectedPatient}
+              speciesList={speciesList}
+              servicesMap={servicesMap}
+              appointments={appointments}
+              vaccinations={patientVacs}
+              vaccinationsError={vacsError}
+              onClose={() => setSelectedPatient(null)}
+              onAddVaccination={() => setIsAddVacOpen(true)}
+            />
+          )}
+        </div>
       </div>
 
-      {/* Modal: Add Vaccination */}
       <VetAddVaccinationModal
         isOpen={isAddVacOpen && !!selectedPatient}
         patient={selectedPatient}
         onClose={() => setIsAddVacOpen(false)}
-        onSuccess={handleVaccinationSuccess}
+        onSubmit={handleAddVaccination}
       />
-    </AppShell>
+    </>
   );
 }

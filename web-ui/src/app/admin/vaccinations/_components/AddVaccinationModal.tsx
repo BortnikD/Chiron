@@ -1,8 +1,11 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { adminApi } from '../../../../api';
-import { Vaccination, Pet, VaccinationFormData } from './types';
+import { AlertCircle, X } from 'lucide-react';
+import type { Vaccination, Pet } from '@/modules/client/types';
+import { formatApiError } from '@/shared/lib';
+import type { VaccinationSaveInput } from '../_hooks/useAdminVaccinations';
+import type { VaccinationFormData } from './types';
 import { createEmptyVaccinationForm } from './constants';
 
 export interface AddVaccinationModalProps {
@@ -10,7 +13,7 @@ export interface AddVaccinationModalProps {
   vaccination?: Vaccination | null;
   pets: Pet[];
   onClose: () => void;
-  onSuccess: () => void | Promise<void>;
+  onSave: (data: VaccinationSaveInput, editingId?: string) => Promise<void>;
 }
 
 /**
@@ -21,7 +24,7 @@ export const AddVaccinationModal: React.FC<AddVaccinationModalProps> = ({
   vaccination,
   pets,
   onClose,
-  onSuccess,
+  onSave,
 }) => {
   const isEditing = Boolean(vaccination);
 
@@ -32,20 +35,28 @@ export const AddVaccinationModal: React.FC<AddVaccinationModalProps> = ({
   const [modalError, setModalError] = useState<string | null>(null);
 
   useEffect(() => {
+    if (!isOpen) return;
     if (vaccination) {
       setForm({
         petId: vaccination.petId,
         name: vaccination.name || vaccination.vaccineName || '',
-        administeredOn: vaccination.administeredOn || vaccination.administeredAt || '',
-        nextDueOn: vaccination.nextDueOn || vaccination.validUntil || '',
-        batchNumber: vaccination.batchNumber || '',
-        notes: vaccination.notes || '',
+        administeredOn: (vaccination.administeredOn || vaccination.administeredAt || '').slice(0, 10),
+        nextDueOn: (vaccination.nextDueOn || vaccination.validUntil || '').slice(0, 10),
       });
     } else {
       setForm(createEmptyVaccinationForm(pets[0]?.id || ''));
     }
     setModalError(null);
   }, [vaccination, isOpen, pets]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && !saving) onClose();
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, saving, onClose]);
 
   if (!isOpen) return null;
 
@@ -69,70 +80,60 @@ export const AddVaccinationModal: React.FC<AddVaccinationModalProps> = ({
     setModalError(null);
 
     try {
-      if (isEditing && vaccination) {
-        await adminApi.updateVaccination(vaccination.id, {
-          name: form.name.trim(),
-          administeredOn: form.administeredOn,
-          nextDueOn: form.nextDueOn || undefined,
-        });
-      } else {
-        await adminApi.createVaccination({
+      await onSave(
+        {
           petId: form.petId,
           name: form.name.trim(),
           administeredOn: form.administeredOn,
           nextDueOn: form.nextDueOn || null,
-          batchNumber: form.batchNumber.trim() || undefined,
-          notes: form.notes.trim() || undefined,
-        });
-      }
-
-      await onSuccess();
-      onClose();
-    } catch (err: any) {
-      setModalError(
-        err?.response?.data?.message || err?.message || 'Не удалось сохранить запись о вакцинации'
+        },
+        vaccination?.id
       );
+      onClose();
+    } catch (err: unknown) {
+      setModalError(formatApiError(err, 'Не удалось сохранить запись о вакцинации'));
     } finally {
       setSaving(false);
     }
   };
 
   return (
-    <div className="overlay" onClick={onClose}>
-      <div
-        className="dialog"
-        role="dialog"
-        aria-modal="true"
-        onClick={(e) => e.stopPropagation()}
-        style={{ maxWidth: '480px', width: '100%' }}
-      >
-        <div className="dialog-head">
-          <span className="dialog-title">
-            {isEditing ? 'Редактирование вакцинации' : 'Новая запись о вакцинации'}
-          </span>
-          <span className="dialog-desc">
-            Внесение данных о введённом биопрепарате в электронный паспорт питомца
-          </span>
+    <div
+      className="overlay"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="add-vax-title"
+      onClick={() => !saving && onClose()}
+    >
+      <div className="dialog dialog-sm" onClick={(e) => e.stopPropagation()}>
+        <div
+          className="dialog-head"
+          style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}
+        >
+          <div className="col" style={{ gap: 4 }}>
+            <span id="add-vax-title" className="dialog-title">
+              {isEditing ? 'Редактирование вакцинации' : 'Новая запись о вакцинации'}
+            </span>
+            <span className="dialog-desc">
+              Внесение данных о введённом биопрепарате в электронный паспорт питомца
+            </span>
+          </div>
+          <button
+            type="button"
+            className="btn btn-ghost btn-icon btn-sm"
+            aria-label="Закрыть"
+            onClick={() => !saving && onClose()}
+          >
+            <X size={16} />
+          </button>
         </div>
 
-        {modalError && (
-          <div
-            className="alert"
-            style={{
-              margin: '16px 20px 0',
-              padding: '8px 12px',
-              borderRadius: '6px',
-              background: 'rgba(239, 68, 68, 0.1)',
-              color: '#ef4444',
-              fontSize: '12px',
-            }}
-          >
-            {modalError}
-          </div>
-        )}
-
-        <form onSubmit={handleSubmit}>
-          <div className="dialog-body col" style={{ gap: '12px' }}>
+        <form
+          onSubmit={handleSubmit}
+          noValidate
+          style={{ display: 'flex', flexDirection: 'column', minHeight: 0, flex: 1 }}
+        >
+          <div className="dialog-body">
             <div className="field">
               <label className="field-label" htmlFor="m-pet">
                 Питомец <span className="req">*</span>
@@ -145,7 +146,7 @@ export const AddVaccinationModal: React.FC<AddVaccinationModalProps> = ({
                 disabled={isEditing}
                 required
               >
-                <option value="">Выберите питомца...</option>
+                <option value="">Выберите питомца…</option>
                 {pets.map((p) => (
                   <option key={p.id} value={p.id}>
                     {p.name} ({p.species?.name || 'Питомец'})
@@ -197,53 +198,29 @@ export const AddVaccinationModal: React.FC<AddVaccinationModalProps> = ({
               </div>
             </div>
 
-            <div className="field">
-              <label className="field-label" htmlFor="m-batch">
-                Серия партии (опционально)
-              </label>
-              <input
-                id="m-batch"
-                className="input"
-                placeholder="Номер серии вакцины"
-                value={form.batchNumber}
-                onChange={(e) => setForm({ ...form, batchNumber: e.target.value })}
-              />
-            </div>
-
-            <div className="field">
-              <label className="field-label" htmlFor="m-notes">
-                Примечания (опционально)
-              </label>
-              <textarea
-                id="m-notes"
-                className="input"
-                rows={2}
-                placeholder="Особые указания или реакции..."
-                value={form.notes}
-                onChange={(e) => setForm({ ...form, notes: e.target.value })}
-              />
-            </div>
+            {modalError && (
+              <div className="alert alert-destructive" role="alert">
+                <AlertCircle size={16} className="ic" />
+                <div>{modalError}</div>
+              </div>
+            )}
           </div>
 
           <div className="dialog-foot">
             <button
               type="button"
-              className="btn btn-ghost"
+              className="btn btn-outline"
               onClick={onClose}
               disabled={saving}
             >
               Отмена
             </button>
-            <button
-              type="submit"
-              disabled={saving}
-              className="btn btn-primary"
-            >
+            <button type="submit" disabled={saving} className="btn btn-primary">
               {saving
-                ? 'Сохранение...'
+                ? 'Сохранение…'
                 : isEditing
-                ? 'Сохранить изменения'
-                : 'Добавить вакцинацию'}
+                  ? 'Сохранить изменения'
+                  : 'Добавить вакцинацию'}
             </button>
           </div>
         </form>

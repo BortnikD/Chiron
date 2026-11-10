@@ -3,8 +3,8 @@
 import React from 'react';
 import Link from 'next/link';
 import { CalendarPlus } from 'lucide-react';
-import { Pet } from '../../../../types';
-import { FilterTab } from './constants';
+import type { Pet } from '@/modules/client/types';
+import type { FilterTab } from '../_hooks/useClientAppointments';
 
 export interface AppointmentsFiltersProps {
   /** Текущая выбранная вкладка (предстоящие, прошедшие или все) */

@@ -2,13 +2,32 @@
 
 import React, { useState, useMemo } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { Calendar, ChevronRight } from 'lucide-react';
-import { Appointment } from '../../../../types';
-import { SpeciesIcon } from '../../../../components/ui/SpeciesIcon';
-import { getDoctorDisplay } from '../../../../utils/doctorHelpers';
-import { ClientAppointmentsIslandProps } from './types';
-import { STATUS_SHORT, ST_COL, SP_TONE } from './constants';
-import { getSpeciesTone } from './utils';
+import type { Appointment, Pet } from '@/modules/client/types';
+import type { Service, Veterinarian } from '@/modules/clinic/types';
+import { SpeciesIcon } from '@/components/ui/SpeciesIcon';
+import { getDoctorDisplay } from '@/utils/doctorHelpers';
+import {
+  APPOINTMENT_STATUS_META,
+  formatCurrency,
+  formatDateRu,
+  formatSlotTime,
+  getMoscowDateKey,
+  getSpeciesTone,
+  pluralRu,
+} from '@/shared/lib';
+import { ST_COL } from './constants';
+
+export interface ClientAppointmentsIslandProps {
+  appointments: Appointment[];
+  pets: Pet[];
+  servicesMap?: Record<string, Service>;
+  veterinariansMap?: Record<string, Veterinarian>;
+  speciesMap?: Record<string, string>;
+  upcomingTotal?: number;
+  pastTotal?: number;
+}
 
 export function ClientAppointmentsIsland({
   appointments,
@@ -16,46 +35,53 @@ export function ClientAppointmentsIsland({
   servicesMap = {},
   veterinariansMap = {},
   speciesMap = {},
+  upcomingTotal,
+  pastTotal,
 }: ClientAppointmentsIslandProps) {
+  const router = useRouter();
   const [tab, setTab] = useState<'UPCOMING' | 'PAST'>('UPCOMING');
 
-  // Предстоящие записи
   const upcomingAppts = useMemo(() => {
     return appointments
       .filter((a) => a && (a.status === 'PENDING' || a.status === 'CONFIRMED'))
       .sort((a, b) => new Date(a.startAt).getTime() - new Date(b.startAt).getTime());
   }, [appointments]);
 
-  // Завершённые и прошедшие визиты
   const pastAppts = useMemo(() => {
     return appointments
       .filter((a) => a && (a.status === 'COMPLETED' || a.status === 'CANCELLED' || a.status === 'NO_SHOW'))
       .sort((a, b) => new Date(b.startAt).getTime() - new Date(a.startAt).getTime());
   }, [appointments]);
 
-  // Группировка предстоящих записей по дням
   const groupedUpcoming = useMemo(() => {
     const groups: { dateKey: string; dayLabel: string; countText: string; items: Appointment[] }[] = [];
     const map: Record<string, Appointment[]> = {};
 
     upcomingAppts.forEach((a) => {
-      const key = new Date(a.startAt).toISOString().split('T')[0];
-      if (!map[key]) {
-        map[key] = [];
-      }
+      const key = getMoscowDateKey(a.startAt);
+      if (!key) return;
+      if (!map[key]) map[key] = [];
       map[key].push(a);
     });
 
-    Object.keys(map).sort().forEach((key) => {
-      const items = map[key];
-      const date = new Date(`${key}T12:00:00`);
-      const dayLabel = date.toLocaleDateString('ru-RU', { weekday: 'long', day: 'numeric', month: 'short' }).toUpperCase();
-      const countText = `${items.length} ${items.length === 1 ? 'запись' : items.length < 5 ? 'записи' : 'записей'}`;
-      groups.push({ dateKey: key, dayLabel, countText, items });
-    });
+    Object.keys(map)
+      .sort()
+      .forEach((key) => {
+        const items = map[key];
+        const dayLabel = formatDateRu(`${key}T12:00:00`, {
+          weekday: 'long',
+          day: 'numeric',
+          month: 'short',
+        }).toUpperCase();
+        const countText = `${items.length} ${pluralRu(items.length, 'запись', 'записи', 'записей')}`;
+        groups.push({ dateKey: key, dayLabel, countText, items });
+      });
 
     return groups;
   }, [upcomingAppts]);
+
+  const upcomingBadgeCount = upcomingTotal ?? upcomingAppts.length;
+  const pastBadgeCount = pastTotal ?? pastAppts.length;
 
   return (
     <section className="island">
@@ -74,7 +100,7 @@ export function ClientAppointmentsIsland({
               onClick={() => setTab('UPCOMING')}
             >
               <span>Предстоящие</span>
-              {upcomingAppts.length > 0 && <span className="count">{upcomingAppts.length}</span>}
+              {upcomingBadgeCount > 0 && <span className="count">{upcomingBadgeCount}</span>}
             </button>
             <button
               type="button"
@@ -84,7 +110,7 @@ export function ClientAppointmentsIsland({
               onClick={() => setTab('PAST')}
             >
               <span>Прошедшие</span>
-              {pastAppts.length > 0 && <span className="count">{pastAppts.length}</span>}
+              {pastBadgeCount > 0 && <span className="count">{pastBadgeCount}</span>}
             </button>
           </div>
           <Link href="/client/appointments" className="btn btn-ghost btn-sm" style={{ textDecoration: 'none' }}>
@@ -111,10 +137,10 @@ export function ClientAppointmentsIsland({
                 {group.items.map((a) => {
                   const pet = pets.find((p) => p.id === a.petId);
                   const tone = getSpeciesTone(pet?.speciesId, speciesMap);
-                  const toneColor = SP_TONE[tone] || 'var(--primary)';
                   const svc = servicesMap[a.serviceId];
                   const vet = veterinariansMap[a.veterinarianId];
                   const vetName = vet ? getDoctorDisplay(vet).name : 'Врач клиники';
+                  const statusShort = APPOINTMENT_STATUS_META[a.status]?.short || a.status;
 
                   return (
                     <Link
@@ -126,17 +152,8 @@ export function ClientAppointmentsIsland({
                         textDecoration: 'none',
                       } as React.CSSProperties}
                     >
-                      <span className="hm-appt-time">
-                        {new Date(a.startAt).toLocaleTimeString('ru-RU', {
-                          hour: '2-digit',
-                          minute: '2-digit',
-                          timeZone: 'Europe/Moscow',
-                        })}
-                      </span>
-                      <span
-                        className="hm-ava sm"
-                        style={{ '--tone': toneColor } as React.CSSProperties}
-                      >
+                      <span className="hm-appt-time">{formatSlotTime(a.startAt)}</span>
+                      <span className={`hm-ava sm tone-${tone}`}>
                         <SpeciesIcon species={tone} size={16} />
                       </span>
                       <span className="col" style={{ gap: '1px', minWidth: 0 }}>
@@ -144,12 +161,10 @@ export function ClientAppointmentsIsland({
                           {pet?.name || 'Питомец'} — {svc?.name || 'Приём'}
                         </span>
                         <span className="cell-sub hm-ell">
-                          {vetName} · {a.priceSnapshot ? `${a.priceSnapshot.toLocaleString('ru-RU')} ₽` : '1 500 ₽'}
+                          {vetName} · {a.priceSnapshot != null ? formatCurrency(a.priceSnapshot) : '—'}
                         </span>
                       </span>
-                      <span className={`badge st badge-${a.status}`}>
-                        {STATUS_SHORT[a.status] || a.status}
-                      </span>
+                      <span className={`badge st badge-${a.status}`}>{statusShort}</span>
                     </Link>
                   );
                 })}
@@ -177,41 +192,26 @@ export function ClientAppointmentsIsland({
                 {pastAppts.map((a) => {
                   const pet = pets.find((p) => p.id === a.petId);
                   const tone = getSpeciesTone(pet?.speciesId, speciesMap);
-                  const toneColor = SP_TONE[tone] || 'var(--primary)';
                   const svc = servicesMap[a.serviceId];
                   const vet = veterinariansMap[a.veterinarianId];
                   const vetName = vet ? getDoctorDisplay(vet).name : 'Врач клиники';
+                  const statusShort = APPOINTMENT_STATUS_META[a.status]?.short || a.status;
 
                   return (
-                    <tr
-                      key={a.id}
-                      onClick={() => {
-                        window.location.href = '/client/appointments';
-                      }}
-                    >
+                    <tr key={a.id} onClick={() => router.push('/client/appointments')}>
                       <td>
                         <div className="col" style={{ gap: '2px' }}>
                           <span className="font-medium">
-                            {new Date(a.startAt).toLocaleDateString('ru-RU', {
-                              day: 'numeric',
-                              month: 'short',
-                              year: 'numeric',
-                            })}
+                            {formatDateRu(a.startAt, { day: 'numeric', month: 'short', year: 'numeric' })}
                           </span>
-                          <span className="cell-sub">
-                            {new Date(a.startAt).toLocaleTimeString('ru-RU', {
-                              hour: '2-digit',
-                              minute: '2-digit',
-                              timeZone: 'Europe/Moscow',
-                            })}
-                          </span>
+                          <span className="cell-sub">{formatSlotTime(a.startAt)}</span>
                         </div>
                       </td>
                       <td>
                         <div className="row" style={{ gap: '6px', alignItems: 'center' }}>
                           <span
-                            className="hm-ava sm"
-                            style={{ '--tone': toneColor, width: 24, height: 24 } as React.CSSProperties}
+                            className={`hm-ava sm tone-${tone}`}
+                            style={{ width: 24, height: 24 }}
                           >
                             <SpeciesIcon species={tone} size={14} />
                           </span>
@@ -221,12 +221,10 @@ export function ClientAppointmentsIsland({
                       <td>{svc?.name || 'Приём'}</td>
                       <td>{vetName}</td>
                       <td>
-                        <span className={`badge st badge-${a.status}`}>
-                          {STATUS_SHORT[a.status] || a.status}
-                        </span>
+                        <span className={`badge st badge-${a.status}`}>{statusShort}</span>
                       </td>
                       <td className="right">
-                        {a.priceSnapshot ? `${a.priceSnapshot.toLocaleString('ru-RU')} ₽` : '1 500 ₽'}
+                        {a.priceSnapshot != null ? formatCurrency(a.priceSnapshot) : '—'}
                       </td>
                     </tr>
                   );

@@ -1,24 +1,25 @@
 import Link from 'next/link';
-import { Button } from '../components/ui/Button';
 import { FileQuestion, Home } from 'lucide-react';
 
 export default function NotFound() {
   return (
-    <div className="min-h-[60vh] flex flex-col items-center justify-center text-center px-4">
-      <div className="w-16 h-16 rounded-2xl bg-slate-100 text-slate-500 flex items-center justify-center mb-6">
-        <FileQuestion className="w-8 h-8" />
+    <div
+      className="auth-wrap"
+      style={{ flexDirection: 'column', gap: '16px', textAlign: 'center', minHeight: '70vh' }}
+    >
+      <div className="t-ava lg" style={{ width: 64, height: 64 }}>
+        <FileQuestion className="ic" style={{ width: 28, height: 28 }} />
       </div>
-      <h1 className="text-3xl font-extrabold text-slate-900 tracking-tight">404 — Страница не найдена</h1>
-      <p className="mt-2 text-sm text-slate-500 max-w-md">
+      <h1 className="hero-title" style={{ fontSize: '28px', margin: 0 }}>
+        404 — Страница не найдена
+      </h1>
+      <p className="muted small" style={{ maxWidth: '420px', margin: 0 }}>
         Запрашиваемый ресурс был перемещен или никогда не существовал. Проверьте правильность адреса.
       </p>
-      <div className="mt-6">
-        <Link href="/">
-          <Button leftIcon={<Home className="w-4 h-4" />}>
-            Вернуться на главную
-          </Button>
-        </Link>
-      </div>
+      <Link href="/" className="btn btn-primary" style={{ marginTop: '8px' }}>
+        <Home className="ic" />
+        <span>Вернуться на главную</span>
+      </Link>
     </div>
   );
 }

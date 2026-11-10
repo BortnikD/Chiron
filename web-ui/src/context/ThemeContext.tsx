@@ -1,6 +1,6 @@
 'use client';
 
-import React, { createContext, useContext, useEffect, useState, ReactNode } from 'react';
+import React, { createContext, useContext, useEffect, useState, useCallback, useMemo, ReactNode } from 'react';
 
 export type Theme = 'system' | 'light' | 'dark';
 
@@ -32,14 +32,14 @@ export const ThemeProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     return () => mq.removeEventListener('change', handler);
   }, []);
 
-  const setTheme = (t: Theme) => {
+  const setTheme = useCallback((t: Theme) => {
     setThemeState(t);
     try {
       localStorage.setItem('chiron-theme', t);
     } catch {
-      // Игнорируем ошибку чтения localStorage при SSR
+      // ignore SSR storage errors
     }
-  };
+  }, []);
 
   const resolvedTheme: 'light' | 'dark' =
     theme === 'system' ? (sysDark ? 'dark' : 'light') : theme;
@@ -48,20 +48,16 @@ export const ThemeProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     if (!mounted) return;
     document.documentElement.setAttribute('data-theme', resolvedTheme);
     document.body.setAttribute('data-theme', resolvedTheme);
-    if (resolvedTheme === 'dark') {
-      document.documentElement.classList.add('dark');
-      document.body.classList.add('dark');
-    } else {
-      document.documentElement.classList.remove('dark');
-      document.body.classList.remove('dark');
-    }
+    document.documentElement.classList.toggle('dark', resolvedTheme === 'dark');
+    document.body.classList.toggle('dark', resolvedTheme === 'dark');
   }, [resolvedTheme, mounted]);
 
-  return (
-    <ThemeContext.Provider value={{ theme, resolvedTheme, setTheme }}>
-      {children}
-    </ThemeContext.Provider>
+  const value = useMemo(
+    () => ({ theme, resolvedTheme, setTheme }),
+    [theme, resolvedTheme, setTheme]
   );
+
+  return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>;
 };
 
 export const useTheme = () => {

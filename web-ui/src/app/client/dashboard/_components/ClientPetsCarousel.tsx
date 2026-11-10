@@ -3,10 +3,17 @@
 import React from 'react';
 import Link from 'next/link';
 import { PawPrint, ChevronRight, Calendar, CalendarPlus, Plus, Syringe } from 'lucide-react';
-import { SpeciesIcon } from '../../../../components/ui/SpeciesIcon';
-import { ClientPetsCarouselProps } from './types';
-import { SP_TONE } from './constants';
-import { getPetAge, getSpeciesTone, getDueInfo } from './utils';
+import type { Pet, Appointment, Vaccination } from '@/modules/client/types';
+import { SpeciesIcon } from '@/components/ui/SpeciesIcon';
+import { calculateAgeRu, formatDateRu, formatSlotTime, getSpeciesTone } from '@/shared/lib';
+import { getDueInfo, isVaccinationDueSoonOrOverdue } from './utils';
+
+export interface ClientPetsCarouselProps {
+  pets: Pet[];
+  speciesMap?: Record<string, string>;
+  appointments?: Appointment[];
+  vaccinations?: Vaccination[];
+}
 
 export function ClientPetsCarousel({
   pets,
@@ -30,32 +37,33 @@ export function ClientPetsCarousel({
         <div className="hm-pets">
           {pets.map((p) => {
             const tone = getSpeciesTone(p.speciesId, speciesMap);
-            const toneColor = SP_TONE[tone] || 'var(--primary)';
             const spName = (speciesMap && speciesMap[p.speciesId]) || 'Питомец';
-            const age = getPetAge(p.birthDate);
-            const petAppt = appointments.find(
-              (a) => a.petId === p.id && (a.status === 'PENDING' || a.status === 'CONFIRMED')
-            );
+            const age = calculateAgeRu(p.birthDate, 'возраст не указан');
+            const petApptStartAt =
+              p.summary != null
+                ? p.summary.nextAppointment?.startAt ?? null
+                : appointments.find(
+                    (a) => a.petId === p.id && (a.status === 'PENDING' || a.status === 'CONFIRMED')
+                  )?.startAt ?? null;
 
-            // Определение статуса вакцинации для бейджа
             const petVacs = vaccinations.filter((v) => v.petId === p.id);
-            const dueVac = petVacs.find((v) => {
-              if (!v.nextDueOn) return false;
-              const diffDays = Math.ceil((new Date(v.nextDueOn).getTime() - Date.now()) / (1000 * 60 * 60 * 24));
-              return diffDays <= 7;
-            });
+            const fallbackDueVac = petVacs.find((v) =>
+              isVaccinationDueSoonOrOverdue(v.nextDueOn || v.validUntil)
+            );
+            const dueDateStr =
+              p.summary != null
+                ? p.summary.nextVaccinationDueOn ?? null
+                : fallbackDueVac?.nextDueOn || fallbackDueVac?.validUntil || null;
+            const dueInfo =
+              dueDateStr &&
+              (p.summary?.hasOverdueVaccination || isVaccinationDueSoonOrOverdue(dueDateStr))
+                ? getDueInfo(dueDateStr)
+                : null;
 
             return (
-              <div
-                key={p.id}
-                className="hm-pet"
-                style={{ '--tone': toneColor } as React.CSSProperties}
-              >
+              <div key={p.id} className={`hm-pet tone-${tone}`}>
                 <div className="hm-pet-top">
-                  <span
-                    className="hm-ava"
-                    style={{ '--tone': toneColor } as React.CSSProperties}
-                  >
+                  <span className={`hm-ava tone-${tone}`}>
                     <SpeciesIcon species={tone} size={20} />
                   </span>
                   <span className="col" style={{ gap: '1px', minWidth: 0 }}>
@@ -68,22 +76,22 @@ export function ClientPetsCarousel({
                   </span>
                 </div>
 
-                <div className={`hm-pet-next ${petAppt ? 'has' : ''}`}>
+                <div className={`hm-pet-next ${petApptStartAt ? 'has' : ''}`}>
                   <Calendar className="ic" />
                   <span>
-                    {petAppt
-                      ? `Приём ${new Date(petAppt.startAt).toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' })} в ${new Date(petAppt.startAt).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Moscow' })}`
+                    {petApptStartAt
+                      ? `Приём ${formatDateRu(petApptStartAt, { day: 'numeric', month: 'short' })} в ${formatSlotTime(petApptStartAt)}`
                       : 'Нет активных записей'}
                   </span>
                 </div>
 
-                {dueVac && (
+                {dueInfo && (
                   <div
-                    className={`badge ${getDueInfo(dueVac.nextDueOn).cls}`}
+                    className={`badge ${dueInfo.cls}`}
                     style={{ alignSelf: 'flex-start', fontSize: '11px', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
                   >
                     <Syringe className="ic" style={{ width: 12, height: 12 }} />
-                    <span>Прививка {getDueInfo(dueVac.nextDueOn).text}</span>
+                    <span>Прививка {dueInfo.text}</span>
                   </div>
                 )}
 

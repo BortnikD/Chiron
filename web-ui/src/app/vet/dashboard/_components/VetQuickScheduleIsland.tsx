@@ -1,20 +1,20 @@
 'use client';
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import Link from 'next/link';
+import { Calendar, ChevronRight } from 'lucide-react';
 import {
-  Calendar,
-  CheckCircle2,
-  ChevronRight,
-  Clock,
-  CalendarDays,
-} from 'lucide-react';
-import { VetQuickScheduleIslandProps } from './types';
-import { formatSlotTime, getPetName } from './utils';
-import { Appointment } from '../../../../types';
+  APPOINTMENT_STATUS_META,
+  formatDateRu,
+  formatSlotTime,
+  getMoscowDateKey,
+  getMoscowTodayIso,
+} from '@/shared/lib';
+import type { VetQuickScheduleIslandProps } from './types';
+import { getPetName } from './utils';
 
 /**
- * Компактный виджет расписания врача на сегодня и ближайшие дни:
+ * Компактный виджет расписания врача на ближайшие дни и подтверждения:
  * отображает записи, требующие подтверждения, а также расписание приёмов
  * на предстоящие дни с быстрым переходом в полноценный календарь смен.
  */
@@ -23,6 +23,7 @@ export const VetQuickScheduleIsland: React.FC<VetQuickScheduleIslandProps> = ({
   pendingAppointments,
   servicesMap,
   petsMap,
+  loading = false,
   onSelectAppointment,
   onUpdateStatus,
 }) => {
@@ -30,13 +31,34 @@ export const VetQuickScheduleIsland: React.FC<VetQuickScheduleIslandProps> = ({
     pendingAppointments.length > 0 ? 'pending' : 'upcoming'
   );
 
-  const todayStr = useMemo(() => new Date().toISOString().split('T')[0], []);
+  const userSwitchedTabRef = useRef(false);
+  const syncedInitialTabRef = useRef(false);
 
-  // Предстоящие приёмы на ближайшие дни (начиная с завтра)
+  useEffect(() => {
+    if (loading) return;
+    if (!syncedInitialTabRef.current) {
+      syncedInitialTabRef.current = true;
+      if (!userSwitchedTabRef.current) {
+        setActiveTab(pendingAppointments.length > 0 ? 'pending' : 'upcoming');
+      }
+      return;
+    }
+    if (activeTab === 'pending' && pendingAppointments.length === 0) {
+      setActiveTab('upcoming');
+    }
+  }, [loading, pendingAppointments.length, activeTab]);
+
+  const handleTabChange = (tab: 'pending' | 'upcoming') => {
+    userSwitchedTabRef.current = true;
+    setActiveTab(tab);
+  };
+
+  const todayStr = getMoscowTodayIso();
+
   const upcomingAppointments = useMemo(() => {
     return appointments
       .filter((a) => {
-        const dateStr = a.startAt.split('T')[0];
+        const dateStr = getMoscowDateKey(a.startAt);
         return dateStr > todayStr && a.status !== 'CANCELLED';
       })
       .slice(0, 8);
@@ -45,29 +67,33 @@ export const VetQuickScheduleIsland: React.FC<VetQuickScheduleIslandProps> = ({
   const displayList = activeTab === 'pending' ? pendingAppointments : upcomingAppointments;
 
   return (
-    <section className="island" style={{ width: '100%' }} aria-label="Расписание врача">
+    <section
+      className="island md:max-h-[240px]"
+      style={{ flex: 'none', width: '100%' }}
+      aria-label="Расписание врача"
+    >
       <div className="island-head">
-        <div className="row items-center" style={{ gap: '8px' }}>
+        <div className="row items-center wrap" style={{ gap: '8px' }}>
           <span className="island-title">
             <Calendar className="ic" />
             Расписание
           </span>
-          <div className="btn-group" style={{ display: 'inline-flex' }}>
+          <div className="seg">
             {pendingAppointments.length > 0 && (
               <button
                 type="button"
-                className={`btn btn-xs ${activeTab === 'pending' ? 'btn-primary' : 'btn-ghost'}`}
-                onClick={() => setActiveTab('pending')}
-                style={{ fontSize: '11px', height: '22px' }}
+                className={`seg-item ${activeTab === 'pending' ? 'on' : ''}`}
+                style={{ height: '24px', padding: '0 9px', fontSize: '12px' }}
+                onClick={() => handleTabChange('pending')}
               >
                 Ожидают ({pendingAppointments.length})
               </button>
             )}
             <button
               type="button"
-              className={`btn btn-xs ${activeTab === 'upcoming' ? 'btn-primary' : 'btn-ghost'}`}
-              onClick={() => setActiveTab('upcoming')}
-              style={{ fontSize: '11px', height: '22px' }}
+              className={`seg-item ${activeTab === 'upcoming' ? 'on' : ''}`}
+              style={{ height: '24px', padding: '0 9px', fontSize: '12px' }}
+              onClick={() => handleTabChange('upcoming')}
             >
               Ближайшие дни ({upcomingAppointments.length})
             </button>
@@ -76,18 +102,18 @@ export const VetQuickScheduleIsland: React.FC<VetQuickScheduleIslandProps> = ({
 
         <Link
           href="/vet/schedule"
-          className="btn btn-ghost btn-xs"
-          style={{ fontSize: '11px', height: '22px', gap: '2px' }}
+          className="btn btn-ghost btn-sm"
+          style={{ height: '26px', padding: '0 8px', fontSize: '12px', gap: '2px' }}
           title="Открыть полный календарь смен и расписания"
         >
           <span>Всё расписание</span>
-          <ChevronRight size={12} className="ic" />
+          <ChevronRight size={13} className="ic" />
         </Link>
       </div>
 
-      <div className="island-body" style={{ padding: '0 8px 8px' }}>
+      <div className="island-body" style={{ padding: '0 12px 10px' }}>
         {displayList.length === 0 ? (
-          <div className="empty" style={{ padding: '24px 12px' }}>
+          <div className="empty" style={{ padding: '20px 12px' }}>
             <span className="empty-title" style={{ fontSize: '13px' }}>
               {activeTab === 'pending'
                 ? 'Нет записей, ожидающих подтверждения'
@@ -103,27 +129,26 @@ export const VetQuickScheduleIsland: React.FC<VetQuickScheduleIslandProps> = ({
           displayList.map((p) => {
             const petName = getPetName(p, petsMap);
             const serviceName = servicesMap[p.serviceId] || 'Приём';
+            const dayNum = formatDateRu(p.startAt, { day: 'numeric' });
+            const monthShort = formatDateRu(p.startAt, { month: 'short' });
 
             return (
               <div
                 key={p.id}
                 className="lrow"
                 style={{
-                  padding: '8px 0',
+                  padding: '8px 6px',
                   borderBottom: '1px solid var(--border)',
+                  borderRadius: 0,
                   cursor: 'pointer',
                 }}
                 onClick={() => onSelectAppointment(p)}
               >
-                {/* Дата слота */}
                 <span className="datebox">
-                  <b>{new Date(p.startAt).getDate()}</b>
-                  <span>
-                    {new Date(p.startAt).toLocaleDateString('ru-RU', { month: 'short' })}
-                  </span>
+                  <b>{dayNum}</b>
+                  <span>{monthShort}</span>
                 </span>
 
-                {/* Время, услуга, пациент */}
                 <span className="col grow" style={{ gap: 0, minWidth: 0 }}>
                   <span className="row items-center" style={{ gap: '6px' }}>
                     <span className="cell-main tnum" style={{ fontWeight: 600 }}>
@@ -136,7 +161,6 @@ export const VetQuickScheduleIsland: React.FC<VetQuickScheduleIslandProps> = ({
                   </span>
                 </span>
 
-                {/* Действия */}
                 <div className="row" style={{ gap: '4px' }} onClick={(e) => e.stopPropagation()}>
                   {p.status === 'PENDING' ? (
                     <button
@@ -148,7 +172,7 @@ export const VetQuickScheduleIsland: React.FC<VetQuickScheduleIslandProps> = ({
                     </button>
                   ) : (
                     <span className={`badge st badge-${p.status}`} style={{ fontSize: '11px' }}>
-                      {p.status === 'CONFIRMED' ? 'Подтверждён' : p.status}
+                      {APPOINTMENT_STATUS_META[p.status]?.short || p.status}
                     </span>
                   )}
                 </div>

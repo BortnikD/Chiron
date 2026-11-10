@@ -1,9 +1,10 @@
 'use client';
 
 import React from 'react';
-import { Veterinarian, Species, User } from '../../../../types';
 import { Search, Plus } from 'lucide-react';
-import { getVetName } from './utils';
+import type { Veterinarian, Species } from '@/modules/clinic/types';
+import { APPOINTMENT_STATUS_LIST, APPOINTMENT_STATUS_META } from '@/shared/lib';
+import { getDoctorDisplay } from '@/utils/doctorHelpers';
 
 export interface AdminAppointmentsFiltersProps {
   statusFilter: string;
@@ -20,7 +21,6 @@ export interface AdminAppointmentsFiltersProps {
   onSearchChange: (value: string) => void;
   veterinarians: Veterinarian[];
   speciesList: Species[];
-  users: User[];
   onCreateClick: () => void;
 }
 
@@ -42,7 +42,6 @@ export const AdminAppointmentsFilters: React.FC<AdminAppointmentsFiltersProps> =
   onSearchChange,
   veterinarians,
   speciesList,
-  users,
   onCreateClick,
 }) => {
   return (
@@ -56,12 +55,11 @@ export const AdminAppointmentsFilters: React.FC<AdminAppointmentsFiltersProps> =
             onChange={(e) => onStatusFilterChange(e.target.value)}
           >
             <option value="ALL">Все статусы</option>
-            <option value="PENDING">Ожидает</option>
-            <option value="CONFIRMED">Подтверждена</option>
-            <option value="IN_PROGRESS">В процессе</option>
-            <option value="COMPLETED">Завершена</option>
-            <option value="CANCELLED">Отменена</option>
-            <option value="NO_SHOW">Неявка</option>
+            {APPOINTMENT_STATUS_LIST.map((st) => (
+              <option key={st} value={st}>
+                {APPOINTMENT_STATUS_META[st].short}
+              </option>
+            ))}
           </select>
         </div>
       </div>
@@ -77,7 +75,7 @@ export const AdminAppointmentsFilters: React.FC<AdminAppointmentsFiltersProps> =
             <option value="ALL">Все врачи</option>
             {veterinarians.map((v) => (
               <option key={v.id} value={v.id}>
-                {getVetName(v.id, veterinarians, users)}
+                {getDoctorDisplay(v).fullName}
               </option>
             ))}
           </select>

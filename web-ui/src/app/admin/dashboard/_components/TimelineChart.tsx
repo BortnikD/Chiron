@@ -2,9 +2,34 @@
 
 import React, { useState, useMemo } from 'react';
 import { BarChart2 } from 'lucide-react';
-import { rub } from './utils';
-import { PROTOTYPE_TIMELINE_HEIGHTS } from './constants';
-import { TimelineChartProps } from './types';
+import {
+  formatCurrency,
+  formatDateRu,
+  formatIsoDateDisplay,
+  getMoscowDateKey,
+} from '@/shared/lib';
+import type { StatisticsGranularity } from '@/shared/types';
+import type { TimelineChartProps } from './types';
+
+function formatPeriodTick(
+  periodStart: string,
+  granularity: StatisticsGranularity,
+  multiMonthDay: boolean
+): string {
+  const key = getMoscowDateKey(periodStart);
+  if (!key) return periodStart;
+  const parts = key.split('-');
+  if (parts.length < 3) return periodStart;
+  const [, m, d] = parts;
+
+  if (granularity === 'MONTH') {
+    return formatDateRu(key, { month: 'short', year: '2-digit' });
+  }
+  if (granularity === 'WEEK' || multiMonthDay) {
+    return `${d}.${m}`;
+  }
+  return d;
+}
 
 export function TimelineChart({
   timeline,
@@ -21,38 +46,32 @@ export function TimelineChart({
     onMetricChange?.(m);
   };
 
-  // 31-day Timeline Bars for the left chart
   const timelineBars = useMemo(() => {
-    if (timeline.length > 0) {
-      const maxC = Math.max(1, ...timeline.map((t) => t.appointments));
-      const maxR = Math.max(1, ...timeline.map((t) => t.revenue));
-      const step = Math.ceil(timeline.length / 10);
+    if (timeline.length === 0) return [];
 
-      return timeline.map((pt, i) => {
-        const dd = pt.periodStart.slice(-2);
-        return {
-          label: i % step === 0 ? dd : '',
-          h1: metric === 'count' ? `${((pt.appointments / maxC) * 100).toFixed(1)}%` : `${((pt.revenue / maxR) * 100).toFixed(1)}%`,
-          h2: metric === 'count' ? `${((pt.completed / maxC) * 100).toFixed(1)}%` : '0%',
-          tip: `${pt.periodStart}: записей ${pt.appointments}, завершено ${pt.completed}, выручка ${rub(pt.revenue)}`,
-        };
-      });
-    }
+    const maxC = Math.max(1, ...timeline.map((t) => t.appointments));
+    const maxR = Math.max(1, ...timeline.map((t) => t.revenue));
+    const step = Math.max(1, Math.ceil(timeline.length / 10));
+    const months = new Set(timeline.map((t) => getMoscowDateKey(t.periodStart).slice(0, 7)));
+    const multiMonthDay = months.size > 1;
 
-    const heights = PROTOTYPE_TIMELINE_HEIGHTS;
-    const maxH = 9;
-    return heights.map(([tot, comp], i) => {
-      const dayNum = String(i + 1).padStart(2, '0');
-      const showLabel = [1, 5, 9, 13, 17, 21, 25, 29].includes(i + 1);
+    return timeline.map((pt, i) => {
+      const key = getMoscowDateKey(pt.periodStart) || pt.periodStart;
+      const tick = formatPeriodTick(pt.periodStart, granularity, multiMonthDay);
+      const isLast = i === timeline.length - 1;
+      const showLabel = i % step === 0 || (isLast && timeline.length <= 12);
 
       return {
-        label: showLabel ? dayNum : '',
-        h1: `${((tot / maxH) * 100).toFixed(1)}%`,
-        h2: `${((comp / maxH) * 100).toFixed(1)}%`,
-        tip: `${dayNum}.10.2026: записей ${tot}, завершено ${comp}`,
+        label: showLabel ? tick : '',
+        h1:
+          metric === 'count'
+            ? `${((pt.appointments / maxC) * 100).toFixed(1)}%`
+            : `${((pt.revenue / maxR) * 100).toFixed(1)}%`,
+        h2: metric === 'count' ? `${((pt.completed / maxC) * 100).toFixed(1)}%` : '0%',
+        tip: `${formatIsoDateDisplay(key)}: записей ${pt.appointments}, завершено ${pt.completed}, выручка ${formatCurrency(pt.revenue)}`,
       };
     });
-  }, [timeline, metric]);
+  }, [timeline, metric, granularity]);
 
   return (
     <section className="island" style={{ minHeight: '320px' }} aria-label="Динамика">
@@ -104,89 +123,99 @@ export function TimelineChart({
         </div>
       </div>
       <div className="island-body">
-        <div className="legend" style={{ marginBottom: '10px' }}>
-          {metric === 'count' ? (
-            <>
-              <span>
-                <i style={{ background: 'var(--chart-2)' }} />
-                Все записи
-              </span>
-              <span>
-                <i style={{ background: 'var(--chart-1)' }} />
-                Завершённые
-              </span>
-            </>
-          ) : (
-            <span>
-              <i style={{ background: 'var(--chart-1)' }} />
-              Выручка по завершённым
-            </span>
-          )}
-        </div>
-        <div
-          className="row"
-          style={{
-            alignItems: 'flex-end',
-            gap: '3px',
-            height: '200px',
-            borderBottom: '1px solid var(--border)',
-            padding: '0 2px',
-          }}
-        >
-          {timelineBars.map((b, i) => (
+        {timelineBars.length === 0 ? (
+          <div className="empty" style={{ minHeight: '220px' }}>
+            <BarChart2 className="ic ic-40" />
+            <span className="empty-title">Нет данных за выбранный период</span>
+            <span className="small">Попробуйте выбрать другой интервал дат.</span>
+          </div>
+        ) : (
+          <>
+            <div className="legend" style={{ marginBottom: '10px' }}>
+              {metric === 'count' ? (
+                <>
+                  <span>
+                    <i style={{ background: 'var(--chart-2)' }} />
+                    Все записи
+                  </span>
+                  <span>
+                    <i style={{ background: 'var(--chart-1)' }} />
+                    Завершённые
+                  </span>
+                </>
+              ) : (
+                <span>
+                  <i style={{ background: 'var(--chart-1)' }} />
+                  Выручка по завершённым
+                </span>
+              )}
+            </div>
             <div
-              key={i}
-              className="col"
+              className="row"
               style={{
-                flex: 1,
-                minWidth: 0,
-                height: '100%',
-                justifyContent: 'flex-end',
-                gap: 0,
+                alignItems: 'flex-end',
+                gap: '3px',
+                height: '200px',
+                borderBottom: '1px solid var(--border)',
+                padding: '0 2px',
               }}
-              title={b.tip}
             >
-              <div className="row" style={{ alignItems: 'flex-end', gap: '1px', height: '100%' }}>
+              {timelineBars.map((b, i) => (
                 <div
+                  key={i}
+                  className="col"
                   style={{
                     flex: 1,
-                    height: b.h1,
-                    background: metric === 'count' ? 'var(--chart-2)' : 'var(--chart-1)',
-                    borderRadius: '3px 3px 0 0',
+                    minWidth: 0,
+                    height: '100%',
+                    justifyContent: 'flex-end',
+                    gap: 0,
                   }}
-                />
-                {metric === 'count' && (
-                  <div
-                    style={{
-                      flex: 1,
-                      height: b.h2,
-                      background: 'var(--chart-1)',
-                      borderRadius: '3px 3px 0 0',
-                    }}
-                  />
-                )}
-              </div>
+                  title={b.tip}
+                >
+                  <div className="row" style={{ alignItems: 'flex-end', gap: '1px', height: '100%' }}>
+                    <div
+                      style={{
+                        flex: 1,
+                        height: b.h1,
+                        background: metric === 'count' ? 'var(--chart-2)' : 'var(--chart-1)',
+                        borderRadius: '3px 3px 0 0',
+                      }}
+                    />
+                    {metric === 'count' && (
+                      <div
+                        style={{
+                          flex: 1,
+                          height: b.h2,
+                          background: 'var(--chart-1)',
+                          borderRadius: '3px 3px 0 0',
+                        }}
+                      />
+                    )}
+                  </div>
+                </div>
+              ))}
             </div>
-          ))}
-        </div>
-        <div className="row" style={{ gap: '3px', padding: '4px 2px 0' }}>
-          {timelineBars.map((b, i) => (
-            <span
-              key={i}
-              style={{
-                flex: 1,
-                minWidth: 0,
-                fontSize: '10.5px',
-                textAlign: 'center',
-                overflow: 'hidden',
-                whiteSpace: 'nowrap',
-              }}
-              className="muted"
-            >
-              {b.label}
-            </span>
-          ))}
-        </div>
+            <div className="row" style={{ gap: '3px', padding: '4px 2px 0' }}>
+              {timelineBars.map((b, i) => (
+                <span
+                  key={i}
+                  style={{
+                    flex: 1,
+                    minWidth: 0,
+                    fontSize: '10.5px',
+                    textAlign: 'center',
+                    overflow: b.label ? 'visible' : 'hidden',
+                    whiteSpace: 'nowrap',
+                  }}
+                  className="muted"
+                >
+                  {b.label}
+                </span>
+              ))}
+            </div>
+          </>
+        )}
       </div>
     </section>
   );

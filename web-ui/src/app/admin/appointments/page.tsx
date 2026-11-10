@@ -1,195 +1,147 @@
 'use client';
 
-import React, { useEffect, useState, useMemo, useCallback } from 'react';
-import { adminApi, clinicApi } from '../../../api';
-import {
-  Appointment,
-  AppointmentStatus,
-  Veterinarian,
-  Service,
-  Species,
-  Pet,
-  User,
-} from '../../../types';
-import { AppShell } from '../../../components/layout/AppShell';
-import {
-  getVetName,
-  getServiceName,
-  getPet,
-  getOwnerName,
-  AdminAppointmentsFilters,
-  AdminAppointmentsTable,
-  AdminAppointmentDetailIsland,
-  AdminCreateAppointmentModal,
-  AdminEditAppointmentModal,
-  AdminCancelAppointmentModal,
-  AdminDeleteAppointmentModal,
-} from './_components';
+import { AlertCircle, RefreshCw } from 'lucide-react';
+import { ConfirmModal } from '@/shared/components/ConfirmModal';
+import { formatDateTimeCompact } from '@/shared/lib';
+import { getDoctorDisplay } from '@/utils/doctorHelpers';
+import { CANCEL_REASONS, useAdminAppointments } from './_hooks/useAdminAppointments';
+import { AdminAppointmentsFilters } from './_components/AdminAppointmentsFilters';
+import { AdminAppointmentsTable } from './_components/AdminAppointmentsTable';
+import { AdminAppointmentDetailIsland } from './_components/AdminAppointmentDetailIsland';
+import { AdminCreateAppointmentModal } from './_components/AdminCreateAppointmentModal';
+import { AdminEditAppointmentModal } from './_components/AdminEditAppointmentModal';
 
 /**
  * Страница администрирования записей на приём клиники Chiron.
- * Компактный оркестратор состояния фильтров, списков и модальных окон.
  */
 export default function AdminAppointmentsPage() {
-  const [appointments, setAppointments] = useState<Appointment[]>([]);
-  const [veterinarians, setVeterinarians] = useState<Veterinarian[]>([]);
-  const [services, setServices] = useState<Service[]>([]);
-  const [speciesList, setSpeciesList] = useState<Species[]>([]);
-  const [pets, setPets] = useState<Pet[]>([]);
-  const [users, setUsers] = useState<User[]>([]);
-  const [loading, setLoading] = useState(true);
+  const vm = useAdminAppointments();
 
-  // Фильтры
-  const [statusFilter, setStatusFilter] = useState<string>('ALL');
-  const [vetFilter, setVetFilter] = useState<string>('ALL');
-  const [speciesFilter, setSpeciesFilter] = useState<string>('ALL');
-  const [search, setSearch] = useState<string>('');
-  const [dateFrom, setDateFrom] = useState<string>('');
-  const [dateTo, setDateTo] = useState<string>('');
+  const cancelPetName = vm.cancelAppt ? vm.pets.find((p) => p.id === vm.cancelAppt?.petId)?.name || 'Питомец' : '';
+  const cancelServiceName = vm.cancelAppt ? vm.services.find((s) => s.id === vm.cancelAppt?.serviceId)?.name || 'Услуга клиники' : '';
+  const cancelVetName = vm.cancelAppt
+    ? getDoctorDisplay(vm.veterinarians.find((v) => v.id === vm.cancelAppt?.veterinarianId)).fullName
+    : '';
+  const cancelDt = vm.cancelAppt ? formatDateTimeCompact(vm.cancelAppt.startAt) : null;
 
-  // Выбранная запись (Master-Detail) и состояние модалок
-  const [selectedAppt, setSelectedAppt] = useState<Appointment | null>(null);
-  const [isCreateOpen, setIsCreateOpen] = useState(false);
-  const [editAppt, setEditAppt] = useState<Appointment | null>(null);
-  const [cancelAppt, setCancelAppt] = useState<Appointment | null>(null);
-  const [deleteAppt, setDeleteAppt] = useState<Appointment | null>(null);
-  const [isDeleting, setIsDeleting] = useState(false);
-
-  const loadData = useCallback(async () => {
-    setLoading(true);
-    try {
-      const [apptsRes, vetsRes, svcsRes, speciesRes, petsRes, usersRes] = await Promise.all([
-        adminApi
-          .getAppointments(0, 100, {
-            status: statusFilter !== 'ALL' ? (statusFilter as AppointmentStatus) : undefined,
-            veterinarianId: vetFilter !== 'ALL' ? vetFilter : undefined,
-          })
-          .catch(() => ({ items: [] })),
-        adminApi.getVeterinarians().catch(() => [] as Veterinarian[]),
-        clinicApi.getServices().catch(() => [] as Service[]),
-        clinicApi.getSpecies().catch(() => [] as Species[]),
-        adminApi.getPets(0, 100).catch(() => ({ items: [] })),
-        adminApi.getUsers(0, 100).catch(() => ({ items: [] })),
-      ]);
-
-      const appts = apptsRes?.items || [];
-      setAppointments(appts);
-      setVeterinarians(Array.isArray(vetsRes) ? vetsRes : []);
-      setServices(Array.isArray(svcsRes) ? svcsRes : []);
-      setSpeciesList(Array.isArray(speciesRes) ? speciesRes : []);
-      setPets(petsRes?.items || []);
-      setUsers(usersRes?.items || []);
-
-      if (selectedAppt) {
-        const updated = appts.find((a: Appointment) => a.id === selectedAppt.id);
-        if (updated) setSelectedAppt(updated);
-      }
-    } catch (err) {
-      console.error('Ошибка загрузки данных приёмов:', err);
-    } finally {
-      setLoading(false);
-    }
-  }, [statusFilter, vetFilter, selectedAppt?.id]);
-
-  useEffect(() => {
-    loadData();
-  }, [loadData]);
-
-  const handleDeleteAppt = async () => {
-    if (!deleteAppt) return;
-    setIsDeleting(true);
-    try {
-      await adminApi.deleteAppointment(deleteAppt.id);
-      if (selectedAppt?.id === deleteAppt.id) setSelectedAppt(null);
-      setDeleteAppt(null);
-      await loadData();
-    } catch (err: any) {
-      alert(err?.response?.data?.message || err?.message || 'Ошибка при удалении записи');
-    } finally {
-      setIsDeleting(false);
-    }
-  };
-
-  const handleModalSuccess = (item: Appointment) => {
-    setSelectedAppt(item);
-    loadData();
-  };
-
-  const filteredAppointments = useMemo(() => {
-    return appointments.filter((a) => {
-      const p = getPet(a.petId, pets);
-      if (speciesFilter !== 'ALL' && (!p || p.speciesId !== speciesFilter)) return false;
-      if (search) {
-        const q = search.toLowerCase();
-        const sName = getServiceName(a.serviceId, services).toLowerCase();
-        const vName = getVetName(a.veterinarianId, veterinarians, users).toLowerCase();
-        const pName = (p?.name || '').toLowerCase();
-        const oName = getOwnerName(p?.ownerId, users).toLowerCase();
-        if (!sName.includes(q) && !vName.includes(q) && !pName.includes(q) && !oName.includes(q)) {
-          return false;
-        }
-      }
-      if (dateFrom && a.startAt.split('T')[0] < dateFrom) return false;
-      if (dateTo && a.startAt.split('T')[0] > dateTo) return false;
-      return true;
-    });
-  }, [appointments, speciesFilter, search, dateFrom, dateTo, pets, services, veterinarians, users]);
+  const deletePetName = vm.deleteAppt ? vm.pets.find((p) => p.id === vm.deleteAppt?.petId)?.name || 'Питомец' : 'Питомец';
+  const deleteServiceName = vm.deleteAppt ? vm.services.find((s) => s.id === vm.deleteAppt?.serviceId)?.name || 'Услуга клиники' : 'Услуга';
 
   return (
-    <AppShell crumbGroup="Клиника" crumb="Записи">
+    <>
       <div className="content-row">
         <div className="content-col grow">
+          {vm.error && (
+            <div className="alert alert-destructive" role="alert" style={{ alignItems: 'center' }}>
+              <AlertCircle size={16} className="ic" />
+              <span className="grow">{vm.error}</span>
+              <button type="button" className="btn btn-outline btn-sm" onClick={vm.reload}>
+                <RefreshCw size={14} />
+                Повторить
+              </button>
+            </div>
+          )}
+
           <AdminAppointmentsFilters
-            statusFilter={statusFilter} onStatusFilterChange={setStatusFilter}
-            vetFilter={vetFilter} onVetFilterChange={setVetFilter}
-            speciesFilter={speciesFilter} onSpeciesFilterChange={setSpeciesFilter}
-            dateFrom={dateFrom} onDateFromChange={setDateFrom}
-            dateTo={dateTo} onDateToChange={setDateTo}
-            search={search} onSearchChange={setSearch}
-            veterinarians={veterinarians} speciesList={speciesList} users={users}
-            onCreateClick={() => setIsCreateOpen(true)}
+            statusFilter={vm.statusFilter} onStatusFilterChange={vm.setStatusFilter}
+            vetFilter={vm.vetFilter} onVetFilterChange={vm.setVetFilter}
+            speciesFilter={vm.speciesFilter} onSpeciesFilterChange={vm.setSpeciesFilter}
+            dateFrom={vm.dateFrom} onDateFromChange={vm.setDateFrom}
+            dateTo={vm.dateTo} onDateToChange={vm.setDateTo}
+            search={vm.search} onSearchChange={vm.setSearch}
+            veterinarians={vm.veterinarians} speciesList={vm.speciesList}
+            onCreateClick={() => vm.setIsCreateOpen(true)}
           />
 
           <AdminAppointmentsTable
-            appointments={filteredAppointments} veterinarians={veterinarians}
-            services={services} pets={pets} users={users}
-            selectedAppt={selectedAppt} loading={loading}
-            onSelect={setSelectedAppt} onEdit={setEditAppt}
-            onCancel={setCancelAppt} onDelete={setDeleteAppt}
+            appointments={vm.appointments} veterinarians={vm.veterinarians}
+            services={vm.services} pets={vm.pets} users={vm.users}
+            selectedAppt={vm.selectedAppt} loading={vm.loading}
+            page={vm.page} totalPages={vm.totalPages} totalElements={vm.totalElements}
+            onPageChange={vm.setPage}
+            onSelect={vm.setSelectedAppt} onEdit={vm.setEditAppt}
+            onCancel={vm.openCancelModal} onDelete={vm.openDeleteModal}
           />
         </div>
 
-        {selectedAppt && (
+        {vm.selectedAppt && (
           <AdminAppointmentDetailIsland
-            appointment={selectedAppt} veterinarians={veterinarians}
-            services={services} pets={pets} users={users}
-            onClose={() => setSelectedAppt(null)} onEdit={setEditAppt}
-            onCancel={setCancelAppt} onDelete={setDeleteAppt}
+            appointment={vm.selectedAppt} veterinarians={vm.veterinarians}
+            services={vm.services} pets={vm.pets} users={vm.users}
+            onClose={() => vm.setSelectedAppt(null)} onEdit={vm.setEditAppt}
+            onCancel={vm.openCancelModal} onDelete={vm.openDeleteModal}
           />
         )}
       </div>
 
       <AdminCreateAppointmentModal
-        isOpen={isCreateOpen} onClose={() => setIsCreateOpen(false)} onSuccess={handleModalSuccess}
-        veterinarians={veterinarians} services={services} pets={pets} users={users}
+        isOpen={vm.isCreateOpen} onClose={() => vm.setIsCreateOpen(false)}
+        onCreate={vm.createAppointment} onCheckSlot={vm.checkSlotAvailability}
+        veterinarians={vm.veterinarians} services={vm.services} pets={vm.pets} users={vm.users}
       />
 
       <AdminEditAppointmentModal
-        isOpen={Boolean(editAppt)} appointment={editAppt} onClose={() => setEditAppt(null)}
-        onSuccess={handleModalSuccess} veterinarians={veterinarians} services={services} pets={pets} users={users}
+        isOpen={Boolean(vm.editAppt)} appointment={vm.editAppt} onClose={() => vm.setEditAppt(null)}
+        onUpdate={vm.updateAppointment} onCheckSlot={vm.checkSlotAvailability}
+        veterinarians={vm.veterinarians} services={vm.services} pets={vm.pets}
       />
 
-      <AdminCancelAppointmentModal
-        isOpen={Boolean(cancelAppt)} appointment={cancelAppt} onClose={() => setCancelAppt(null)}
-        onSuccess={handleModalSuccess} veterinarians={veterinarians} services={services} pets={pets} users={users}
-      />
+      <ConfirmModal
+        isOpen={Boolean(vm.cancelAppt)}
+        title="Отмена записи"
+        description={cancelDt ? `${cancelPetName} — ${cancelServiceName} (${cancelDt.date}, ${cancelDt.time})` : undefined}
+        confirmLabel="Подтвердить отмену"
+        cancelLabel="Назад"
+        tone="destructive"
+        loading={vm.isCancelling}
+        error={vm.cancelError}
+        onClose={vm.closeCancelModal}
+        onConfirm={vm.confirmCancelAppt}
+      >
+        <div className="small muted">Врач: <strong>{cancelVetName}</strong></div>
+        <div className="field">
+          <span className="field-label">Типичные причины</span>
+          <div className="chips">
+            {CANCEL_REASONS.map((r) => (
+              <button
+                key={r}
+                type="button"
+                className={`chip ${vm.cancelReason === r ? 'on' : ''}`}
+                onClick={() => vm.setCancelReason(r)}
+              >
+                {r}
+              </button>
+            ))}
+          </div>
+        </div>
+        <div className="field">
+          <label className="field-label" htmlFor="mc-reason">Причина отмены <span className="req">*</span></label>
+          <input
+            id="mc-reason"
+            className="input"
+            value={vm.cancelReason}
+            onChange={(e) => vm.setCancelReason(e.target.value)}
+            placeholder="Укажите подробную причину отмены…"
+          />
+        </div>
+      </ConfirmModal>
 
-      <AdminDeleteAppointmentModal
-        isOpen={Boolean(deleteAppt)} appointment={deleteAppt}
-        petName={getPet(deleteAppt?.petId || '', pets)?.name}
-        serviceName={getServiceName(deleteAppt?.serviceId || '', services)}
-        isDeleting={isDeleting} onClose={() => setDeleteAppt(null)} onConfirm={handleDeleteAppt}
+      <ConfirmModal
+        isOpen={Boolean(vm.deleteAppt)}
+        title="Удалить запись на приём?"
+        description={
+          vm.deleteAppt
+            ? `Запись #${vm.deleteAppt.id.slice(0, 8)} (${deletePetName} — ${deleteServiceName}) будет безвозвратно удалена.`
+            : undefined
+        }
+        confirmLabel="Удалить"
+        cancelLabel="Отмена"
+        tone="destructive"
+        loading={vm.isDeleting}
+        error={vm.deleteError}
+        onClose={vm.closeDeleteModal}
+        onConfirm={vm.confirmDeleteAppt}
       />
-    </AppShell>
+    </>
   );
 }

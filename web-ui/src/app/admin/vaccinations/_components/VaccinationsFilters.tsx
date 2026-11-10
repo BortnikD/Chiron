@@ -2,7 +2,8 @@
 
 import React from 'react';
 import { Search, Plus } from 'lucide-react';
-import { Pet, VaccinationStatusTone } from './types';
+import type { Pet } from '@/modules/client/types';
+import type { VaccinationStatusTone } from './types';
 import { STATUS_FILTERS } from './constants';
 
 export interface VaccinationsFiltersProps {
@@ -17,7 +18,7 @@ export interface VaccinationsFiltersProps {
 }
 
 /**
- * Панель фильтров: поиск по названию вакцины/серии партии/питомцу, выбор питомца, статуса ревакцинации.
+ * Панель фильтров: поиск по названию вакцины или питомцу, выбор питомца, статуса ревакцинации.
  */
 export const VaccinationsFilters: React.FC<VaccinationsFiltersProps> = ({
   search,
@@ -43,14 +44,14 @@ export const VaccinationsFilters: React.FC<VaccinationsFiltersProps> = ({
     >
       <div className="field" style={{ minWidth: '220px', flex: 1 }}>
         <label className="field-label" htmlFor="vx-search">
-          Поиск вакцины, партии или питомца
+          Поиск вакцины или питомца
         </label>
         <div className="input-icon">
           <Search className="ic" />
           <input
             id="vx-search"
             className="input"
-            placeholder="Поиск по названию или серии..."
+            placeholder="Название препарата или кличка…"
             value={search}
             onChange={(e) => onSearchChange(e.target.value)}
           />
@@ -77,7 +78,7 @@ export const VaccinationsFilters: React.FC<VaccinationsFiltersProps> = ({
       </div>
 
       <div className="field">
-        <label className="field-label">Статус ревакцинации</label>
+        <span className="field-label">Статус ревакцинации</span>
         <div className="seg" role="tablist">
           {STATUS_FILTERS.map((item) => (
             <button

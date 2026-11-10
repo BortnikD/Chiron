@@ -3,11 +3,37 @@
 import React from 'react';
 import Link from 'next/link';
 import { Clock, ChevronRight } from 'lucide-react';
-import { SpeciesIcon } from '../../../../components/ui/SpeciesIcon';
-import { getDoctorDisplay } from '../../../../utils/doctorHelpers';
-import { NextAppointmentBannerProps } from './types';
-import { STATUS_SHORT, ST_COL, SP_TONE } from './constants';
-import { getCountdown, getSpeciesTone } from './utils';
+import type { Pet, Appointment } from '@/modules/client/types';
+import type { Service, Veterinarian } from '@/modules/clinic/types';
+import { SpeciesIcon } from '@/components/ui/SpeciesIcon';
+import { getDoctorDisplay } from '@/utils/doctorHelpers';
+import {
+  APPOINTMENT_STATUS_META,
+  formatCurrency,
+  formatDateRu,
+  formatSlotTime,
+  getSpeciesTone,
+} from '@/shared/lib';
+import { ST_COL } from './constants';
+
+export interface NextAppointmentBannerProps {
+  nextAppointment?: Appointment | null;
+  nextAppt?: Appointment | null;
+  pet?: Pet | null;
+  service?: Service | null;
+  veterinarian?: Veterinarian | null;
+  speciesMap?: Record<string, string>;
+}
+
+function getCountdown(iso: string): string {
+  const diffMin = Math.round((new Date(iso).getTime() - Date.now()) / 60000);
+  if (diffMin <= 0) return 'сейчас';
+  if (diffMin < 60) return `через ${diffMin} мин`;
+  const diffHours = Math.round(diffMin / 60);
+  if (diffHours < 24) return `через ${diffHours} ч`;
+  const diffDays = Math.round(diffHours / 24);
+  return `через ${diffDays} дн`;
+}
 
 export function NextAppointmentBanner({
   nextAppointment,
@@ -32,8 +58,8 @@ export function NextAppointmentBanner({
   }
 
   const tone = getSpeciesTone(pet?.speciesId, speciesMap);
-  const toneColor = SP_TONE[tone] || 'var(--primary)';
   const vetName = veterinarian ? getDoctorDisplay(veterinarian).name : 'Врач клиники';
+  const statusShort = APPOINTMENT_STATUS_META[appt.status]?.short || appt.status;
 
   return (
     <div
@@ -45,39 +71,21 @@ export function NextAppointmentBanner({
           <Clock className="ic" />
           Следующий приём
         </span>
-        <span className={`badge st badge-${appt.status}`}>
-          {STATUS_SHORT[appt.status] || appt.status}
-        </span>
+        <span className={`badge st badge-${appt.status}`}>{statusShort}</span>
       </div>
 
       <div className="hm-next-when">
-        <b>
-          {new Date(appt.startAt).toLocaleTimeString('ru-RU', {
-            hour: '2-digit',
-            minute: '2-digit',
-            timeZone: 'Europe/Moscow',
-          })}
-        </b>
+        <b>{formatSlotTime(appt.startAt)}</b>
         <span className="col" style={{ gap: 0 }}>
           <span className="hm-next-day">
-            {new Date(appt.startAt).toLocaleDateString('ru-RU', {
-              weekday: 'short',
-              day: 'numeric',
-              month: 'short',
-              timeZone: 'Europe/Moscow',
-            })}
+            {formatDateRu(appt.startAt, { weekday: 'short', day: 'numeric', month: 'short' })}
           </span>
-          <span className="hm-next-cd">
-            {getCountdown(appt.startAt)}
-          </span>
+          <span className="hm-next-cd">{getCountdown(appt.startAt)}</span>
         </span>
       </div>
 
       <div className="hm-next-who">
-        <span
-          className="hm-ava sm"
-          style={{ '--tone': toneColor } as React.CSSProperties}
-        >
+        <span className={`hm-ava sm tone-${tone}`}>
           <SpeciesIcon species={tone} size={20} />
         </span>
         <span className="col" style={{ gap: '1px', minWidth: 0 }}>
@@ -85,7 +93,7 @@ export function NextAppointmentBanner({
             {pet?.name || 'Питомец'} — {service?.name || 'Приём'}
           </span>
           <span className="cell-sub">
-            {vetName} · {appt.priceSnapshot ? `${appt.priceSnapshot.toLocaleString('ru-RU')} ₽` : '1 500 ₽'}
+            {vetName} · {appt.priceSnapshot != null ? formatCurrency(appt.priceSnapshot) : '—'}
           </span>
         </span>
       </div>

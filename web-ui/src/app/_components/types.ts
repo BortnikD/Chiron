@@ -1,4 +1,4 @@
-import { Service, Veterinarian, Specialization } from '../../types';
+import type { Service, Veterinarian, Specialization } from '@/modules/clinic/types';
 
 export interface ClinicDirection {
   id: string;
@@ -35,6 +35,8 @@ export interface LandingDoctorsSectionProps {
 
 export interface LandingServicesSectionProps {
   services?: Service[];
+  specializations?: Specialization[];
+  error?: string | null;
 }
 
 export interface DoctorCardData {
@@ -45,5 +47,4 @@ export interface DoctorCardData {
   specName: string;
   experienceYears: number;
   tone: string;
-  bio?: string;
 }

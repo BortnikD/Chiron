@@ -1,11 +1,13 @@
-import {
+import type {
   Pet,
-  Species,
-  Gender,
-  User,
   Vaccination,
   Appointment,
-} from '../../../../types';
+  CreatePetRequest,
+  UpdatePetRequest,
+  CreateVaccinationRequest,
+} from '@/modules/client/types';
+import type { Species } from '@/modules/clinic/types';
+import type { Gender, User } from '@/shared/types';
 
 export type GenderFilter = 'ALL' | 'MALE' | 'FEMALE';
 export type StatusFilter = 'ALL' | 'ACTIVE' | 'ARCHIVED';
@@ -65,6 +67,8 @@ export interface PetDetailIslandProps {
   users: User[];
   appointments: Appointment[];
   vaccinations: Vaccination[];
+  loadingDetails?: boolean;
+  detailsError?: string | null;
   onClose: () => void;
   onEdit: () => void;
   onToggleArchive: () => void;
@@ -75,7 +79,7 @@ export interface PetDetailIslandProps {
 export interface CreatePetModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSuccess: (createdPet: Pet) => void;
+  onCreate: (payload: CreatePetRequest) => Promise<Pet>;
   speciesList: Species[];
   users: User[];
 }
@@ -85,20 +89,12 @@ export interface EditPetModalProps {
   pet: Pet | null;
   speciesList: Species[];
   onClose: () => void;
-  onSuccess: () => void;
-}
-
-export interface DeletePetModalProps {
-  isOpen: boolean;
-  pet: Pet | null;
-  deleting: boolean;
-  onClose: () => void;
-  onConfirm: () => Promise<void> | void;
+  onUpdate: (id: string, payload: UpdatePetRequest) => Promise<Pet>;
 }
 
 export interface AddVaccinationModalProps {
   isOpen: boolean;
   pet: Pet | null;
   onClose: () => void;
-  onSuccess: () => void;
+  onCreate: (payload: CreateVaccinationRequest) => Promise<Vaccination>;
 }

@@ -2,9 +2,135 @@
 
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Calendar, X, ChevronLeft, ChevronRight } from 'lucide-react';
-import { DOWS, DP_MONS } from './constants';
-import { formatIsoDisplay } from './utils';
-import { DatePeriodSelectorProps } from './types';
+import { DOW_SHORT, formatIsoDateDisplay, getMoscowTodayIso } from '@/shared/lib';
+import { DP_MONS } from './constants';
+import type { DatePeriodSelectorProps } from './types';
+
+interface CalendarPopoverProps {
+  selectedDate: string;
+  viewMonth: string;
+  onViewMonthChange: (nextMonth: string) => void;
+  onSelectDate: (iso: string) => void;
+  onClose: () => void;
+}
+
+function CalendarPopover({
+  selectedDate,
+  viewMonth,
+  onViewMonthChange,
+  onSelectDate,
+  onClose,
+}: CalendarPopoverProps) {
+  const todayIso = getMoscowTodayIso();
+
+  const calendarCells = useMemo(() => {
+    const [y, m] = viewMonth.split('-').map(Number);
+    const firstDay = new Date(Date.UTC(y, m - 1, 1));
+    const shift = (firstDay.getUTCDay() + 6) % 7;
+    const cells = [];
+
+    for (let i = 0; i < 42; i++) {
+      const d = new Date(Date.UTC(y, m - 1, 1 - shift + i));
+      const iso = `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}-${String(d.getUTCDate()).padStart(2, '0')}`;
+      const isOut = d.getUTCMonth() + 1 !== m;
+      const isWeekend = (d.getUTCDay() + 6) % 7 >= 5;
+      const isSelected = iso === selectedDate;
+      const isToday = iso === todayIso;
+
+      cells.push({
+        n: d.getUTCDate(),
+        iso,
+        cls: [
+          isOut ? 'out' : '',
+          isWeekend ? 'we' : '',
+          isToday ? 'today' : '',
+          isSelected ? 'on' : '',
+        ]
+          .filter(Boolean)
+          .join(' '),
+      });
+    }
+    return cells;
+  }, [viewMonth, selectedDate, todayIso]);
+
+  return (
+    <div className="popover dp-pop shadow-xl" onClick={(e) => e.stopPropagation()}>
+      <div className="dp-head">
+        <button
+          type="button"
+          className="btn btn-ghost btn-icon btn-sm"
+          aria-label="Предыдущий месяц"
+          onClick={() => {
+            const [y, m] = viewMonth.split('-').map(Number);
+            const prev = new Date(Date.UTC(y, m - 2, 1));
+            onViewMonthChange(`${prev.getUTCFullYear()}-${String(prev.getUTCMonth() + 1).padStart(2, '0')}`);
+          }}
+        >
+          <ChevronLeft className="ic w-4 h-4" />
+        </button>
+        <span className="dp-title">
+          {DP_MONS[+viewMonth.slice(5, 7) - 1]} {viewMonth.slice(0, 4)}
+        </span>
+        <button
+          type="button"
+          className="btn btn-ghost btn-icon btn-sm"
+          aria-label="Следующий месяц"
+          onClick={() => {
+            const [y, m] = viewMonth.split('-').map(Number);
+            const next = new Date(Date.UTC(y, m, 1));
+            onViewMonthChange(`${next.getUTCFullYear()}-${String(next.getUTCMonth() + 1).padStart(2, '0')}`);
+          }}
+        >
+          <ChevronRight className="ic w-4 h-4" />
+        </button>
+      </div>
+      <div className="dp-dows">
+        {DOW_SHORT.map((d, i) => (
+          <span key={d} className={i >= 5 ? 'we' : ''}>
+            {d}
+          </span>
+        ))}
+      </div>
+      <div className="dp-grid">
+        {calendarCells.map((c) => (
+          <button
+            key={c.iso}
+            type="button"
+            className={`dp-cell ${c.cls}`}
+            onClick={() => {
+              onSelectDate(c.iso);
+              onClose();
+            }}
+          >
+            {c.n}
+          </button>
+        ))}
+      </div>
+      <div className="dp-foot">
+        <button
+          type="button"
+          className="btn btn-ghost btn-sm text-xs"
+          onClick={() => {
+            onSelectDate(getMoscowTodayIso());
+            onClose();
+          }}
+        >
+          Сегодня
+        </button>
+        <button
+          type="button"
+          className="btn btn-ghost btn-sm text-xs"
+          onClick={() => {
+            onSelectDate('');
+            onClose();
+          }}
+        >
+          Очистить
+        </button>
+      </div>
+    </div>
+  );
+}
 
 export function DatePeriodSelector({
   period,
@@ -15,11 +141,12 @@ export function DatePeriodSelector({
   onToChange,
 }: DatePeriodSelectorProps) {
   const [dpOpen, setDpOpen] = useState<'from' | 'to' | null>(null);
-  const [dpViewMonth, setDpViewMonth] = useState<string>('2026-10'); // YYYY-MM
+  const [dpViewMonth, setDpViewMonth] = useState<string>(() =>
+    (stFrom || getMoscowTodayIso()).slice(0, 7)
+  );
   const dpFromRef = useRef<HTMLDivElement>(null);
   const dpToRef = useRef<HTMLDivElement>(null);
 
-  // Close datepicker popover on outside click
   useEffect(() => {
     const handleOutside = (e: MouseEvent) => {
       const target = e.target as Node;
@@ -32,33 +159,6 @@ export function DatePeriodSelector({
     document.addEventListener('mousedown', handleOutside);
     return () => document.removeEventListener('mousedown', handleOutside);
   }, []);
-
-  // Calendar cells for interactive datepicker
-  const calendarCells = useMemo(() => {
-    const [y, m] = dpViewMonth.split('-').map(Number);
-    const firstDay = new Date(Date.UTC(y, m - 1, 1));
-    const shift = (firstDay.getUTCDay() + 6) % 7; // Monday = 0
-    const cells = [];
-
-    for (let i = 0; i < 42; i++) {
-      const d = new Date(Date.UTC(y, m - 1, 1 - shift + i));
-      const iso = `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}-${String(d.getUTCDate()).padStart(2, '0')}`;
-      const isOut = d.getUTCMonth() + 1 !== m;
-      const isWeekend = (d.getUTCDay() + 6) % 7 >= 5;
-      const isSelected = dpOpen === 'from' ? iso === stFrom : iso === stTo;
-
-      cells.push({
-        n: d.getUTCDate(),
-        iso,
-        cls: [
-          isOut ? 'out' : '',
-          isWeekend ? 'we' : '',
-          isSelected ? 'on' : '',
-        ].filter(Boolean).join(' '),
-      });
-    }
-    return cells;
-  }, [dpViewMonth, dpOpen, stFrom, stTo]);
 
   return (
     <section className="island filters" style={{ flex: 'none' }} aria-label="Период">
@@ -102,113 +202,56 @@ export function DatePeriodSelector({
           С
         </label>
         <div className="dp" ref={dpFromRef}>
-          <button
-            type="button"
-            className="input dp-btn"
-            id="st-from"
-            onClick={() => {
-              setDpViewMonth(stFrom ? stFrom.slice(0, 7) : '2026-10');
-              setDpOpen(dpOpen === 'from' ? null : 'from');
-            }}
-          >
-            <Calendar className="ic w-4 h-4" />
-            <span className="dp-val">{stFrom ? formatIsoDisplay(stFrom) : 'дд.мм.гггг'}</span>
+          <div style={{ position: 'relative' }}>
+            <button
+              type="button"
+              className={`input dp-btn ${!stFrom ? 'dp-empty' : ''}`}
+              id="st-from"
+              style={stFrom ? { paddingRight: '30px' } : undefined}
+              onClick={() => {
+                setDpViewMonth((stFrom || getMoscowTodayIso()).slice(0, 7));
+                setDpOpen(dpOpen === 'from' ? null : 'from');
+              }}
+            >
+              <Calendar className="ic w-4 h-4" />
+              <span className="dp-val">{stFrom ? formatIsoDateDisplay(stFrom) : 'дд.мм.гггг'}</span>
+            </button>
             {stFrom && (
-              <span
+              <button
+                type="button"
                 className="dp-clear"
-                role="button"
-                aria-label="Очистить дату"
-                onClick={(e) => {
-                  e.stopPropagation();
+                aria-label="Очистить дату начала"
+                style={{
+                  position: 'absolute',
+                  right: '10px',
+                  top: '50%',
+                  transform: 'translateY(-50%)',
+                  border: 0,
+                  background: 'transparent',
+                  padding: 0,
+                  cursor: 'pointer',
+                }}
+                onClick={() => {
                   onFromChange('');
                   onSelectPeriod('custom');
                 }}
               >
                 <X className="ic w-3.5 h-3.5" />
-              </span>
+              </button>
             )}
-          </button>
+          </div>
 
           {dpOpen === 'from' && (
-            <div
-              className="popover dp-pop shadow-xl"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <div className="dp-head">
-                <button
-                  type="button"
-                  className="btn btn-ghost btn-icon btn-sm"
-                  onClick={() => {
-                    const [y, m] = dpViewMonth.split('-').map(Number);
-                    const prev = new Date(Date.UTC(y, m - 2, 1));
-                    setDpViewMonth(`${prev.getUTCFullYear()}-${String(prev.getUTCMonth() + 1).padStart(2, '0')}`);
-                  }}
-                >
-                  <ChevronLeft className="ic w-4 h-4" />
-                </button>
-                <span className="dp-title">
-                  {DP_MONS[+dpViewMonth.slice(5, 7) - 1]} {dpViewMonth.slice(0, 4)}
-                </span>
-                <button
-                  type="button"
-                  className="btn btn-ghost btn-icon btn-sm"
-                  onClick={() => {
-                    const [y, m] = dpViewMonth.split('-').map(Number);
-                    const next = new Date(Date.UTC(y, m, 1));
-                    setDpViewMonth(`${next.getUTCFullYear()}-${String(next.getUTCMonth() + 1).padStart(2, '0')}`);
-                  }}
-                >
-                  <ChevronRight className="ic w-4 h-4" />
-                </button>
-              </div>
-              <div className="dp-dows">
-                {DOWS.map((d, i) => (
-                  <span key={d} className={i >= 5 ? 'we' : ''}>
-                    {d}
-                  </span>
-                ))}
-              </div>
-              <div className="dp-grid">
-                {calendarCells.map((c, i) => (
-                  <button
-                    key={i}
-                    type="button"
-                    className={`dp-cell ${c.cls}`}
-                    onClick={() => {
-                      onFromChange(c.iso);
-                      onSelectPeriod('custom');
-                      setDpOpen(null);
-                    }}
-                  >
-                    {c.n}
-                  </button>
-                ))}
-              </div>
-              <div className="dp-foot">
-                <button
-                  type="button"
-                  className="btn btn-ghost btn-sm text-xs"
-                  onClick={() => {
-                    onFromChange('2026-10-26');
-                    onSelectPeriod('custom');
-                    setDpOpen(null);
-                  }}
-                >
-                  Сегодня
-                </button>
-                <button
-                  type="button"
-                  className="btn btn-ghost btn-sm text-xs"
-                  onClick={() => {
-                    onFromChange('');
-                    onSelectPeriod('custom');
-                    setDpOpen(null);
-                  }}
-                >
-                  Очистить
-                </button>
-              </div>
-            </div>
+            <CalendarPopover
+              selectedDate={stFrom}
+              viewMonth={dpViewMonth}
+              onViewMonthChange={setDpViewMonth}
+              onSelectDate={(iso) => {
+                onFromChange(iso);
+                onSelectPeriod('custom');
+              }}
+              onClose={() => setDpOpen(null)}
+            />
           )}
         </div>
       </div>
@@ -219,113 +262,56 @@ export function DatePeriodSelector({
           По (включительно)
         </label>
         <div className="dp" ref={dpToRef}>
-          <button
-            type="button"
-            className="input dp-btn"
-            id="st-to"
-            onClick={() => {
-              setDpViewMonth(stTo ? stTo.slice(0, 7) : '2026-10');
-              setDpOpen(dpOpen === 'to' ? null : 'to');
-            }}
-          >
-            <Calendar className="ic w-4 h-4" />
-            <span className="dp-val">{stTo ? formatIsoDisplay(stTo) : 'дд.мм.гггг'}</span>
+          <div style={{ position: 'relative' }}>
+            <button
+              type="button"
+              className={`input dp-btn ${!stTo ? 'dp-empty' : ''}`}
+              id="st-to"
+              style={stTo ? { paddingRight: '30px' } : undefined}
+              onClick={() => {
+                setDpViewMonth((stTo || getMoscowTodayIso()).slice(0, 7));
+                setDpOpen(dpOpen === 'to' ? null : 'to');
+              }}
+            >
+              <Calendar className="ic w-4 h-4" />
+              <span className="dp-val">{stTo ? formatIsoDateDisplay(stTo) : 'дд.мм.гггг'}</span>
+            </button>
             {stTo && (
-              <span
+              <button
+                type="button"
                 className="dp-clear"
-                role="button"
-                aria-label="Очистить дату"
-                onClick={(e) => {
-                  e.stopPropagation();
+                aria-label="Очистить дату окончания"
+                style={{
+                  position: 'absolute',
+                  right: '10px',
+                  top: '50%',
+                  transform: 'translateY(-50%)',
+                  border: 0,
+                  background: 'transparent',
+                  padding: 0,
+                  cursor: 'pointer',
+                }}
+                onClick={() => {
                   onToChange('');
                   onSelectPeriod('custom');
                 }}
               >
                 <X className="ic w-3.5 h-3.5" />
-              </span>
+              </button>
             )}
-          </button>
+          </div>
 
           {dpOpen === 'to' && (
-            <div
-              className="popover dp-pop shadow-xl"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <div className="dp-head">
-                <button
-                  type="button"
-                  className="btn btn-ghost btn-icon btn-sm"
-                  onClick={() => {
-                    const [y, m] = dpViewMonth.split('-').map(Number);
-                    const prev = new Date(Date.UTC(y, m - 2, 1));
-                    setDpViewMonth(`${prev.getUTCFullYear()}-${String(prev.getUTCMonth() + 1).padStart(2, '0')}`);
-                  }}
-                >
-                  <ChevronLeft className="ic w-4 h-4" />
-                </button>
-                <span className="dp-title">
-                  {DP_MONS[+dpViewMonth.slice(5, 7) - 1]} {dpViewMonth.slice(0, 4)}
-                </span>
-                <button
-                  type="button"
-                  className="btn btn-ghost btn-icon btn-sm"
-                  onClick={() => {
-                    const [y, m] = dpViewMonth.split('-').map(Number);
-                    const next = new Date(Date.UTC(y, m, 1));
-                    setDpViewMonth(`${next.getUTCFullYear()}-${String(next.getUTCMonth() + 1).padStart(2, '0')}`);
-                  }}
-                >
-                  <ChevronRight className="ic w-4 h-4" />
-                </button>
-              </div>
-              <div className="dp-dows">
-                {DOWS.map((d, i) => (
-                  <span key={d} className={i >= 5 ? 'we' : ''}>
-                    {d}
-                  </span>
-                ))}
-              </div>
-              <div className="dp-grid">
-                {calendarCells.map((c, i) => (
-                  <button
-                    key={i}
-                    type="button"
-                    className={`dp-cell ${c.cls}`}
-                    onClick={() => {
-                      onToChange(c.iso);
-                      onSelectPeriod('custom');
-                      setDpOpen(null);
-                    }}
-                  >
-                    {c.n}
-                  </button>
-                ))}
-              </div>
-              <div className="dp-foot">
-                <button
-                  type="button"
-                  className="btn btn-ghost btn-sm text-xs"
-                  onClick={() => {
-                    onToChange('2026-10-26');
-                    onSelectPeriod('custom');
-                    setDpOpen(null);
-                  }}
-                >
-                  Сегодня
-                </button>
-                <button
-                  type="button"
-                  className="btn btn-ghost btn-sm text-xs"
-                  onClick={() => {
-                    onToChange('');
-                    onSelectPeriod('custom');
-                    setDpOpen(null);
-                  }}
-                >
-                  Очистить
-                </button>
-              </div>
-            </div>
+            <CalendarPopover
+              selectedDate={stTo}
+              viewMonth={dpViewMonth}
+              onViewMonthChange={setDpViewMonth}
+              onSelectDate={(iso) => {
+                onToChange(iso);
+                onSelectPeriod('custom');
+              }}
+              onClose={() => setDpOpen(null)}
+            />
           )}
         </div>
       </div>

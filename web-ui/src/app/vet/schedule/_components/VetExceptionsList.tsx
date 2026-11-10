@@ -1,9 +1,9 @@
 'use client';
 
 import React, { useMemo } from 'react';
-import { WorkSchedule, ScheduleException } from '../../../../types';
 import { CalendarOff, Plus } from 'lucide-react';
-import { DOWS, INDEX_TO_DOW, formatIsoDisplay } from './utils';
+import type { WorkSchedule, ScheduleException } from '@/modules/admin/types';
+import { DOW_ORDER, DOW_SHORT, formatIsoDateDisplay } from '@/shared/lib';
 
 export interface VetExceptionsListProps {
   exceptions: ScheduleException[];
@@ -12,6 +12,7 @@ export interface VetExceptionsListProps {
   onSelectException?: (exception: ScheduleException) => void;
   onAddException?: () => void;
   loading?: boolean;
+  hasDetail?: boolean;
 }
 
 /**
@@ -24,28 +25,30 @@ export const VetExceptionsList: React.FC<VetExceptionsListProps> = ({
   onSelectException,
   onAddException,
   loading,
+  hasDetail = false,
 }) => {
-  // Недельный шаблон графика врача на 7 дней
   const myWeek = useMemo(() => {
-    return DOWS.map((dw, i) => {
-      const dowEnum = INDEX_TO_DOW[i];
+    return DOW_SHORT.map((dw, i) => {
+      const dowEnum = DOW_ORDER[i];
       const w = schedules.find((x) => x.dayOfWeek === dowEnum);
       return {
         dow: dw,
         hours: w ? `${w.startTime.slice(0, 5)}–${w.endTime.slice(0, 5)}` : 'Выходной',
-        brk: w && w.breakStart && w.breakEnd ? `перерыв ${w.breakStart.slice(0, 5)}–${w.breakEnd.slice(0, 5)}` : '',
+        brk:
+          w && w.breakStart && w.breakEnd
+            ? `перерыв ${w.breakStart.slice(0, 5)}–${w.breakEnd.slice(0, 5)}`
+            : '',
       };
     });
   }, [schedules]);
 
-  // Список исключений текущего врача
   const myExceptions = useMemo(() => {
     return exceptions.map((e) => {
       const isAbsence = e.type === 'ABSENCE';
       const range =
         e.startDate === e.endDate
-          ? formatIsoDisplay(e.startDate)
-          : `${formatIsoDisplay(e.startDate)} – ${formatIsoDisplay(e.endDate)}`;
+          ? formatIsoDateDisplay(e.startDate)
+          : `${formatIsoDateDisplay(e.startDate)} – ${formatIsoDateDisplay(e.endDate)}`;
       const reason =
         e.type === 'CUSTOM_HOURS' && e.startTime && e.endTime
           ? `${e.startTime.slice(0, 5)}–${e.endTime.slice(0, 5)} · ${e.reason || ''}`
@@ -62,11 +65,12 @@ export const VetExceptionsList: React.FC<VetExceptionsListProps> = ({
     });
   }, [exceptions]);
 
+  const sizingClass = hasDetail
+    ? 'w-full md:max-h-[260px] lg:max-h-none lg:w-[300px] lg:flex-none xl:w-full xl:max-h-[240px] 2xl:w-[300px] 2xl:max-h-none 2xl:flex-none'
+    : 'w-full md:max-h-[260px] lg:max-h-none lg:w-[310px] lg:flex-none';
+
   return (
-    <section
-      className="island"
-      style={{ width: '340px', flex: 'none', display: 'flex', flexDirection: 'column' }}
-    >
+    <section className={`island ${sizingClass}`} aria-label="Исключения и шаблон графика">
       <div className="island-head">
         <span className="island-title">
           <CalendarOff className="ic" />
@@ -101,41 +105,34 @@ export const VetExceptionsList: React.FC<VetExceptionsListProps> = ({
               myExceptions.map((e) => {
                 const isSelected = selectedException?.id === e.id;
                 return (
-                  <div
+                  <button
                     key={e.id}
-                    className="row between"
+                    type="button"
+                    className={`lrow ${isSelected ? 'sel' : ''}`}
                     style={{
-                      padding: '10px 0',
                       borderBottom: '1px solid var(--border)',
-                      cursor: onSelectException ? 'pointer' : 'default',
-                      backgroundColor: isSelected ? 'var(--muted)' : undefined,
-                      borderRadius: isSelected ? '6px' : undefined,
-                      paddingLeft: isSelected ? '8px' : undefined,
-                      paddingRight: isSelected ? '8px' : undefined,
+                      borderRadius: isSelected ? '8px' : 0,
+                      padding: '9px 8px',
                     }}
                     onClick={() => onSelectException?.(e.raw)}
                   >
-                    <div className="col" style={{ gap: 0 }}>
+                    <span className="col" style={{ gap: 0, gridColumn: '1 / 3', minWidth: 0 }}>
                       <span className="cell-main tnum">{e.range}</span>
                       <span className="cell-sub">{e.reason}</span>
-                    </div>
+                    </span>
                     <span className={`badge ${e.cls}`}>{e.label}</span>
-                  </div>
+                  </button>
                 );
               })
             )}
           </div>
         )}
 
-        {/* Недельный шаблон графика */}
-        <div className="col" style={{ gap: '8px', marginTop: '12px' }}>
+        <div className="col" style={{ gap: '8px', marginTop: '4px' }}>
           <span className="section-title">Недельный шаблон</span>
           <div
             className="dtable"
-            style={{
-              // @ts-ignore
-              '--cols': '44px 1fr 1fr',
-            }}
+            style={{ '--cols': '44px 1fr 1fr' } as React.CSSProperties}
           >
             {myWeek.map((w, idx) => (
               <div key={idx} className="trow static compact">

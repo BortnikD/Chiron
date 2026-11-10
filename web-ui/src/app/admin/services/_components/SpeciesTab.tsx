@@ -1,43 +1,71 @@
 'use client';
 
-import React, { useState } from 'react';
-import { PawPrint, Plus, Trash2 } from 'lucide-react';
-import { adminApi } from '../../../../api';
-import { Species } from '../../../../types';
+import React, { useState, useEffect } from 'react';
+import { PawPrint, Plus, Trash2, AlertCircle, X } from 'lucide-react';
+import type { Species } from '@/modules/clinic/types';
+import { formatApiError } from '@/shared/lib';
+import { ConfirmModal } from '@/shared/components/ConfirmModal';
 
 export interface SpeciesTabProps {
   speciesList: Species[];
-  onRefresh: () => Promise<void>;
+  onCreateSpecies: (name: string) => Promise<void>;
+  onDeleteSpecies: (id: string) => Promise<void>;
 }
 
-export const SpeciesTab: React.FC<SpeciesTabProps> = ({ speciesList, onRefresh }) => {
+export const SpeciesTab: React.FC<SpeciesTabProps> = ({
+  speciesList,
+  onCreateSpecies,
+  onDeleteSpecies,
+}) => {
   const [isSpeciesModalOpen, setIsSpeciesModalOpen] = useState(false);
   const [newSpeciesName, setNewSpeciesName] = useState('');
   const [savingSpecies, setSavingSpecies] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+
+  const [deleteTarget, setDeleteTarget] = useState<Species | null>(null);
+  const [deletingSpecies, setDeletingSpecies] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!isSpeciesModalOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && !savingSpecies) setIsSpeciesModalOpen(false);
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isSpeciesModalOpen, savingSpecies]);
 
   const handleAddSpecies = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newSpeciesName.trim()) return;
+    const trimmed = newSpeciesName.trim();
+    if (!trimmed) {
+      setSaveError('Введите название вида');
+      return;
+    }
     setSavingSpecies(true);
+    setSaveError(null);
     try {
-      await adminApi.createSpecies(newSpeciesName.trim());
+      await onCreateSpecies(trimmed);
       setIsSpeciesModalOpen(false);
       setNewSpeciesName('');
-      await onRefresh();
-    } catch (err: any) {
-      alert(err?.response?.data?.message || err?.message || 'Ошибка добавления вида');
+    } catch (err: unknown) {
+      setSaveError(formatApiError(err, 'Ошибка добавления вида'));
     } finally {
       setSavingSpecies(false);
     }
   };
 
-  const handleDeleteSpecies = async (id: string) => {
-    if (!confirm('Удалить вид животных?')) return;
+  const handleDeleteSpecies = async () => {
+    if (!deleteTarget) return;
+    setDeletingSpecies(true);
+    setDeleteError(null);
     try {
-      await adminApi.deleteSpecies(id);
-      await onRefresh();
-    } catch (err: any) {
-      alert(err?.response?.data?.message || err?.message || 'Ошибка удаления вида');
+      await onDeleteSpecies(deleteTarget.id);
+      setDeleteTarget(null);
+    } catch (err: unknown) {
+      setDeleteError(formatApiError(err, 'Ошибка удаления вида'));
+    } finally {
+      setDeletingSpecies(false);
     }
   };
 
@@ -52,7 +80,11 @@ export const SpeciesTab: React.FC<SpeciesTabProps> = ({ speciesList, onRefresh }
           <button
             type="button"
             className="btn btn-primary btn-sm"
-            onClick={() => setIsSpeciesModalOpen(true)}
+            onClick={() => {
+              setNewSpeciesName('');
+              setSaveError(null);
+              setIsSpeciesModalOpen(true);
+            }}
           >
             <Plus size={14} />
             Добавить вид
@@ -78,7 +110,12 @@ export const SpeciesTab: React.FC<SpeciesTabProps> = ({ speciesList, onRefresh }
                   <button
                     type="button"
                     className="btn btn-ghost btn-icon btn-sm"
-                    onClick={() => handleDeleteSpecies(sp.id)}
+                    aria-label={`Удалить вид «${sp.name}»`}
+                    title="Удалить"
+                    onClick={() => {
+                      setDeleteError(null);
+                      setDeleteTarget(sp);
+                    }}
                   >
                     <Trash2 size={14} />
                   </button>
@@ -89,22 +126,30 @@ export const SpeciesTab: React.FC<SpeciesTabProps> = ({ speciesList, onRefresh }
         </div>
       </section>
 
-      {/* Modal: Add Species */}
       {isSpeciesModalOpen && (
         <div
           className="overlay"
-          onClick={() => setIsSpeciesModalOpen(false)}
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="add-species-title"
+          onClick={() => !savingSpecies && setIsSpeciesModalOpen(false)}
         >
-          <div
-            className="dialog dialog-sm"
-            style={{ width: 400 }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="dialog-head">
-              <span className="dialog-title">Добавить вид животных</span>
+          <div className="dialog dialog-sm" onClick={(e) => e.stopPropagation()}>
+            <div className="dialog-head" style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span id="add-species-title" className="dialog-title">
+                Добавить вид животных
+              </span>
+              <button
+                type="button"
+                className="btn btn-ghost btn-icon btn-sm"
+                aria-label="Закрыть"
+                onClick={() => !savingSpecies && setIsSpeciesModalOpen(false)}
+              >
+                <X size={16} />
+              </button>
             </div>
 
-            <form onSubmit={handleAddSpecies}>
+            <form onSubmit={handleAddSpecies} style={{ display: 'flex', flexDirection: 'column', minHeight: 0, flex: 1 }}>
               <div className="dialog-body">
                 <div className="field">
                   <label className="field-label" htmlFor="new-sp-name">
@@ -119,21 +164,25 @@ export const SpeciesTab: React.FC<SpeciesTabProps> = ({ speciesList, onRefresh }
                     required
                   />
                 </div>
+
+                {saveError && (
+                  <div className="alert alert-destructive" role="alert">
+                    <AlertCircle size={16} className="ic" />
+                    <div>{saveError}</div>
+                  </div>
+                )}
               </div>
 
               <div className="dialog-foot">
                 <button
                   type="button"
                   className="btn btn-outline"
+                  disabled={savingSpecies}
                   onClick={() => setIsSpeciesModalOpen(false)}
                 >
                   Отмена
                 </button>
-                <button
-                  type="submit"
-                  className="btn btn-primary"
-                  disabled={savingSpecies}
-                >
+                <button type="submit" className="btn btn-primary" disabled={savingSpecies}>
                   {savingSpecies ? 'Сохранение…' : 'Добавить'}
                 </button>
               </div>
@@ -141,6 +190,17 @@ export const SpeciesTab: React.FC<SpeciesTabProps> = ({ speciesList, onRefresh }
           </div>
         </div>
       )}
+
+      <ConfirmModal
+        isOpen={Boolean(deleteTarget)}
+        title="Удалить вид животных?"
+        description={deleteTarget ? `Вид «${deleteTarget.name}» будет удалён.` : ''}
+        confirmLabel="Удалить"
+        loading={deletingSpecies}
+        error={deleteError}
+        onClose={() => !deletingSpecies && setDeleteTarget(null)}
+        onConfirm={handleDeleteSpecies}
+      />
     </>
   );
 };

@@ -1,212 +1,157 @@
 'use client';
 
-import React, { useEffect, useState, useMemo, Suspense } from 'react';
-import { useSearchParams, useRouter } from 'next/navigation';
-import { adminApi, clinicApi } from '../../../api';
-import { Service, Specialization, Species, ServiceSpecies } from '../../../types';
-import { AppShell } from '../../../components/layout/AppShell';
-import {
-  ServicesFilters,
-  ServicesTable,
-  ServiceDetailIsland,
-  ServiceModal,
-  ServiceSpeciesModal,
-  DeleteServiceModal,
-  SpeciesTab,
-  SpecializationsTab,
-} from './_components';
+import React, { Suspense } from 'react';
+import { AlertCircle } from 'lucide-react';
+import { useShellHeader } from '@/components/layout/AppShell';
+import { ConfirmModal } from '@/shared/components/ConfirmModal';
+import { SERVICE_NAV_TABS, useAdminServices } from './_hooks/useAdminServices';
+import { ServicesFilters } from './_components/ServicesFilters';
+import { ServicesTable } from './_components/ServicesTable';
+import { ServiceDetailIsland } from './_components/ServiceDetailIsland';
+import { ServiceModal } from './_components/ServiceModal';
+import { ServiceSpeciesModal } from './_components/ServiceSpeciesModal';
+import { SpeciesTab } from './_components/SpeciesTab';
+import { SpecializationsTab } from './_components/SpecializationsTab';
 
-const NAV_TABS = [
-  { key: 'SERVICES', label: 'Услуги', href: '/admin/services', crumb: 'Услуги' },
-  { key: 'SPECIES', label: 'Виды животных', href: '/admin/services?tab=species', crumb: 'Виды животных' },
-  { key: 'SPECIALIZATIONS', label: 'Специализации', href: '/admin/services?tab=specs', crumb: 'Специализации' },
-] as const;
-
-/**
- * Страница управления ветеринарными услугами, видами животных и специализациями.
- * Компактный оркестратор состояния данных, фильтрации и модальных окон.
- */
 function AdminServicesContent() {
-  const router = useRouter();
-  const searchParams = useSearchParams();
-  const tabParam = searchParams.get('tab');
+  const s = useAdminServices();
 
-  const [services, setServices] = useState<Service[]>([]);
-  const [specializations, setSpecializations] = useState<Specialization[]>([]);
-  const [speciesList, setSpeciesList] = useState<Species[]>([]);
-  const [serviceSpeciesMap, setServiceSpeciesMap] = useState<Record<string, ServiceSpecies[]>>({});
-  const [loading, setLoading] = useState(true);
-
-  const [mainTab, setMainTab] = useState<'SERVICES' | 'SPECIES' | 'SPECIALIZATIONS'>('SERVICES');
-  const [filterSpec, setFilterSpec] = useState<string>('ALL');
-  const [filterSpecies, setFilterSpecies] = useState<string>('ALL');
-  const [search, setSearch] = useState('');
-
-  const [selectedService, setSelectedService] = useState<Service | null>(null);
-  const [serviceModal, setServiceModal] = useState<{ open: boolean; service?: Service | null }>({ open: false });
-  const [deleteModal, setDeleteModal] = useState<{ open: boolean; service?: Service | null }>({ open: false });
-  const [speciesOverrideModal, setSpeciesOverrideModal] = useState<{ open: boolean; link?: ServiceSpecies | null }>({ open: false });
-  const [deleting, setDeleting] = useState(false);
-
-  const loadData = async () => {
-    setLoading(true);
-    try {
-      const [svcData, specData, speciesData] = await Promise.all([
-        adminApi.getServices().catch(() => [] as Service[]),
-        clinicApi.getSpecializations().catch(() => [] as Specialization[]),
-        clinicApi.getSpecies().catch(() => [] as Species[]),
-      ]);
-      const safeServices = Array.isArray(svcData) ? svcData : [];
-      setServices(safeServices);
-      setSpecializations(Array.isArray(specData) ? specData : []);
-      setSpeciesList(Array.isArray(speciesData) ? speciesData : []);
-
-      const linkEntries = await Promise.all(
-        safeServices.map(async (s) => [s.id, (await clinicApi.getServiceSpecies(s.id).catch(() => [])) || []] as const)
-      );
-      setServiceSpeciesMap(Object.fromEntries(linkEntries));
-
-      if (selectedService) {
-        const updated = safeServices.find((s: Service) => s.id === selectedService.id);
-        if (updated) setSelectedService(updated);
-      }
-    } catch (err) {
-      console.error('Failed to load services data', err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => { loadData(); }, []);
-
-  useEffect(() => {
-    if (tabParam === 'specs' || tabParam === 'specializations') setMainTab('SPECIALIZATIONS');
-    else if (tabParam === 'species') setMainTab('SPECIES');
-    else setMainTab('SERVICES');
-  }, [tabParam]);
-
-  const filteredServices = useMemo(() => {
-    const q = search.trim().toLowerCase();
-    return services.filter((s) => {
-      if (filterSpec !== 'ALL' && s.specializationId !== filterSpec) return false;
-      if (filterSpecies !== 'ALL' && !(serviceSpeciesMap[s.id] || []).some((l) => l.speciesId === filterSpecies)) return false;
-      if (q) {
-        const specName = specializations.find((sp) => sp.id === s.specializationId)?.name.toLowerCase() || '';
-        if (!s.name.toLowerCase().includes(q) && !specName.includes(q)) return false;
-      }
-      return true;
-    });
-  }, [services, filterSpec, filterSpecies, search, serviceSpeciesMap, specializations]);
-
-  const handleDeleteService = async () => {
-    const target = deleteModal.service || selectedService;
-    if (!target) return;
-    setDeleting(true);
-    try {
-      await adminApi.deleteService(target.id);
-      setDeleteModal({ open: false });
-      if (selectedService?.id === target.id) setSelectedService(null);
-      await loadData();
-    } catch (err: any) {
-      alert(err?.response?.data?.message || err?.message || 'Ошибка удаления услуги');
-    } finally {
-      setDeleting(false);
-    }
-  };
-
-  const activeTabItem = NAV_TABS.find((t) => t.key === mainTab) || NAV_TABS[0];
+  useShellHeader({ crumbGroup: 'Справочники', crumb: s.activeTabItem.crumb });
 
   return (
-    <AppShell crumbGroup="Справочники" crumb={activeTabItem.crumb}>
+    <>
       <div className="tabs-line" style={{ marginBottom: 'var(--gap)' }}>
-        {NAV_TABS.map((t) => (
+        {SERVICE_NAV_TABS.map((t) => (
           <button
             key={t.key}
-            className={`tab-line ${mainTab === t.key ? 'on' : ''}`}
-            onClick={() => { setMainTab(t.key); router.replace(t.href); }}
+            type="button"
+            className={`tab-line ${s.mainTab === t.key ? 'on' : ''}`}
+            onClick={() => s.switchTab(t)}
           >
             {t.label}
           </button>
         ))}
       </div>
 
-      {mainTab === 'SERVICES' && (
+      {s.error && (
+        <div className="alert alert-destructive row between" role="alert" style={{ alignItems: 'center', marginBottom: 'var(--gap)' }}>
+          <div className="row" style={{ gap: 8, alignItems: 'center' }}>
+            <AlertCircle size={16} className="ic" />
+            <span>{s.error}</span>
+          </div>
+          <button type="button" className="btn btn-outline btn-sm" onClick={() => void s.reload()}>
+            Повторить
+          </button>
+        </div>
+      )}
+
+      {s.mainTab === 'SERVICES' && (
         <div className="content-row">
           <div className="content-col grow">
             <ServicesFilters
-              filterSpec={filterSpec}
-              onFilterSpecChange={setFilterSpec}
-              filterSpecies={filterSpecies}
-              onFilterSpeciesChange={setFilterSpecies}
-              search={search}
-              onSearchChange={setSearch}
-              specializations={specializations}
-              speciesList={speciesList}
-              onOpenCreate={() => setServiceModal({ open: true, service: null })}
+              filterSpec={s.filterSpec}
+              onFilterSpecChange={s.setFilterSpec}
+              filterSpecies={s.filterSpecies}
+              onFilterSpeciesChange={s.setFilterSpecies}
+              search={s.search}
+              onSearchChange={s.setSearch}
+              specializations={s.specializations}
+              speciesList={s.speciesList}
+              onOpenCreate={s.openCreateService}
             />
             <ServicesTable
-              services={filteredServices}
-              loading={loading}
-              selectedService={selectedService}
-              onSelectService={setSelectedService}
-              serviceSpeciesMap={serviceSpeciesMap}
-              specializations={specializations}
-              speciesList={speciesList}
-              onEditService={(svc) => setServiceModal({ open: true, service: svc })}
-              onDeleteService={(svc) => setDeleteModal({ open: true, service: svc })}
+              services={s.services}
+              loading={s.loading}
+              selectedService={s.selectedService}
+              onSelectService={s.setSelectedService}
+              serviceSpeciesMap={s.serviceSpeciesMap}
+              specializations={s.specializations}
+              speciesList={s.speciesList}
+              onEditService={s.openEditService}
+              onDeleteService={s.requestDeleteService}
             />
           </div>
 
-          {selectedService && (
+          {s.selectedService && (
             <ServiceDetailIsland
-              service={selectedService}
-              specializations={specializations}
-              speciesList={speciesList}
-              serviceSpeciesMap={serviceSpeciesMap}
-              onClose={() => setSelectedService(null)}
-              onRefresh={loadData}
-              onDeleteClick={() => setDeleteModal({ open: true, service: selectedService })}
-              onOpenSpeciesModal={(link) => setSpeciesOverrideModal({ open: true, link })}
+              service={s.selectedService}
+              specializations={s.specializations}
+              speciesList={s.speciesList}
+              serviceSpeciesMap={s.serviceSpeciesMap}
+              onClose={() => s.setSelectedService(null)}
+              onSaveService={s.saveService}
+              onLoadServiceSpecies={s.loadServiceSpecies}
+              onAttachSpecies={s.attachServiceSpecies}
+              onDetachSpecies={s.detachServiceSpecies}
+              onSaveOverrides={s.saveServiceSpeciesOverrides}
+              onDeleteClick={() => s.requestDeleteService(s.selectedService!)}
+              onOpenSpeciesModal={s.openSpeciesOverrideModal}
             />
           )}
         </div>
       )}
 
-      {mainTab === 'SPECIES' && <SpeciesTab speciesList={speciesList} onRefresh={loadData} />}
-      {mainTab === 'SPECIALIZATIONS' && <SpecializationsTab specializations={specializations} onRefresh={loadData} />}
+      {s.mainTab === 'SPECIES' && (
+        <SpeciesTab
+          speciesList={s.speciesList}
+          onCreateSpecies={s.createSpecies}
+          onDeleteSpecies={s.deleteSpecies}
+        />
+      )}
+      {s.mainTab === 'SPECIALIZATIONS' && (
+        <SpecializationsTab
+          specializations={s.specializations}
+          onSaveSpecialization={s.saveSpecialization}
+          onDeleteSpecialization={s.deleteSpecialization}
+        />
+      )}
 
       <ServiceModal
-        isOpen={serviceModal.open}
-        service={serviceModal.service}
-        specializations={specializations}
-        onClose={() => setServiceModal({ open: false })}
-        onSuccess={async (saved) => { await loadData(); if (saved) setSelectedService(saved); }}
+        isOpen={s.serviceModal.open}
+        service={s.serviceModal.service}
+        specializations={s.specializations}
+        onClose={s.closeServiceModal}
+        onSave={s.saveService}
       />
 
-      <DeleteServiceModal
-        isOpen={deleteModal.open}
-        service={deleteModal.service || selectedService}
-        deleting={deleting}
-        onClose={() => setDeleteModal({ open: false })}
-        onConfirm={handleDeleteService}
+      <ConfirmModal
+        isOpen={Boolean(s.deleteTarget)}
+        title="Удалить услугу?"
+        description={
+          s.deleteTarget
+            ? `Услуга «${s.deleteTarget.name}» будет удалена. Записи с этой услугой могут быть затронуты.`
+            : ''
+        }
+        confirmLabel="Удалить"
+        loading={s.deleting}
+        error={s.deleteError}
+        onClose={s.closeDeleteModal}
+        onConfirm={s.confirmDeleteService}
       />
 
       <ServiceSpeciesModal
-        isOpen={speciesOverrideModal.open}
-        service={selectedService}
-        speciesList={speciesList}
-        existingOverride={speciesOverrideModal.link}
-        attachedSpeciesIds={(selectedService && serviceSpeciesMap[selectedService.id]?.map((l) => l.speciesId)) || []}
-        onClose={() => setSpeciesOverrideModal({ open: false })}
-        onSuccess={loadData}
+        isOpen={s.speciesOverrideModal.open}
+        service={s.selectedService}
+        speciesList={s.speciesList}
+        existingOverride={s.speciesOverrideModal.link}
+        attachedSpeciesIds={s.attachedSpeciesIds}
+        onClose={s.closeSpeciesOverrideModal}
+        onSave={s.saveServiceSpeciesOverride}
       />
-    </AppShell>
+    </>
   );
 }
 
 export default function AdminServicesPage() {
   return (
-    <Suspense fallback={<div className="p-8 text-center text-sm text-[var(--muted-foreground)]">Загрузка справочников…</div>}>
+    <Suspense
+      fallback={
+        <div className="empty">
+          <span className="spinner" aria-hidden="true" />
+          <span className="muted">Загрузка справочников…</span>
+        </div>
+      }
+    >
       <AdminServicesContent />
     </Suspense>
   );

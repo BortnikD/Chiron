@@ -1,10 +1,6 @@
-import {
-  Veterinarian,
-  Specialization,
-  Species,
-  WorkSchedule,
-  ScheduleException,
-} from '../../../types';
+import type { UserRole } from '@/shared/types';
+import type { Veterinarian, Specialization, Species } from '@/modules/clinic/types';
+import type { WorkSchedule, ScheduleException } from '@/modules/admin/types';
 
 export interface VeterinariansFiltersProps {
   specializations: Specialization[];
@@ -37,5 +33,5 @@ export interface VeterinarianDetailIslandProps {
   exceptions: ScheduleException[];
   onClose: () => void;
   isAuthenticated: boolean;
-  role?: string | null;
+  role?: UserRole | null;
 }

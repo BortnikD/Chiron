@@ -1,16 +1,18 @@
 'use client';
 
-import React from 'react';
-import { PawPrint } from 'lucide-react';
-import { Pet, Species, Appointment } from '../../../../types';
-import { getSpeciesTone } from '../../../../components/ui/SpeciesIcon';
+import React, { useMemo } from 'react';
+import type { Appointment, Pet } from '@/modules/client/types';
+import type { Species } from '@/modules/clinic/types';
+import { SpeciesIcon } from '@/components/ui/SpeciesIcon';
 import {
-  calculateAge,
-  getSpeciesName,
-  getPatientAppointments,
-  getLastAppointment,
-  getNextAppointment,
-} from './utils';
+  calculateAgeRu,
+  formatIsoDateDisplay,
+  formatSlotTime,
+  getMoscowDateKey,
+  getMoscowTodayIso,
+  getSpeciesTone,
+  toIdNameMap,
+} from '@/shared/lib';
 
 export interface VetPatientsListProps {
   /** Список пациентов для отображения */
@@ -29,6 +31,28 @@ export interface VetPatientsListProps {
   viewMode?: 'table' | 'cards';
 }
 
+function getLastAppointmentDate(appts: Appointment[]): string {
+  const nowMs = Date.now();
+  const past = appts
+    .filter((a) => new Date(a.startAt).getTime() <= nowMs)
+    .sort((a, b) => new Date(b.startAt).getTime() - new Date(a.startAt).getTime());
+  if (past.length === 0) return '—';
+  return formatIsoDateDisplay(getMoscowDateKey(past[0].startAt));
+}
+
+function getNextAppointmentDate(appts: Appointment[], todayMoscow: string): string {
+  const nowMs = Date.now();
+  const upcoming = appts
+    .filter((a) => new Date(a.startAt).getTime() > nowMs && a.status !== 'CANCELLED')
+    .sort((a, b) => new Date(a.startAt).getTime() - new Date(b.startAt).getTime());
+  if (upcoming.length === 0) return '—';
+  const dateKey = getMoscowDateKey(upcoming[0].startAt);
+  if (dateKey === todayMoscow) {
+    return `сегодня ${formatSlotTime(upcoming[0].startAt)}`;
+  }
+  return formatIsoDateDisplay(dateKey);
+}
+
 /**
  * Список пациентов врача:
  * отображает данные пациентов в виде интерактивной таблицы (.dtable) либо сетки карточек (.cards),
@@ -43,17 +67,34 @@ export function VetPatientsList({
   loading = false,
   viewMode = 'table',
 }: VetPatientsListProps) {
+  const speciesMap = useMemo(() => toIdNameMap(speciesList), [speciesList]);
+  const todayMoscow = getMoscowTodayIso();
+
+  const apptsByPet = useMemo(() => {
+    const map: Record<string, Appointment[]> = {};
+    for (const appt of appointments) {
+      if (!map[appt.petId]) map[appt.petId] = [];
+      map[appt.petId].push(appt);
+    }
+    return map;
+  }, [appointments]);
+
   if (viewMode === 'cards') {
     return (
-      <div style={{ padding: '0 16px 16px' }}>
+      <div className="island-body">
         <div className="cards">
           {patients.map((p) => {
             const isSelected = selectedPatient?.id === p.id;
-            const age = calculateAge(p.birthDate);
-            const last = getLastAppointment(appointments, p.id);
-            const next = getNextAppointment(appointments, p.id);
-            const count = getPatientAppointments(appointments, p.id).length;
-            const tone = getSpeciesTone(p.speciesId);
+            const age = calculateAgeRu(p.birthDate);
+            const petAppts = apptsByPet[p.id] || [];
+            const last = getLastAppointmentDate(petAppts);
+            const next = getNextAppointmentDate(petAppts, todayMoscow);
+            const count = petAppts.length;
+            const tone = getSpeciesTone(
+              p.species?.name || p.speciesName || p.speciesId,
+              speciesMap
+            );
+            const speciesName = p.species?.name || p.speciesName || speciesMap[p.speciesId] || '—';
 
             return (
               <button
@@ -64,13 +105,13 @@ export function VetPatientsList({
                 style={{ textAlign: 'left', cursor: 'pointer' }}
               >
                 <div className="tcard-head">
-                  <span className={`t-ava sm ${tone}`}>
-                    <PawPrint size={14} className="ic" />
+                  <span className={`t-ava sm tone-${tone}`}>
+                    <SpeciesIcon species={tone} size={16} />
                   </span>
                   <div className="col" style={{ gap: '2px', minWidth: 0 }}>
                     <span className="tcard-title">{p.name}</span>
                     <span className="cell-sub">
-                      {getSpeciesName(speciesList, p.speciesId)} · {age}
+                      {speciesName} · {age}
                     </span>
                   </div>
                   {p.isArchived && (
@@ -144,25 +185,32 @@ export function VetPatientsList({
 
         {patients.map((p) => {
           const isSelected = selectedPatient?.id === p.id;
-          const age = calculateAge(p.birthDate);
-          const last = getLastAppointment(appointments, p.id);
-          const next = getNextAppointment(appointments, p.id);
-          const count = getPatientAppointments(appointments, p.id).length;
+          const age = calculateAgeRu(p.birthDate);
+          const petAppts = apptsByPet[p.id] || [];
+          const last = getLastAppointmentDate(petAppts);
+          const next = getNextAppointmentDate(petAppts, todayMoscow);
+          const count = petAppts.length;
+          const tone = getSpeciesTone(
+            p.species?.name || p.speciesName || p.speciesId,
+            speciesMap
+          );
+          const speciesName = p.species?.name || p.speciesName || speciesMap[p.speciesId] || '—';
 
           return (
             <button
               key={p.id}
+              type="button"
               className={`trow ${isSelected ? 'sel' : ''}`}
               onClick={() => onSelectPatient(p)}
             >
               <span className="row" style={{ gap: 10 }}>
-                <span className={`t-ava sm ${getSpeciesTone(p.speciesId)}`}>
-                  <PawPrint size={14} className="ic" />
+                <span className={`t-ava sm tone-${tone}`}>
+                  <SpeciesIcon species={tone} size={16} />
                 </span>
                 <span className="cell-main">{p.name}</span>
                 {p.isArchived && <span className="badge">Архив</span>}
               </span>
-              <span>{getSpeciesName(speciesList, p.speciesId)}</span>
+              <span>{speciesName}</span>
               <span className="tnum">{age}</span>
               <span className="tnum">{last}</span>
               <span className="tnum">

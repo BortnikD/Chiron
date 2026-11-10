@@ -1,8 +1,14 @@
 'use client';
 
-import React from 'react';
+import React, { useMemo } from 'react';
 import { ClipboardList, Edit2, Trash2 } from 'lucide-react';
-import { Service, Specialization, Species, ServiceSpecies } from '../../../../types';
+import type {
+  Service,
+  Specialization,
+  Species,
+  ServiceSpecies,
+} from '@/modules/clinic/types';
+import { formatCurrency, toIdNameMap } from '@/shared/lib';
 
 export interface ServicesTableProps {
   services: Service[];
@@ -27,17 +33,8 @@ export const ServicesTable: React.FC<ServicesTableProps> = ({
   onEditService,
   onDeleteService,
 }) => {
-  const getSpecName = (specId?: string) => {
-    if (!specId) return '—';
-    const s = specializations.find((sp) => sp.id === specId);
-    return s ? s.name : '—';
-  };
-
-  const getSpeciesName = (spId?: string) => {
-    if (!spId) return '—';
-    const s = speciesList.find((sp) => sp.id === spId);
-    return s ? s.name : '—';
-  };
+  const specsMap = useMemo(() => toIdNameMap(specializations), [specializations]);
+  const speciesMap = useMemo(() => toIdNameMap(speciesList), [speciesList]);
 
   return (
     <section className="island grow">
@@ -73,22 +70,29 @@ export const ServicesTable: React.FC<ServicesTableProps> = ({
             const links = serviceSpeciesMap[r.id] || [];
 
             return (
-              <button
+              <div
                 key={r.id}
-                type="button"
+                role="button"
+                tabIndex={0}
                 className={`trow ${isSelected ? 'sel' : ''}`}
                 onClick={() => onSelectService(r)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    onSelectService(r);
+                  }
+                }}
               >
                 <span className="cell-main">{r.name}</span>
-                <span className="muted">{getSpecName(r.specializationId)}</span>
-                <span className="right tnum">{r.basePrice.toLocaleString('ru-RU')} ₽</span>
+                <span className="muted">{specsMap[r.specializationId] || '—'}</span>
+                <span className="right tnum">{formatCurrency(r.basePrice)}</span>
                 <span className="right tnum">{r.baseDurationMin} мин</span>
                 <span className="right tnum">{r.bufferAfterMin} мин</span>
                 <span className="chips">
                   {links.length > 0 ? (
                     links.map((l) => (
                       <span key={l.speciesId} className="badge badge-outline">
-                        {getSpeciesName(l.speciesId)}
+                        {speciesMap[l.speciesId] || '—'}
                       </span>
                     ))
                   ) : (
@@ -96,21 +100,16 @@ export const ServicesTable: React.FC<ServicesTableProps> = ({
                   )}
                 </span>
                 <span className="row between" style={{ alignItems: 'center' }}>
-                  <span
-                    className={`badge ${r.isActive ? 'badge-accent' : 'badge-outline'}`}
-                  >
+                  <span className={`badge ${r.isActive ? 'badge-accent' : 'badge-outline'}`}>
                     {r.isActive ? 'Активна' : 'Отключена'}
                   </span>
                   {(onEditService || onDeleteService) && (
-                    <span
-                      className="row-actions"
-                      onClick={(e) => e.stopPropagation()}
-                    >
+                    <span className="row-actions" onClick={(e) => e.stopPropagation()}>
                       {onEditService && (
-                        <span
+                        <button
+                          type="button"
                           className="btn btn-ghost btn-icon btn-sm"
-                          role="button"
-                          tabIndex={0}
+                          aria-label={`Редактировать услугу «${r.name}»`}
                           title="Редактировать"
                           onClick={(e) => {
                             e.stopPropagation();
@@ -118,13 +117,13 @@ export const ServicesTable: React.FC<ServicesTableProps> = ({
                           }}
                         >
                           <Edit2 size={13} />
-                        </span>
+                        </button>
                       )}
                       {onDeleteService && (
-                        <span
+                        <button
+                          type="button"
                           className="btn btn-ghost btn-icon btn-sm"
-                          role="button"
-                          tabIndex={0}
+                          aria-label={`Удалить услугу «${r.name}»`}
                           title="Удалить"
                           onClick={(e) => {
                             e.stopPropagation();
@@ -132,15 +131,22 @@ export const ServicesTable: React.FC<ServicesTableProps> = ({
                           }}
                         >
                           <Trash2 size={13} />
-                        </span>
+                        </button>
                       )}
                     </span>
                   )}
                 </span>
-              </button>
+              </div>
             );
           })}
         </div>
+
+        {loading && services.length === 0 && (
+          <div className="empty">
+            <span className="spinner" aria-hidden="true" />
+            <span className="muted">Загрузка услуг…</span>
+          </div>
+        )}
 
         {services.length === 0 && !loading && (
           <div className="empty">

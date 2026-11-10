@@ -1,4 +1,5 @@
-import { VaccinationStatusTone, VaccinationFormData } from './types';
+import { getMoscowTodayIso } from '@/shared/lib';
+import type { VaccinationStatusTone, VaccinationFormData } from './types';
 
 export const STATUS_FILTERS: Array<{ value: VaccinationStatusTone; label: string }> = [
   { value: 'all', label: 'Все' },
@@ -12,8 +13,6 @@ export const VACCINATIONS_TABLE_COLS = '1.4fr 1.6fr 1fr 1fr 1fr 80px';
 export const createEmptyVaccinationForm = (defaultPetId = ''): VaccinationFormData => ({
   petId: defaultPetId,
   name: '',
-  administeredOn: new Date().toISOString().split('T')[0],
+  administeredOn: getMoscowTodayIso(),
   nextDueOn: '',
-  batchNumber: '',
-  notes: '',
 });

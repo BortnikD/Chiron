@@ -1,15 +1,15 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { AlertCircle } from 'lucide-react';
-import { adminApi } from '../../../../api';
-import { User } from '../../../../types';
+import { AlertCircle, X } from 'lucide-react';
+import type { User } from '@/shared/types';
+import { formatApiError } from '@/shared/lib';
 
 export interface AdminEditUserModalProps {
   isOpen: boolean;
   user: User | null;
   onClose: () => void;
-  onSuccess: (updated?: User) => void;
+  onUpdateUser: (id: string, data: Partial<User>) => Promise<User>;
 }
 
 /**
@@ -19,7 +19,7 @@ export const AdminEditUserModal: React.FC<AdminEditUserModalProps> = ({
   isOpen,
   user,
   onClose,
-  onSuccess,
+  onUpdateUser,
 }) => {
   const [editForm, setEditForm] = useState({
     firstName: '',
@@ -45,30 +45,41 @@ export const AdminEditUserModal: React.FC<AdminEditUserModalProps> = ({
     }
   }, [isOpen, user]);
 
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && !saving) onClose();
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, saving, onClose]);
+
   if (!isOpen || !user) return null;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    const normalizedPhone = editForm.phone.replace(/[\s()-]/g, '').trim();
     if (!editForm.firstName.trim() || !editForm.lastName.trim() || !editForm.email.trim()) {
       setError('Заполните обязательные поля');
+      return;
+    }
+    if (normalizedPhone && !/^\+?\d{10,15}$/.test(normalizedPhone)) {
+      setError('Телефон должен содержать от 10 до 15 цифр (например, +79001234567)');
       return;
     }
     setSaving(true);
     setError(null);
     try {
-      const updated = await adminApi.updateUser(user.id, {
+      await onUpdateUser(user.id, {
         firstName: editForm.firstName.trim(),
         middleName: editForm.middleName.trim() || null,
         lastName: editForm.lastName.trim(),
         email: editForm.email.trim(),
-        phone: editForm.phone.trim(),
+        phone: normalizedPhone,
       });
-      onSuccess(updated as unknown as User);
       onClose();
-    } catch (err: any) {
-      setError(
-        err?.response?.data?.message || err?.message || 'Ошибка обновления пользователя'
-      );
+    } catch (err: unknown) {
+      setError(formatApiError(err, 'Ошибка обновления пользователя'));
     } finally {
       setSaving(false);
     }
@@ -77,117 +88,119 @@ export const AdminEditUserModal: React.FC<AdminEditUserModalProps> = ({
   return (
     <div
       className="overlay"
-      onClick={onClose}
-      style={{
-        position: 'fixed',
-        inset: 0,
-        background: 'rgba(0,0,0,0.5)',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        zIndex: 1000,
-      }}
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="edit-user-title"
+      onClick={() => !saving && onClose()}
     >
-      <div
-        className="dialog dialog-md"
-        style={{ width: 480 }}
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="dialog-head">
-          <span className="dialog-title">Редактировать пользователя</span>
-          <span className="dialog-desc">
-            Изменение данных пользователя «{user.fullName || `${user.firstName} ${user.lastName}`}»
-          </span>
+      <div className="dialog" onClick={(e) => e.stopPropagation()}>
+        <div
+          className="dialog-head"
+          style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}
+        >
+          <div className="col" style={{ gap: 4 }}>
+            <span id="edit-user-title" className="dialog-title">
+              Редактировать пользователя
+            </span>
+            <span className="dialog-desc">
+              Изменение данных пользователя «{user.fullName || `${user.firstName} ${user.lastName}`}»
+            </span>
+          </div>
+          <button
+            type="button"
+            className="btn btn-ghost btn-icon btn-sm"
+            aria-label="Закрыть"
+            onClick={() => !saving && onClose()}
+          >
+            <X size={16} />
+          </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="col" style={{ gap: 14 }}>
-          <div className="form-grid">
-            <div className="field">
-              <label className="field-label" htmlFor="me-first">
-                Имя <span className="req">*</span>
-              </label>
-              <input
-                id="me-first"
-                className="input"
-                value={editForm.firstName}
-                onChange={(e) => setEditForm({ ...editForm, firstName: e.target.value })}
-                required
-              />
+        <form
+          onSubmit={handleSubmit}
+          style={{ display: 'flex', flexDirection: 'column', minHeight: 0, flex: 1 }}
+        >
+          <div className="dialog-body">
+            <div className="form-grid">
+              <div className="field">
+                <label className="field-label" htmlFor="me-first">
+                  Имя <span className="req">*</span>
+                </label>
+                <input
+                  id="me-first"
+                  className="input"
+                  value={editForm.firstName}
+                  onChange={(e) => setEditForm({ ...editForm, firstName: e.target.value })}
+                  required
+                />
+              </div>
+
+              <div className="field">
+                <label className="field-label" htmlFor="me-middle">
+                  Отчество
+                </label>
+                <input
+                  id="me-middle"
+                  className="input"
+                  value={editForm.middleName}
+                  onChange={(e) => setEditForm({ ...editForm, middleName: e.target.value })}
+                />
+              </div>
+
+              <div className="field span-2">
+                <label className="field-label" htmlFor="me-last">
+                  Фамилия <span className="req">*</span>
+                </label>
+                <input
+                  id="me-last"
+                  className="input"
+                  value={editForm.lastName}
+                  onChange={(e) => setEditForm({ ...editForm, lastName: e.target.value })}
+                  required
+                />
+              </div>
+
+              <div className="field span-2">
+                <label className="field-label" htmlFor="me-email">
+                  Email <span className="req">*</span>
+                </label>
+                <input
+                  id="me-email"
+                  type="email"
+                  className="input"
+                  value={editForm.email}
+                  onChange={(e) => setEditForm({ ...editForm, email: e.target.value })}
+                  required
+                />
+              </div>
+
+              <div className="field span-2">
+                <label className="field-label" htmlFor="me-phone">
+                  Телефон
+                </label>
+                <input
+                  id="me-phone"
+                  type="tel"
+                  className="input"
+                  value={editForm.phone}
+                  onChange={(e) => setEditForm({ ...editForm, phone: e.target.value })}
+                />
+              </div>
             </div>
 
-            <div className="field">
-              <label className="field-label" htmlFor="me-middle">
-                Отчество
-              </label>
-              <input
-                id="me-middle"
-                className="input"
-                value={editForm.middleName}
-                onChange={(e) => setEditForm({ ...editForm, middleName: e.target.value })}
-              />
-            </div>
-
-            <div className="field span-2">
-              <label className="field-label" htmlFor="me-last">
-                Фамилия <span className="req">*</span>
-              </label>
-              <input
-                id="me-last"
-                className="input"
-                value={editForm.lastName}
-                onChange={(e) => setEditForm({ ...editForm, lastName: e.target.value })}
-                required
-              />
-            </div>
-
-            <div className="field span-2">
-              <label className="field-label" htmlFor="me-email">
-                Email <span className="req">*</span>
-              </label>
-              <input
-                id="me-email"
-                type="email"
-                className="input"
-                value={editForm.email}
-                onChange={(e) => setEditForm({ ...editForm, email: e.target.value })}
-                required
-              />
-            </div>
-
-            <div className="field span-2">
-              <label className="field-label" htmlFor="me-phone">
-                Телефон
-              </label>
-              <input
-                id="me-phone"
-                type="tel"
-                className="input"
-                value={editForm.phone}
-                onChange={(e) => setEditForm({ ...editForm, phone: e.target.value })}
-              />
-            </div>
+            {error && (
+              <div className="alert alert-destructive" role="alert">
+                <AlertCircle size={16} className="ic" />
+                <div>{error}</div>
+              </div>
+            )}
           </div>
 
-          {error && (
-            <div className="alert" role="alert">
-              <AlertCircle size={16} />
-              <div>{error}</div>
-            </div>
-          )}
-
           <div className="dialog-foot">
-            <button
-              type="button"
-              className="btn btn-outline"
-              onClick={onClose}
-            >
+            <button type="button" className="btn btn-outline" onClick={onClose} disabled={saving}>
               Отмена
             </button>
-            <button
-              type="submit"
-              className="btn btn-primary"
-              disabled={saving}
-            >
+            <button type="submit" className="btn btn-primary" disabled={saving}>
               {saving ? 'Сохранение…' : 'Сохранить'}
             </button>
           </div>

@@ -9,56 +9,93 @@ import {
   Sparkles,
   CalendarPlus,
   Clock,
+  AlertCircle,
 } from 'lucide-react';
-import { LandingServicesSectionProps, ClinicDirection, PopularOffer } from './types';
+import { formatCurrency, getSpecTone, toIdNameMap } from '@/shared/lib';
+import { SPECIALIZATION_NAMES_RU } from '@/utils/doctorHelpers';
+import type { Service } from '@/modules/clinic/types';
+import type { LandingServicesSectionProps, ClinicDirection, PopularOffer } from './types';
 
 const DEFAULT_DIRECTIONS: ClinicDirection[] = [
-  { id: 'ther', name: 'Терапия', who: 'И. И. Петров' },
-  { id: 'surg', name: 'Хирургия', who: 'М. А. Соколова' },
-  { id: 'dent', name: 'Стоматология', who: 'О. В. Ким' },
-  { id: 'derm', name: 'Дерматология', who: 'Е. П. Морозова' },
-  { id: 'opht', name: 'Офтальмология', who: 'А. С. Белов' },
-  { id: 'prev', name: 'Профилактика', who: 'Н. И. Орлова' },
+  { id: 'ther', name: 'Терапия', who: 'Первичный осмотр и диагностика' },
+  { id: 'surg', name: 'Хирургия', who: 'Плановые и срочные операции' },
+  { id: 'dent', name: 'Стоматология', who: 'УЗ-чистка и санация полости' },
+  { id: 'derm', name: 'Дерматология', who: 'Диагностика кожи и шерсти' },
+  { id: 'opht', name: 'Офтальмология', who: 'Осмотр глаз и тонометрия' },
+  { id: 'prev', name: 'Профилактика', who: 'Вакцинация и паспорт прививок' },
 ];
 
-export const LandingServicesSection: React.FC<LandingServicesSectionProps> = ({ services = [] }) => {
+const FEATURED_SERVICES: PopularOffer[] = [
+  {
+    spec: 'ther',
+    specName: 'Терапия',
+    name: 'Первичный осмотр',
+    desc: 'Осмотр, сбор анамнеза, план обследования и лечения.',
+    dur: 30,
+    price: formatCurrency(1500),
+  },
+  {
+    spec: 'surg',
+    specName: 'Хирургия',
+    name: 'Стерилизация и кастрация',
+    desc: 'Плановые операции под ингаляционным наркозом с мониторингом.',
+    dur: 60,
+    price: formatCurrency(4500),
+  },
+  {
+    spec: 'dent',
+    specName: 'Стоматология',
+    name: 'Ультразвуковая чистка зубов',
+    desc: 'Снятие зубного камня, полировка, санация ротовой полости.',
+    dur: 40,
+    price: formatCurrency(3000),
+  },
+];
+
+export const LandingServicesSection: React.FC<LandingServicesSectionProps> = ({
+  services = [],
+  specializations = [],
+  error = null,
+}) => {
+  const specsMap = useMemo(() => toIdNameMap(specializations), [specializations]);
+
   const popularOffers: PopularOffer[] = useMemo(() => {
-    return [
-      {
-        spec: 'ther',
-        specName: 'Терапия',
-        name: 'Первичный осмотр',
-        desc: 'Осмотр, сбор анамнеза, план обследования и лечения.',
-        dur: 30,
-        price: '1 500 ₽',
-        serviceId: services.find(
-          (s) => s.name.toLowerCase().includes('осмотр') || s.name.toLowerCase().includes('check-up')
-        )?.id,
-      },
-      {
-        spec: 'surg',
-        specName: 'Хирургия',
-        name: 'Стерилизация и кастрация',
-        desc: 'Плановые операции под ингаляционным наркозом с мониторингом.',
-        dur: 60,
-        price: '4 500 ₽',
-        serviceId: services.find(
-          (s) => s.name.toLowerCase().includes('spaying') || s.name.toLowerCase().includes('стерил')
-        )?.id,
-      },
-      {
-        spec: 'dent',
-        specName: 'Стоматология',
-        name: 'Ультразвуковая чистка зубов',
-        desc: 'Снятие зубного камня, полировка, санация ротовой полости.',
-        dur: 40,
-        price: '3 000 ₽',
-        serviceId: services.find(
-          (s) => s.name.toLowerCase().includes('teeth') || s.name.toLowerCase().includes('чистк')
-        )?.id,
-      },
-    ];
-  }, [services]);
+    if (services.length === 0) {
+      return FEATURED_SERVICES;
+    }
+
+    const active = services.filter((s) => s.isActive !== false);
+    const pool = active.length > 0 ? active : services;
+    const picked: Service[] = [];
+    const usedSpecs = new Set<string>();
+
+    for (const s of pool) {
+      if (!usedSpecs.has(s.specializationId)) {
+        picked.push(s);
+        usedSpecs.add(s.specializationId);
+        if (picked.length === 3) break;
+      }
+    }
+    for (const s of pool) {
+      if (picked.length >= 3) break;
+      if (!picked.some((item) => item.id === s.id)) {
+        picked.push(s);
+      }
+    }
+
+    return picked.map((s) => ({
+      spec: getSpecTone(s.specializationId),
+      specName:
+        specsMap[s.specializationId] ||
+        SPECIALIZATION_NAMES_RU[s.specializationId] ||
+        'Услуга',
+      name: s.name,
+      desc: s.description || 'Консультация специалиста и проведение процедуры по показаниям.',
+      dur: s.baseDurationMin || s.durationMin || 30,
+      price: formatCurrency(s.basePrice ?? s.price ?? 0),
+      serviceId: s.id,
+    }));
+  }, [services, specsMap]);
 
   return (
     <>
@@ -111,10 +148,18 @@ export const LandingServicesSection: React.FC<LandingServicesSectionProps> = ({ 
             </Link>
           </div>
           <div className="island-body" style={{ paddingTop: 0 }}>
+            {error && (
+              <div className="alert alert-info mb-3" role="status">
+                <AlertCircle className="ic" />
+                <div className="small">
+                  Не удалось обновить каталог с сервера — показаны базовые услуги клиники.
+                </div>
+              </div>
+            )}
             <div className="ab-offers">
               {popularOffers.map((offer) => (
                 <Link
-                  key={offer.name}
+                  key={offer.serviceId || offer.name}
                   href={offer.serviceId ? `/services?open=${offer.serviceId}` : '/services'}
                   className={`ab-offer tone-${offer.spec}`}
                   style={{ textDecoration: 'none' }}

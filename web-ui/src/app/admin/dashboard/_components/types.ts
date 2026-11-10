@@ -1,4 +1,10 @@
-import { StatisticsGranularity, TimelinePoint, VeterinarianStatistics, ServiceStatistics, SpeciesStatistics } from '../../../../types';
+import type { StatisticsGranularity } from '@/shared/types';
+import type {
+  TimelinePoint,
+  VeterinarianStatistics,
+  ServiceStatistics,
+  SpeciesStatistics,
+} from '@/modules/admin/types';
 
 export type DashboardPeriod = 'week' | 'month' | 'quarter' | 'custom';
 
@@ -67,7 +73,6 @@ export interface TopVeterinariansIslandProps {
 
 export interface TopServicesIslandProps {
   servicesStats: ServiceStatistics[];
-  initialMetric?: 'rev' | 'count';
 }
 
 export interface SpeciesDistributionIslandProps {

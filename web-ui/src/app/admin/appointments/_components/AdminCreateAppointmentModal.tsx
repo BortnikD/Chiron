@@ -1,135 +1,168 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import { X } from 'lucide-react';
+import type { AdminCreateAppointmentRequest } from '@/modules/admin/types';
+import type { Appointment, Pet } from '@/modules/client/types';
+import type { Veterinarian, Service } from '@/modules/clinic/types';
+import type { User } from '@/shared/types';
+import { formatApiError, getMoscowTodayIso, timeToMinutes } from '@/shared/lib';
 import {
-  Appointment,
-  Veterinarian,
-  Service,
-  Pet,
-  User,
-  AppointmentStatus,
-  AdminCreateAppointmentRequest,
-} from '../../../../types';
-import { clinicApi, adminApi } from '../../../../api';
-import { Check, AlertCircle, X } from 'lucide-react';
-import { getVetName, getOwnerName } from './utils';
+  CreateAppointmentFields,
+  type CreateAppointmentFormState,
+} from './CreateAppointmentFields';
 
 export interface AdminCreateAppointmentModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSuccess: (created: Appointment) => void;
+  onCreate: (payload: AdminCreateAppointmentRequest) => Promise<Appointment>;
+  onCheckSlot: (params: {
+    veterinarianId: string;
+    startAt: string;
+    endAt: string;
+  }) => Promise<boolean>;
   veterinarians: Veterinarian[];
   services: Service[];
   pets: Pet[];
   users: User[];
 }
 
-/**
- * Модальное окно создания записи на приём администратором клиники.
- */
+function calculateEndTime(startTime: string, durationMin: number): string {
+  const [h, m] = startTime.split(':').map(Number);
+  const totalMin = (h || 0) * 60 + (m || 0) + durationMin;
+  const endH = Math.floor(totalMin / 60) % 24;
+  const endM = totalMin % 60;
+  return `${String(endH).padStart(2, '0')}:${String(endM).padStart(2, '0')}`;
+}
+
 export const AdminCreateAppointmentModal: React.FC<AdminCreateAppointmentModalProps> = ({
   isOpen,
   onClose,
-  onSuccess,
+  onCreate,
+  onCheckSlot,
   veterinarians,
   services,
   pets,
   users,
 }) => {
-  const [form, setForm] = useState({
+  const [form, setForm] = useState<CreateAppointmentFormState>({
     veterinarianId: '',
     petId: '',
     serviceId: '',
-    date: new Date().toISOString().split('T')[0],
+    date: getMoscowTodayIso(),
     start: '10:00',
     end: '10:30',
     price: 1500,
-    status: 'CONFIRMED' as AppointmentStatus,
     clientComment: '',
   });
-
+  const [endEdited, setEndEdited] = useState(false);
   const [availStatus, setAvailStatus] = useState<'idle' | 'ok' | 'err'>('idle');
-  const [availMsg, setAvailMsg] = useState<string>('');
+  const [availMsg, setAvailMsg] = useState('');
+  const [checkingSlot, setCheckingSlot] = useState(false);
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
 
-  // Инициализация значений по умолчанию при открытии
   useEffect(() => {
     if (!isOpen) return;
     setCreateError(null);
     setAvailStatus('idle');
     setAvailMsg('');
-    const firstVet = veterinarians[0]?.id || '';
+    setEndEdited(false);
     const firstSvc = services[0];
-    const firstPet = pets[0]?.id || '';
-
     setForm({
-      veterinarianId: firstVet,
-      petId: firstPet,
+      veterinarianId: veterinarians[0]?.id || '',
+      petId: pets[0]?.id || '',
       serviceId: firstSvc?.id || '',
-      date: new Date().toISOString().split('T')[0],
+      date: getMoscowTodayIso(),
       start: '10:00',
-      end: firstSvc?.baseDurationMin ? calculateEndTime('10:00', firstSvc.baseDurationMin) : '10:30',
+      end: firstSvc?.baseDurationMin
+        ? calculateEndTime('10:00', firstSvc.baseDurationMin)
+        : '10:30',
       price: firstSvc?.basePrice || 1500,
-      status: 'CONFIRMED',
       clientComment: '',
     });
   }, [isOpen, veterinarians, services, pets]);
 
-  function calculateEndTime(startTime: string, durationMin: number): string {
-    const [h, m] = startTime.split(':').map(Number);
-    const totalMin = (h || 0) * 60 + (m || 0) + durationMin;
-    const endH = Math.floor(totalMin / 60) % 24;
-    const endM = totalMin % 60;
-    return `${String(endH).padStart(2, '0')}:${String(endM).padStart(2, '0')}`;
-  }
+  useEffect(() => {
+    if (!isOpen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && !creating) onClose();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [isOpen, creating, onClose]);
 
   const handleServiceChange = (svcId: string) => {
     const svc = services.find((s) => s.id === svcId);
     const dur = svc?.baseDurationMin || 30;
+    setAvailStatus('idle');
     setForm((prev) => ({
       ...prev,
       serviceId: svcId,
       price: svc?.basePrice || 1500,
-      end: calculateEndTime(prev.start, dur),
+      end: endEdited ? prev.end : calculateEndTime(prev.start, dur),
     }));
   };
 
   const handleStartChange = (newStart: string) => {
     const svc = services.find((s) => s.id === form.serviceId);
     const dur = svc?.baseDurationMin || 30;
+    setAvailStatus('idle');
     setForm((prev) => ({
       ...prev,
       start: newStart,
-      end: calculateEndTime(newStart, dur),
+      end: endEdited ? prev.end : calculateEndTime(newStart, dur),
     }));
   };
 
+  const handleEndChange = (newEnd: string) => {
+    setEndEdited(true);
+    setAvailStatus('idle');
+    setForm((prev) => ({ ...prev, end: newEnd }));
+  };
+
+  const buildTimeRange = () => {
+    if (!form.date || !form.start || !form.end) {
+      return { error: 'Укажите дату, время начала и окончания приёма' };
+    }
+    if (timeToMinutes(form.end) <= timeToMinutes(form.start)) {
+      return { error: 'Время окончания должно быть позже времени начала' };
+    }
+    return {
+      startAt: new Date(`${form.date}T${form.start}:00+03:00`).toISOString(),
+      endAt: new Date(`${form.date}T${form.end}:00+03:00`).toISOString(),
+    };
+  };
+
   const handleCheckSlot = async () => {
-    if (!form.veterinarianId || !form.date || !form.start) return;
+    if (!form.veterinarianId) {
+      setAvailStatus('err');
+      setAvailMsg('Выберите врача для проверки слота');
+      return;
+    }
+    const range = buildTimeRange();
+    if ('error' in range) {
+      setAvailStatus('err');
+      setAvailMsg(range.error || 'Некорректное время приёма');
+      return;
+    }
+    setCheckingSlot(true);
     setAvailStatus('idle');
     try {
-      const selectedSvc = services.find((s) => s.id === form.serviceId);
-      const dur = selectedSvc?.baseDurationMin ?? 30;
-      const startIso = new Date(`${form.date}T${form.start}:00`).toISOString();
-      const endIso = new Date(new Date(startIso).getTime() + dur * 60000).toISOString();
-
-      const isAvailable = await clinicApi.checkAvailability({
+      const ok = await onCheckSlot({
         veterinarianId: form.veterinarianId,
-        startAt: startIso,
-        endAt: endIso,
+        startAt: range.startAt,
+        endAt: range.endAt,
       });
-
-      if (isAvailable) {
-        setAvailStatus('ok');
-        setAvailMsg('Слот свободен — можно создавать');
-      } else {
-        setAvailStatus('err');
-        setAvailMsg('Слот недоступен в рабочем графике врача');
-      }
-    } catch (err: any) {
+      setAvailStatus(ok ? 'ok' : 'err');
+      setAvailMsg(
+        ok ? 'Слот свободен — можно создавать' : 'Слот недоступен в рабочем графике врача'
+      );
+    } catch (err: unknown) {
       setAvailStatus('err');
-      setAvailMsg(err?.response?.data?.message || err?.message || 'Ошибка проверки слота');
+      setAvailMsg(formatApiError(err, 'Ошибка проверки слота'));
+    } finally {
+      setCheckingSlot(false);
     }
   };
 
@@ -139,29 +172,26 @@ export const AdminCreateAppointmentModal: React.FC<AdminCreateAppointmentModalPr
       setCreateError('Заполните все обязательные поля');
       return;
     }
+    const range = buildTimeRange();
+    if ('error' in range) {
+      setCreateError(range.error || 'Некорректное время приёма');
+      return;
+    }
     setCreating(true);
     setCreateError(null);
     try {
-      const selectedSvc = services.find((s) => s.id === form.serviceId);
-      const dur = selectedSvc?.baseDurationMin ?? 30;
-      const startIso = new Date(`${form.date}T${form.start}:00`).toISOString();
-      const endIso = new Date(new Date(startIso).getTime() + dur * 60000).toISOString();
-
-      const payload: AdminCreateAppointmentRequest = {
+      await onCreate({
         veterinarianId: form.veterinarianId,
         petId: form.petId,
         serviceId: form.serviceId,
-        startAt: startIso,
-        endAt: endIso,
+        startAt: range.startAt,
+        endAt: range.endAt,
         priceSnapshot: form.price,
-        clientComment: form.clientComment || null,
-      };
-
-      const created = await adminApi.createAppointment(payload);
-      onSuccess(created);
+        clientComment: form.clientComment.trim() || null,
+      });
       onClose();
-    } catch (err: any) {
-      setCreateError(err?.response?.data?.message || err?.message || 'Ошибка при создании записи');
+    } catch (err: unknown) {
+      setCreateError(formatApiError(err, 'Ошибка при создании записи'));
     } finally {
       setCreating(false);
     }
@@ -170,26 +200,27 @@ export const AdminCreateAppointmentModal: React.FC<AdminCreateAppointmentModalPr
   if (!isOpen) return null;
 
   return (
-    <div className="overlay" onClick={onClose}>
+    <div className="overlay" onClick={() => !creating && onClose()}>
       <div
         className="dialog dialog-lg"
-        style={{ width: 620 }}
         onClick={(e) => e.stopPropagation()}
         role="dialog"
         aria-modal="true"
+        aria-labelledby="na-title"
       >
         <div className="dialog-head">
           <div className="row between" style={{ alignItems: 'flex-start' }}>
             <div>
-              <span className="dialog-title">Новая запись</span>
-              <span className="dialog-desc">
-                Создание записи на приём с проверкой доступности слота
-              </span>
+              <h2 id="na-title" className="dialog-title">
+                Новая запись
+              </h2>
+              <p className="dialog-desc">Создание записи на приём с проверкой доступности слота</p>
             </div>
             <button
               type="button"
               className="btn btn-ghost btn-icon btn-sm"
               onClick={onClose}
+              disabled={creating}
               aria-label="Закрыть"
             >
               <X size={16} />
@@ -197,192 +228,33 @@ export const AdminCreateAppointmentModal: React.FC<AdminCreateAppointmentModalPr
           </div>
         </div>
 
-        <form onSubmit={handleSubmit}>
-          <div className="dialog-body">
-            <div className="field">
-              <span className="field-label">
-                Питомец <span className="req">*</span>
-              </span>
-              <select
-                className="select"
-                value={form.petId}
-                onChange={(e) => setForm({ ...form, petId: e.target.value })}
-                required
-              >
-                <option value="">Выберите питомца…</option>
-                {pets.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.name} ({getOwnerName(p.ownerId, users)})
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div className="field">
-              <span className="field-label">
-                Услуга <span className="req">*</span>
-              </span>
-              <select
-                className="select"
-                value={form.serviceId}
-                onChange={(e) => handleServiceChange(e.target.value)}
-                required
-              >
-                <option value="">Выберите услугу…</option>
-                {services.map((s) => (
-                  <option key={s.id} value={s.id}>
-                    {s.name} ({s.basePrice} ₽, {s.baseDurationMin} мин)
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div className="field">
-              <span className="field-label">
-                Врач <span className="req">*</span>
-              </span>
-              <select
-                className="select"
-                value={form.veterinarianId}
-                onChange={(e) => setForm({ ...form, veterinarianId: e.target.value })}
-                required
-              >
-                <option value="">Выберите врача…</option>
-                {veterinarians.map((v) => (
-                  <option key={v.id} value={v.id}>
-                    {getVetName(v.id, veterinarians, users)}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div
-              className="form-grid"
-              style={{ gridTemplateColumns: 'repeat(4, minmax(0, 1fr))' }}
-            >
-              <div className="field">
-                <label className="field-label" htmlFor="na-date">
-                  Дата <span className="req">*</span>
-                </label>
-                <input
-                  id="na-date"
-                  type="date"
-                  className="input"
-                  value={form.date}
-                  onChange={(e) => setForm({ ...form, date: e.target.value })}
-                  required
-                />
-              </div>
-              <div className="field">
-                <label className="field-label" htmlFor="na-start">
-                  Начало <span className="req">*</span>
-                </label>
-                <input
-                  id="na-start"
-                  type="time"
-                  step="900"
-                  className="input"
-                  value={form.start}
-                  onChange={(e) => handleStartChange(e.target.value)}
-                  required
-                />
-              </div>
-              <div className="field">
-                <label className="field-label" htmlFor="na-end">
-                  Конец <span className="req">*</span>
-                </label>
-                <input
-                  id="na-end"
-                  type="time"
-                  step="900"
-                  className="input"
-                  value={form.end}
-                  onChange={(e) => setForm({ ...form, end: e.target.value })}
-                  required
-                />
-              </div>
-              <div className="field">
-                <label className="field-label" htmlFor="na-price">
-                  Цена, ₽ <span className="req">*</span>
-                </label>
-                <input
-                  id="na-price"
-                  type="number"
-                  min="0"
-                  className="input"
-                  value={form.price}
-                  onChange={(e) =>
-                    setForm({ ...form, price: parseInt(e.target.value, 10) || 0 })
-                  }
-                  required
-                />
-              </div>
-            </div>
-
-            <div className="row between">
-              <span className="small muted">Проверка доступности слота перед сохранением</span>
-              <button
-                type="button"
-                className="btn btn-outline btn-sm"
-                onClick={handleCheckSlot}
-              >
-                Проверить слот
-              </button>
-            </div>
-
-            {availStatus === 'ok' && (
-              <div
-                className="alert alert-info"
-                style={{ borderColor: 'var(--st-completed-fg, #22c55e)' }}
-              >
-                <Check size={16} style={{ color: 'var(--st-completed-fg, #22c55e)' }} />
-                <div>{availMsg}</div>
-              </div>
-            )}
-
-            {availStatus === 'err' && (
-              <div className="alert" role="alert">
-                <AlertCircle size={16} />
-                <div>{availMsg}</div>
-              </div>
-            )}
-
-            <div className="field">
-              <label className="field-label" htmlFor="na-comm">
-                Комментарий клиента
-              </label>
-              <textarea
-                id="na-comm"
-                className="textarea"
-                rows={2}
-                maxLength={1000}
-                value={form.clientComment}
-                onChange={(e) => setForm({ ...form, clientComment: e.target.value })}
-              />
-            </div>
-
-            {createError && (
-              <div className="alert" role="alert">
-                <AlertCircle size={16} />
-                <div>{createError}</div>
-              </div>
-            )}
-          </div>
+        <form
+          onSubmit={handleSubmit}
+          style={{ display: 'flex', flexDirection: 'column', minHeight: 0, flex: 1 }}
+        >
+          <CreateAppointmentFields
+            form={form}
+            veterinarians={veterinarians}
+            services={services}
+            pets={pets}
+            users={users}
+            availStatus={availStatus}
+            availMsg={availMsg}
+            checkingSlot={checkingSlot}
+            createError={createError}
+            onChangeForm={setForm}
+            onServiceChange={handleServiceChange}
+            onStartChange={handleStartChange}
+            onEndChange={handleEndChange}
+            onClearAvailStatus={() => setAvailStatus('idle')}
+            onCheckSlot={handleCheckSlot}
+          />
 
           <div className="dialog-foot">
-            <button
-              type="button"
-              className="btn btn-outline"
-              onClick={onClose}
-              disabled={creating}
-            >
+            <button type="button" className="btn btn-outline" onClick={onClose} disabled={creating}>
               Отмена
             </button>
-            <button
-              type="submit"
-              className="btn btn-primary"
-              disabled={creating}
-            >
+            <button type="submit" className="btn btn-primary" disabled={creating}>
               {creating ? 'Создание…' : 'Создать запись'}
             </button>
           </div>

@@ -1,4 +1,12 @@
-import { Service, Specialization, Species, ServiceSpecies, AvailableSlotResponse, Veterinarian, UserRole } from '../../../types';
+import type { UserRole } from '@/shared/types';
+import type {
+  Service,
+  Specialization,
+  Species,
+  ServiceSpecies,
+  AvailableSlotResponse,
+  Veterinarian,
+} from '@/modules/clinic/types';
 
 export type ServiceSortOption = 'default' | 'price-asc' | 'price-desc' | 'duration-asc' | 'duration-desc';
 

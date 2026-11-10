@@ -1,17 +1,19 @@
-import React from 'react';
-import { Appointment, AppointmentStatus, Service, Pet } from '../../../../types';
+import type { AppointmentStatus } from '@/shared/types';
+import type { Service, Veterinarian } from '@/modules/clinic/types';
+import type { Appointment, Pet } from '@/modules/client/types';
+import type { CreateFollowUpRequest } from '@/modules/vet/types';
 
 export interface VetQueueSummaryProps {
   /** Все приёмы на сегодня */
   todayAppointments: Appointment[];
   /** Следующий приём в очереди */
   nextAppointment: Appointment | null;
-  /** Текущий приём (в процессе) */
-  currentAppointment?: Appointment | null;
   /** Карта услуг (id -> название) */
   servicesMap: Record<string, string>;
   /** Карта питомцев (id -> Pet) */
   petsMap?: Record<string, Pet>;
+  /** Карта видов животных (id -> название) */
+  speciesMap?: Record<string, string>;
   /** Выбор приёма для просмотра/ведения */
   onSelectAppointment?: (appt: Appointment) => void;
 }
@@ -29,6 +31,8 @@ export interface VetQueueListProps {
   servicesMap: Record<string, string>;
   /** Карта питомцев */
   petsMap?: Record<string, Pet>;
+  /** Карта видов животных (id -> название) */
+  speciesMap?: Record<string, string>;
   /** Флаг загрузки */
   loading?: boolean;
   /** Обработчик выбора приёма */
@@ -46,12 +50,20 @@ export interface VetActiveAppointmentDrawerProps {
   servicesMap: Record<string, string>;
   /** Карта питомцев */
   petsMap?: Record<string, Pet>;
+  /** Карта видов животных (id -> название) */
+  speciesMap?: Record<string, string>;
+  /** Профиль текущего врача для печатного листа */
+  vet?: Veterinarian | null;
+  /** Карта специализаций */
+  specsMap?: Record<string, string>;
   /** Закрыть карточку приёма */
   onClose: () => void;
   /** Обновить статус приёма */
   onUpdateStatus: (apptId: string, status: AppointmentStatus) => void;
-  /** Обновить данные дашборда после изменений */
-  onRefresh: () => Promise<void> | void;
+  /** Сохранить заметки врача */
+  onSaveNotes: (apptId: string, notes: string) => Promise<void>;
+  /** Назначить повторный приём */
+  onCreateFollowUp: (apptId: string, data: CreateFollowUpRequest) => Promise<void>;
 }
 
 export interface VetQuickScheduleIslandProps {
@@ -63,6 +75,8 @@ export interface VetQuickScheduleIslandProps {
   servicesMap: Record<string, string>;
   /** Карта питомцев */
   petsMap?: Record<string, Pet>;
+  /** Флаг первичной загрузки */
+  loading?: boolean;
   /** Обработчик выбора приёма */
   onSelectAppointment: (appt: Appointment) => void;
   /** Обработчик подтверждения или обновления статуса */

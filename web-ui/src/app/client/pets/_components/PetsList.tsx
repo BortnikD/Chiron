@@ -2,9 +2,15 @@
 
 import React from 'react';
 import { PawPrint, Plus, Archive, Calendar, Syringe } from 'lucide-react';
-import { Pet, Appointment, Vaccination } from '../../../../types';
-import { SpeciesIcon } from '../../../../components/ui/SpeciesIcon';
-import { getSpeciesTone, getPetAge } from './utils';
+import type { Pet, Appointment, Vaccination } from '@/modules/client/types';
+import { SpeciesIcon } from '@/components/ui/SpeciesIcon';
+import {
+  calculateAgeRu,
+  formatDateRu,
+  formatIsoDateDisplay,
+  getMoscowDateKey,
+  getSpeciesTone,
+} from '@/shared/lib';
 
 export interface PetsListProps {
   /** Список отображаемых питомцев */
@@ -67,14 +73,22 @@ export function PetsList({
               const isSel = selectedPet?.id === p.id;
               const tone = getSpeciesTone(p.speciesId, speciesMap);
               const spName = speciesMap[p.speciesId] || 'Питомец';
-              const age = getPetAge(p.birthDate);
-              const visitsCount = appointments.filter(
-                (a) => a.petId === p.id && a.status === 'COMPLETED'
-              ).length;
-              const nextAppt = appointments.find(
-                (a) => a.petId === p.id && (a.status === 'PENDING' || a.status === 'CONFIRMED')
-              );
-              const nextVac = vaccinations.find((v) => v.petId === p.id && v.nextDueOn);
+              const age = calculateAgeRu(p.birthDate, 'возраст не указан');
+              const visitsCount =
+                p.summary != null
+                  ? p.summary.completedVisits
+                  : appointments.filter((a) => a.petId === p.id && a.status === 'COMPLETED').length;
+              const nextApptStartAt =
+                p.summary != null
+                  ? p.summary.nextAppointment?.startAt ?? null
+                  : appointments.find(
+                      (a) => a.petId === p.id && (a.status === 'PENDING' || a.status === 'CONFIRMED')
+                    )?.startAt ?? null;
+              const nextVacDate =
+                p.summary != null
+                  ? p.summary.nextVaccinationDueOn ?? null
+                  : vaccinations.find((v) => v.petId === p.id && v.nextDueOn)?.nextDueOn ?? null;
+              const hasOverdueVac = p.summary != null ? p.summary.hasOverdueVaccination : false;
 
               return (
                 <button
@@ -118,21 +132,22 @@ export function PetsList({
                   </div>
 
                   <div className="col" style={{ gap: '6px' }}>
-                    <div className={`tcard-line ${nextAppt ? 'ok' : 'muted'}`}>
+                    <div className={`tcard-line ${nextApptStartAt ? 'ok' : 'muted'}`}>
                       <Calendar className="ic" />
                       <span>
-                        {nextAppt
-                          ? `Приём ${new Date(nextAppt.startAt).toLocaleDateString('ru-RU', {
-                              day: 'numeric',
-                              month: 'short',
-                            })}`
+                        {nextApptStartAt
+                          ? `Приём ${formatDateRu(nextApptStartAt, { day: 'numeric', month: 'short' })}`
                           : 'Нет предстоящих приёмов'}
                       </span>
                     </div>
-                    <div className={`tcard-line ${nextVac ? 'ok' : 'muted'}`}>
+                    <div className={`tcard-line ${hasOverdueVac ? 'bad' : nextVacDate ? 'ok' : 'muted'}`}>
                       <Syringe className="ic" />
                       <span>
-                        {nextVac ? `Прививка до ${nextVac.nextDueOn}` : 'Прививки по плану'}
+                        {nextVacDate
+                          ? hasOverdueVac
+                            ? `Прививка просрочена (${formatIsoDateDisplay(getMoscowDateKey(nextVacDate) || nextVacDate)})`
+                            : `Прививка до ${formatIsoDateDisplay(getMoscowDateKey(nextVacDate) || nextVacDate)}`
+                          : 'Прививки по плану'}
                       </span>
                     </div>
                   </div>

@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 import './globals.css';
-import { AuthProvider } from '../context/AuthContext';
-import { ThemeProvider } from '../context/ThemeContext';
+import { AuthProvider } from '@/context/AuthContext';
+import { ThemeProvider } from '@/context/ThemeContext';
 
 export const metadata: Metadata = {
   title: 'Chiron — Ветеринарная клиника',
@@ -35,7 +35,7 @@ export default function RootLayout({
               (function() {
                 try {
                   var t = localStorage.getItem('chiron-theme');
-                  var d = t === 'dark' || (!t && window.matchMedia('(prefers-color-scheme: dark)').matches) || (t === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
+                  var d = !t || t === 'dark' || (t === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
                   var theme = d ? 'dark' : 'light';
                   document.documentElement.setAttribute('data-theme', theme);
                   if (d) { document.documentElement.classList.add('dark'); }

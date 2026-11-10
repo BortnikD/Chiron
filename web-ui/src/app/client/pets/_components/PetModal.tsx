@@ -1,9 +1,11 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { AlertCircle } from 'lucide-react';
-import { Pet, Species, Gender } from '../../../../types';
-import { PetFormData } from './types';
+import type { Pet } from '@/modules/client/types';
+import type { Species } from '@/modules/clinic/types';
+import type { Gender } from '@/shared/types';
+import type { PetFormData } from './types';
 
 export interface PetModalProps {
   /** Флаг открытия модального окна */
@@ -42,9 +44,22 @@ export function PetModal({
   const [weightKg, setWeightKg] = useState('');
   const [notes, setNotes] = useState('');
   const [localError, setLocalError] = useState<string | null>(null);
+  const wasOpenRef = useRef(false);
+  const prevPetIdRef = useRef<string | null>(null);
 
   useEffect(() => {
-    if (isOpen) {
+    if (!isOpen) {
+      wasOpenRef.current = false;
+      prevPetIdRef.current = null;
+      return;
+    }
+
+    const currentPetId = pet?.id ?? null;
+    const shouldInit = !wasOpenRef.current || prevPetIdRef.current !== currentPetId;
+    wasOpenRef.current = true;
+    prevPetIdRef.current = currentPetId;
+
+    if (shouldInit) {
       if (pet) {
         setName(pet.name);
         setSpeciesId(pet.speciesId);
@@ -61,6 +76,8 @@ export function PetModal({
         setNotes('');
       }
       setLocalError(null);
+    } else if (!pet && speciesList.length > 0) {
+      setSpeciesId((prev) => prev || speciesList[0].id);
     }
   }, [isOpen, pet, speciesList]);
 

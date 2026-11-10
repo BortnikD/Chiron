@@ -1,11 +1,14 @@
-import React from 'react';
-import { Veterinarian, AvailableSlotResponse } from '../../../../types';
-import { getDoctorDisplay } from '../../../../utils/doctorHelpers';
-import { Stethoscope, Check, Clock, Loader2 } from 'lucide-react';
-import { SPEC_TONES, GroupedDaySlots, formatSlotTime } from './constants';
+import React, { useMemo } from 'react';
+import { Stethoscope, Check, Clock, Loader2, AlertCircle } from 'lucide-react';
+import type { Veterinarian, AvailableSlotResponse } from '@/modules/clinic/types';
+import { getDoctorDisplay } from '@/utils/doctorHelpers';
+import { formatSlotTime, getSpecTone, pluralRu } from '@/shared/lib';
+import type { GroupedDaySlots } from '../_hooks/useBookingSlots';
 
 export interface StepDoctorAndSlotSelectionProps {
   veterinarians: Veterinarian[];
+  serviceSpecializationId?: string | null;
+  petSpeciesId?: string | null;
   specsMap: Record<string, string>;
   isAnyVet: boolean;
   selectedVet: Veterinarian | null;
@@ -18,6 +21,8 @@ export interface StepDoctorAndSlotSelectionProps {
   onHorizonDaysChange: (days: number) => void;
   durationInfoText?: string;
   loadingSlots: boolean;
+  slotsError?: string | null;
+  onRetrySlots?: () => void;
   availableSlots: AvailableSlotResponse[];
   slotsByDay: GroupedDaySlots[];
   selectedSlot: AvailableSlotResponse | null;
@@ -30,6 +35,8 @@ export interface StepDoctorAndSlotSelectionProps {
  */
 export const StepDoctorAndSlotSelection: React.FC<StepDoctorAndSlotSelectionProps> = ({
   veterinarians,
+  serviceSpecializationId,
+  petSpeciesId,
   specsMap,
   isAnyVet,
   selectedVet,
@@ -42,11 +49,32 @@ export const StepDoctorAndSlotSelection: React.FC<StepDoctorAndSlotSelectionProp
   onHorizonDaysChange,
   durationInfoText,
   loadingSlots,
+  slotsError,
+  onRetrySlots,
   availableSlots,
   slotsByDay,
   selectedSlot,
   onSelectSlot,
 }) => {
+  const filteredVeterinarians = useMemo(() => {
+    const hasAnySpeciesIds = veterinarians.some(
+      (v) => Array.isArray(v.speciesIds) && v.speciesIds.length > 0
+    );
+    return veterinarians.filter((v) => {
+      if (v.isActive === false) return false;
+      if (serviceSpecializationId && v.specializationId !== serviceSpecializationId) return false;
+      if (
+        petSpeciesId &&
+        hasAnySpeciesIds &&
+        Array.isArray(v.speciesIds) &&
+        !v.speciesIds.includes(petSpeciesId)
+      ) {
+        return false;
+      }
+      return true;
+    });
+  }, [veterinarians, serviceSpecializationId, petSpeciesId]);
+
   return (
     <div className="col" style={{ gap: '20px' }}>
       {/* 1. Выбор врача */}
@@ -57,7 +85,6 @@ export const StepDoctorAndSlotSelection: React.FC<StepDoctorAndSlotSelectionProp
         </div>
 
         <div className="cards">
-          {/* Карточка «Любой врач» */}
           <button
             type="button"
             className={`tcard tone-ther ${isAnyVet ? 'sel' : ''}`}
@@ -80,10 +107,9 @@ export const StepDoctorAndSlotSelection: React.FC<StepDoctorAndSlotSelectionProp
             </div>
           </button>
 
-          {/* Карточки конкретных врачей */}
-          {veterinarians.map((v) => {
+          {filteredVeterinarians.map((v) => {
             const isSel = !isAnyVet && selectedVet?.id === v.id;
-            const tone = SPEC_TONES[v.specializationId] || 'ther';
+            const tone = getSpecTone(v.specializationId);
             const { name, initials, specName } = getDoctorDisplay(v, specsMap);
 
             return (
@@ -100,7 +126,10 @@ export const StepDoctorAndSlotSelection: React.FC<StepDoctorAndSlotSelectionProp
                     <span className="tcard-title">{name}</span>
                     <span className="row" style={{ gap: '6px' }}>
                       <span className="t-badge">{specName}</span>
-                      <span className="cell-sub">стаж {v.experienceYears} лет</span>
+                      <span className="cell-sub">
+                        стаж {v.experienceYears}{' '}
+                        {pluralRu(v.experienceYears, 'год', 'года', 'лет')}
+                      </span>
                     </span>
                   </span>
                   {isSel && (
@@ -163,11 +192,22 @@ export const StepDoctorAndSlotSelection: React.FC<StepDoctorAndSlotSelectionProp
           )}
         </div>
 
-        {/* Индикатор загрузки / пустой список / свободные слоты */}
         {loadingSlots ? (
           <div className="p-8 text-center text-xs text-[var(--muted-foreground)] flex items-center justify-center gap-2">
             <Loader2 className="w-4 h-4 animate-spin text-[var(--primary-text)]" />
             <span>Поиск свободных окон...</span>
+          </div>
+        ) : slotsError ? (
+          <div className="alert alert-destructive" role="alert">
+            <AlertCircle className="ic" />
+            <div className="row between wrap grow" style={{ gap: '8px', alignItems: 'center' }}>
+              <span>{slotsError}</span>
+              {onRetrySlots && (
+                <button type="button" className="btn btn-outline btn-sm" onClick={onRetrySlots}>
+                  Повторить
+                </button>
+              )}
+            </div>
           </div>
         ) : availableSlots.length === 0 ? (
           <div className="empty">

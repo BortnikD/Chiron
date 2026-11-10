@@ -1,9 +1,9 @@
 import React from 'react';
 import Link from 'next/link';
-import { Pet } from '../../../../types';
-import { SpeciesIcon } from '../../../../components/ui/SpeciesIcon';
 import { Check, Plus } from 'lucide-react';
-import { getPetSpeciesTone } from './constants';
+import type { Pet } from '@/modules/client/types';
+import { SpeciesIcon } from '@/components/ui/SpeciesIcon';
+import { getSpeciesTone } from '@/shared/lib';
 
 export interface StepPetSelectionProps {
   pets: Pet[];
@@ -56,7 +56,7 @@ export const StepPetSelection: React.FC<StepPetSelectionProps> = ({
           {pets.map((p) => {
             const isSel = selectedPet?.id === p.id;
             const spName = speciesMap[p.speciesId] || 'Питомец';
-            const spTone = getPetSpeciesTone(spName);
+            const spTone = getSpeciesTone(p.speciesId, speciesMap);
 
             return (
               <button

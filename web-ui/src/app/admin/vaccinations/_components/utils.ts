@@ -1,17 +1,23 @@
-import { Vaccination, Pet, VaccinationStatusInfo, VaccinationStatusTone } from './types';
+import type { Pet, Vaccination } from '@/modules/client/types';
+import { getMoscowTodayIso } from '@/shared/lib';
+import type { VaccinationStatusInfo, VaccinationStatusTone } from './types';
 
 /**
- * Расчет статуса вакцинации и цветовой индикации по дате следующей дозы.
+ * Расчет статуса вакцинации и цветовой индикации по дате следующей дозы (в Europe/Moscow).
  */
 export const calculateVaccinationStatus = (nextDueStr?: string | null): VaccinationStatusInfo => {
   if (!nextDueStr) return { label: 'Выполнено', cls: 'badge-accent', tone: 'ok' };
 
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const due = new Date(nextDueStr);
-  due.setHours(0, 0, 0, 0);
+  const todayIso = getMoscowTodayIso();
+  const dueIso = nextDueStr.slice(0, 10);
+  const todayMs = Date.parse(`${todayIso}T00:00:00Z`);
+  const dueMs = Date.parse(`${dueIso}T00:00:00Z`);
 
-  const diffDays = Math.ceil((due.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+  if (Number.isNaN(dueMs)) {
+    return { label: 'Выполнено', cls: 'badge-accent', tone: 'ok' };
+  }
+
+  const diffDays = Math.round((dueMs - todayMs) / (1000 * 60 * 60 * 24));
 
   if (diffDays < 0) {
     return { label: 'Просрочена', cls: 'badge-danger', tone: 'overdue' };
@@ -32,7 +38,7 @@ export const calculateVaccinationStatus = (nextDueStr?: string | null): Vaccinat
 };
 
 /**
- * Фильтрация записей вакцинации по поисковому запросу (название вакцины, серия партии, имя питомца),
+ * Фильтрация записей вакцинации по поисковому запросу (название вакцины или имя питомца),
  * статусу ревакцинации и идентификатору выбранного питомца.
  */
 export const filterVaccinations = (
@@ -52,14 +58,9 @@ export const filterVaccinations = (
     const pet = petMap.get(v.petId);
     const petName = (pet?.name || '').toLowerCase();
     const vaxName = (v.name || v.vaccineName || '').toLowerCase();
-    const batch = (v.batchNumber || '').toLowerCase();
 
     if (query) {
-      const matchesSearch =
-        petName.includes(query) ||
-        vaxName.includes(query) ||
-        batch.includes(query);
-
+      const matchesSearch = petName.includes(query) || vaxName.includes(query);
       if (!matchesSearch) return false;
     }
 

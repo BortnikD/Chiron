@@ -1,4 +1,4 @@
-import { Pet, Gender } from '../../../../types';
+import type { Gender } from '@/shared/types';
 
 export type ArchiveFilter = 'ACTIVE' | 'ARCHIVED' | 'ALL';
 

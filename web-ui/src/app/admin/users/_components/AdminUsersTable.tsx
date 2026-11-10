@@ -2,8 +2,8 @@
 
 import React from 'react';
 import { Users } from 'lucide-react';
-import { User } from '../../../../types';
-import { ROLE_META, getUserInitials } from './utils';
+import type { User } from '@/shared/types';
+import { USER_ROLE_META, formatDateShort, getUserInitials } from '@/shared/lib';
 
 export interface AdminUsersTableProps {
   users: User[];
@@ -50,8 +50,8 @@ export const AdminUsersTable: React.FC<AdminUsersTableProps> = ({
 
           {users.map((u) => {
             const isSelected = selectedUser?.id === u.id;
-            const rInfo = ROLE_META[u.role] || { label: u.role, cls: 'badge-outline' };
-            const created = u.createdAt ? u.createdAt.slice(0, 10) : '—';
+            const rInfo = USER_ROLE_META[u.role] || { label: u.role, cls: 'badge-outline' };
+            const created = u.createdAt ? formatDateShort(u.createdAt) : '—';
 
             return (
               <button
@@ -62,7 +62,7 @@ export const AdminUsersTable: React.FC<AdminUsersTableProps> = ({
               >
                 <span className="row" style={{ gap: 8 }}>
                   <span className={`t-ava sm round tone-${u.role}`}>
-                    {getUserInitials(u)}
+                    {getUserInitials(u, 'ПЛ')}
                   </span>
                   <span className="cell-main">{u.fullName || `${u.firstName} ${u.lastName}`}</span>
                 </span>
@@ -76,6 +76,13 @@ export const AdminUsersTable: React.FC<AdminUsersTableProps> = ({
             );
           })}
         </div>
+
+        {loading && users.length === 0 && (
+          <div className="empty">
+            <span className="spinner" aria-hidden="true" />
+            <span className="muted">Загрузка пользователей…</span>
+          </div>
+        )}
 
         {users.length === 0 && !loading && (
           <div className="empty">

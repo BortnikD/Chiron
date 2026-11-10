@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { Search, Plus } from 'lucide-react';
-import { Specialization, Species } from '../../../../types';
+import type { Specialization, Species } from '@/modules/clinic/types';
 
 export interface ServicesFiltersProps {
   filterSpec: string;
@@ -81,11 +81,7 @@ export const ServicesFilters: React.FC<ServicesFiltersProps> = ({
 
       <div className="spacer" />
 
-      <button
-        type="button"
-        className="btn btn-primary"
-        onClick={onOpenCreate}
-      >
+      <button type="button" className="btn btn-primary" onClick={onOpenCreate}>
         <Plus size={16} />
         Новая услуга
       </button>
