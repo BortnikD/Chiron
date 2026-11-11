@@ -8,6 +8,7 @@ import {
   calculateAgeRu,
   formatIsoDateDisplay,
   formatSlotTime,
+  formatWeightRu,
   getMoscowDateKey,
   getMoscowTodayIso,
   getSpeciesTone,
@@ -15,26 +16,19 @@ import {
 } from '@/shared/lib';
 
 export interface VetPatientsListProps {
-  /** Список пациентов для отображения */
   patients: Pet[];
-  /** Текущий выбранный пациент */
   selectedPatient: Pet | null;
-  /** Обработчик выбора пациента */
   onSelectPatient: (patient: Pet) => void;
-  /** Справочник видов животных */
   speciesList: Species[];
-  /** Список всех записей на приём */
   appointments: Appointment[];
-  /** Флаг загрузки данных */
   loading?: boolean;
-  /** Режим отображения: таблица или сетка карточек */
   viewMode?: 'table' | 'cards';
 }
 
 function getLastAppointmentDate(appts: Appointment[]): string {
   const nowMs = Date.now();
   const past = appts
-    .filter((a) => new Date(a.startAt).getTime() <= nowMs)
+    .filter((a) => new Date(a.startAt).getTime() <= nowMs && a.status !== 'CANCELLED')
     .sort((a, b) => new Date(b.startAt).getTime() - new Date(a.startAt).getTime());
   if (past.length === 0) return '—';
   return formatIsoDateDisplay(getMoscowDateKey(past[0].startAt));
@@ -43,21 +37,20 @@ function getLastAppointmentDate(appts: Appointment[]): string {
 function getNextAppointmentDate(appts: Appointment[], todayMoscow: string): string {
   const nowMs = Date.now();
   const upcoming = appts
-    .filter((a) => new Date(a.startAt).getTime() > nowMs && a.status !== 'CANCELLED')
+    .filter(
+      (a) =>
+        new Date(a.startAt).getTime() > nowMs &&
+        (a.status === 'PENDING' || a.status === 'CONFIRMED')
+    )
     .sort((a, b) => new Date(a.startAt).getTime() - new Date(b.startAt).getTime());
   if (upcoming.length === 0) return '—';
   const dateKey = getMoscowDateKey(upcoming[0].startAt);
   if (dateKey === todayMoscow) {
     return `сегодня ${formatSlotTime(upcoming[0].startAt)}`;
   }
-  return formatIsoDateDisplay(dateKey);
+  return `${formatIsoDateDisplay(dateKey)} ${formatSlotTime(upcoming[0].startAt)}`;
 }
 
-/**
- * Список пациентов врача:
- * отображает данные пациентов в виде интерактивной таблицы (.dtable) либо сетки карточек (.cards),
- * с аватарками видов, кличкой, статусом архива, возрастом, весом и историей приёмов.
- */
 export function VetPatientsList({
   patients,
   selectedPatient,
@@ -125,9 +118,7 @@ export function VetPatientsList({
                   {p.weightKg != null && (
                     <div className="row" style={{ justifyContent: 'space-between' }}>
                       <span className="muted">Вес:</span>
-                      <span className="tnum">
-                        {String(p.weightKg).replace('.', ',')} кг
-                      </span>
+                      <span className="tnum">{formatWeightRu(p.weightKg)}</span>
                     </div>
                   )}
                   <div className="row" style={{ justifyContent: 'space-between' }}>

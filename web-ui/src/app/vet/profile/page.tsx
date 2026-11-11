@@ -1,13 +1,39 @@
 'use client';
 
-import { useState } from 'react';
+import { Suspense, useCallback } from 'react';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { AlertCircle, Stethoscope, User as UserIcon } from 'lucide-react';
+import { useShellHeader } from '@/components/layout/AppShell';
 import { UserProfileCard } from '@/components/profile/UserProfileCard';
 import { useVetProfile } from './_hooks/useVetProfile';
 import { VetClinicalProfileCard } from './_components/VetClinicalProfileCard';
 
-export default function VetProfilePage() {
-  const [activeTab, setActiveTab] = useState<'profile' | 'practice'>('profile');
+function VetProfileInner() {
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  const pathname = usePathname();
+  const activeTab: 'profile' | 'practice' =
+    searchParams.get('tab') === 'practice' ? 'practice' : 'profile';
+
+  useShellHeader({
+    crumbGroup: 'Врач',
+    crumb: activeTab === 'practice' ? 'Профиль врача' : 'Профиль',
+  });
+
+  const setTab = useCallback(
+    (tab: 'profile' | 'practice') => {
+      const nextParams = new URLSearchParams(searchParams.toString());
+      if (tab === 'practice') {
+        nextParams.set('tab', 'practice');
+      } else {
+        nextParams.delete('tab');
+      }
+      const query = nextParams.toString();
+      router.replace(query ? `${pathname}?${query}` : pathname, { scroll: false });
+    },
+    [pathname, router, searchParams]
+  );
+
   const {
     vetProfile,
     specsMap,
@@ -24,27 +50,27 @@ export default function VetProfilePage() {
 
   return (
     <div className="scroll-col grow">
-      <div className="flex flex-col gap-2 max-w-[1120px] w-full">
-        <div className="seg self-start" role="tablist" aria-label="Разделы профиля">
+      <div className="col" style={{ gap: '8px', maxWidth: '1120px', width: '100%' }}>
+        <div className="seg" style={{ alignSelf: 'flex-start' }} role="tablist" aria-label="Разделы профиля">
           <button
             type="button"
             role="tab"
             aria-selected={activeTab === 'profile'}
-            className={`seg-item ${activeTab === 'profile' ? 'on font-semibold' : ''}`}
-            onClick={() => setActiveTab('profile')}
+            className={`seg-item ${activeTab === 'profile' ? 'on' : ''}`}
+            onClick={() => setTab('profile')}
           >
-            <UserIcon className="ic" style={{ width: '15px', height: '15px' }} />
-            <span>Личный профиль</span>
+            <UserIcon className="ic" />
+            Личный профиль
           </button>
           <button
             type="button"
             role="tab"
             aria-selected={activeTab === 'practice'}
-            className={`seg-item ${activeTab === 'practice' ? 'on font-semibold' : ''}`}
-            onClick={() => setActiveTab('practice')}
+            className={`seg-item ${activeTab === 'practice' ? 'on' : ''}`}
+            onClick={() => setTab('practice')}
           >
-            <Stethoscope className="ic" style={{ width: '15px', height: '15px' }} />
-            <span>Врачебная практика</span>
+            <Stethoscope className="ic" />
+            Врачебная практика
           </button>
         </div>
 
@@ -53,8 +79,8 @@ export default function VetProfilePage() {
         ) : (
           <>
             {loadError && (
-              <div className="alert alert-destructive items-center justify-between" role="alert">
-                <div className="flex items-center gap-2 min-w-0">
+              <div className="alert alert-destructive" role="alert" style={{ justifyContent: 'space-between', alignItems: 'center' }}>
+                <div className="row" style={{ gap: '8px', minWidth: 0 }}>
                   <AlertCircle className="ic" style={{ marginTop: 0 }} />
                   <span>{loadError}</span>
                 </div>
@@ -86,5 +112,21 @@ export default function VetProfilePage() {
         )}
       </div>
     </div>
+  );
+}
+
+export default function VetProfilePage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="scroll-col grow">
+          <div className="island p-12 text-center text-xs text-[var(--muted-foreground)]">
+            Загрузка профиля...
+          </div>
+        </div>
+      }
+    >
+      <VetProfileInner />
+    </Suspense>
   );
 }

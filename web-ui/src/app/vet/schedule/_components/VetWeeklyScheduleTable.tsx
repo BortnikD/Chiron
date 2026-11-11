@@ -3,7 +3,7 @@
 import React, { useMemo } from 'react';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import type { WorkSchedule, ScheduleException } from '@/modules/clinic/types';
-import type { Appointment } from '@/modules/client/types';
+import type { Appointment, Pet } from '@/modules/client/types';
 import {
   APPOINTMENT_STATUS_META,
   DOW_ORDER,
@@ -14,6 +14,8 @@ import {
   getMoscowTodayIso,
   timeToMinutes,
 } from '@/shared/lib';
+import { getPetName } from '../../dashboard/_components/utils';
+import { VET_STATUS_COLORS } from '../../dashboard/_components/vetTimelineUtils';
 
 const H0 = 8;
 const H1 = 19;
@@ -28,8 +30,10 @@ export interface VetWeeklyScheduleTableProps {
   schedules: WorkSchedule[];
   exceptions: ScheduleException[];
   appointments: Appointment[];
-  services: Record<string, string>;
-  pets: Record<string, string>;
+  servicesMap: Record<string, string>;
+  petsMap: Record<string, Pet>;
+  todayIso?: string;
+  nowMinutes?: number;
   selectedAppt: Appointment | null;
   onSelectAppt: (appt: Appointment) => void;
   onSelectException?: (exc: ScheduleException) => void;
@@ -39,16 +43,15 @@ export interface VetWeeklyScheduleTableProps {
   onCurrentWeek: () => void;
 }
 
-/**
- * Недельная сетка рабочих часов, перерывов врача и записей на приём.
- */
 export const VetWeeklyScheduleTable: React.FC<VetWeeklyScheduleTableProps> = ({
   loading,
   schedules,
   exceptions,
   appointments,
-  services,
-  pets,
+  servicesMap,
+  petsMap,
+  todayIso,
+  nowMinutes,
   selectedAppt,
   onSelectAppt,
   onSelectException,
@@ -57,46 +60,34 @@ export const VetWeeklyScheduleTable: React.FC<VetWeeklyScheduleTableProps> = ({
   onNextWeek,
   onCurrentWeek,
 }) => {
-  const mondayDate = useMemo(() => {
-    const todayMoscow = getMoscowTodayIso();
-    const [y, m, dayNum] = todayMoscow.split('-').map(Number);
-    const d = new Date(Date.UTC(y, m - 1, dayNum, 12, 0, 0));
-    const day = d.getUTCDay();
-    const diffToMonday = day === 0 ? -6 : 1 - day;
-    d.setUTCDate(d.getUTCDate() + diffToMonday + weekOffset * 7);
-    return d;
-  }, [weekOffset]);
+  const effectiveToday = todayIso || getMoscowTodayIso();
 
   const weekDays = useMemo(() => {
-    const todayIso = getMoscowTodayIso();
+    const [y, m, dayNum] = getMoscowTodayIso().split('-').map(Number);
+    const monday = new Date(Date.UTC(y, m - 1, dayNum, 12, 0, 0));
+    const day = monday.getUTCDay();
+    monday.setUTCDate(monday.getUTCDate() + (day === 0 ? -6 : 1 - day) + weekOffset * 7);
 
     return Array.from({ length: 7 }, (_, i) => {
-      const d = new Date(mondayDate);
+      const d = new Date(monday);
       d.setUTCDate(d.getUTCDate() + i);
-
       const iso = getMoscowDateKey(d);
-      const isToday = iso === todayIso;
-      const isWeekend = i >= 5;
-      const dayNum = d.getUTCDate();
-      const monthShort = formatDateRu(d.toISOString(), { month: 'short' });
-
+      const monthShort = formatDateRu(d.toISOString(), { month: 'short' }).replace('.', '');
       return {
         i,
         date: d,
         iso,
         dow: DOW_SHORT[i],
-        short: `${dayNum} ${monthShort}`,
-        isToday,
-        isWeekend,
+        short: `${d.getUTCDate()} ${monthShort}`,
+        isToday: iso === effectiveToday,
+        isWeekend: i >= 5,
       };
     });
-  }, [mondayDate]);
+  }, [weekOffset, effectiveToday]);
 
   const weekRangeTitle = useMemo(() => {
     if (weekDays.length < 7) return '';
-    const first = weekDays[0];
-    const last = weekDays[6];
-    return `${first.short} – ${last.short} ${last.date.getUTCFullYear()}`;
+    return `${weekDays[0].short} – ${weekDays[6].short} ${weekDays[6].date.getUTCFullYear()}`;
   }, [weekDays]);
 
   const calHours = useMemo(
@@ -108,139 +99,9 @@ export const VetWeeklyScheduleTable: React.FC<VetWeeklyScheduleTableProps> = ({
     []
   );
 
-  const getBlocksForDay = (dayIso: string, dayIndex: number) => {
-    const blocks: React.ReactNode[] = [];
-
-    const exc = exceptions.find((e) => e.startDate <= dayIso && e.endDate >= dayIso);
-
-    if (exc && exc.type === 'ABSENCE') {
-      blocks.push(
-        <button
-          key={`exc-${exc.id}`}
-          type="button"
-          className="wk-block wk-off"
-          style={{
-            top: 0,
-            height: CAL_HEIGHT,
-            backgroundColor: 'color-mix(in srgb, var(--destructive) 25%, transparent)',
-            border: 0,
-            borderRadius: 0,
-            left: 0,
-            right: 0,
-            margin: 0,
-            padding: '0 4px',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            color: 'var(--destructive)',
-            fontWeight: 600,
-            fontSize: '12px',
-            cursor: onSelectException ? 'pointer' : 'default',
-          }}
-          onClick={() => onSelectException?.(exc)}
-          title={`Отсутствие · ${exc.reason || 'Отпуск/Больничный'}`}
-        >
-          <span>Отсутствие · {exc.reason || 'Отпуск/Больничный'}</span>
-        </button>
-      );
-      return blocks;
-    }
-
-    const dowEnum = DOW_ORDER[dayIndex];
-    const sched = schedules.find((s) => s.dayOfWeek === dowEnum);
-
-    let start = '';
-    let end = '';
-    let bs = '';
-    let be = '';
-
-    if (exc && exc.type === 'CUSTOM_HOURS' && exc.startTime && exc.endTime) {
-      start = exc.startTime.slice(0, 5);
-      end = exc.endTime.slice(0, 5);
-    } else if (sched) {
-      start = sched.startTime.slice(0, 5);
-      end = sched.endTime.slice(0, 5);
-      bs = sched.breakStart ? sched.breakStart.slice(0, 5) : '';
-      be = sched.breakEnd ? sched.breakEnd.slice(0, 5) : '';
-    }
-
-    if (start && end) {
-      const topMin = Math.max(0, timeToMinutes(start) - H0 * 60);
-      const heightMin = Math.max(0, timeToMinutes(end) - timeToMinutes(start));
-
-      blocks.push(
-        <div
-          key="work-bg"
-          className="wk-block wk-work"
-          style={{
-            top: px(topMin * PPM),
-            height: px(heightMin * PPM),
-          }}
-        />
-      );
-
-      if (bs && be) {
-        const brkTopMin = Math.max(0, timeToMinutes(bs) - H0 * 60);
-        const brkHeightMin = Math.max(0, timeToMinutes(be) - timeToMinutes(bs));
-        blocks.push(
-          <div
-            key="brk"
-            className="wk-block wk-break"
-            style={{
-              top: px(brkTopMin * PPM),
-              height: px(brkHeightMin * PPM),
-            }}
-          >
-            <span>Перерыв</span>
-          </div>
-        );
-      }
-    }
-
-    const dayAppts = appointments.filter((a) => {
-      const apptDateIso = getMoscowDateKey(a.startAt);
-      return apptDateIso === dayIso && a.status !== 'CANCELLED';
-    });
-
-    dayAppts.forEach((a) => {
-      const sTime = formatSlotTime(a.startAt);
-      const eTime = formatSlotTime(a.endAt);
-
-      const topMin = Math.max(0, timeToMinutes(sTime) - H0 * 60);
-      const durMin = Math.max(20, timeToMinutes(eTime) - timeToMinutes(sTime));
-      const petName = pets[a.petId] || 'Пациент';
-      const svcName = services[a.serviceId] || 'Приём';
-      const isSel = selectedAppt?.id === a.id;
-
-      blocks.push(
-        <button
-          key={`appt-${a.id}`}
-          type="button"
-          className={`wk-block wk-appt ${a.status} ${isSel ? 'sel' : ''} ${durMin < 40 ? 'sm' : ''}`}
-          style={{
-            top: px(topMin * PPM),
-            height: px(durMin * PPM - 3),
-            textAlign: 'left',
-            cursor: 'pointer',
-            zIndex: 10,
-          }}
-          onClick={() => onSelectAppt(a)}
-          title={`${sTime}–${eTime} · ${petName} (${svcName}) — ${
-            APPOINTMENT_STATUS_META[a.status]?.short || a.status
-          }`}
-        >
-          <span className="wk-time">
-            {sTime}
-            <span className="wk-end">–{eTime}</span>
-          </span>
-          <span className="wk-pet">{petName}</span>
-          <span className="wk-svc">{svcName}</span>
-        </button>
-      );
-    });
-
-    return blocks;
-  };
+  const showNowLine =
+    typeof nowMinutes === 'number' && nowMinutes >= H0 * 60 && nowMinutes <= H1 * 60;
+  const nowTop = showNowLine ? px((nowMinutes - H0 * 60) * PPM) : null;
 
   return (
     <section className="island grow" style={{ display: 'flex', flexDirection: 'column' }}>
@@ -265,7 +126,6 @@ export const VetWeeklyScheduleTable: React.FC<VetWeeklyScheduleTableProps> = ({
           >
             <ChevronRight className="ic" />
           </button>
-
           <span className="island-title" style={{ marginLeft: '6px' }}>
             {weekRangeTitle}
           </span>
@@ -276,20 +136,19 @@ export const VetWeeklyScheduleTable: React.FC<VetWeeklyScheduleTableProps> = ({
 
       <div className="island-body" style={{ overflowX: 'auto', paddingBottom: '16px' }}>
         {loading ? (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-            <div className="skeleton" style={{ height: '40px', borderRadius: '8px' }} />
-            <div className="skeleton" style={{ height: '400px', borderRadius: '12px' }} />
+          <div className="col" style={{ gap: '10px' }}>
+            <div className="skeleton" style={{ height: '40px' }} />
+            <div className="skeleton" style={{ height: '420px' }} />
           </div>
         ) : (
           <div
             className="week"
             style={{
               gridTemplateColumns: '52px repeat(7, minmax(0, 1fr))',
-              minWidth: '540px',
+              minWidth: '580px',
             }}
           >
             <div className="week-h" style={{ background: 'var(--muted)' }} />
-
             {weekDays.map((d) => (
               <div
                 key={d.i}
@@ -301,27 +160,135 @@ export const VetWeeklyScheduleTable: React.FC<VetWeeklyScheduleTableProps> = ({
             ))}
 
             <div className="week-t" style={{ height: CAL_HEIGHT }}>
-              {calHours.map((h, idx) => (
-                <span key={idx} className="wt-label" style={{ top: h.top }}>
+              {calHours.map((h) => (
+                <span key={h.label} className="wt-label" style={{ top: h.top }}>
                   {h.label}
                 </span>
               ))}
             </div>
 
-            {weekDays.map((d) => (
-              <div
-                key={d.i}
-                className={`week-c ${d.isWeekend ? 'we' : ''} ${d.isToday ? 'today' : ''}`}
-                style={
-                  {
-                    height: CAL_HEIGHT,
-                    '--hp': CAL_HOUR_PX,
-                  } as React.CSSProperties
-                }
-              >
-                {getBlocksForDay(d.iso, d.i)}
-              </div>
-            ))}
+            {weekDays.map((d) => {
+              const exc = exceptions.find((e) => e.startDate <= d.iso && e.endDate >= d.iso);
+              const sched = schedules.find((s) => s.dayOfWeek === DOW_ORDER[d.i]);
+              const start =
+                exc?.type === 'CUSTOM_HOURS' && exc.startTime
+                  ? exc.startTime.slice(0, 5)
+                  : sched?.startTime.slice(0, 5) || '';
+              const end =
+                exc?.type === 'CUSTOM_HOURS' && exc.endTime
+                  ? exc.endTime.slice(0, 5)
+                  : sched?.endTime.slice(0, 5) || '';
+              const bs = exc?.type === 'CUSTOM_HOURS' ? '' : sched?.breakStart?.slice(0, 5) || '';
+              const be = exc?.type === 'CUSTOM_HOURS' ? '' : sched?.breakEnd?.slice(0, 5) || '';
+
+              const dayAppts = appointments.filter(
+                (a) => getMoscowDateKey(a.startAt) === d.iso && a.status !== 'CANCELLED'
+              );
+
+              return (
+                <div
+                  key={d.i}
+                  className={`week-c ${d.isWeekend ? 'we' : ''} ${d.isToday ? 'today' : ''}`}
+                  style={{ height: CAL_HEIGHT, '--hp': CAL_HOUR_PX } as React.CSSProperties}
+                >
+                  {exc?.type === 'ABSENCE' ? (
+                    <button
+                      type="button"
+                      className="wk-block wk-off"
+                      style={{
+                        top: 0,
+                        height: CAL_HEIGHT,
+                        left: 0,
+                        right: 0,
+                        width: '100%',
+                        border: 0,
+                        borderRadius: 0,
+                        padding: '0 6px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        textAlign: 'center',
+                        fontSize: '12px',
+                        cursor: onSelectException ? 'pointer' : 'default',
+                      }}
+                      onClick={() => onSelectException?.(exc)}
+                      title={`Отсутствие · ${exc.reason || 'Отпуск/Больничный'}`}
+                    >
+                      <span>Отсутствие · {exc.reason || 'Отпуск'}</span>
+                    </button>
+                  ) : (
+                    <>
+                      {start && end && (
+                        <div
+                          className="wk-block wk-work"
+                          style={{
+                            top: px(Math.max(0, timeToMinutes(start) - H0 * 60) * PPM),
+                            height: px(Math.max(0, timeToMinutes(end) - timeToMinutes(start)) * PPM),
+                          }}
+                        />
+                      )}
+                      {bs && be && (
+                        <div
+                          className="wk-block wk-break"
+                          style={{
+                            top: px(Math.max(0, timeToMinutes(bs) - H0 * 60) * PPM),
+                            height: px(Math.max(0, timeToMinutes(be) - timeToMinutes(bs)) * PPM),
+                          }}
+                        >
+                          Перерыв
+                        </div>
+                      )}
+                      {dayAppts.map((a) => {
+                        const sTime = formatSlotTime(a.startAt);
+                        const eTime = formatSlotTime(a.endAt);
+                        const topMin = Math.max(0, timeToMinutes(sTime) - H0 * 60);
+                        const durPx = Math.max(24, (timeToMinutes(eTime) - timeToMinutes(sTime)) * PPM - 3);
+                        const petName = getPetName(a, petsMap);
+                        const svcName =
+                          a.serviceName || a.service?.name || servicesMap[a.serviceId] || 'Приём';
+                        const isSel = selectedAppt?.id === a.id;
+
+                        return (
+                          <button
+                            key={a.id}
+                            type="button"
+                            className={`wk-block wk-appt ${a.status} ${isSel ? 'sel' : ''} ${durPx < 56 ? 'sm' : ''}`}
+                            style={{
+                              top: px(topMin * PPM),
+                              height: px(durPx),
+                              '--st': VET_STATUS_COLORS[a.status],
+                            } as React.CSSProperties}
+                            onClick={() => onSelectAppt(a)}
+                            title={`${sTime}–${eTime} · ${petName} (${svcName}) — ${APPOINTMENT_STATUS_META[a.status]?.short || a.status}`}
+                          >
+                            <span className="wk-time">
+                              {sTime}
+                              <span className="wk-end">–{eTime}</span>
+                            </span>
+                            <span className="wk-pet">{petName}</span>
+                            <span className="wk-svc">{svcName}</span>
+                          </button>
+                        );
+                      })}
+                    </>
+                  )}
+
+                  {d.isToday && nowTop && (
+                    <div
+                      style={{
+                        position: 'absolute',
+                        left: 0,
+                        right: 0,
+                        top: nowTop,
+                        height: '2px',
+                        background: 'var(--primary)',
+                        zIndex: 5,
+                      }}
+                    />
+                  )}
+                </div>
+              );
+            })}
           </div>
         )}
 
@@ -335,7 +302,7 @@ export const VetWeeklyScheduleTable: React.FC<VetWeeklyScheduleTableProps> = ({
             Перерыв
           </span>
           <span>
-            <i style={{ background: 'color-mix(in srgb, var(--destructive) 25%, transparent)' }} />
+            <i style={{ background: 'color-mix(in oklch, var(--destructive) 25%, transparent)' }} />
             Отсутствие
           </span>
           <span>

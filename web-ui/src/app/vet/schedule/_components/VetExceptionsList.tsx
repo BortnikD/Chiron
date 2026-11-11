@@ -1,73 +1,80 @@
 'use client';
 
 import React, { useMemo } from 'react';
-import { CalendarOff, Plus } from 'lucide-react';
-import type { WorkSchedule, ScheduleException } from '@/modules/admin/types';
-import { DOW_ORDER, DOW_SHORT, formatIsoDateDisplay } from '@/shared/lib';
+import { CalendarOff } from 'lucide-react';
+import type { WorkSchedule, ScheduleException } from '@/modules/clinic/types';
+import { DOW_ORDER, DOW_SHORT, formatIsoDateDisplay, getMoscowTodayIso } from '@/shared/lib';
+import { shiftIsoDate } from '../../dashboard/_components/vetHelpers';
 
 export interface VetExceptionsListProps {
   exceptions: ScheduleException[];
   schedules: WorkSchedule[];
   selectedException?: ScheduleException | null;
   onSelectException?: (exception: ScheduleException) => void;
-  onAddException?: () => void;
   loading?: boolean;
   hasDetail?: boolean;
 }
 
 /**
- * Список исключений врача (отпуска, больничные, особый график) и недельный шаблон.
+ * Список предстоящих исключений врача (на ближайшие 60 дней) и недельный шаблон.
  */
 export const VetExceptionsList: React.FC<VetExceptionsListProps> = ({
   exceptions,
   schedules,
   selectedException,
   onSelectException,
-  onAddException,
-  loading,
+  loading = false,
   hasDetail = false,
 }) => {
-  const myWeek = useMemo(() => {
-    return DOW_SHORT.map((dw, i) => {
-      const dowEnum = DOW_ORDER[i];
-      const w = schedules.find((x) => x.dayOfWeek === dowEnum);
-      return {
-        dow: dw,
-        hours: w ? `${w.startTime.slice(0, 5)}–${w.endTime.slice(0, 5)}` : 'Выходной',
-        brk:
-          w && w.breakStart && w.breakEnd
-            ? `перерыв ${w.breakStart.slice(0, 5)}–${w.breakEnd.slice(0, 5)}`
-            : '',
-      };
-    });
-  }, [schedules]);
+  const myWeek = useMemo(
+    () =>
+      DOW_SHORT.map((dw, i) => {
+        const w = schedules.find((x) => x.dayOfWeek === DOW_ORDER[i]);
+        return {
+          dow: dw,
+          hours: w ? `${w.startTime.slice(0, 5)}–${w.endTime.slice(0, 5)}` : 'Выходной',
+          brk:
+            w && w.breakStart && w.breakEnd
+              ? `перерыв ${w.breakStart.slice(0, 5)}–${w.breakEnd.slice(0, 5)}`
+              : '',
+        };
+      }),
+    [schedules]
+  );
 
   const myExceptions = useMemo(() => {
-    return exceptions.map((e) => {
-      const isAbsence = e.type === 'ABSENCE';
-      const range =
-        e.startDate === e.endDate
-          ? formatIsoDateDisplay(e.startDate)
-          : `${formatIsoDateDisplay(e.startDate)} – ${formatIsoDateDisplay(e.endDate)}`;
-      const reason =
-        e.type === 'CUSTOM_HOURS' && e.startTime && e.endTime
-          ? `${e.startTime.slice(0, 5)}–${e.endTime.slice(0, 5)} · ${e.reason || ''}`
-          : e.reason || '—';
+    const todayIso = getMoscowTodayIso();
+    const limitIso = shiftIsoDate(todayIso, 60);
 
-      return {
-        id: e.id,
-        raw: e,
-        range,
-        reason,
-        label: isAbsence ? 'Отсутствие' : 'Особые часы',
-        cls: isAbsence ? 'due-over' : 'badge-accent',
-      };
-    });
+    return exceptions
+      .filter((e) => e.endDate >= todayIso && e.startDate <= limitIso)
+      .slice()
+      .sort((a, b) => a.startDate.localeCompare(b.startDate))
+      .map((e) => {
+        const isAbsence = e.type === 'ABSENCE';
+        const range =
+          e.startDate === e.endDate
+            ? formatIsoDateDisplay(e.startDate)
+            : `${formatIsoDateDisplay(e.startDate)} – ${formatIsoDateDisplay(e.endDate)}`;
+        const reason =
+          e.type === 'CUSTOM_HOURS' && e.startTime && e.endTime
+            ? `${e.startTime.slice(0, 5)}–${e.endTime.slice(0, 5)} · ${e.reason || 'Особые часы'}`
+            : e.reason || '—';
+
+        return {
+          id: e.id,
+          raw: e,
+          range,
+          reason,
+          label: isAbsence ? 'Отсутствие' : 'Особые часы',
+          cls: isAbsence ? 'due-over' : 'badge-accent',
+        };
+      });
   }, [exceptions]);
 
   const sizingClass = hasDetail
-    ? 'w-full md:max-h-[260px] lg:max-h-none lg:w-[300px] lg:flex-none xl:w-full xl:max-h-[240px] 2xl:w-[300px] 2xl:max-h-none 2xl:flex-none'
-    : 'w-full md:max-h-[260px] lg:max-h-none lg:w-[310px] lg:flex-none';
+    ? 'w-full lg:w-[300px] lg:flex-none xl:w-full 2xl:w-[300px] 2xl:flex-none'
+    : 'w-full lg:w-[340px] lg:flex-none';
 
   return (
     <section className={`island ${sizingClass}`} aria-label="Исключения и шаблон графика">
@@ -76,30 +83,19 @@ export const VetExceptionsList: React.FC<VetExceptionsListProps> = ({
           <CalendarOff className="ic" />
           <span>Исключения</span>
         </span>
-        {onAddException && (
-          <button
-            type="button"
-            className="btn btn-outline btn-sm btn-icon"
-            onClick={onAddException}
-            title="Добавить исключение"
-            aria-label="Добавить исключение"
-          >
-            <Plus className="ic" />
-          </button>
-        )}
       </div>
 
-      <div className="island-body" style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+      <div className="island-body" style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
         {loading ? (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-            <div className="skeleton" style={{ height: '36px', borderRadius: '6px' }} />
-            <div className="skeleton" style={{ height: '36px', borderRadius: '6px' }} />
+          <div className="col" style={{ gap: '8px' }}>
+            <div className="skeleton" style={{ height: '38px' }} />
+            <div className="skeleton" style={{ height: '38px' }} />
           </div>
         ) : (
           <div className="col" style={{ gap: 0 }}>
             {myExceptions.length === 0 ? (
               <div className="small muted" style={{ padding: '8px 0' }}>
-                Исключений на ближайшее время нет
+                На ближайшие 60 дней исключений нет
               </div>
             ) : (
               myExceptions.map((e) => {
@@ -112,7 +108,8 @@ export const VetExceptionsList: React.FC<VetExceptionsListProps> = ({
                     style={{
                       borderBottom: '1px solid var(--border)',
                       borderRadius: isSelected ? '8px' : 0,
-                      padding: '9px 8px',
+                      padding: '10px 6px',
+                      width: '100%',
                     }}
                     onClick={() => onSelectException?.(e.raw)}
                   >
@@ -128,14 +125,14 @@ export const VetExceptionsList: React.FC<VetExceptionsListProps> = ({
           </div>
         )}
 
-        <div className="col" style={{ gap: '8px', marginTop: '4px' }}>
+        <div className="col" style={{ gap: '6px' }}>
           <span className="section-title">Недельный шаблон</span>
           <div
             className="dtable"
-            style={{ '--cols': '44px 1fr 1fr' } as React.CSSProperties}
+            style={{ '--cols': '40px 1fr 1fr' } as React.CSSProperties}
           >
-            {myWeek.map((w, idx) => (
-              <div key={idx} className="trow static compact">
+            {myWeek.map((w) => (
+              <div key={w.dow} className="trow static compact">
                 <span className="cell-main">{w.dow}</span>
                 <span className="tnum">{w.hours}</span>
                 <span className="small muted">{w.brk}</span>

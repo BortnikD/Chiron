@@ -1,92 +1,156 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
-import { AlertCircle } from 'lucide-react';
-import type { CreateVaccinationRequest, Pet } from '@/modules/client/types';
-import { formatApiError, getMoscowTodayIso } from '@/shared/lib';
-
-export interface VaccinationFormData {
-  name: string;
-  administeredOn: string;
-  nextDueOn: string;
-}
+import React, { useState, useEffect, useMemo } from 'react';
+import { AlertCircle, X } from 'lucide-react';
+import type {
+  Appointment,
+  CreateVaccinationRequest,
+  Pet,
+  UpdateVaccinationRequest,
+  Vaccination,
+} from '@/modules/client/types';
+import { DatePicker, FilterDropdown } from '@/shared/components';
+import { formatApiError, formatDateShort, getMoscowTodayIso } from '@/shared/lib';
 
 export interface VetAddVaccinationModalProps {
-  /** Флаг видимости модального окна */
   isOpen: boolean;
-  /** Пациент, которому назначается вакцинация */
-  patient: Pet | null;
-  /** Обработчик закрытия модального окна */
+  mode?: 'create' | 'edit';
+  vaccination?: Vaccination | null;
+  patient?: Pet | null;
+  patients?: Pet[];
+  appointment?: Appointment | null;
+  serviceName?: string;
   onClose: () => void;
-  /** Обработчик сохранения вакцинации */
-  onSubmit: (payload: CreateVaccinationRequest) => Promise<void>;
+  onSubmit?: (payload: CreateVaccinationRequest) => Promise<void>;
+  onUpdate?: (id: string, payload: UpdateVaccinationRequest) => Promise<void>;
 }
 
-const getInitialForm = (): VaccinationFormData => ({
-  name: '',
-  administeredOn: getMoscowTodayIso(),
-  nextDueOn: getMoscowTodayIso(365),
-});
+interface FieldErrors {
+  petId?: string;
+  name?: string;
+  administeredOn?: string;
+  nextDueOn?: string;
+}
 
 /**
- * Модальное окно добавления вакцинации пациенту:
- * содержит форму с названием вакцины, датами введения и следующей ревакцинации,
- * валидацией и отображением ошибок API.
+ * Модальное окно внесения или редактирования прививки пациента.
  */
 export function VetAddVaccinationModal({
   isOpen,
+  mode,
+  vaccination,
   patient,
+  patients = [],
+  appointment,
+  serviceName,
   onClose,
   onSubmit,
+  onUpdate,
 }: VetAddVaccinationModalProps) {
-  const [vacForm, setVacForm] = useState<VaccinationFormData>(getInitialForm);
-  const [savingVac, setSavingVac] = useState(false);
-  const [vacError, setVacError] = useState<string | null>(null);
+  const resolvedMode: 'create' | 'edit' = mode ?? (vaccination ? 'edit' : 'create');
+  const todayIso = getMoscowTodayIso();
+
+  const [petId, setPetId] = useState('');
+  const [name, setName] = useState('');
+  const [administeredOn, setAdministeredOn] = useState(todayIso);
+  const [nextDueOn, setNextDueOn] = useState('');
+  const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
+  const [saving, setSaving] = useState(false);
+  const [apiError, setApiError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (isOpen) {
-      setVacForm(getInitialForm());
-      setVacError(null);
-      setSavingVac(false);
+    if (!isOpen) return;
+    setFieldErrors({});
+    setApiError(null);
+    setSaving(false);
+
+    if (resolvedMode === 'edit' && vaccination) {
+      setPetId(vaccination.petId);
+      setName(vaccination.name || '');
+      setAdministeredOn(vaccination.administeredOn || todayIso);
+      setNextDueOn(vaccination.nextDueOn || '');
+    } else {
+      const defaultAdmin = appointment
+        ? appointment.startAt.slice(0, 10)
+        : todayIso;
+      setPetId(patient?.id || patients[0]?.id || '');
+      setName('');
+      setAdministeredOn(defaultAdmin <= todayIso ? defaultAdmin : todayIso);
+      setNextDueOn('');
     }
-  }, [isOpen]);
+  }, [isOpen, resolvedMode, vaccination, patient, patients, appointment, todayIso]);
 
   useEffect(() => {
     if (!isOpen) return;
     const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && !savingVac) onClose();
+      if (e.key === 'Escape' && !saving) onClose();
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [isOpen, savingVac, onClose]);
+  }, [isOpen, saving, onClose]);
 
-  if (!isOpen || !patient) {
-    return null;
-  }
+  const petOptions = useMemo(() => {
+    const list = patient && !patients.some((p) => p.id === patient.id) ? [patient, ...patients] : patients;
+    return list
+      .slice()
+      .sort((a, b) => a.name.localeCompare(b.name, 'ru'))
+      .map((p) => ({ value: p.id, label: p.name }));
+  }, [patient, patients]);
 
-  const todayIso = getMoscowTodayIso();
+  const resolvedPatientName = useMemo(() => {
+    if (patient && (!petId || patient.id === petId)) return patient.name;
+    return patients.find((p) => p.id === petId)?.name || 'Пациент';
+  }, [patient, patients, petId]);
+
+  if (!isOpen) return null;
+
+  const isPetLocked = resolvedMode === 'edit' || Boolean(patient);
+  const apptLabel = appointment
+    ? `${formatDateShort(appointment.startAt)} · ${serviceName || 'Приём'}`
+    : vaccination?.appointmentId
+      ? 'Связана с приёмом'
+      : 'Без привязки';
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!vacForm.name.trim()) return;
+    const errs: FieldErrors = {};
 
-    setVacError(null);
-    setSavingVac(true);
+    if (!petId) errs.petId = 'Выберите пациента';
+    if (!name.trim()) errs.name = 'Обязательное поле';
+    if (!administeredOn) errs.administeredOn = 'Обязательное поле';
+    else if (administeredOn > todayIso) errs.administeredOn = 'Не может быть в будущем';
+    if (nextDueOn && administeredOn && nextDueOn < administeredOn) {
+      errs.nextDueOn = 'Не раньше даты введения';
+    }
 
+    if (Object.keys(errs).length > 0) {
+      setFieldErrors(errs);
+      return;
+    }
+
+    setApiError(null);
+    setSaving(true);
     try {
-      const payload: CreateVaccinationRequest = {
-        petId: patient.id,
-        name: vacForm.name.trim(),
-        administeredOn: vacForm.administeredOn,
-        nextDueOn: vacForm.nextDueOn || null,
-      };
-
-      await onSubmit(payload);
+      if (resolvedMode === 'edit' && vaccination && onUpdate) {
+        await onUpdate(vaccination.id, {
+          name: name.trim(),
+          administeredOn,
+          nextDueOn: nextDueOn || null,
+        });
+      } else if (onSubmit) {
+        await onSubmit({
+          petId,
+          appointmentId: appointment?.id || null,
+          name: name.trim(),
+          administeredOn,
+          nextDueOn: nextDueOn || null,
+        });
+      }
       onClose();
     } catch (err: unknown) {
-      setVacError(formatApiError(err, 'Ошибка сохранения прививки'));
+      setApiError(formatApiError(err, 'Ошибка сохранения прививки'));
     } finally {
-      setSavingVac(false);
+      setSaving(false);
     }
   };
 
@@ -95,70 +159,140 @@ export function VetAddVaccinationModal({
       className="overlay"
       role="dialog"
       aria-modal="true"
-      aria-label="Внести прививку"
-      onClick={() => !savingVac && onClose()}
+      aria-label={resolvedMode === 'edit' ? 'Изменить прививку' : 'Внести прививку'}
+      onClick={() => !saving && onClose()}
     >
-      <div className="dialog dialog-sm" onClick={(e) => e.stopPropagation()}>
+      <div className="dialog" onClick={(e) => e.stopPropagation()}>
         <div className="dialog-head">
-          <span className="dialog-title">Внести прививку</span>
-          <span className="dialog-desc">Запись вакцинации для «{patient.name}»</span>
+          <div className="row between" style={{ alignItems: 'flex-start', gap: '12px' }}>
+            <div className="col" style={{ gap: '4px' }}>
+              <span className="dialog-title">
+                {resolvedMode === 'edit' ? 'Изменить прививку' : 'Внести прививку'}
+              </span>
+              <span className="dialog-desc">
+                {resolvedMode === 'edit'
+                  ? `Обновление записи вакцинации для «${resolvedPatientName}»`
+                  : isPetLocked
+                    ? `Новая запись вакцинации для «${resolvedPatientName}»`
+                    : 'Регистрация вакцинации пациента'}
+              </span>
+            </div>
+            <button
+              type="button"
+              className="btn btn-ghost btn-icon btn-sm"
+              onClick={onClose}
+              disabled={saving}
+              aria-label="Закрыть"
+            >
+              <X size={16} />
+            </button>
+          </div>
         </div>
 
         <form onSubmit={handleSubmit}>
           <div className="dialog-body">
-            {vacError && (
+            {apiError && (
               <div className="alert alert-destructive" role="alert">
                 <AlertCircle className="ic" />
-                <div>{vacError}</div>
+                <div>{apiError}</div>
               </div>
             )}
 
-            <div className="field">
-              <label className="field-label" htmlFor="vet-vac-name">
-                Название вакцины <span className="req">*</span>
-              </label>
-              <input
-                id="vet-vac-name"
-                className="input"
-                placeholder="Нобивак DHPPi…"
-                value={vacForm.name}
-                onChange={(e) => setVacForm({ ...vacForm, name: e.target.value })}
-                disabled={savingVac}
-                required
-              />
-            </div>
-
             <div className="form-grid">
               <div className="field">
-                <label className="field-label" htmlFor="vet-vac-adm">
-                  Дата введения <span className="req">*</span>
-                </label>
-                <input
-                  id="vet-vac-adm"
-                  type="date"
-                  className="input"
-                  max={todayIso}
-                  value={vacForm.administeredOn}
-                  onChange={(e) =>
-                    setVacForm({ ...vacForm, administeredOn: e.target.value })
-                  }
-                  disabled={savingVac}
-                  required
-                />
+                <span className="field-label">
+                  Пациент <span className="req">*</span>
+                </span>
+                {isPetLocked ? (
+                  <input
+                    className="input"
+                    value={resolvedPatientName}
+                    readOnly
+                    aria-label="Пациент"
+                  />
+                ) : (
+                  <FilterDropdown
+                    value={petId}
+                    options={petOptions}
+                    onChange={(v) => {
+                      setPetId(v);
+                      setFieldErrors((p) => ({ ...p, petId: undefined }));
+                    }}
+                    placeholder="Выберите пациента"
+                    searchable
+                    invalid={!!fieldErrors.petId}
+                    disabled={saving}
+                    ariaLabel="Пациент"
+                  />
+                )}
+                {fieldErrors.petId && <span className="field-error">{fieldErrors.petId}</span>}
               </div>
 
               <div className="field">
-                <label className="field-label" htmlFor="vet-vac-due">
-                  Следующая дата
+                <span className="field-label">Приём</span>
+                <input className="input" value={apptLabel} readOnly aria-label="Приём" />
+                <span className="field-hint">Необязательно; приём того же пациента</span>
+              </div>
+
+              <div className="field span-2">
+                <label className="field-label" htmlFor="vx-name">
+                  Вакцина <span className="req">*</span>
                 </label>
                 <input
-                  id="vet-vac-due"
-                  type="date"
-                  className="input"
-                  value={vacForm.nextDueOn}
-                  onChange={(e) => setVacForm({ ...vacForm, nextDueOn: e.target.value })}
-                  disabled={savingVac}
+                  id="vx-name"
+                  className={`input ${fieldErrors.name ? 'invalid' : ''}`}
+                  maxLength={150}
+                  placeholder="Например, Нобивак DHPPi"
+                  value={name}
+                  onChange={(e) => {
+                    setName(e.target.value);
+                    setFieldErrors((p) => ({ ...p, name: undefined }));
+                  }}
+                  disabled={saving}
                 />
+                {fieldErrors.name && <span className="field-error">{fieldErrors.name}</span>}
+              </div>
+
+              <div className="field">
+                <label className="field-label" htmlFor="vx-admin">
+                  Дата введения <span className="req">*</span>
+                </label>
+                <DatePicker
+                  id="vx-admin"
+                  value={administeredOn}
+                  max={todayIso}
+                  onChange={(iso) => {
+                    setAdministeredOn(iso);
+                    setFieldErrors((p) => ({ ...p, administeredOn: undefined }));
+                  }}
+                  invalid={!!fieldErrors.administeredOn}
+                  clearable={false}
+                  disabled={saving}
+                />
+                {fieldErrors.administeredOn && (
+                  <span className="field-error">{fieldErrors.administeredOn}</span>
+                )}
+              </div>
+
+              <div className="field">
+                <label className="field-label" htmlFor="vx-next">
+                  Следующая доза
+                </label>
+                <DatePicker
+                  id="vx-next"
+                  value={nextDueOn}
+                  min={administeredOn || undefined}
+                  onChange={(iso) => {
+                    setNextDueOn(iso);
+                    setFieldErrors((p) => ({ ...p, nextDueOn: undefined }));
+                  }}
+                  invalid={!!fieldErrors.nextDueOn}
+                  clearable
+                  disabled={saving}
+                />
+                {fieldErrors.nextDueOn && (
+                  <span className="field-error">{fieldErrors.nextDueOn}</span>
+                )}
               </div>
             </div>
           </div>
@@ -168,12 +302,16 @@ export function VetAddVaccinationModal({
               type="button"
               className="btn btn-outline"
               onClick={onClose}
-              disabled={savingVac}
+              disabled={saving}
             >
               Отмена
             </button>
-            <button type="submit" className="btn btn-primary" disabled={savingVac}>
-              {savingVac ? 'Сохранение…' : 'Внести'}
+            <button type="submit" className="btn btn-primary" disabled={saving}>
+              {saving
+                ? 'Сохранение…'
+                : resolvedMode === 'edit'
+                  ? 'Сохранить'
+                  : 'Внести'}
             </button>
           </div>
         </form>

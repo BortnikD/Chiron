@@ -1,43 +1,150 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
-import { AlertCircle } from 'lucide-react';
-import type { Service } from '@/modules/clinic/types';
+import React, { useState, useEffect, useMemo } from 'react';
+import { AlertCircle, Repeat, X } from 'lucide-react';
+import { clinicApi } from '@/modules/clinic/api';
+import type { Appointment, Pet } from '@/modules/client/types';
+import type { AvailableSlotResponse, Service, Veterinarian } from '@/modules/clinic/types';
 import type { CreateFollowUpRequest } from '@/modules/vet/types';
-import { formatApiError, getMoscowTodayIso } from '@/shared/lib';
+import { DatePicker, SearchCombobox } from '@/shared/components';
+import {
+  formatApiError,
+  formatCurrency,
+  formatDateShort,
+  formatSlotTime,
+  getMoscowDateKey,
+  getMoscowTodayIso,
+  pluralRu,
+} from '@/shared/lib';
+import {
+  getEffectiveServiceDuration,
+  getEffectiveServicePrice,
+  shiftIsoDate,
+} from './vetHelpers';
+import { groupFollowUpSlotsByDay } from './vetFollowUpUtils';
 
 export interface VetFollowUpModalProps {
   isOpen: boolean;
-  defaultServiceId: string;
+  appointment: Appointment;
+  pet?: Pet | null;
+  vet?: Veterinarian | null;
   services: Service[];
   onClose: () => void;
   onSubmit: (data: CreateFollowUpRequest) => Promise<void>;
 }
 
-/**
- * Модальное окно назначения повторного приёма для контроля результатов лечения.
- */
 export const VetFollowUpModal: React.FC<VetFollowUpModalProps> = ({
   isOpen,
-  defaultServiceId,
+  appointment,
+  pet,
+  vet,
   services,
   onClose,
   onSubmit,
 }) => {
-  const [followUpDate, setFollowUpDate] = useState(() => getMoscowTodayIso(7));
-  const [followUpTime, setFollowUpTime] = useState('10:00');
-  const [followUpServiceId, setFollowUpServiceId] = useState(defaultServiceId);
+  const todayIso = getMoscowTodayIso();
+  const origDateIso = getMoscowDateKey(appointment.startAt);
+  const minFromDate = origDateIso > todayIso ? origDateIso : todayIso;
+
+  const [speciesServices, setSpeciesServices] = useState<Service[]>([]);
+  const [selectedServiceId, setSelectedServiceId] = useState(appointment.serviceId);
+  const [fromDate, setFromDate] = useState(minFromDate);
+  const [slots, setSlots] = useState<AvailableSlotResponse[]>([]);
+  const [loadingSlots, setLoadingSlots] = useState(false);
+  const [slotsError, setSlotsError] = useState<string | null>(null);
+  const [selectedSlot, setSelectedSlot] = useState<AvailableSlotResponse | null>(null);
   const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [submitError, setSubmitError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!isOpen) return;
-    setFollowUpDate(getMoscowTodayIso(7));
-    setFollowUpTime('10:00');
-    setFollowUpServiceId(defaultServiceId || services[0]?.id || '');
-    setError(null);
-    setSubmitting(false);
-  }, [isOpen, defaultServiceId, services]);
+    setSelectedServiceId(appointment.serviceId);
+    setFromDate(minFromDate);
+    setSelectedSlot(null);
+    setSubmitError(null);
+    setSlotsError(null);
+  }, [isOpen, appointment.id, appointment.serviceId, minFromDate]);
+
+  const speciesId = pet?.speciesId || appointment.pet?.speciesId || '';
+
+  useEffect(() => {
+    if (!isOpen || !speciesId) {
+      setSpeciesServices([]);
+      return;
+    }
+    let cancelled = false;
+    clinicApi
+      .getServices(vet?.specializationId, speciesId)
+      .then((list) => {
+        if (cancelled) return;
+        const active = (Array.isArray(list) ? list : []).filter((s) => s.isActive !== false);
+        setSpeciesServices(active);
+      })
+      .catch(() => {
+        if (!cancelled) setSpeciesServices([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [isOpen, speciesId, vet?.specializationId]);
+
+  const availableServices = useMemo(() => {
+    if (speciesServices.length > 0) return speciesServices;
+    return services.filter(
+      (s) => s.isActive !== false && (!vet?.specializationId || s.specializationId === vet.specializationId)
+    );
+  }, [speciesServices, services, vet?.specializationId]);
+
+  useEffect(() => {
+    if (!isOpen || availableServices.length === 0) return;
+    if (!availableServices.some((s) => s.id === selectedServiceId)) {
+      setSelectedServiceId(availableServices[0].id);
+    }
+  }, [isOpen, availableServices, selectedServiceId]);
+
+  const vetId = vet?.id || appointment.veterinarianId;
+
+  useEffect(() => {
+    if (!isOpen || !speciesId || !selectedServiceId || !fromDate) {
+      setSlots([]);
+      return;
+    }
+    let cancelled = false;
+    const toDate = shiftIsoDate(fromDate, 6);
+    const origEndMs = new Date(appointment.endAt).getTime();
+
+    setLoadingSlots(true);
+    setSlotsError(null);
+    setSelectedSlot(null);
+
+    clinicApi
+      .findAvailableSlots({
+        speciesId,
+        serviceId: selectedServiceId,
+        veterinarianId: vetId,
+        from: fromDate,
+        to: toDate,
+      })
+      .then((res) => {
+        if (cancelled) return;
+        const filtered = (Array.isArray(res) ? res : [])
+          .filter((sl) => new Date(sl.startAt).getTime() >= origEndMs)
+          .sort((a, b) => new Date(a.startAt).getTime() - new Date(b.startAt).getTime());
+        setSlots(filtered);
+      })
+      .catch((err: unknown) => {
+        if (cancelled) return;
+        setSlots([]);
+        setSlotsError(formatApiError(err, 'Не удалось загрузить свободные окна'));
+      })
+      .finally(() => {
+        if (!cancelled) setLoadingSlots(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [isOpen, speciesId, selectedServiceId, fromDate, vetId, appointment.endAt]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -48,44 +155,46 @@ export const VetFollowUpModal: React.FC<VetFollowUpModalProps> = ({
     return () => window.removeEventListener('keydown', onKeyDown);
   }, [isOpen, submitting, onClose]);
 
+  const serviceOptions = useMemo(
+    () =>
+      availableServices.map((s) => ({
+        value: s.id,
+        label: s.name,
+        hint: `${getEffectiveServiceDuration(s)} мин · ${formatCurrency(getEffectiveServicePrice(s))}`,
+      })),
+    [availableServices]
+  );
+
+  const selectedService = useMemo(
+    () => availableServices.find((s) => s.id === selectedServiceId) || availableServices[0] || null,
+    [availableServices, selectedServiceId]
+  );
+
+  const groupedDays = useMemo(() => groupFollowUpSlotsByDay(slots), [slots]);
+
   if (!isOpen) return null;
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError(null);
+  const petName = pet?.name || appointment.pet?.name || appointment.petName || 'Пациент';
+  const origLabel = `${formatDateShort(appointment.startAt)} ${formatSlotTime(appointment.startAt)}–${formatSlotTime(appointment.endAt)}`;
 
-    const [hoursStr, minutesStr] = followUpTime.split(':');
-    const hours = Number(hoursStr);
-    const minutes = Number(minutesStr);
+  const summaryText =
+    selectedSlot && selectedService
+      ? `${selectedService.name} · ${formatDateShort(selectedSlot.startAt)} ${formatSlotTime(selectedSlot.startAt)} · ${formatCurrency(getEffectiveServicePrice(selectedService))}`
+      : 'Выберите окно';
 
-    if (!followUpDate || hoursStr == null || minutesStr == null || Number.isNaN(hours) || Number.isNaN(minutes)) {
-      setError('Укажите корректные дату и время приёма');
-      return;
-    }
-
-    const start = new Date(
-      `${followUpDate}T${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:00+03:00`
-    );
-
-    if (Number.isNaN(start.getTime())) {
-      setError('Укажите корректные дату и время приёма');
-      return;
-    }
-
-    const targetSvc = services.find((s) => s.id === followUpServiceId) || services[0];
-    const dur = targetSvc?.baseDurationMin || 30;
-    const end = new Date(start.getTime() + dur * 60000);
-
+  const handleConfirm = async () => {
+    if (!selectedSlot || submitting) return;
     setSubmitting(true);
+    setSubmitError(null);
     try {
       await onSubmit({
-        serviceId: targetSvc?.id || defaultServiceId || undefined,
-        startAt: start.toISOString(),
-        endAt: end.toISOString(),
+        serviceId: selectedServiceId || undefined,
+        startAt: selectedSlot.startAt,
+        endAt: selectedSlot.endAt,
       });
       onClose();
     } catch (err: unknown) {
-      setError(formatApiError(err, 'Не удалось назначить повторный приём'));
+      setSubmitError(formatApiError(err, 'Не удалось назначить повторный приём'));
     } finally {
       setSubmitting(false);
     }
@@ -93,95 +202,144 @@ export const VetFollowUpModal: React.FC<VetFollowUpModalProps> = ({
 
   return (
     <div
-      className="dialog-backdrop"
+      className="overlay"
       role="dialog"
       aria-modal="true"
-      aria-label="Назначить повторный приём"
+      aria-label="Повторный приём"
       onClick={() => !submitting && onClose()}
     >
-      <div className="dialog dialog-sm" onClick={(e) => e.stopPropagation()}>
+      <div className="dialog dialog-lg" onClick={(e) => e.stopPropagation()}>
         <div className="dialog-head">
-          <span className="dialog-title">Назначить повторный приём</span>
-          <span className="dialog-desc">
-            Создание связанного визита для контроля результатов лечения
-          </span>
-        </div>
-
-        <form onSubmit={handleSubmit}>
-          <div className="dialog-body">
-            {error && (
-              <div className="alert alert-destructive" role="alert">
-                <AlertCircle className="ic" />
-                <div>{error}</div>
-              </div>
-            )}
-
-            <div className="form-grid">
-              <div className="field span-2">
-                <label className="field-label" htmlFor="fu-svc">
-                  Услуга
-                </label>
-                <select
-                  id="fu-svc"
-                  className="select"
-                  value={followUpServiceId}
-                  onChange={(e) => setFollowUpServiceId(e.target.value)}
-                  disabled={submitting}
-                >
-                  {services.map((s) => (
-                    <option key={s.id} value={s.id}>
-                      {s.name} ({s.baseDurationMin} мин)
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="field">
-                <label className="field-label" htmlFor="fu-date">
-                  Дата приёма
-                </label>
-                <input
-                  id="fu-date"
-                  type="date"
-                  className="input"
-                  value={followUpDate}
-                  onChange={(e) => setFollowUpDate(e.target.value)}
-                  disabled={submitting}
-                  required
-                />
-              </div>
-
-              <div className="field">
-                <label className="field-label" htmlFor="fu-time">
-                  Время
-                </label>
-                <input
-                  id="fu-time"
-                  type="time"
-                  className="input"
-                  value={followUpTime}
-                  onChange={(e) => setFollowUpTime(e.target.value)}
-                  disabled={submitting}
-                  required
-                />
-              </div>
+          <div className="row between" style={{ alignItems: 'flex-start', gap: '12px' }}>
+            <div className="col" style={{ gap: '4px' }}>
+              <span className="dialog-title">Повторный приём · {petName}</span>
+              <span className="dialog-desc">
+                После приёма {origLabel}. Запись сразу создаётся подтверждённой, владелец получит уведомление.
+              </span>
             </div>
-          </div>
-
-          <div className="dialog-foot">
             <button
               type="button"
-              className="btn btn-outline"
+              className="btn btn-ghost btn-icon btn-sm"
               onClick={onClose}
               disabled={submitting}
+              aria-label="Закрыть"
             >
-              Отмена
-            </button>
-            <button type="submit" className="btn btn-primary" disabled={submitting}>
-              {submitting ? 'Назначение...' : 'Назначить приём'}
+              <X size={16} />
             </button>
           </div>
-        </form>
+        </div>
+
+        <div className="dialog-body">
+          {submitError && (
+            <div className="alert alert-destructive" role="alert">
+              <AlertCircle className="ic" />
+              <div>{submitError}</div>
+            </div>
+          )}
+
+          <div className="field">
+            <span className="field-label">Услуга</span>
+            <SearchCombobox
+              value={selectedServiceId}
+              options={serviceOptions}
+              onChange={(val) => setSelectedServiceId(val)}
+              placeholder="Выберите услугу"
+              disabled={submitting}
+              ariaLabel="Выберите услугу"
+            />
+            <span className="field-hint">По умолчанию — услуга исходного приёма</span>
+          </div>
+
+          <div className="row wrap" style={{ gap: '12px', alignItems: 'flex-end' }}>
+            <div className="field" style={{ width: '180px' }}>
+              <label className="field-label" htmlFor="fu-from">
+                С даты
+              </label>
+              <DatePicker
+                id="fu-from"
+                value={fromDate}
+                min={minFromDate}
+                onChange={(val) => val && setFromDate(val)}
+                clearable={false}
+                disabled={submitting}
+              />
+            </div>
+            <span className="small muted" style={{ paddingBottom: '8px' }}>
+              Свободные окна в вашем графике на 7 дней
+            </span>
+          </div>
+
+          {slotsError && (
+            <div className="alert alert-destructive" role="alert">
+              <AlertCircle className="ic" />
+              <div>{slotsError}</div>
+            </div>
+          )}
+
+          <div className="col" style={{ gap: 0, maxHeight: '300px', overflow: 'auto' }}>
+            {loadingSlots ? (
+              <div className="col" style={{ gap: '8px', padding: '8px 0' }}>
+                <div className="skeleton" style={{ height: '48px' }} />
+                <div className="skeleton" style={{ height: '48px' }} />
+              </div>
+            ) : groupedDays.length === 0 ? (
+              <div className="empty" style={{ padding: '20px' }}>
+                <span>
+                  {!speciesId
+                    ? 'Не удалось определить вид пациента для подбора окон'
+                    : 'Нет свободных окон, попробуйте другой период'}
+                </span>
+              </div>
+            ) : (
+              groupedDays.map((day) => (
+                <div
+                  key={day.dateIso}
+                  className="col"
+                  style={{ gap: '6px', padding: '8px 0', borderBottom: '1px solid var(--border)' }}
+                >
+                  <div className="row between">
+                    <span className="cell-main">
+                      {day.dow}, {day.dateLabel}
+                    </span>
+                    <span className="cell-sub">
+                      {day.slots.length} {pluralRu(day.slots.length, 'окно', 'окна', 'окон')}
+                    </span>
+                  </div>
+                  <div className="chips">
+                    {day.slots.map((sl) => (
+                      <button
+                        key={sl.startAt}
+                        type="button"
+                        className={`slot ${selectedSlot?.startAt === sl.startAt ? 'on' : ''}`}
+                        onClick={() => setSelectedSlot(sl)}
+                      >
+                        {formatSlotTime(sl.startAt)}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+
+        <div className="dialog-foot">
+          <span className="small muted" style={{ marginRight: 'auto', alignSelf: 'center' }}>
+            {summaryText}
+          </span>
+          <button type="button" className="btn btn-outline" onClick={onClose} disabled={submitting}>
+            Отмена
+          </button>
+          <button
+            type="button"
+            className="btn btn-primary"
+            disabled={!selectedSlot || submitting}
+            onClick={handleConfirm}
+          >
+            <Repeat className="ic" />
+            <span>{submitting ? 'Назначение…' : 'Назначить'}</span>
+          </button>
+        </div>
       </div>
     </div>
   );

@@ -1,7 +1,9 @@
 'use client';
 
 import React, { useMemo, useState } from 'react';
-import { AlertCircle, Syringe, X } from 'lucide-react';
+import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import { AlertCircle, Calendar, Syringe, X } from 'lucide-react';
 import type { Appointment, Pet, Vaccination } from '@/modules/client/types';
 import type { Species } from '@/modules/clinic/types';
 import { SpeciesIcon } from '@/components/ui/SpeciesIcon';
@@ -12,34 +14,24 @@ import {
   formatDateRu,
   formatIsoDateDisplay,
   formatSlotTime,
+  formatWeightRu,
   getSpeciesTone,
   toIdNameMap,
 } from '@/shared/lib';
+import { getVetVaccinationDueInfo } from '../../dashboard/_components/vetHelpers';
 
 export interface VetPatientDetailIslandProps {
-  /** Выбранный пациент для детального просмотра */
   patient: Pet;
-  /** Справочник видов животных */
   speciesList: Species[];
-  /** Карта услуг (id -> название) */
   servicesMap?: Record<string, string>;
-  /** Список всех записей на приём */
   appointments: Appointment[];
-  /** Список вакцинаций выбранного пациента */
   vaccinations: Vaccination[];
-  /** Ошибка загрузки вакцинаций */
   vaccinationsError?: string | null;
-  /** Обработчик закрытия детального острова */
   onClose: () => void;
-  /** Обработчик открытия модального окна добавления вакцинации */
   onAddVaccination: () => void;
+  onEditVaccination: (vac: Vaccination) => void;
 }
 
-/**
- * Правый master-detail остров с карточкой выбранного пациента:
- * отображает общую информацию о пациенте, историю приёмов у текущего врача
- * и список вакцинаций с возможностью добавления новой записи.
- */
 export function VetPatientDetailIsland({
   patient,
   speciesList,
@@ -49,7 +41,9 @@ export function VetPatientDetailIsland({
   vaccinationsError,
   onClose,
   onAddVaccination,
+  onEditVaccination,
 }: VetPatientDetailIslandProps) {
+  const router = useRouter();
   const [activeTab, setActiveTab] = useState<'overview' | 'appointments' | 'vaccinations'>('overview');
 
   const speciesMap = useMemo(() => toIdNameMap(speciesList), [speciesList]);
@@ -60,12 +54,25 @@ export function VetPatientDetailIsland({
   );
 
   const patientAppts = useMemo(
-    () => appointments.filter((a) => a.petId === patient.id),
+    () =>
+      appointments
+        .filter((a) => a.petId === patient.id)
+        .slice()
+        .sort((a, b) => new Date(b.startAt).getTime() - new Date(a.startAt).getTime()),
     [appointments, patient.id]
   );
 
+  const runtimeOwner = patient as Pet & {
+    ownerName?: string | null;
+    ownerPhone?: string | null;
+    ownerEmail?: string | null;
+  };
+  const hasOwnerContact = Boolean(
+    runtimeOwner.ownerName || runtimeOwner.ownerPhone || runtimeOwner.ownerEmail
+  );
+
   return (
-    <section className="island detail-island" aria-label="Карточка пациента">
+    <section className="island detail-island xl:w-[440px]" aria-label="Карточка пациента">
       <div className="island-head">
         <div className="row">
           <span className={`t-ava tone-${tone}`}>
@@ -92,6 +99,8 @@ export function VetPatientDetailIsland({
       <div className="tabs-line" role="tablist">
         <button
           type="button"
+          role="tab"
+          aria-selected={activeTab === 'overview'}
           className={`tab-line ${activeTab === 'overview' ? 'on' : ''}`}
           onClick={() => setActiveTab('overview')}
         >
@@ -99,6 +108,8 @@ export function VetPatientDetailIsland({
         </button>
         <button
           type="button"
+          role="tab"
+          aria-selected={activeTab === 'appointments'}
           className={`tab-line ${activeTab === 'appointments' ? 'on' : ''}`}
           onClick={() => setActiveTab('appointments')}
         >
@@ -106,6 +117,8 @@ export function VetPatientDetailIsland({
         </button>
         <button
           type="button"
+          role="tab"
+          aria-selected={activeTab === 'vaccinations'}
           className={`tab-line ${activeTab === 'vaccinations' ? 'on' : ''}`}
           onClick={() => setActiveTab('vaccinations')}
         >
@@ -126,49 +139,71 @@ export function VetPatientDetailIsland({
                 {patient.birthDate ? formatIsoDateDisplay(patient.birthDate) : 'Не указана'}
               </dd>
               <dt>Вес</dt>
-              <dd className="tnum">
-                {patient.weightKg != null
-                  ? `${String(patient.weightKg).replace('.', ',')} кг`
-                  : '—'}
-              </dd>
+              <dd className="tnum">{formatWeightRu(patient.weightKg)}</dd>
               <dt>Заметки</dt>
               <dd>{patient.notes || '—'}</dd>
+              {hasOwnerContact && (
+                <>
+                  <dt>Владелец</dt>
+                  <dd>
+                    {[runtimeOwner.ownerName, runtimeOwner.ownerPhone, runtimeOwner.ownerEmail]
+                      .filter(Boolean)
+                      .join(' · ')}
+                  </dd>
+                </>
+              )}
             </dl>
 
-            <span className="small muted">Контакты владельца врачу недоступны.</span>
+            {!hasOwnerContact && (
+              <span className="small muted">Контакты владельца врачу недоступны.</span>
+            )}
 
-            <button type="button" className="btn btn-outline" onClick={onAddVaccination}>
-              <Syringe size={14} />
-              Внести прививку
-            </button>
+            <div className="col" style={{ gap: 6 }}>
+              <button type="button" className="btn btn-outline btn-block" onClick={onAddVaccination}>
+                <Syringe size={14} />
+                Внести прививку
+              </button>
+              <Link
+                href={`/vet/appointments?petId=${encodeURIComponent(patient.id)}`}
+                className="btn btn-ghost btn-block"
+              >
+                <Calendar size={14} />
+                Все приёмы
+              </Link>
+            </div>
           </div>
         )}
 
         {activeTab === 'appointments' && (
-          <div className="col" style={{ gap: 4, margin: '0 -10px' }}>
+          <div className="col" style={{ gap: 2, margin: '0 -10px' }}>
             {patientAppts.map((a) => {
-              const dd = formatDateRu(a.startAt, { day: 'numeric' });
-              const mon = formatDateRu(a.startAt, { month: 'short' });
+              const dd = formatDateRu(a.startAt, { day: '2-digit' });
+              const mon = formatDateRu(a.startAt, { month: 'short' }).replace('.', '');
               const time = formatSlotTime(a.startAt);
               const serviceName =
                 a.serviceName || a.service?.name || servicesMap?.[a.serviceId] || 'Приём';
 
               return (
-                <div key={a.id} className="lrow">
+                <button
+                  key={a.id}
+                  type="button"
+                  className="lrow"
+                  onClick={() => router.push(`/vet/appointments?sel=${encodeURIComponent(a.id)}`)}
+                >
                   <span className="datebox">
                     <b>{dd}</b>
                     <span>{mon}</span>
                   </span>
                   <span className="col" style={{ gap: 1 }}>
                     <span className="cell-main">{serviceName}</span>
-                    <span className="cell-sub">
+                    <span className="cell-sub tnum">
                       {time} · {formatCurrency(a.priceSnapshot ?? a.price ?? 0)}
                     </span>
                   </span>
                   <span className={`badge st badge-${a.status}`}>
                     {APPOINTMENT_STATUS_META[a.status]?.short || a.status}
                   </span>
-                </div>
+                </button>
               );
             })}
 
@@ -189,25 +224,34 @@ export function VetPatientDetailIsland({
               </div>
             )}
 
-            <div className="col" style={{ gap: 4, margin: '0 -10px' }}>
-              {vaccinations.map((v) => (
-                <div key={v.id} className="lrow">
-                  <span className="t-ava tone-prev">
-                    <Syringe size={16} />
-                  </span>
-                  <span className="col" style={{ gap: 1 }}>
-                    <span className="cell-main">{v.name}</span>
-                    <span className="cell-sub tnum">
-                      Введена {formatIsoDateDisplay(v.administeredOn)}
+            <div className="col" style={{ gap: 2, margin: '0 -10px' }}>
+              {vaccinations.map((v) => {
+                const due = getVetVaccinationDueInfo(v.nextDueOn);
+                return (
+                  <button
+                    key={v.id}
+                    type="button"
+                    className="lrow"
+                    onClick={() => onEditVaccination(v)}
+                  >
+                    <span
+                      className="pet-ava"
+                      style={{ width: 36, height: 36, borderRadius: 10 }}
+                    >
+                      <Syringe size={16} />
                     </span>
-                  </span>
-                  {v.nextDueOn && (
-                    <span className="badge badge-accent tnum">
-                      до {formatIsoDateDisplay(v.nextDueOn)}
+                    <span className="col" style={{ gap: 1 }}>
+                      <span className="cell-main">{v.name}</span>
+                      <span className="cell-sub tnum">
+                        Введена {formatIsoDateDisplay(v.administeredOn)}
+                      </span>
                     </span>
-                  )}
-                </div>
-              ))}
+                    <span className={`badge ${due.cls} tnum`}>
+                      {due.label === '—' ? due.text : `${due.label}`}
+                    </span>
+                  </button>
+                );
+              })}
 
               {vaccinations.length === 0 && !vaccinationsError && (
                 <div className="empty" style={{ padding: 24 }}>

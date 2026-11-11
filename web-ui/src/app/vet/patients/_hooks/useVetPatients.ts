@@ -5,12 +5,24 @@ import type {
   Appointment,
   CreateVaccinationRequest,
   Pet,
+  UpdateVaccinationRequest,
   Vaccination,
 } from '@/modules/client/types';
 import type { Service, Species } from '@/modules/clinic/types';
-import { formatApiError, toIdNameMap } from '@/shared/lib';
+import { useShellHeader } from '@/components/layout/AppShell';
+import { useToast } from '@/shared/components';
+import { fetchAllPages, formatApiError, toIdNameMap } from '@/shared/lib';
 
-export function useVetPatients() {
+async function fetchAllVetAppointments(): Promise<Appointment[]> {
+  return fetchAllPages(
+    (page, size) => vetApi.getAppointments({ page, size, direction: 'DESC' }),
+    { pageSize: 100, maxPages: 50, concurrency: 4 }
+  );
+}
+
+export function useVetPatients(initialSelId?: string | null) {
+  const { toast } = useToast();
+
   const [patients, setPatients] = useState<Pet[]>([]);
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [speciesList, setSpeciesList] = useState<Species[]>([]);
@@ -18,17 +30,20 @@ export function useVetPatients() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState('');
+  const [speciesFilter, setSpeciesFilter] = useState('');
   const [viewMode, setViewMode] = useState<'table' | 'cards'>('table');
 
   const [selectedPatient, setSelectedPatient] = useState<Pet | null>(null);
   const [patientVacs, setPatientVacs] = useState<Vaccination[]>([]);
   const [vacsError, setVacsError] = useState<string | null>(null);
-  const [isAddVacOpen, setIsAddVacOpen] = useState(false);
+  const [isVacModalOpen, setIsVacModalOpen] = useState(false);
+  const [editingVac, setEditingVac] = useState<Vaccination | null>(null);
 
   const isMountedRef = useRef(true);
   const loadSeqRef = useRef(0);
   const activePatientIdRef = useRef<string | null>(null);
   const vacReqSeqRef = useRef(0);
+  const appliedSelRef = useRef<string | null>(null);
 
   useEffect(() => {
     isMountedRef.current = true;
@@ -45,22 +60,23 @@ export function useVetPatients() {
     }
     try {
       const [patientsData, apptsData, speciesData, servicesData] = await Promise.all([
-        vetApi.getPatients(),
-        vetApi.getAppointments(0, 100),
+        vetApi.getPatients(silent),
+        fetchAllVetAppointments().catch(() => [] as Appointment[]),
         clinicApi.getSpecies().catch(() => [] as Species[]),
         clinicApi.getServices().catch(() => [] as Service[]),
       ]);
 
       if (!isMountedRef.current || seq !== loadSeqRef.current) return;
 
-      const safePatients = Array.isArray(patientsData) ? patientsData : [];
-      const safeAppts = apptsData?.items ?? (Array.isArray(apptsData) ? apptsData : []);
+      const safePatients = (Array.isArray(patientsData) ? patientsData : [])
+        .slice()
+        .sort((a, b) => a.name.localeCompare(b.name, 'ru'));
       const safeSpecies = Array.isArray(speciesData) ? speciesData : [];
       const safeServices = Array.isArray(servicesData) ? servicesData : [];
 
       setError(null);
       setPatients(safePatients);
-      setAppointments(safeAppts);
+      setAppointments(apptsData);
       setSpeciesList(safeSpecies);
       setServicesMap(toIdNameMap(safeServices));
 
@@ -81,26 +97,49 @@ export function useVetPatients() {
   }, []);
 
   useEffect(() => {
-    let cancelled = false;
-    void (async () => {
-      if (cancelled) return;
-      await loadData();
-    })();
-    const handleNotification = () => {
-      if (!cancelled) void loadData(true);
-    };
-    window.addEventListener('chiron:notification-received', handleNotification);
+    void loadData();
+    const handleRefresh = () => void loadData(true);
+    window.addEventListener('chiron:notification-received', handleRefresh);
+    window.addEventListener('chiron:vet-appointments-updated', handleRefresh);
     return () => {
-      cancelled = true;
-      window.removeEventListener('chiron:notification-received', handleNotification);
+      window.removeEventListener('chiron:notification-received', handleRefresh);
+      window.removeEventListener('chiron:vet-appointments-updated', handleRefresh);
     };
   }, [loadData]);
+
+  useEffect(() => {
+    if (!initialSelId || loading || appliedSelRef.current === initialSelId) return;
+    appliedSelRef.current = initialSelId;
+    const found = patients.find((p) => p.id === initialSelId);
+    if (found) {
+      setSelectedPatient(found);
+      return;
+    }
+    let cancelled = false;
+    vetApi
+      .getPatientPet(initialSelId)
+      .then((pet) => {
+        if (cancelled || !isMountedRef.current || !pet) return;
+        setPatients((prev) => (prev.some((p) => p.id === pet.id) ? prev : [pet, ...prev]));
+        setSelectedPatient(pet);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [initialSelId, loading, patients]);
+
+  useShellHeader({
+    crumbGroup: 'Врач',
+    crumb: 'Пациенты',
+    crumb2: selectedPatient?.name || undefined,
+  });
 
   const loadPatientVaccinations = useCallback(async (petId: string) => {
     const reqSeq = ++vacReqSeqRef.current;
     setVacsError(null);
     try {
-      const res = await vetApi.getVaccinations(0, 50, petId);
+      const res = await vetApi.getVaccinations(0, 100, petId);
       if (
         !isMountedRef.current ||
         activePatientIdRef.current !== petId ||
@@ -134,27 +173,62 @@ export function useVetPatients() {
     void loadPatientVaccinations(petId);
   }, [selectedPatient?.id, loadPatientVaccinations]);
 
+  const openCreateVaccination = useCallback(() => {
+    setEditingVac(null);
+    setIsVacModalOpen(true);
+  }, []);
+
+  const openEditVaccination = useCallback((vac: Vaccination) => {
+    setEditingVac(vac);
+    setIsVacModalOpen(true);
+  }, []);
+
+  const closeVaccinationModal = useCallback(() => {
+    setIsVacModalOpen(false);
+    setEditingVac(null);
+  }, []);
+
   const handleAddVaccination = useCallback(
     async (payload: CreateVaccinationRequest): Promise<void> => {
       await vetApi.createVaccination(payload);
+      const pName =
+        patients.find((p) => p.id === payload.petId)?.name ||
+        selectedPatient?.name ||
+        'Пациент';
+      toast('Прививка внесена', `${pName} — ${payload.name}`);
       if (isMountedRef.current && activePatientIdRef.current === payload.petId) {
         await loadPatientVaccinations(payload.petId);
       }
     },
-    [loadPatientVaccinations]
+    [patients, selectedPatient?.name, loadPatientVaccinations, toast]
+  );
+
+  const handleUpdateVaccination = useCallback(
+    async (id: string, payload: UpdateVaccinationRequest): Promise<void> => {
+      await vetApi.updateVaccination(id, payload);
+      toast(
+        'Прививка обновлена',
+        payload.nextDueOn ? undefined : 'Дата ревакцинации очищена'
+      );
+      if (isMountedRef.current && activePatientIdRef.current) {
+        await loadPatientVaccinations(activePatientIdRef.current);
+      }
+    },
+    [loadPatientVaccinations, toast]
   );
 
   const speciesMap = useMemo(() => toIdNameMap(speciesList), [speciesList]);
 
   const filteredPatients = useMemo(() => {
-    if (!search.trim()) return patients;
     const q = search.toLowerCase().trim();
     return patients.filter((p) => {
+      if (speciesFilter && p.speciesId !== speciesFilter) return false;
+      if (!q) return true;
       const pName = p.name.toLowerCase();
       const sName = (p.species?.name || p.speciesName || speciesMap[p.speciesId] || '').toLowerCase();
       return pName.includes(q) || sName.includes(q);
     });
-  }, [patients, search, speciesMap]);
+  }, [patients, search, speciesFilter, speciesMap]);
 
   return {
     patients,
@@ -167,14 +241,20 @@ export function useVetPatients() {
     reload: loadData,
     search,
     setSearch,
+    speciesFilter,
+    setSpeciesFilter,
     viewMode,
     setViewMode,
     selectedPatient,
     setSelectedPatient,
     patientVacs,
     vacsError,
-    isAddVacOpen,
-    setIsAddVacOpen,
+    isVacModalOpen,
+    editingVac,
+    openCreateVaccination,
+    openEditVaccination,
+    closeVaccinationModal,
     handleAddVaccination,
+    handleUpdateVaccination,
   };
 }

@@ -1,33 +1,42 @@
 'use client';
 
-import React from 'react';
+import React, { useMemo } from 'react';
 import { PawPrint, Search, LayoutGrid, List } from 'lucide-react';
+import type { Species } from '@/modules/clinic/types';
+import { FilterDropdown } from '@/shared/components';
 
 export interface VetPatientsFiltersProps {
-  /** Поисковый запрос по кличке или виду */
   search: string;
-  /** Обработчик изменения строки поиска */
   onSearchChange: (value: string) => void;
-  /** Количество отфильтрованных пациентов */
+  speciesFilter: string;
+  onSpeciesFilterChange: (speciesId: string) => void;
+  speciesList: Species[];
   count: number;
-  /** Текущий режим отображения (таблица или карточки) */
   viewMode?: 'table' | 'cards';
-  /** Обработчик переключения режима отображения */
   onViewModeChange?: (mode: 'table' | 'cards') => void;
 }
 
-/**
- * Шапка и строка поиска пациентов врача.
- * Включает заголовок со счётчиком, строку поиска по кличке/виду,
- * опциональный переключатель отображения (таблица/карточки) и системную подсказку.
- */
 export function VetPatientsFilters({
   search,
   onSearchChange,
+  speciesFilter,
+  onSpeciesFilterChange,
+  speciesList,
   count,
   viewMode,
   onViewModeChange,
 }: VetPatientsFiltersProps) {
+  const speciesOptions = useMemo(
+    () => [
+      { value: '', label: 'Все виды' },
+      ...speciesList
+        .slice()
+        .sort((a, b) => a.name.localeCompare(b.name, 'ru'))
+        .map((s) => ({ value: s.id, label: s.name })),
+    ],
+    [speciesList]
+  );
+
   return (
     <>
       <div className="island-head">
@@ -35,7 +44,7 @@ export function VetPatientsFilters({
           <PawPrint size={18} />
           Пациенты <span className="count">{count}</span>
         </span>
-        <div className="row" style={{ gap: 8, alignItems: 'center' }}>
+        <div className="row wrap" style={{ gap: 8, alignItems: 'center' }}>
           {onViewModeChange && viewMode && (
             <div className="seg">
               <button
@@ -58,23 +67,29 @@ export function VetPatientsFilters({
               </button>
             </div>
           )}
-          <div className="input-icon w-full sm:w-[260px]">
+
+          <div style={{ width: '170px' }}>
+            <FilterDropdown
+              value={speciesFilter}
+              options={speciesOptions}
+              onChange={onSpeciesFilterChange}
+              placeholder="Все виды"
+              ariaLabel="Фильтр по виду"
+            />
+          </div>
+
+          <div className="input-icon" style={{ width: '240px', maxWidth: '100%' }}>
             <Search size={14} className="ic" />
             <input
               type="text"
               className="input input-sm"
               placeholder="Кличка или вид…"
+              aria-label="Поиск по кличке"
               value={search}
               onChange={(e) => onSearchChange(e.target.value)}
             />
           </div>
         </div>
-      </div>
-
-      <div className="row" style={{ padding: '0 16px 10px' }}>
-        <span className="dev-note">
-          Отдельного списка пациентов в API нет — список собран из уникальных petId ваших записей
-        </span>
       </div>
     </>
   );

@@ -1,20 +1,17 @@
 'use client';
 
+import { Suspense } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { AlertCircle } from 'lucide-react';
-import { useShellHeader } from '@/components/layout/AppShell';
 import { useVetPatients } from './_hooks/useVetPatients';
 import { VetPatientsFilters } from './_components/VetPatientsFilters';
 import { VetPatientsList } from './_components/VetPatientsList';
 import { VetPatientDetailIsland } from './_components/VetPatientDetailIsland';
 import { VetAddVaccinationModal } from './_components/VetAddVaccinationModal';
 
-/**
- * Страница пациентов врача Chiron:
- * оркестратор списка пациентов, фильтрации по кличке/виду,
- * правого master-detail острова и модального окна добавления вакцинаций.
- */
-export default function VetPatientsPage() {
-  useShellHeader({ crumbGroup: 'Пациенты', crumb: 'Список' });
+function VetPatientsContent() {
+  const searchParams = useSearchParams();
+  const initialSelId = searchParams.get('sel');
 
   const {
     filteredPatients,
@@ -26,16 +23,22 @@ export default function VetPatientsPage() {
     reload,
     search,
     setSearch,
+    speciesFilter,
+    setSpeciesFilter,
     viewMode,
     setViewMode,
     selectedPatient,
     setSelectedPatient,
     patientVacs,
     vacsError,
-    isAddVacOpen,
-    setIsAddVacOpen,
+    isVacModalOpen,
+    editingVac,
+    openCreateVaccination,
+    openEditVaccination,
+    closeVaccinationModal,
     handleAddVaccination,
-  } = useVetPatients();
+    handleUpdateVaccination,
+  } = useVetPatients(initialSelId);
 
   return (
     <>
@@ -57,6 +60,9 @@ export default function VetPatientsPage() {
             <VetPatientsFilters
               search={search}
               onSearchChange={setSearch}
+              speciesFilter={speciesFilter}
+              onSpeciesFilterChange={setSpeciesFilter}
+              speciesList={speciesList}
               count={filteredPatients.length}
               viewMode={viewMode}
               onViewModeChange={setViewMode}
@@ -82,18 +88,38 @@ export default function VetPatientsPage() {
               vaccinations={patientVacs}
               vaccinationsError={vacsError}
               onClose={() => setSelectedPatient(null)}
-              onAddVaccination={() => setIsAddVacOpen(true)}
+              onAddVaccination={openCreateVaccination}
+              onEditVaccination={openEditVaccination}
             />
           )}
         </div>
       </div>
 
       <VetAddVaccinationModal
-        isOpen={isAddVacOpen && !!selectedPatient}
+        isOpen={isVacModalOpen && !!selectedPatient}
+        mode={editingVac ? 'edit' : 'create'}
+        vaccination={editingVac}
         patient={selectedPatient}
-        onClose={() => setIsAddVacOpen(false)}
+        onClose={closeVaccinationModal}
         onSubmit={handleAddVaccination}
+        onUpdate={handleUpdateVaccination}
       />
     </>
+  );
+}
+
+export default function VetPatientsPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="content-col grow">
+          <div className="island p-12 text-center text-xs text-[var(--muted-foreground)]">
+            Загрузка пациентов...
+          </div>
+        </div>
+      }
+    >
+      <VetPatientsContent />
+    </Suspense>
   );
 }
