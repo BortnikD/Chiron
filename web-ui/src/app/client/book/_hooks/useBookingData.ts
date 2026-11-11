@@ -8,7 +8,7 @@ import type { Service, Veterinarian, Specialization, Species } from '@/modules/c
 import { formatApiError, toIdNameMap } from '@/shared/lib';
 
 /**
- * Хук загрузки справочников и инициализации выбранных сущностей записи.
+ * Хук загрузки справочников и инициализации выбранных сущностей мастера записи.
  */
 export function useBookingData(
   initialServiceId: string | null,
@@ -50,14 +50,16 @@ export function useBookingData(
     setDataError(null);
 
     Promise.all([
-      clientApi.getPets({ isArchived: false }),
+      clientApi.getPets(),
       clinicApi.getVeterinarians(),
       clinicApi.getSpecializations(),
       clinicApi.getSpecies(),
     ])
       .then(async ([petsData, vetsData, specData, spData]) => {
         if (cancelled) return;
-        const safePets = (Array.isArray(petsData) ? petsData : []).filter((p) => !p.isArchived);
+        const rawPets = Array.isArray(petsData) ? petsData : [];
+        const safePets = rawPets.slice().sort((a, b) => Number(a.isArchived) - Number(b.isArchived));
+        const activePets = safePets.filter((p) => !p.isArchived);
         const safeVets = Array.isArray(vetsData) ? vetsData : [];
 
         const rawMatchedVet = initialVetId
@@ -67,19 +69,22 @@ export function useBookingData(
         let resolvedPet: Pet | null = null;
         if (!didInitRef.current) {
           if (initialPetId) {
-            resolvedPet = safePets.find((p) => p.id === initialPetId) ?? safePets[0] ?? null;
+            resolvedPet =
+              activePets.find((p) => p.id === initialPetId) ?? activePets[0] ?? null;
           } else if (rawMatchedVet && Array.isArray(rawMatchedVet.speciesIds)) {
             resolvedPet =
-              safePets.find((p) => rawMatchedVet.speciesIds!.includes(p.speciesId)) ??
-              safePets[0] ??
+              activePets.find((p) => rawMatchedVet.speciesIds!.includes(p.speciesId)) ??
+              activePets[0] ??
               null;
           } else {
-            resolvedPet = safePets[0] ?? null;
+            resolvedPet = activePets[0] ?? null;
           }
         } else {
           const prevPet = selectedPetRef.current;
           resolvedPet =
-            (prevPet ? safePets.find((p) => p.id === prevPet.id) : null) ?? safePets[0] ?? null;
+            (prevPet ? activePets.find((p) => p.id === prevPet.id) : null) ??
+            activePets[0] ??
+            null;
         }
 
         const targetSpeciesId = resolvedPet?.speciesId ?? null;
@@ -131,8 +136,10 @@ export function useBookingData(
         }
 
         if (resolvedPet && matchedService && (matchedVet || initialSlot)) {
-          onSetStepRef.current(3);
+          onSetStepRef.current(4);
         } else if (resolvedPet && matchedService) {
+          onSetStepRef.current(3);
+        } else if (initialPetId && resolvedPet) {
           onSetStepRef.current(2);
         }
       })
@@ -185,6 +192,10 @@ export function useBookingData(
 
   const specsMap = useMemo(() => toIdNameMap(specializations), [specializations]);
   const speciesMap = useMemo(() => toIdNameMap(speciesList), [speciesList]);
+  const vetsMap = useMemo(
+    () => Object.fromEntries(veterinarians.map((v) => [v.id, v])),
+    [veterinarians]
+  );
 
   return {
     pets,
@@ -206,5 +217,6 @@ export function useBookingData(
     reloadData,
     specsMap,
     speciesMap,
+    vetsMap,
   };
 }

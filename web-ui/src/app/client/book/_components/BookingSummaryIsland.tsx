@@ -7,11 +7,13 @@ export interface BookingSummaryIslandProps {
   serviceName?: string;
   doctorDisplay: string;
   selectedSlotStartAt?: string;
-  servicePrice?: number;
+  selectedSlotEndAt?: string;
+  serviceDurationMin?: number | null;
+  servicePrice?: number | null;
 }
 
 /**
- * Правая панель/сводка выбранных параметров визита.
+ * Правый остров «Сводка» с актуальными параметрами оформляемой записи.
  */
 export const BookingSummaryIsland: React.FC<BookingSummaryIslandProps> = ({
   petName,
@@ -19,12 +21,20 @@ export const BookingSummaryIsland: React.FC<BookingSummaryIslandProps> = ({
   serviceName,
   doctorDisplay,
   selectedSlotStartAt,
+  selectedSlotEndAt,
+  serviceDurationMin,
   servicePrice,
 }) => {
+  const whenLabel = selectedSlotStartAt
+    ? selectedSlotEndAt
+      ? `${formatDateShort(selectedSlotStartAt)}, ${formatSlotTime(selectedSlotStartAt)}–${formatSlotTime(selectedSlotEndAt)}`
+      : `${formatDateShort(selectedSlotStartAt)} в ${formatSlotTime(selectedSlotStartAt)}`
+    : '—';
+
   return (
     <aside
       className="island"
-      style={{ flex: '0 1 320px', width: 'clamp(220px, 26vw, 320px)' }}
+      style={{ width: '320px', flex: 'none' }}
       aria-label="Сводка записи"
     >
       <div className="island-head">
@@ -48,15 +58,17 @@ export const BookingSummaryIsland: React.FC<BookingSummaryIslandProps> = ({
           </div>
           <div className="col" style={{ gap: '2px' }}>
             <span className="small muted">Дата и время</span>
-            <span className="cell-main">
-              {selectedSlotStartAt
-                ? `${formatDateShort(selectedSlotStartAt)} в ${formatSlotTime(selectedSlotStartAt)}`
-                : '—'}
+            <span className="cell-main tnum">{whenLabel}</span>
+          </div>
+          <div className="col" style={{ gap: '2px' }}>
+            <span className="small muted">Длительность</span>
+            <span className="tnum">
+              {serviceDurationMin != null ? `${serviceDurationMin} мин` : '—'}
             </span>
           </div>
           <div className="col" style={{ gap: '2px' }}>
             <span className="small muted">Стоимость</span>
-            <span className="cell-main" style={{ fontSize: '16px', fontWeight: 700 }}>
+            <span className="kpi-value accent">
               {servicePrice != null ? formatCurrency(servicePrice) : '—'}
             </span>
           </div>

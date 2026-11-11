@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import {
   X,
@@ -11,65 +11,65 @@ import {
   Syringe,
 } from 'lucide-react';
 import type { Pet, Appointment, Vaccination } from '@/modules/client/types';
+import type { Service, Veterinarian } from '@/modules/clinic/types';
 import { SpeciesIcon } from '@/components/ui/SpeciesIcon';
+import { getDoctorDisplay } from '@/utils/doctorHelpers';
 import {
   APPOINTMENT_STATUS_META,
   calculateAgeRu,
-  formatCurrency,
   formatDateRu,
-  formatDateShort,
   formatIsoDateDisplay,
   formatSlotTime,
+  formatWeightRu,
   getMoscowDateKey,
   getSpeciesTone,
 } from '@/shared/lib';
-import type { DetailTab } from './types';
+import { DetailTab, getPetVacDueInfo } from './types';
 
 export interface PetDetailIslandProps {
-  /** Выбранный питомец */
   pet: Pet;
-  /** Словарь названий видов животных по их ID */
   speciesMap: Record<string, string>;
-  /** Список записей на приём для фильтрации истории */
+  servicesMap?: Record<string, Service>;
+  veterinariansMap?: Record<string, Veterinarian>;
   appointments: Appointment[];
-  /** Список вакцинаций для фильтрации истории */
   vaccinations: Vaccination[];
-  /** Флаг загрузки истории приёмов выбранного питомца */
   loadingAppts?: boolean;
-  /** Функция закрытия острова */
+  initialTab?: DetailTab;
   onClose: () => void;
-  /** Функция вызова модального окна редактирования питомца */
   onEdit: (pet: Pet) => void;
-  /** Функция переключения статуса архива */
   onToggleArchive: (pet: Pet) => void;
-  /** Функция удаления питомца */
   onDelete: (pet: Pet) => void;
 }
 
-/**
- * Правый master-detail остров с полной информацией о питомце, историей визитов и вакцинаций.
- */
 export function PetDetailIsland({
   pet,
   speciesMap,
+  servicesMap = {},
+  veterinariansMap = {},
   appointments,
   vaccinations,
   loadingAppts = false,
+  initialTab = 'OVERVIEW',
   onClose,
   onEdit,
   onToggleArchive,
   onDelete,
 }: PetDetailIslandProps) {
-  const [detailTab, setDetailTab] = useState<DetailTab>('OVERVIEW');
+  const [detailTab, setDetailTab] = useState<DetailTab>(initialTab);
+
+  useEffect(() => {
+    setDetailTab(initialTab);
+  }, [pet.id, initialTab]);
 
   const petAppts = appointments.filter((a) => a.petId === pet.id);
   const petVaccs = vaccinations.filter((v) => v.petId === pet.id);
   const apptsCount = pet.summary?.appointmentsCount ?? petAppts.length;
   const vaccsCount = pet.summary?.vaccinationsCount ?? petVaccs.length;
 
-  const tone = getSpeciesTone(pet.speciesId, speciesMap);
-  const spName = speciesMap[pet.speciesId] || 'Питомец';
+  const tone = getSpeciesTone(pet.species?.name || pet.speciesId, speciesMap);
+  const spName = pet.species?.name || pet.speciesName || speciesMap[pet.speciesId] || 'Питомец';
   const age = calculateAgeRu(pet.birthDate, 'возраст не указан');
+  const birthIso = pet.birthDate ? getMoscowDateKey(pet.birthDate) || pet.birthDate.slice(0, 10) : '';
 
   return (
     <section
@@ -78,8 +78,8 @@ export function PetDetailIsland({
       aria-label="Карточка питомца"
     >
       <div className="island-head">
-        <div className="row" style={{ gap: '10px' }}>
-          <span className={`t-ava ${tone}`}>
+        <div className="row">
+          <span className={`pet-ava tone-${tone}`} style={{ color: 'var(--tone)', background: 'color-mix(in srgb, var(--tone, var(--muted-foreground)) 16%, transparent)' }}>
             <SpeciesIcon species={tone} size={20} />
           </span>
           <div className="col" style={{ gap: 0, minWidth: 0 }}>
@@ -99,16 +99,17 @@ export function PetDetailIsland({
         </button>
       </div>
 
-      {/* Панель быстрых действий */}
       <div className="row wrap" style={{ gap: '6px', padding: '0 16px 12px' }}>
-        <Link
-          href={`/client/book?petId=${pet.id}`}
-          className="btn btn-primary btn-sm"
-          style={{ textDecoration: 'none' }}
-        >
-          <CalendarPlus className="ic" />
-          <span>Записать</span>
-        </Link>
+        {!pet.isArchived && (
+          <Link
+            href={`/client/book?petId=${encodeURIComponent(pet.id)}`}
+            className="btn btn-primary btn-sm"
+            style={{ textDecoration: 'none' }}
+          >
+            <CalendarPlus className="ic" />
+            <span>Записать</span>
+          </Link>
+        )}
         <button
           type="button"
           className="btn btn-outline btn-sm"
@@ -123,7 +124,7 @@ export function PetDetailIsland({
           onClick={() => onToggleArchive(pet)}
         >
           <Archive className="ic" />
-          <span>{pet.isArchived ? 'Из архива' : 'В архив'}</span>
+          <span>{pet.isArchived ? 'Вернуть из архива' : 'В архив'}</span>
         </button>
         <button
           type="button"
@@ -135,10 +136,11 @@ export function PetDetailIsland({
         </button>
       </div>
 
-      {/* Вкладки: Обзор / Записи / Прививки */}
       <div className="tabs-line" role="tablist">
         <button
           type="button"
+          role="tab"
+          aria-selected={detailTab === 'OVERVIEW'}
           className={`tab-line ${detailTab === 'OVERVIEW' ? 'on' : ''}`}
           onClick={() => setDetailTab('OVERVIEW')}
         >
@@ -146,6 +148,8 @@ export function PetDetailIsland({
         </button>
         <button
           type="button"
+          role="tab"
+          aria-selected={detailTab === 'APPTS'}
           className={`tab-line ${detailTab === 'APPTS' ? 'on' : ''}`}
           onClick={() => setDetailTab('APPTS')}
         >
@@ -153,6 +157,8 @@ export function PetDetailIsland({
         </button>
         <button
           type="button"
+          role="tab"
+          aria-selected={detailTab === 'VACC'}
           className={`tab-line ${detailTab === 'VACC' ? 'on' : ''}`}
           onClick={() => setDetailTab('VACC')}
         >
@@ -166,89 +172,110 @@ export function PetDetailIsland({
             {pet.isArchived && (
               <div className="alert alert-info">
                 <Archive className="ic" />
-                <div>Питомец находится в архиве. Новые записи заблокированы.</div>
+                <div>Питомец в архиве: история сохранена, новые записи недоступны.</div>
               </div>
             )}
 
             <dl className="kv" style={{ margin: 0 }}>
               <dt>Вид</dt>
-              <dd>{speciesMap[pet.speciesId] || '—'}</dd>
+              <dd>{spName}</dd>
               <dt>Пол</dt>
               <dd>{pet.gender === 'MALE' ? 'Самец' : 'Самка'}</dd>
               <dt>Дата рождения</dt>
               <dd className="tnum">
-                {pet.birthDate ? `${formatDateShort(pet.birthDate)} (${age})` : '—'}
+                {birthIso ? (
+                  <>
+                    {formatIsoDateDisplay(birthIso)} <span className="muted">({age})</span>
+                  </>
+                ) : (
+                  '—'
+                )}
               </dd>
               <dt>Вес</dt>
-              <dd className="tnum">
-                {pet.weightKg ? `${pet.weightKg} кг` : 'не указан'}
-              </dd>
-              <dt>Особенности</dt>
-              <dd>{pet.notes || 'Особых отметок нет'}</dd>
+              <dd className="tnum">{formatWeightRu(pet.weightKg)}</dd>
+              <dt>Заметки</dt>
+              <dd>{pet.notes || '—'}</dd>
             </dl>
           </div>
         )}
 
         {detailTab === 'APPTS' && (
-          <div className="col" style={{ gap: '8px' }}>
+          <div className="col" style={{ gap: '2px', margin: '0 -10px' }}>
             {loadingAppts && petAppts.length === 0 ? (
-              <span className="small muted">Загрузка истории записей...</span>
+              <div className="empty" style={{ padding: '24px' }}>
+                <div className="spinner" />
+                <span className="small muted">Загрузка истории записей…</span>
+              </div>
             ) : petAppts.length === 0 ? (
-              <span className="small muted">Записей на приём пока нет</span>
+              <div className="empty" style={{ padding: '24px' }}>
+                Записей пока нет
+              </div>
             ) : (
-              petAppts.map((a) => (
-                <div
-                  key={a.id}
-                  className="lrow"
-                  style={{ padding: '8px 0', borderBottom: '1px solid var(--border)' }}
-                >
-                  <span className="datebox">
-                    <b>{formatDateRu(a.startAt, { day: 'numeric' })}</b>
-                    <span>{formatDateRu(a.startAt, { month: 'short' })}</span>
-                  </span>
-                  <span className="col" style={{ gap: 0, minWidth: 0, flex: 1 }}>
-                    <span className="cell-main tnum">{formatSlotTime(a.startAt)}</span>
-                    <span className="cell-sub">
-                      {a.priceSnapshot != null ? formatCurrency(a.priceSnapshot) : 'Приём'}
+              petAppts.map((a) => {
+                const svc = servicesMap[a.serviceId] || a.service;
+                const vet = veterinariansMap[a.veterinarianId] || a.veterinarian;
+                const vetName = vet
+                  ? getDoctorDisplay(vet).name
+                  : a.veterinarianName || 'Врач клиники';
+                const statusShort = APPOINTMENT_STATUS_META[a.status]?.short || a.status;
+
+                return (
+                  <Link
+                    key={a.id}
+                    href={`/client/appointments?sel=${encodeURIComponent(a.id)}`}
+                    className="lrow"
+                    style={{ textDecoration: 'none' }}
+                  >
+                    <span className="datebox">
+                      <b>{formatDateRu(a.startAt, { day: '2-digit' })}</b>
+                      <span>{formatDateRu(a.startAt, { month: 'short' }).replace(/\.$/, '')}</span>
                     </span>
-                  </span>
-                  <span className={`badge st badge-${a.status}`}>
-                    {APPOINTMENT_STATUS_META[a.status]?.short || a.status}
-                  </span>
-                </div>
-              ))
+                    <span className="col" style={{ gap: '1px', minWidth: 0 }}>
+                      <span className="cell-main">{svc?.name || a.serviceName || 'Приём'}</span>
+                      <span className="cell-sub tnum">
+                        {formatSlotTime(a.startAt)} · {vetName}
+                      </span>
+                    </span>
+                    <span className={`badge st badge-${a.status}`}>{statusShort}</span>
+                  </Link>
+                );
+              })
             )}
           </div>
         )}
 
         {detailTab === 'VACC' && (
-          <div className="col" style={{ gap: '8px' }}>
+          <div className="col" style={{ gap: '2px', margin: '0 -10px' }}>
             {petVaccs.length === 0 ? (
-              <span className="small muted">Вакцинаций не зарегистрировано</span>
+              <div className="empty" style={{ padding: '24px' }}>
+                Прививок пока нет
+              </div>
             ) : (
-              petVaccs.map((v) => (
-                <div
-                  key={v.id}
-                  className="lrow"
-                  style={{ padding: '8px 0', borderBottom: '1px solid var(--border)' }}
-                >
-                  <span className="t-ava sm tone-prev">
-                    <Syringe className="ic" />
-                  </span>
-                  <span className="col" style={{ gap: 0, minWidth: 0, flex: 1 }}>
-                    <span className="cell-main">{v.name}</span>
-                    <span className="cell-sub tnum">
-                      Сделана: {formatIsoDateDisplay(getMoscowDateKey(v.administeredOn) || v.administeredOn)}
-                      {v.nextDueOn
-                        ? ` · След.: ${formatIsoDateDisplay(getMoscowDateKey(v.nextDueOn) || v.nextDueOn)}`
-                        : ''}
+              petVaccs.map((v) => {
+                const adminIso = getMoscowDateKey(v.administeredOn || v.administeredAt) || v.administeredOn;
+                const dueInfo = getPetVacDueInfo(v.nextDueOn || v.validUntil);
+                const vacName = v.name || v.vaccineName || 'Вакцинация';
+
+                return (
+                  <Link
+                    key={v.id}
+                    href={`/client/vaccinations?petId=${encodeURIComponent(pet.id)}&sel=${encodeURIComponent(v.id)}`}
+                    className="lrow"
+                    style={{ textDecoration: 'none' }}
+                  >
+                    <span className="pet-ava" style={{ width: '36px', height: '36px', borderRadius: '10px' }}>
+                      <Syringe className="ic" />
                     </span>
-                  </span>
-                  <span className="badge badge-outline">
-                    {v.nextDueOn ? 'По плану' : 'Выполнена'}
-                  </span>
-                </div>
-              ))
+                    <span className="col" style={{ gap: '1px', minWidth: 0 }}>
+                      <span className="cell-main">{vacName}</span>
+                      <span className="cell-sub tnum">Введена {formatIsoDateDisplay(adminIso)}</span>
+                    </span>
+                    <span className={`badge ${dueInfo.cls}`}>
+                      {dueInfo.cls === 'due-none' ? dueInfo.text : dueInfo.label}
+                    </span>
+                  </Link>
+                );
+              })
             )}
           </div>
         )}

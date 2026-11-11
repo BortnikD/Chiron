@@ -3,42 +3,49 @@
 import React from 'react';
 import { PawPrint, Plus, Archive, Calendar, Syringe } from 'lucide-react';
 import type { Pet, Appointment, Vaccination } from '@/modules/client/types';
+import type { Service } from '@/modules/clinic/types';
 import { SpeciesIcon } from '@/components/ui/SpeciesIcon';
 import {
   calculateAgeRu,
   formatDateRu,
-  formatIsoDateDisplay,
+  formatSlotTime,
+  formatWeightRu,
   getMoscowDateKey,
+  getMoscowTodayIso,
   getSpeciesTone,
 } from '@/shared/lib';
+import { ArchiveFilter, getPetVacDueInfo } from './types';
 
 export interface PetsListProps {
-  /** Список отображаемых питомцев */
   pets: Pet[];
-  /** Выбранный питомец для детального просмотра */
   selectedPet: Pet | null;
-  /** Функция выбора питомца */
   onSelectPet: (pet: Pet) => void;
-  /** Словарь названий видов животных по их ID */
   speciesMap: Record<string, string>;
-  /** Список записей на приём для подсчёта истории и предстоящих визитов */
+  servicesMap?: Record<string, Service>;
   appointments: Appointment[];
-  /** Список вакцинаций для плановых отметок */
   vaccinations: Vaccination[];
-  /** Опциональный колбэк добавления питомца для кнопки в пустом состоянии */
+  archiveFilter?: ArchiveFilter;
+  loading?: boolean;
   onAddPet?: () => void;
 }
 
-/**
- * Сетка карточек питомцев (.cards, .tcard, аватарки видов, возраст, вес, статус).
- */
+function formatPetApptDay(isoStr: string): string {
+  const key = getMoscowDateKey(isoStr);
+  if (key === getMoscowTodayIso(0)) return 'сегодня';
+  if (key === getMoscowTodayIso(1)) return 'завтра';
+  return formatDateRu(isoStr, { day: 'numeric', month: 'short' }).replace(/\.$/, '');
+}
+
 export function PetsList({
   pets,
   selectedPet,
   onSelectPet,
   speciesMap,
+  servicesMap = {},
   appointments,
   vaccinations,
+  archiveFilter = 'ACTIVE',
+  loading = false,
   onAddPet,
 }: PetsListProps) {
   return (
@@ -51,44 +58,84 @@ export function PetsList({
       </div>
 
       <div className="island-body">
-        {pets.length === 0 ? (
-          <div className="empty" style={{ padding: '40px' }}>
-            <span className="empty-title">Питомцы не найдены</span>
-            <span>Добавьте первого питомца или измените параметры фильтра</span>
-            {onAddPet && (
-              <button
-                type="button"
-                className="btn btn-primary"
-                onClick={onAddPet}
-                style={{ marginTop: '12px' }}
-              >
-                <Plus className="ic" />
-                <span>Добавить питомца</span>
-              </button>
-            )}
+        {loading && pets.length === 0 ? (
+          <div className="empty">
+            <div className="spinner" />
+            <span className="small muted">Загрузка питомцев…</span>
           </div>
+        ) : pets.length === 0 ? (
+          archiveFilter === 'ARCHIVED' ? (
+            <div className="empty">
+              <div className="empty-art">
+                <Archive className="ic ic-40" />
+              </div>
+              <span className="empty-title">В архиве никого нет</span>
+              <span>Архивные питомцы сохраняют историю, но записать их нельзя</span>
+            </div>
+          ) : (
+            <div className="empty">
+              <div className="empty-art">
+                <PawPrint className="ic ic-40" />
+              </div>
+              <span className="empty-title">Питомцы не найдены</span>
+              <span>Добавьте первого питомца или измените параметры фильтра</span>
+              {onAddPet && (
+                <button type="button" className="btn btn-primary" onClick={onAddPet}>
+                  <Plus className="ic" />
+                  <span>Добавить питомца</span>
+                </button>
+              )}
+            </div>
+          )
         ) : (
           <div className="cards">
             {pets.map((p) => {
               const isSel = selectedPet?.id === p.id;
-              const tone = getSpeciesTone(p.speciesId, speciesMap);
-              const spName = speciesMap[p.speciesId] || 'Питомец';
+              const tone = getSpeciesTone(p.species?.name || p.speciesId, speciesMap);
+              const spName = p.species?.name || p.speciesName || speciesMap[p.speciesId] || 'Питомец';
               const age = calculateAgeRu(p.birthDate, 'возраст не указан');
               const visitsCount =
                 p.summary != null
                   ? p.summary.completedVisits
                   : appointments.filter((a) => a.petId === p.id && a.status === 'COMPLETED').length;
-              const nextApptStartAt =
-                p.summary != null
-                  ? p.summary.nextAppointment?.startAt ?? null
-                  : appointments.find(
-                      (a) => a.petId === p.id && (a.status === 'PENDING' || a.status === 'CONFIRMED')
-                    )?.startAt ?? null;
+
+              const summaryNext = p.summary?.nextAppointment ?? null;
+              const fallbackNext = appointments.find(
+                (a) => a.petId === p.id && (a.status === 'PENDING' || a.status === 'CONFIRMED')
+              );
+              const nextApptStartAt = summaryNext?.startAt ?? fallbackNext?.startAt ?? null;
+              const nextServiceId = summaryNext?.serviceId ?? fallbackNext?.serviceId;
+              const nextServiceName =
+                (nextServiceId && servicesMap[nextServiceId]?.name) ||
+                fallbackNext?.service?.name ||
+                fallbackNext?.serviceName;
+
+              const petDueVacs = vaccinations
+                .filter((v) => v.petId === p.id && (v.nextDueOn || v.validUntil))
+                .sort((a, b) => {
+                  const ka = getMoscowDateKey(a.nextDueOn || a.validUntil) || '';
+                  const kb = getMoscowDateKey(b.nextDueOn || b.validUntil) || '';
+                  return ka.localeCompare(kb);
+                });
+              const nearestVac = petDueVacs[0];
               const nextVacDate =
-                p.summary != null
-                  ? p.summary.nextVaccinationDueOn ?? null
-                  : vaccinations.find((v) => v.petId === p.id && v.nextDueOn)?.nextDueOn ?? null;
-              const hasOverdueVac = p.summary != null ? p.summary.hasOverdueVaccination : false;
+                p.summary?.nextVaccinationDueOn ?? nearestVac?.nextDueOn ?? nearestVac?.validUntil ?? null;
+              const dueInfo = nextVacDate ? getPetVacDueInfo(nextVacDate) : null;
+
+              const vacCls = !dueInfo
+                ? ''
+                : dueInfo.cls === 'due-over' || p.summary?.hasOverdueVaccination
+                ? 'bad'
+                : dueInfo.cls === 'due-soon'
+                ? 'warn'
+                : 'ok';
+              const vacText = !dueInfo
+                ? 'Прививок с повторной дозой нет'
+                : vacCls === 'bad'
+                ? `Просрочена${nearestVac ? `: ${nearestVac.name}` : ` (${dueInfo.label})`}`
+                : vacCls === 'warn'
+                ? `${nearestVac ? `${nearestVac.name} — ` : 'Прививка '}${dueInfo.text}`
+                : `Прививки в порядке · след. ${dueInfo.label}`;
 
               return (
                 <button
@@ -96,7 +143,6 @@ export function PetsList({
                   type="button"
                   className={`tcard tone-${tone} ${isSel ? 'sel' : ''}`}
                   onClick={() => onSelectPet(p)}
-                  style={{ textAlign: 'left', cursor: 'pointer' }}
                 >
                   <div className="tcard-head">
                     <span className="t-ava lg">
@@ -123,7 +169,7 @@ export function PetsList({
                     </div>
                     <div>
                       <span>Вес</span>
-                      <b>{p.weightKg ? `${p.weightKg} кг` : '—'}</b>
+                      <b>{formatWeightRu(p.weightKg)}</b>
                     </div>
                     <div>
                       <span>Приёмов</span>
@@ -132,23 +178,19 @@ export function PetsList({
                   </div>
 
                   <div className="col" style={{ gap: '6px' }}>
-                    <div className={`tcard-line ${nextApptStartAt ? 'ok' : 'muted'}`}>
+                    <div className={`tcard-line ${nextApptStartAt && !p.isArchived ? 'has' : ''}`}>
                       <Calendar className="ic" />
                       <span>
-                        {nextApptStartAt
-                          ? `Приём ${formatDateRu(nextApptStartAt, { day: 'numeric', month: 'short' })}`
-                          : 'Нет предстоящих приёмов'}
+                        {p.isArchived
+                          ? 'В архиве — запись недоступна'
+                          : nextApptStartAt
+                          ? `Приём ${formatPetApptDay(nextApptStartAt)} в ${formatSlotTime(nextApptStartAt)}${nextServiceName ? ` · ${nextServiceName}` : ''}`
+                          : 'Нет предстоящих записей'}
                       </span>
                     </div>
-                    <div className={`tcard-line ${hasOverdueVac ? 'bad' : nextVacDate ? 'ok' : 'muted'}`}>
+                    <div className={`tcard-line ${vacCls}`}>
                       <Syringe className="ic" />
-                      <span>
-                        {nextVacDate
-                          ? hasOverdueVac
-                            ? `Прививка просрочена (${formatIsoDateDisplay(getMoscowDateKey(nextVacDate) || nextVacDate)})`
-                            : `Прививка до ${formatIsoDateDisplay(getMoscowDateKey(nextVacDate) || nextVacDate)}`
-                          : 'Прививки по плану'}
-                      </span>
+                      <span>{vacText}</span>
                     </div>
                   </div>
 

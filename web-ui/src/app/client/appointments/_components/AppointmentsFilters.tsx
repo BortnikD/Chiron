@@ -1,27 +1,30 @@
 'use client';
 
-import React from 'react';
+import React, { useMemo } from 'react';
 import Link from 'next/link';
 import { CalendarPlus } from 'lucide-react';
 import type { Pet } from '@/modules/client/types';
-import type { FilterTab } from '../_hooks/useClientAppointments';
+import type { AppointmentStatus } from '@/shared/types';
+import { DatePicker, FilterDropdown, type FilterDropdownOption } from '@/shared/components';
+import { APPOINTMENT_STATUS_LIST, APPOINTMENT_STATUS_META } from '@/shared/lib';
+import type { AppointmentsFilterTab } from '../_components/utils';
 
 export interface AppointmentsFiltersProps {
-  /** Текущая выбранная вкладка (предстоящие, прошедшие или все) */
-  tab: FilterTab;
-  /** Функция смены вкладки фильтрации */
-  onTabChange: (tab: FilterTab) => void;
-  /** ID выбранного питомца или 'ALL' */
+  tab: AppointmentsFilterTab;
+  onTabChange: (tab: AppointmentsFilterTab) => void;
   selectedPetId: string;
-  /** Функция смены выбранного питомца */
   onPetChange: (petId: string) => void;
-  /** Список всех питомцев клиента */
   pets: Pet[];
+  fromDate: string;
+  onFromDateChange: (iso: string) => void;
+  toDate: string;
+  onToDateChange: (iso: string) => void;
+  statusChips: AppointmentStatus[];
+  onToggleStatus: (status: AppointmentStatus) => void;
 }
 
 /**
- * Верхний остров фильтров записей клиента:
- * переключение вкладок «Предстоящие / Прошедшие / Все», выбор питомца и кнопка новой записи.
+ * Верхний остров фильтров записей клиента.
  */
 export function AppointmentsFilters({
   tab,
@@ -29,7 +32,25 @@ export function AppointmentsFilters({
   selectedPetId,
   onPetChange,
   pets,
+  fromDate,
+  onFromDateChange,
+  toDate,
+  onToDateChange,
+  statusChips,
+  onToggleStatus,
 }: AppointmentsFiltersProps) {
+  const petOptions = useMemo<FilterDropdownOption[]>(
+    () => [
+      { value: 'ALL', label: 'Все питомцы' },
+      ...pets.map((p) => ({
+        value: p.id,
+        label: p.name,
+        hint: p.isArchived ? 'архив' : undefined,
+      })),
+    ],
+    [pets]
+  );
+
   return (
     <section className="island filters" aria-label="Фильтры">
       <div className="field" style={{ width: 'auto' }}>
@@ -44,10 +65,10 @@ export function AppointmentsFilters({
           </button>
           <button
             type="button"
-            className={`seg-item ${tab === 'COMPLETED' ? 'on' : ''}`}
-            onClick={() => onTabChange('COMPLETED')}
+            className={`seg-item ${tab === 'HISTORY' ? 'on' : ''}`}
+            onClick={() => onTabChange('HISTORY')}
           >
-            Прошедшие
+            История
           </button>
           <button
             type="button"
@@ -61,27 +82,66 @@ export function AppointmentsFilters({
 
       <div className="field">
         <span className="field-label">Питомец</span>
-        <select
-          className="select"
+        <FilterDropdown
           value={selectedPetId}
-          onChange={(e) => onPetChange(e.target.value)}
-        >
-          <option value="ALL">Все питомцы</option>
-          {pets.map((p) => (
-            <option key={p.id} value={p.id}>
-              {p.name}
-            </option>
-          ))}
-        </select>
+          options={petOptions}
+          onChange={onPetChange}
+          searchable={pets.length > 6}
+          placeholder="Все питомцы"
+          searchPlaceholder="Поиск питомца…"
+          ariaLabel="Фильтр по питомцу"
+        />
+      </div>
+
+      <div className="field" style={{ width: '150px' }}>
+        <label className="field-label" htmlFor="ap-from">
+          С
+        </label>
+        <DatePicker
+          id="ap-from"
+          value={fromDate}
+          max={toDate || undefined}
+          onChange={onFromDateChange}
+          ariaLabel="Дата начала периода"
+        />
+      </div>
+
+      <div className="field" style={{ width: '150px' }}>
+        <label className="field-label" htmlFor="ap-to">
+          По
+        </label>
+        <DatePicker
+          id="ap-to"
+          value={toDate}
+          min={fromDate || undefined}
+          onChange={onToDateChange}
+          ariaLabel="Дата окончания периода"
+        />
+      </div>
+
+      <div className="field" style={{ width: 'auto' }}>
+        <span className="field-label">Статус</span>
+        <div className="chips">
+          {APPOINTMENT_STATUS_LIST.map((st) => {
+            const on = statusChips.includes(st);
+            return (
+              <button
+                key={st}
+                type="button"
+                className={`chip ${on ? 'on' : ''}`}
+                aria-pressed={on}
+                onClick={() => onToggleStatus(st)}
+              >
+                {APPOINTMENT_STATUS_META[st].short}
+              </button>
+            );
+          })}
+        </div>
       </div>
 
       <div className="spacer" />
 
-      <Link
-        href="/client/book"
-        className="btn btn-primary"
-        style={{ textDecoration: 'none', alignSelf: 'flex-end', height: '34px' }}
-      >
+      <Link href="/client/book" className="btn btn-primary">
         <CalendarPlus className="ic" />
         <span>Записаться</span>
       </Link>

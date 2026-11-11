@@ -1,25 +1,48 @@
 import React from 'react';
 import Link from 'next/link';
 import { CalendarCheck } from 'lucide-react';
+import { formatDateShort, formatSlotTime } from '@/shared/lib';
 
 export interface BookingSuccessViewProps {
   petName?: string;
   serviceName?: string;
+  doctorDisplay?: string;
+  slotStartAt?: string;
   appointmentId?: string | null;
   onNewBooking: () => void;
 }
 
 /**
- * Экран успешного бронирования с кнопками перехода в записи / кабинет.
+ * Экран успешного создания записи («Вы записаны»).
  */
 export const BookingSuccessView: React.FC<BookingSuccessViewProps> = ({
   petName,
   serviceName,
+  doctorDisplay,
+  slotStartAt,
   appointmentId,
   onNewBooking,
 }) => {
+  const detailsParts: string[] = [];
+  if (petName) detailsParts.push(petName);
+  const headText =
+    detailsParts.length > 0 && serviceName
+      ? `${detailsParts[0]} — ${serviceName}`
+      : serviceName || petName || 'Запись оформлена';
+
+  const whenPart = slotStartAt
+    ? `${formatDateShort(slotStartAt)} в ${formatSlotTime(slotStartAt)}`
+    : '';
+  const summaryLine = [headText, whenPart, doctorDisplay ? `врач ${doctorDisplay}` : '']
+    .filter(Boolean)
+    .join(', ');
+
+  const openHref = appointmentId
+    ? `/client/appointments?sel=${encodeURIComponent(appointmentId)}`
+    : '/client/appointments';
+
   return (
-    <div className="empty" style={{ padding: '40px 16px' }}>
+    <div className="empty">
       <div
         className="empty-art"
         style={{ background: 'var(--primary-soft)', color: 'var(--primary-text)' }}
@@ -27,36 +50,13 @@ export const BookingSuccessView: React.FC<BookingSuccessViewProps> = ({
         <CalendarCheck className="ic ic-40" />
       </div>
       <span className="empty-title">Вы записаны</span>
-      <span>
-        Питомец: <b>{petName || 'Питомец'}</b>
-        {serviceName ? ` · ${serviceName}` : ''}
-      </span>
-      {appointmentId && (
-        <span className="small muted mono">
-          Номер записи: #{appointmentId.slice(0, 8).toUpperCase()}
-        </span>
-      )}
+      <span>{summaryLine}</span>
       <span className="badge st badge-PENDING">Ожидает подтверждения</span>
-      <div className="row wrap" style={{ gap: '8px', marginTop: '14px', justifyContent: 'center' }}>
-        <Link
-          href="/client/appointments"
-          className="btn btn-outline"
-          style={{ textDecoration: 'none' }}
-        >
-          Открыть записи
+      <div className="row wrap" style={{ justifyContent: 'center' }}>
+        <Link href={openHref} className="btn btn-outline">
+          Открыть запись
         </Link>
-        <Link
-          href="/client/dashboard"
-          className="btn btn-ghost"
-          style={{ textDecoration: 'none' }}
-        >
-          В кабинет
-        </Link>
-        <button
-          type="button"
-          className="btn btn-primary"
-          onClick={onNewBooking}
-        >
+        <button type="button" className="btn btn-primary" onClick={onNewBooking}>
           Новая запись
         </button>
       </div>

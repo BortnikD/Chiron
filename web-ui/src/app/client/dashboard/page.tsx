@@ -3,6 +3,7 @@
 import React from 'react';
 import { AlertCircle } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
+import { useShellHeader } from '@/components/layout/AppShell';
 import { useClientDashboard } from './_hooks/useClientDashboard';
 import { NextAppointmentBanner } from './_components/NextAppointmentBanner';
 import { ClientPetsCarousel } from './_components/ClientPetsCarousel';
@@ -11,11 +12,8 @@ import { ClientQuickActions } from './_components/ClientQuickActions';
 import { ClientVaccinationsIsland } from './_components/ClientVaccinationsIsland';
 import { ClientNotificationsIsland } from './_components/ClientNotificationsIsland';
 
-/**
- * Главная страница личного кабинета клиента.
- * Компактный оркестратор: загрузка профиля питомцев, ближайших записей, вакцинаций и координация виджетов.
- */
 export default function ClientDashboardPage() {
+  useShellHeader({ crumbGroup: 'Кабинет', crumb: 'Главная' });
   const { user } = useAuth();
   const {
     pets,
@@ -29,12 +27,10 @@ export default function ClientDashboardPage() {
     vetsMap,
     upcomingCount,
     petsCount,
-    upcomingTotal,
-    pastTotal,
-    nextAppt,
-    todayWord,
     vacAttnCount,
     unreadNotifsCount,
+    nextAppt,
+    todayWord,
     nextApptPet,
     nextApptService,
     nextApptVet,
@@ -55,7 +51,6 @@ export default function ClientDashboardPage() {
           </div>
         )}
 
-        {/* HERO БЛОК С БЛИЖАЙШИМ ПРИЁМОМ И СТАТИСТИКОЙ */}
         <section className="island hm-hero" style={{ flex: 'none' }}>
           <div className="hm-hero-main">
             <div className="col" style={{ gap: '4px' }}>
@@ -81,15 +76,12 @@ export default function ClientDashboardPage() {
           />
         </section>
 
-        {/* СЕКЦИЯ: МОИ ПИТОМЦЫ */}
         <ClientPetsCarousel
           pets={pets}
           speciesMap={speciesMap}
           appointments={appointments}
-          vaccinations={vaccinations}
         />
 
-        {/* ДВЕ КОЛОНКИ: ЗАПИСИ (С ВКЛАДКАМИ) + БОКОВИК (ВАКЦИНАЦИЯ + УВЕДОМЛЕНИЯ) */}
         <div className="hm-grid">
           <ClientAppointmentsIsland
             appointments={appointments}
@@ -97,13 +89,15 @@ export default function ClientDashboardPage() {
             servicesMap={servicesMap}
             veterinariansMap={vetsMap}
             speciesMap={speciesMap}
-            upcomingTotal={upcomingTotal}
-            pastTotal={pastTotal}
+            nextAppointmentId={nextAppt?.id}
           />
 
           <div className="col hm-side" style={{ gap: '8px', minWidth: 0 }}>
             <ClientVaccinationsIsland vaccinations={vaccinations} pets={pets} />
-            <ClientNotificationsIsland notifications={notifications} />
+            <ClientNotificationsIsland
+              notifications={notifications}
+              unreadCount={unreadNotifsCount}
+            />
           </div>
         </div>
       </div>

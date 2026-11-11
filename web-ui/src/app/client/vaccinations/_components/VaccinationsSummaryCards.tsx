@@ -10,44 +10,71 @@ export interface VaccinationsSummaryCardsProps {
   petsCount: number;
 }
 
+/**
+ * Сводные KPI-карточки по прививкам питомцев.
+ */
 export function VaccinationsSummaryCards({
   totalCount,
   overdueCount,
   soonCount,
   petsCount,
 }: VaccinationsSummaryCardsProps) {
+  const attentionCount = overdueCount + soonCount;
+
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '12px' }}>
-      <div className="card" style={{ padding: '16px' }}>
-        <span className="small muted">Всего прививок</span>
-        <div className="row between" style={{ alignItems: 'baseline', marginTop: '4px' }}>
-          <span className="title-md font-mono">{totalCount}</span>
-          <Syringe className="ic muted" style={{ width: '20px', height: '20px' }} />
-        </div>
+    <div
+      className="kpi-grid"
+      style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 'var(--gap)' }}
+    >
+      <div className="island kpi">
+        <span className="kpi-label">
+          <Syringe className="ic" />
+          Всего прививок
+        </span>
+        <span className="kpi-value">{totalCount}</span>
+        <span className="kpi-sub">в электронном паспорте</span>
       </div>
 
-      <div className="card" style={{ padding: '16px' }}>
-        <span className="small muted">Требуют внимания</span>
-        <div className="row between" style={{ alignItems: 'baseline', marginTop: '4px' }}>
-          <span className="title-md font-mono" style={{ color: overdueCount > 0 ? '#ef4444' : undefined }}>
-            {overdueCount + soonCount}
-          </span>
+      <div className="island kpi">
+        <span className="kpi-label">
           <AlertTriangle
             className="ic"
-            style={{ width: '20px', height: '20px', color: overdueCount > 0 ? '#ef4444' : '#f59e0b' }}
+            style={{
+              color:
+                overdueCount > 0
+                  ? 'var(--st-noshow-fg)'
+                  : soonCount > 0
+                  ? 'var(--st-pending-fg)'
+                  : undefined,
+            }}
           />
-        </div>
-        <span className="small muted" style={{ fontSize: '11px' }}>
-          {overdueCount} просрочено, {soonCount} скоро
+          Требуют внимания
+        </span>
+        <span
+          className="kpi-value"
+          style={{
+            color:
+              overdueCount > 0
+                ? 'var(--st-noshow-fg)'
+                : soonCount > 0
+                ? 'var(--st-pending-fg)'
+                : undefined,
+          }}
+        >
+          {attentionCount}
+        </span>
+        <span className="kpi-sub">
+          {overdueCount} просрочено · {soonCount} в ближайшие 7 дн.
         </span>
       </div>
 
-      <div className="card" style={{ padding: '16px' }}>
-        <span className="small muted">Питомцев в картотеке</span>
-        <div className="row between" style={{ alignItems: 'baseline', marginTop: '4px' }}>
-          <span className="title-md font-mono">{petsCount}</span>
-          <PawPrint className="ic muted" style={{ width: '20px', height: '20px' }} />
-        </div>
+      <div className="island kpi">
+        <span className="kpi-label">
+          <PawPrint className="ic" />
+          Питомцев
+        </span>
+        <span className="kpi-value">{petsCount}</span>
+        <span className="kpi-sub">в картотеке</span>
       </div>
     </div>
   );

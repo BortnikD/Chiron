@@ -1,9 +1,10 @@
 'use client';
 
-import React from 'react';
+import React, { useMemo } from 'react';
 import Link from 'next/link';
 import { Syringe, ChevronRight } from 'lucide-react';
 import type { Vaccination, Pet } from '@/modules/client/types';
+import { getMoscowDateKey } from '@/shared/lib';
 import { getDueInfo } from './utils';
 
 export interface ClientVaccinationsIslandProps {
@@ -15,6 +16,22 @@ export function ClientVaccinationsIsland({
   vaccinations,
   pets,
 }: ClientVaccinationsIslandProps) {
+  const sortedUpcoming = useMemo(() => {
+    const activePetIds = new Set(pets.filter((p) => !p.isArchived).map((p) => p.id));
+    return vaccinations
+      .filter((v) => {
+        const due = v.nextDueOn || v.validUntil;
+        if (!due) return false;
+        return activePetIds.size === 0 || activePetIds.has(v.petId);
+      })
+      .sort((a, b) => {
+        const ka = getMoscowDateKey(a.nextDueOn || a.validUntil) || '';
+        const kb = getMoscowDateKey(b.nextDueOn || b.validUntil) || '';
+        return ka.localeCompare(kb);
+      })
+      .slice(0, 4);
+  }, [vaccinations, pets]);
+
   return (
     <section className="island" style={{ flex: 'none' }}>
       <div className="island-head">
@@ -28,35 +45,34 @@ export function ClientVaccinationsIsland({
         </Link>
       </div>
       <div className="island-body hm-list" style={{ paddingTop: 0 }}>
-        {vaccinations.length === 0 ? (
-          <div className="p-4 text-center text-xs text-[var(--muted-foreground)]">
-            Данных о прививках нет
+        {sortedUpcoming.length === 0 ? (
+          <div className="empty" style={{ padding: '20px' }}>
+            <span className="small muted">Нет предстоящих прививок</span>
           </div>
         ) : (
-          vaccinations.slice(0, 4).map((v) => {
+          sortedUpcoming.map((v) => {
             const pet = pets.find((p) => p.id === v.petId);
             const dueInfo = getDueInfo(v.nextDueOn || v.validUntil);
+            const vacName = v.name || v.vaccineName || 'Вакцинация';
 
             return (
-              <div
+              <Link
                 key={v.id}
+                href={`/client/vaccinations?petId=${encodeURIComponent(v.petId)}&sel=${encodeURIComponent(v.id)}`}
                 className={`hm-vac ${dueInfo.cls}`}
+                style={{ textDecoration: 'none' }}
               >
                 <span className="hm-vac-ic">
                   <Syringe className="ic" />
                 </span>
                 <span className="col" style={{ gap: '1px', minWidth: 0 }}>
                   <span className="cell-main hm-ell">
-                    {pet?.name || 'Питомец'} — {v.name}
+                    {pet?.name || 'Питомец'} — {vacName}
                   </span>
-                  <span className="cell-sub">
-                    Следующая доза {dueInfo.label}
-                  </span>
+                  <span className="cell-sub">Следующая доза {dueInfo.label}</span>
                 </span>
-                <span className={`badge ${dueInfo.cls}`}>
-                  {dueInfo.text}
-                </span>
-              </div>
+                <span className={`badge ${dueInfo.cls}`}>{dueInfo.text}</span>
+              </Link>
             );
           })
         )}

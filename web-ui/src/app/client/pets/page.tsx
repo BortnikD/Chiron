@@ -3,7 +3,8 @@
 import React, { Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { Archive, AlertCircle } from 'lucide-react';
-import { ConfirmModal } from '@/shared/components/ConfirmModal';
+import { ConfirmModal } from '@/shared/components';
+import { useShellHeader } from '@/components/layout/AppShell';
 import { useClientPets } from './_hooks/useClientPets';
 import { PetsFilters } from './_components/PetsFilters';
 import { PetsList } from './_components/PetsList';
@@ -12,7 +13,18 @@ import { PetModal } from './_components/PetModal';
 
 function PetsContent() {
   const searchParams = useSearchParams();
-  const state = useClientPets(searchParams.get('action'));
+  const state = useClientPets(
+    searchParams.get('action'),
+    searchParams.get('sel'),
+    searchParams.get('tab')
+  );
+
+  useShellHeader({
+    crumbGroup: 'Кабинет',
+    crumb: 'Питомцы',
+    crumb2: state.selectedPet ? state.selectedPet.name : undefined,
+  });
+
   const isArchiving = state.archivingPet ? !state.archivingPet.isArchived : true;
 
   return (
@@ -22,11 +34,14 @@ function PetsContent() {
         onSearchChange={state.setSearchQuery}
         archiveFilter={state.archiveFilter}
         onArchiveFilterChange={state.setArchiveFilter}
+        speciesList={state.speciesList}
+        selectedSpeciesId={state.selectedSpeciesId}
+        onSpeciesChange={state.setSelectedSpeciesId}
         onAddPet={state.openCreate}
       />
 
       {state.error && (
-        <div className="alert alert-destructive">
+        <div className="alert alert-destructive" role="alert">
           <AlertCircle className="ic" />
           <div className="grow">{state.error}</div>
           <button type="button" className="btn btn-outline btn-sm" onClick={state.reload}>
@@ -41,8 +56,11 @@ function PetsContent() {
           selectedPet={state.selectedPet}
           onSelectPet={state.setSelectedPet}
           speciesMap={state.speciesMap}
+          servicesMap={state.servicesMap}
           appointments={state.appointments}
           vaccinations={state.vaccinations}
+          archiveFilter={state.archiveFilter}
+          loading={state.loading}
           onAddPet={state.openCreate}
         />
 
@@ -50,9 +68,12 @@ function PetsContent() {
           <PetDetailIsland
             pet={state.selectedPet}
             speciesMap={state.speciesMap}
+            servicesMap={state.servicesMap}
+            veterinariansMap={state.vetsMap}
             appointments={state.appointments}
             vaccinations={state.vaccinations}
             loadingAppts={state.loadingAppts}
+            initialTab={state.initialDetailTab}
             onClose={() => state.setSelectedPet(null)}
             onEdit={state.openEdit}
             onToggleArchive={state.openArchiveModal}
@@ -73,17 +94,21 @@ function PetsContent() {
 
       <ConfirmModal
         isOpen={!!state.archivingPet}
-        title={isArchiving ? 'Архивация питомца' : 'Восстановление из архива'}
-        description={
+        title={
           state.archivingPet
             ? isArchiving
-              ? `Вы уверены, что хотите переместить профиль «${state.archivingPet.name}» в архив?`
-              : `Вы уверены, что хотите восстановить профиль «${state.archivingPet.name}» из архива?`
-            : undefined
+              ? `Отправить ${state.archivingPet.name} в архив?`
+              : `Вернуть ${state.archivingPet.name} из архива?`
+            : ''
         }
-        confirmLabel={isArchiving ? 'В архив' : 'Восстановить'}
-        cancelLabel="Отмена"
-        tone={isArchiving ? 'destructive' : 'primary'}
+        description={
+          isArchiving
+            ? 'История сохранится, но записать питомца будет нельзя. Вернуть из архива можно в любой момент.'
+            : 'Питомец снова станет активным и доступным для записи на приём.'
+        }
+        confirmLabel={isArchiving ? 'В архив' : 'Вернуть из архива'}
+        cancelLabel="Не сейчас"
+        tone="primary"
         size="sm"
         loading={state.archiveLoading}
         error={state.archiveError}
@@ -94,22 +119,18 @@ function PetsContent() {
           <Archive className="ic" />
           <div>
             {isArchiving
-              ? 'Питомец будет перемещён во вкладку «В архиве». История визитов и вакцинаций сохранится, но создание новых записей будет заблокировано.'
-              : 'Питомец вернётся в список активных, и для него снова станет доступна онлайн-запись на приём.'}
+              ? 'Питомец переместится во вкладку «Архив». История визитов и прививок сохранится.'
+              : 'Онлайн-запись снова станет доступна.'}
           </div>
         </div>
       </ConfirmModal>
 
       <ConfirmModal
         isOpen={!!state.deletingPet}
-        title="Удаление питомца"
-        description={
-          state.deletingPet
-            ? `Вы действительно хотите удалить профиль питомца «${state.deletingPet.name}»?`
-            : undefined
-        }
+        title={state.deletingPet ? `Удалить ${state.deletingPet.name}?` : 'Удаление питомца'}
+        description="Карточка будет удалена без возможности восстановления."
         confirmLabel="Удалить"
-        cancelLabel="Отмена"
+        cancelLabel="Не сейчас"
         tone="destructive"
         size="sm"
         loading={state.deleteLoading}
@@ -123,7 +144,16 @@ function PetsContent() {
 
 export default function PetsPage() {
   return (
-    <Suspense fallback={<div className="p-8 text-center text-xs text-[var(--muted-foreground)]">Загрузка питомцев...</div>}>
+    <Suspense
+      fallback={
+        <div className="island grow">
+          <div className="empty">
+            <div className="spinner" />
+            <span className="small muted">Загрузка питомцев…</span>
+          </div>
+        </div>
+      }
+    >
       <PetsContent />
     </Suspense>
   );

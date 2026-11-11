@@ -3,17 +3,21 @@
 import React, { Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { CalendarPlus, AlertCircle } from 'lucide-react';
+import { useShellHeader } from '@/components/layout/AppShell';
 import { useBookingWizard } from './_hooks/useBookingWizard';
 import { BookingStepper } from './_components/BookingStepper';
 import { StepPetSelection } from './_components/StepPetSelection';
 import { StepServiceSelection } from './_components/StepServiceSelection';
-import { StepDoctorAndSlotSelection } from './_components/StepDoctorAndSlotSelection';
+import { StepDoctorSelection } from './_components/StepDoctorSelection';
+import { StepSlotSelection } from './_components/StepSlotSelection';
 import { StepConfirmation } from './_components/StepConfirmation';
 import { BookingSuccessView } from './_components/BookingSuccessView';
 import { BookingSummaryIsland } from './_components/BookingSummaryIsland';
 import { BookingWizardFooter } from './_components/BookingWizardFooter';
 
 function BookAppointmentContent() {
+  useShellHeader({ crumbGroup: 'Кабинет', crumb: 'Записи', crumb2: 'Новая запись' });
+
   const router = useRouter();
   const searchParams = useSearchParams();
   const {
@@ -21,16 +25,21 @@ function BookAppointmentContent() {
     setStep,
     isSuccess,
     createdApptId,
+    bookedVetDisplay,
     comment,
     setComment,
     submitting,
     error,
+    slotConflictError,
     data,
     slots,
+    resolvedVetId,
     doctorDisplay,
     isNextDisabled,
     handleSelectPet,
     handleSelectService,
+    handleSelectSlot,
+    handleSelectSlotVetId,
     handleConfirmBooking,
     handleNewBooking,
   } = useBookingWizard(
@@ -40,6 +49,17 @@ function BookAppointmentContent() {
     searchParams.get('slot')
   );
 
+  const selectedService = data.selectedService;
+  const serviceDurationMin = selectedService
+    ? selectedService.effectiveDurationMin ??
+      selectedService.baseDurationMin ??
+      selectedService.durationMin ??
+      null
+    : null;
+  const servicePrice = selectedService
+    ? selectedService.effectivePrice ?? selectedService.basePrice ?? selectedService.price ?? null
+    : null;
+
   return (
     <div className="content-row">
       <section className="island grow">
@@ -48,21 +68,23 @@ function BookAppointmentContent() {
             <CalendarPlus className="ic" />
             Запись на приём
           </span>
-          <BookingStepper currentStep={step} />
+          <BookingStepper currentStep={step} isSuccess={isSuccess} />
         </div>
         <div className="sep" />
         <div className="island-body" style={{ paddingTop: '16px' }}>
           {isSuccess ? (
             <BookingSuccessView
               petName={data.selectedPet?.name}
-              serviceName={data.selectedService?.name}
+              serviceName={selectedService?.name}
+              doctorDisplay={bookedVetDisplay || doctorDisplay}
+              slotStartAt={slots.selectedSlot?.startAt}
               appointmentId={createdApptId}
               onNewBooking={handleNewBooking}
             />
           ) : (
-            <>
+            <div className="col" style={{ gap: '12px' }}>
               {data.dataError && (
-                <div className="alert alert-destructive mb-3" role="alert">
+                <div className="alert alert-destructive" role="alert">
                   <AlertCircle className="ic" />
                   <div className="row between wrap grow" style={{ gap: '8px', alignItems: 'center' }}>
                     <span>{data.dataError}</span>
@@ -77,7 +99,7 @@ function BookAppointmentContent() {
                 </div>
               )}
               {error && (
-                <div className="alert alert-destructive mb-3" role="alert">
+                <div className="alert alert-destructive" role="alert">
                   <AlertCircle className="ic" />
                   <div>
                     <b>Ошибка оформления записи:</b> {error}
@@ -90,13 +112,14 @@ function BookAppointmentContent() {
                   selectedPet={data.selectedPet}
                   onSelectPet={handleSelectPet}
                   speciesMap={data.speciesMap}
+                  loading={data.loadingData}
                 />
               )}
               {step === 2 && (
                 <StepServiceSelection
                   services={data.services}
                   specializations={data.specializations}
-                  selectedService={data.selectedService}
+                  selectedService={selectedService}
                   onSelectService={handleSelectService}
                   specsMap={data.specsMap}
                   speciesName={data.selectedPet ? data.speciesMap[data.selectedPet.speciesId] : undefined}
@@ -104,9 +127,9 @@ function BookAppointmentContent() {
                 />
               )}
               {step === 3 && (
-                <StepDoctorAndSlotSelection
+                <StepDoctorSelection
                   veterinarians={data.veterinarians}
-                  serviceSpecializationId={data.selectedService?.specializationId}
+                  serviceSpecializationId={selectedService?.specializationId}
                   petSpeciesId={data.selectedPet?.speciesId}
                   specsMap={data.specsMap}
                   isAnyVet={data.isAnyVet}
@@ -114,29 +137,50 @@ function BookAppointmentContent() {
                   onSelectAnyVet={() => {
                     data.setIsAnyVet(true);
                     data.setSelectedVet(null);
-                    slots.onSelectSlot(null);
+                    handleSelectSlot(null);
                   }}
                   onSelectVet={(v) => {
                     data.setIsAnyVet(false);
                     data.setSelectedVet(v);
-                    slots.onSelectSlot(null);
+                    handleSelectSlot(null);
                   }}
-                  {...slots}
-                  onRetrySlots={slots.reloadSlots}
                 />
               )}
               {step === 4 && (
+                <StepSlotSelection
+                  fromDate={slots.fromDate}
+                  todayStr={slots.todayStr}
+                  onFromDateChange={slots.onFromDateChange}
+                  horizonDays={slots.horizonDays}
+                  onHorizonDaysChange={slots.onHorizonDaysChange}
+                  durationInfoText={slots.durationInfoText}
+                  loadingSlots={slots.loadingSlots}
+                  slotsError={slots.slotsError}
+                  conflictError={slotConflictError}
+                  onRetrySlots={slots.reloadSlots}
+                  availableSlots={slots.availableSlots}
+                  slotsByDay={slots.slotsByDay}
+                  selectedSlot={slots.selectedSlot}
+                  onSelectSlot={handleSelectSlot}
+                  isAnyVet={data.isAnyVet}
+                  selectedSlotVetId={slots.selectedSlotVetId}
+                  onSelectSlotVetId={handleSelectSlotVetId}
+                  vetsMap={data.vetsMap}
+                  specsMap={data.specsMap}
+                />
+              )}
+              {step === 5 && (
                 <StepConfirmation
                   pet={data.selectedPet}
                   speciesName={data.selectedPet ? data.speciesMap[data.selectedPet.speciesId] || '' : ''}
-                  service={data.selectedService}
+                  service={selectedService}
                   doctorDisplay={doctorDisplay}
                   selectedSlot={slots.selectedSlot}
                   comment={comment}
                   onCommentChange={setComment}
                 />
               )}
-            </>
+            </div>
           )}
         </div>
         {!isSuccess && (
@@ -144,8 +188,8 @@ function BookAppointmentContent() {
             step={step}
             isNextDisabled={isNextDisabled}
             submitting={submitting}
-            canSubmit={!!slots.selectedSlot}
-            onPrev={() => (step > 1 ? setStep(step - 1) : router.push('/client/dashboard'))}
+            canSubmit={Boolean(slots.selectedSlot && resolvedVetId)}
+            onPrev={() => (step > 1 ? setStep(step - 1) : router.push('/client/appointments'))}
             onNext={() => setStep(step + 1)}
             onSubmit={handleConfirmBooking}
           />
@@ -155,10 +199,12 @@ function BookAppointmentContent() {
       <BookingSummaryIsland
         petName={data.selectedPet?.name}
         speciesName={data.selectedPet ? data.speciesMap[data.selectedPet.speciesId] : undefined}
-        serviceName={data.selectedService?.name}
-        servicePrice={data.selectedService?.effectivePrice ?? data.selectedService?.basePrice}
-        doctorDisplay={doctorDisplay}
+        serviceName={selectedService?.name}
+        doctorDisplay={bookedVetDisplay || doctorDisplay}
         selectedSlotStartAt={slots.selectedSlot?.startAt}
+        selectedSlotEndAt={slots.selectedSlot?.endAt}
+        serviceDurationMin={serviceDurationMin}
+        servicePrice={servicePrice}
       />
     </div>
   );
@@ -168,8 +214,11 @@ export default function BookAppointmentPage() {
   return (
     <Suspense
       fallback={
-        <div className="p-8 text-center text-xs text-[var(--muted-foreground)]">
-          Загрузка мастера записи...
+        <div className="island grow">
+          <div className="empty">
+            <div className="spinner" />
+            <span className="small muted">Загрузка мастера записи...</span>
+          </div>
         </div>
       }
     >

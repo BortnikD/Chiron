@@ -1,33 +1,32 @@
 'use client';
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { AlertCircle } from 'lucide-react';
+import { DatePicker, FilterDropdown } from '@/shared/components';
 import type { Pet } from '@/modules/client/types';
 import type { Species } from '@/modules/clinic/types';
+import { getMoscowDateKey, getMoscowTodayIso } from '@/shared/lib';
 import type { Gender } from '@/shared/types';
 import type { PetFormData } from './types';
 
 export interface PetModalProps {
-  /** Флаг открытия модального окна */
   isOpen: boolean;
-  /** Редактируемый питомец (или null при создании) */
   pet: Pet | null;
-  /** Список доступных видов животных */
   speciesList: Species[];
-  /** Функция сохранения формы */
   onSave: (data: PetFormData) => Promise<void> | void;
-  /** Функция закрытия модального окна */
   onClose: () => void;
-  /** Флаг состояния сохранения */
   saving?: boolean;
-  /** Ошибка сохранения с сервера */
   error?: string | null;
 }
 
-/**
- * Модальное окно добавления / редактирования питомца
- * (кличка, вид, пол, дата рождения, вес, особенности).
- */
+interface FieldErrors {
+  name?: string;
+  speciesId?: string;
+  gender?: string;
+  weight?: string;
+  birthDate?: string;
+}
+
 export function PetModal({
   isOpen,
   pet,
@@ -39,13 +38,16 @@ export function PetModal({
 }: PetModalProps) {
   const [name, setName] = useState('');
   const [speciesId, setSpeciesId] = useState('');
-  const [gender, setGender] = useState<Gender>('MALE');
+  const [gender, setGender] = useState<Gender | ''>('');
   const [birthDate, setBirthDate] = useState('');
   const [weightKg, setWeightKg] = useState('');
   const [notes, setNotes] = useState('');
-  const [localError, setLocalError] = useState<string | null>(null);
+  const [isArchived, setIsArchived] = useState(false);
+  const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
+
   const wasOpenRef = useRef(false);
   const prevPetIdRef = useRef<string | null>(null);
+  const todayIso = useMemo(() => getMoscowTodayIso(), []);
 
   useEffect(() => {
     if (!isOpen) {
@@ -64,163 +66,243 @@ export function PetModal({
         setName(pet.name);
         setSpeciesId(pet.speciesId);
         setGender(pet.gender);
-        setBirthDate(pet.birthDate ? pet.birthDate.split('T')[0] : '');
+        setBirthDate(pet.birthDate ? getMoscowDateKey(pet.birthDate) || pet.birthDate.slice(0, 10) : '');
         setWeightKg(pet.weightKg != null ? String(pet.weightKg) : '');
         setNotes(pet.notes || '');
+        setIsArchived(Boolean(pet.isArchived));
       } else {
         setName('');
         setSpeciesId(speciesList[0]?.id || '');
-        setGender('MALE');
+        setGender('');
         setBirthDate('');
         setWeightKg('');
         setNotes('');
+        setIsArchived(false);
       }
-      setLocalError(null);
+      setFieldErrors({});
     } else if (!pet && speciesList.length > 0) {
       setSpeciesId((prev) => prev || speciesList[0].id);
     }
   }, [isOpen, pet, speciesList]);
 
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && !saving) {
+        onClose();
+      }
+    };
+    window.addEventListener('keydown', handleKey);
+    return () => window.removeEventListener('keydown', handleKey);
+  }, [isOpen, saving, onClose]);
+
+  const speciesOptions = useMemo(
+    () => speciesList.map((s) => ({ value: s.id, label: s.name })),
+    [speciesList]
+  );
+
   if (!isOpen) return null;
+
+  const validate = (): FieldErrors => {
+    const errs: FieldErrors = {};
+    if (!name.trim()) errs.name = 'Обязательное поле';
+    if (!speciesId) errs.speciesId = 'Выберите вид';
+    if (!gender) errs.gender = 'Выберите пол';
+    if (birthDate && birthDate > todayIso) {
+      errs.birthDate = 'Дата рождения не может быть в будущем';
+    }
+    if (weightKg.trim() !== '') {
+      const parsed = Number(weightKg.replace(',', '.'));
+      if (Number.isNaN(parsed) || parsed <= 0 || parsed > 9999.99) {
+        errs.weight = 'От 0,01 до 9999,99 кг';
+      }
+    }
+    return errs;
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!name.trim()) {
-      setLocalError('Укажите кличку питомца');
+    const errs = validate();
+    if (Object.keys(errs).length > 0) {
+      setFieldErrors(errs);
       return;
     }
-    if (!speciesId) {
-      setLocalError('Выберите вид животного');
-      return;
-    }
+    setFieldErrors({});
+    const parsedWeight = weightKg.trim() !== '' ? Number(weightKg.replace(',', '.')) : null;
 
-    setLocalError(null);
     await onSave({
       name: name.trim(),
       speciesId,
-      gender,
-      birthDate: birthDate || undefined,
-      weightKg: weightKg ? parseFloat(weightKg) : undefined,
-      notes: notes.trim() || undefined,
+      gender: gender as Gender,
+      birthDate: birthDate || null,
+      weightKg: parsedWeight,
+      notes: notes.trim() || null,
+      ...(pet ? { isArchived } : {}),
     });
   };
 
-  const displayError = error || localError;
+  const modalTitle = pet ? 'Изменить питомца' : 'Новый питомец';
 
   return (
-    <div className="dialog-backdrop" role="dialog" aria-modal="true">
-      <div className="dialog" style={{ width: '480px', maxWidth: 'calc(100vw - 32px)' }}>
+    <div
+      className="overlay"
+      role="dialog"
+      aria-modal="true"
+      aria-label={modalTitle}
+      onClick={() => !saving && onClose()}
+    >
+      <div className="dialog" onClick={(e) => e.stopPropagation()}>
         <div className="dialog-head">
-          <span className="dialog-title">
-            {pet ? 'Редактировать питомца' : 'Новый питомец'}
-          </span>
-          <span className="dialog-desc">
-            Укажите основные сведения о животном для оформления электронной медкарты
-          </span>
+          <span className="dialog-title">{modalTitle}</span>
+          <span className="dialog-desc">Поля со звёздочкой обязательны</span>
         </div>
 
         <form onSubmit={handleSubmit}>
           <div className="dialog-body">
-            {displayError && (
-              <div className="alert alert-destructive">
+            {error && (
+              <div className="alert alert-destructive" role="alert">
                 <AlertCircle className="ic" />
-                <div>{displayError}</div>
+                <div>{error}</div>
               </div>
             )}
 
             <div className="form-grid">
               <div className="field span-2">
-                <label className="field-label" htmlFor="p-name">
+                <label className="field-label" htmlFor="pt-name">
                   Кличка <span className="req">*</span>
                 </label>
                 <input
-                  id="p-name"
+                  id="pt-name"
                   type="text"
-                  className="input"
+                  maxLength={100}
+                  className={`input ${fieldErrors.name ? 'invalid' : ''}`}
                   value={name}
-                  onChange={(e) => setName(e.target.value)}
+                  onChange={(e) => {
+                    setName(e.target.value);
+                    setFieldErrors((prev) => ({ ...prev, name: undefined }));
+                  }}
                   placeholder="Например: Барсик"
-                  required
                 />
+                {fieldErrors.name && <span className="field-error">{fieldErrors.name}</span>}
               </div>
 
-              <div className="field">
-                <label className="field-label" htmlFor="p-spec">
-                  Вид животного <span className="req">*</span>
-                </label>
-                <select
-                  id="p-spec"
-                  className="select"
+              <div className="field span-2">
+                <span className="field-label">
+                  Вид <span className="req">*</span>
+                </span>
+                <FilterDropdown
+                  id="pt-spec"
                   value={speciesId}
-                  onChange={(e) => setSpeciesId(e.target.value)}
-                >
-                  {speciesList.map((s) => (
-                    <option key={s.id} value={s.id}>
-                      {s.name}
-                    </option>
-                  ))}
-                </select>
+                  options={speciesOptions}
+                  onChange={(val) => {
+                    setSpeciesId(val);
+                    setFieldErrors((prev) => ({ ...prev, speciesId: undefined }));
+                  }}
+                  placeholder="Выберите вид"
+                  invalid={!!fieldErrors.speciesId}
+                  searchable={speciesOptions.length > 7}
+                  searchPlaceholder="Найти вид…"
+                  ariaLabel="Вид животного"
+                />
+                {fieldErrors.speciesId && <span className="field-error">{fieldErrors.speciesId}</span>}
               </div>
 
               <div className="field">
-                <span className="field-label">Пол</span>
+                <span className="field-label">
+                  Пол <span className="req">*</span>
+                </span>
                 <div className="seg">
                   <button
                     type="button"
                     className={`seg-item ${gender === 'MALE' ? 'on' : ''}`}
-                    onClick={() => setGender('MALE')}
+                    onClick={() => {
+                      setGender('MALE');
+                      setFieldErrors((prev) => ({ ...prev, gender: undefined }));
+                    }}
                   >
                     Самец
                   </button>
                   <button
                     type="button"
                     className={`seg-item ${gender === 'FEMALE' ? 'on' : ''}`}
-                    onClick={() => setGender('FEMALE')}
+                    onClick={() => {
+                      setGender('FEMALE');
+                      setFieldErrors((prev) => ({ ...prev, gender: undefined }));
+                    }}
                   >
                     Самка
                   </button>
                 </div>
+                {fieldErrors.gender && <span className="field-error">{fieldErrors.gender}</span>}
               </div>
 
               <div className="field">
-                <label className="field-label" htmlFor="p-birth">
+                <label className="field-label" htmlFor="pt-birth">
                   Дата рождения
                 </label>
-                <input
-                  id="p-birth"
-                  type="date"
-                  className="input"
+                <DatePicker
+                  id="pt-birth"
                   value={birthDate}
-                  onChange={(e) => setBirthDate(e.target.value)}
+                  onChange={(iso) => {
+                    setBirthDate(iso);
+                    setFieldErrors((prev) => ({ ...prev, birthDate: undefined }));
+                  }}
+                  max={todayIso}
+                  invalid={!!fieldErrors.birthDate}
+                  ariaLabel="Дата рождения питомца"
                 />
+                {fieldErrors.birthDate && <span className="field-error">{fieldErrors.birthDate}</span>}
               </div>
 
               <div className="field">
-                <label className="field-label" htmlFor="p-weight">
-                  Вес (кг)
+                <label className="field-label" htmlFor="pt-weight">
+                  Вес, кг
                 </label>
                 <input
-                  id="p-weight"
+                  id="pt-weight"
                   type="number"
-                  step="0.1"
-                  className="input"
+                  step="0.01"
+                  min="0.01"
+                  max="9999.99"
+                  className={`input ${fieldErrors.weight ? 'invalid' : ''}`}
                   value={weightKg}
-                  onChange={(e) => setWeightKg(e.target.value)}
+                  onChange={(e) => {
+                    setWeightKg(e.target.value);
+                    setFieldErrors((prev) => ({ ...prev, weight: undefined }));
+                  }}
                   placeholder="4.2"
                 />
+                {fieldErrors.weight && <span className="field-error">{fieldErrors.weight}</span>}
               </div>
 
+              {pet && (
+                <div className="field">
+                  <span className="field-label">Архив</span>
+                  <div className="row" style={{ height: '36px' }}>
+                    <button
+                      type="button"
+                      className={`switch ${isArchived ? 'on' : ''}`}
+                      role="switch"
+                      aria-checked={isArchived}
+                      aria-label="В архиве"
+                      onClick={() => setIsArchived((prev) => !prev)}
+                    />
+                    <span className="small muted">Запрет новых записей</span>
+                  </div>
+                </div>
+              )}
+
               <div className="field span-2">
-                <label className="field-label" htmlFor="p-notes">
-                  Особенности здоровья, аллергии или чип
+                <label className="field-label" htmlFor="pt-notes">
+                  Заметки
                 </label>
                 <textarea
-                  id="p-notes"
+                  id="pt-notes"
                   className="textarea"
-                  rows={2}
+                  maxLength={2000}
                   value={notes}
                   onChange={(e) => setNotes(e.target.value)}
-                  placeholder="Хронические заболевания, особенности поведения..."
+                  placeholder="Аллергии, особенности поведения"
                 />
               </div>
             </div>
@@ -236,7 +318,7 @@ export function PetModal({
               Отмена
             </button>
             <button type="submit" className="btn btn-primary" disabled={saving}>
-              {saving ? 'Сохранение...' : pet ? 'Сохранить изменения' : 'Добавить'}
+              {saving ? 'Сохранение…' : pet ? 'Сохранить' : 'Добавить'}
             </button>
           </div>
         </form>

@@ -2,52 +2,91 @@
 
 import React from 'react';
 import Link from 'next/link';
-import { Calendar } from 'lucide-react';
-import type { Pet } from '@/modules/client/types';
+import { CalendarPlus } from 'lucide-react';
+import { SpeciesIcon } from '@/components/ui/SpeciesIcon';
+import { getSpeciesTone } from '@/shared/lib';
+import type { PetVaccines } from '../_hooks/useClientVaccinations';
 
 export interface VaccinationsPetFilterProps {
-  pets: Pet[];
+  petVaccines: PetVaccines[];
+  speciesMap: Record<string, string>;
   selectedPetId: string;
   onSelectPet: (petId: string) => void;
 }
 
+/**
+ * Верхняя панель фильтра по питомцам, легенда статусов вакцинации и CTA записи.
+ */
 export function VaccinationsPetFilter({
-  pets,
+  petVaccines,
+  speciesMap,
   selectedPetId,
   onSelectPet,
 }: VaccinationsPetFilterProps) {
+  const bookHref =
+    selectedPetId !== 'all'
+      ? `/client/book?petId=${encodeURIComponent(selectedPetId)}`
+      : '/client/book';
+
   return (
-    <section className="island" style={{ padding: '16px 20px' }}>
-      <div className="row between wrap" style={{ alignItems: 'center', gap: '12px' }}>
-        <div className="seg" role="tablist">
+    <section className="island" aria-label="Фильтр по питомцам">
+      <div className="island-head">
+        <div className="seg" role="tablist" aria-label="Питомец">
           <button
             type="button"
-            className={`seg-item ${selectedPetId === 'all' ? 'on font-semibold' : ''}`}
+            className={`seg-item ${selectedPetId === 'all' ? 'on' : ''}`}
             onClick={() => onSelectPet('all')}
           >
             <span>Все питомцы</span>
-            <span className="small muted font-mono">({pets.length})</span>
+            <span className="small muted tnum">({petVaccines.length})</span>
           </button>
-          {pets.map((p) => (
-            <button
-              key={p.id}
-              type="button"
-              className={`seg-item ${selectedPetId === p.id ? 'on font-semibold' : ''}`}
-              onClick={() => onSelectPet(p.id)}
-            >
-              <span>{p.name}</span>
-            </button>
-          ))}
+          {petVaccines.map(({ pet, hasOverdue }) => {
+            const tone = getSpeciesTone(
+              pet.species?.name || pet.speciesName || pet.speciesId,
+              speciesMap
+            );
+            return (
+              <button
+                key={pet.id}
+                type="button"
+                className={`seg-item ${selectedPetId === pet.id ? 'on' : ''}`}
+                onClick={() => onSelectPet(pet.id)}
+              >
+                <SpeciesIcon species={tone} size={15} />
+                <span>{pet.name}</span>
+                {hasOverdue && (
+                  <span
+                    className="dot"
+                    style={{ background: 'var(--st-noshow-fg)' }}
+                    aria-label="Есть просроченные прививки"
+                  />
+                )}
+              </button>
+            );
+          })}
         </div>
 
-        <Link
-          href="/client/book"
-          className="btn btn-primary btn-sm"
-          style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', textDecoration: 'none' }}
-        >
-          <Calendar className="ic" style={{ width: '15px', height: '15px' }} />
-          <span>Записаться на прививку</span>
-        </Link>
+        <div className="row wrap" style={{ gap: '12px' }}>
+          <div className="legend">
+            <span>
+              <i style={{ background: 'var(--st-noshow-fg)' }} />
+              просрочена
+            </span>
+            <span>
+              <i style={{ background: 'var(--st-pending-fg)' }} />
+              ≤ 7 дней
+            </span>
+            <span>
+              <i style={{ background: 'var(--muted-foreground)' }} />
+              позже
+            </span>
+          </div>
+
+          <Link href={bookHref} className="btn btn-primary btn-sm">
+            <CalendarPlus className="ic" />
+            <span>Записаться на прививку</span>
+          </Link>
+        </div>
       </div>
     </section>
   );

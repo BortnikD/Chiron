@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { Clock, Check, Loader2 } from 'lucide-react';
+import { Clock, Check } from 'lucide-react';
 import type { Service, Specialization } from '@/modules/clinic/types';
 import { formatCurrency, getSpecTone } from '@/shared/lib';
 
@@ -14,8 +14,7 @@ export interface StepServiceSelectionProps {
 }
 
 /**
- * Шаг 2: выбор услуги.
- * Вкладки специализаций, карточки услуг с ценами, длительностью и цветовой дифференциацией.
+ * Шаг 2: выбор услуги для вида выбранного питомца.
  */
 export const StepServiceSelection: React.FC<StepServiceSelectionProps> = ({
   services,
@@ -48,7 +47,7 @@ export const StepServiceSelection: React.FC<StepServiceSelectionProps> = ({
       </div>
 
       {activeSpecializations.length > 1 && (
-        <div className="seg wrap" style={{ gap: '4px' }}>
+        <div className="seg">
           <button
             type="button"
             className={`seg-item ${selectedSpecId === 'ALL' ? 'on' : ''}`}
@@ -73,14 +72,14 @@ export const StepServiceSelection: React.FC<StepServiceSelectionProps> = ({
       )}
 
       {loading ? (
-        <div className="p-8 text-center text-xs text-[var(--muted-foreground)] flex items-center justify-center gap-2">
-          <Loader2 className="w-4 h-4 animate-spin text-[var(--primary-text)]" />
-          <span>Загрузка услуг для выбранного вида...</span>
+        <div className="empty">
+          <div className="spinner" />
+          <span className="small muted">Загрузка услуг для выбранного вида...</span>
         </div>
       ) : filteredServices.length === 0 ? (
-        <div className="empty" style={{ padding: '32px 16px' }}>
-          <span className="empty-title">В этой категории нет доступных услуг</span>
-          <span className="muted">Выберите другую специализацию</span>
+        <div className="empty">
+          <span className="empty-title">Нет доступных услуг</span>
+          <span className="muted">Попробуйте выбрать другую специализацию</span>
         </div>
       ) : (
         <div className="cards">
@@ -89,7 +88,7 @@ export const StepServiceSelection: React.FC<StepServiceSelectionProps> = ({
             const tone = getSpecTone(svc.specializationId);
             const specName = specsMap[svc.specializationId] || 'Терапия';
             const duration = svc.effectiveDurationMin ?? svc.baseDurationMin ?? svc.durationMin ?? 30;
-            const price = svc.effectivePrice ?? svc.basePrice;
+            const price = svc.effectivePrice ?? svc.basePrice ?? svc.price;
 
             return (
               <button
@@ -97,7 +96,6 @@ export const StepServiceSelection: React.FC<StepServiceSelectionProps> = ({
                 type="button"
                 className={`tcard tone-${tone} ${isSel ? 'sel' : ''}`}
                 onClick={() => onSelectService(svc)}
-                style={{ textAlign: 'left', cursor: 'pointer' }}
               >
                 <div className="row between" style={{ gap: '8px' }}>
                   <span className="t-badge">{specName}</span>

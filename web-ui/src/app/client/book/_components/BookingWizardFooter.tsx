@@ -12,7 +12,7 @@ export interface BookingWizardFooterProps {
 }
 
 /**
- * Подвал мастера записи: кнопки «Назад / Отмена», «Далее» и «Записаться».
+ * Подвал мастера записи: кнопки «Отмена / Назад», «Далее» и «Записаться».
  */
 export const BookingWizardFooter: React.FC<BookingWizardFooterProps> = ({
   step,
@@ -30,7 +30,7 @@ export const BookingWizardFooter: React.FC<BookingWizardFooterProps> = ({
         <span>{step === 1 ? 'Отмена' : 'Назад'}</span>
       </button>
 
-      {step < 4 ? (
+      {step < 5 ? (
         <button
           type="button"
           className="btn btn-primary"

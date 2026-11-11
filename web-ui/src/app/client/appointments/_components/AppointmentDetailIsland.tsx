@@ -1,65 +1,100 @@
 'use client';
 
 import React from 'react';
-import { X, XCircle, AlertCircle } from 'lucide-react';
+import Link from 'next/link';
+import { X, XCircle, Repeat } from 'lucide-react';
 import type { Appointment, Pet } from '@/modules/client/types';
 import type { Service, Veterinarian } from '@/modules/clinic/types';
-import { getDoctorDisplay } from '@/utils/doctorHelpers';
 import {
   APPOINTMENT_STATUS_META,
   formatCurrency,
-  formatDateRu,
   formatDateShort,
   formatSlotTime,
 } from '@/shared/lib';
+import {
+  computeDurationMinutes,
+  formatFollowUpParentLabel,
+  resolveCancelledByLabel,
+  resolveVetName,
+} from './utils';
 
 export interface AppointmentDetailIslandProps {
-  /** Выбранная запись для детального просмотра */
   appointment: Appointment;
-  /** Словарь питомцев клиента по ID */
   petsMap: Record<string, Pet>;
-  /** Словарь услуг клиники по ID */
   servicesMap: Record<string, Service>;
-  /** Словарь ветеринаров по ID (опционально) */
-  veterinariansMap?: Record<string, Veterinarian>;
-  /** Функция закрытия острова детального просмотра */
+  veterinariansMap: Record<string, Veterinarian>;
+  speciesMap?: Record<string, string>;
+  parentApptsMap?: Record<string, Appointment>;
+  currentUserId?: string;
+  onSelectFollowUpParent: (appointmentId: string) => void;
   onClose: () => void;
-  /** Функция открытия модального окна отмены записи */
   onRequestCancel: () => void;
 }
 
 /**
- * Правый остров детального просмотра выбранной записи на приём:
- * отображает подробные сведения об услуге, питомце, враче, статусе,
- * дате и времени, комментариях клиента и врача, а также действие отмены записи.
+ * Правый остров детального просмотра выбранной записи на приём.
  */
 export function AppointmentDetailIsland({
   appointment,
   petsMap,
   servicesMap,
   veterinariansMap,
+  speciesMap = {},
+  parentApptsMap = {},
+  currentUserId,
+  onSelectFollowUpParent,
   onClose,
   onRequestCancel,
 }: AppointmentDetailIslandProps) {
-  const vet =
-    (veterinariansMap && appointment.veterinarianId && veterinariansMap[appointment.veterinarianId]) ||
-    appointment.veterinarian;
-  const doctorName = vet ? getDoctorDisplay(vet).name : appointment.veterinarianName || null;
-  const statusShort = APPOINTMENT_STATUS_META[appointment.status]?.short || appointment.status;
+  const pet = petsMap[appointment.petId] || appointment.pet;
+  const service = servicesMap[appointment.serviceId] || appointment.service;
+  const serviceName = service?.name || appointment.serviceName || 'Приём';
+  const petName = pet?.name || appointment.petName || 'Питомец';
+  const speciesName =
+    pet?.species?.name ||
+    pet?.speciesName ||
+    (pet?.speciesId ? speciesMap[pet.speciesId] : undefined) ||
+    '';
+  const vetName = resolveVetName(appointment, veterinariansMap);
+  const statusLabel =
+    APPOINTMENT_STATUS_META[appointment.status]?.label || appointment.status;
+
+  const dateLabel = formatDateShort(appointment.startAt);
+  const timeRange = `${formatSlotTime(appointment.startAt)}–${formatSlotTime(appointment.endAt)}`;
+  const durationMin = computeDurationMinutes(appointment.startAt, appointment.endAt);
+  const price = appointment.priceSnapshot ?? appointment.price;
+
+  const parentAppt = appointment.followUpOf
+    ? parentApptsMap[appointment.followUpOf]
+    : undefined;
+  const parentLabel = appointment.followUpOf
+    ? formatFollowUpParentLabel(parentAppt, servicesMap)
+    : '';
+
+  const cancelledByLabel = resolveCancelledByLabel(
+    appointment.cancelledBy,
+    currentUserId,
+    veterinariansMap
+  );
+  const cancelledAtLabel = appointment.cancelledAt
+    ? `${formatDateShort(appointment.cancelledAt)} ${formatSlotTime(appointment.cancelledAt)}`
+    : '—';
+  const cancelReasonText =
+    appointment.cancelReason || appointment.cancellationReason || 'Не указана';
+
+  const canCancel =
+    (appointment.status === 'PENDING' || appointment.status === 'CONFIRMED') &&
+    new Date(appointment.startAt).getTime() > Date.now();
 
   return (
-    <section
-      className="island detail-island"
-      style={{ flex: 'none' }}
-      aria-label="Детали записи"
-    >
+    <section className="island detail-island" aria-label="Детали записи">
       <div className="island-head">
         <div className="col" style={{ gap: '2px', minWidth: 0 }}>
           <span className="h2" style={{ wordBreak: 'break-word' }}>
-            {servicesMap[appointment.serviceId]?.name || 'Приём'}
+            {serviceName}
           </span>
-          <span className="cell-sub">
-            {formatDateRu(appointment.startAt)}, в {formatSlotTime(appointment.startAt)}
+          <span className="cell-sub tnum">
+            {dateLabel}, {timeRange}
           </span>
         </div>
         <button
@@ -75,58 +110,84 @@ export function AppointmentDetailIsland({
       <div className="island-body">
         <div className="col" style={{ gap: '16px' }}>
           <div className="row wrap">
-            <span className={`badge st badge-${appointment.status}`}>{statusShort}</span>
+            <span className={`badge st badge-${appointment.status}`}>{statusLabel}</span>
+            {appointment.followUpOf && (
+              <span className="badge badge-accent">
+                <Repeat className="ic" style={{ width: '12px', height: '12px' }} />
+                Повторный приём
+              </span>
+            )}
           </div>
 
           <dl className="kv" style={{ margin: 0 }}>
             <dt>Питомец</dt>
-            <dd>{petsMap[appointment.petId]?.name || 'Питомец'}</dd>
+            <dd>
+              <Link
+                href={`/client/pets?sel=${encodeURIComponent(appointment.petId)}&tab=appts`}
+                className="linkish"
+              >
+                {petName}
+              </Link>
+              {speciesName && <span className="muted"> · {speciesName}</span>}
+            </dd>
 
-            {doctorName && (
-              <>
-                <dt>Врач</dt>
-                <dd>{doctorName}</dd>
-              </>
-            )}
+            <dt>Врач</dt>
+            <dd>{vetName}</dd>
 
             <dt>Дата и время</dt>
             <dd className="tnum">
-              {formatDateShort(appointment.startAt)} в {formatSlotTime(appointment.startAt)}
+              {dateLabel}, {timeRange}
+              {durationMin != null && <span className="muted"> · {durationMin} мин</span>}
             </dd>
 
             <dt>Стоимость</dt>
-            <dd className="cell-main tnum">
-              {appointment.priceSnapshot != null ? formatCurrency(appointment.priceSnapshot) : '—'}
-            </dd>
+            <dd className="tnum">{price != null ? formatCurrency(price) : '—'}</dd>
+
+            {appointment.followUpOf && (
+              <>
+                <dt>Исходный приём</dt>
+                <dd>
+                  <button
+                    type="button"
+                    className="linkish"
+                    onClick={() => onSelectFollowUpParent(appointment.followUpOf!)}
+                  >
+                    {parentLabel}
+                  </button>
+                </dd>
+              </>
+            )}
           </dl>
 
-          {appointment.clientComment && (
-            <div className="col" style={{ gap: '6px' }}>
-              <span className="section-title">Ваш комментарий</span>
-              <div className="note">{appointment.clientComment}</div>
-            </div>
-          )}
+          <div className="col" style={{ gap: '6px' }}>
+            <span className="section-title">Ваш комментарий</span>
+            <div className="note">{appointment.clientComment || '—'}</div>
+          </div>
 
-          {appointment.vetNotes && (
-            <div className="col" style={{ gap: '6px' }}>
-              <span className="section-title">Заметки врача</span>
-              <div className="note">{appointment.vetNotes}</div>
+          <div className="col" style={{ gap: '6px' }}>
+            <span className="section-title">Заметки врача</span>
+            <div className="note">
+              {appointment.vetNotes || appointment.notes || 'Врач ещё не оставил заметок'}
             </div>
-          )}
+          </div>
 
           {appointment.status === 'CANCELLED' && (
-            <div className="alert alert-info">
-              <AlertCircle className="ic" />
-              <div>
-                <b>Запись отменена.</b>{' '}
-                {appointment.cancelReason ? `Причина: ${appointment.cancelReason}` : ''}
-              </div>
+            <div className="col" style={{ gap: '6px' }}>
+              <span className="section-title">Отмена</span>
+              <dl className="kv" style={{ margin: 0 }}>
+                <dt>Кто отменил</dt>
+                <dd>{cancelledByLabel}</dd>
+                <dt>Когда</dt>
+                <dd className="tnum">{cancelledAtLabel}</dd>
+                <dt>Причина</dt>
+                <dd>{cancelReasonText}</dd>
+              </dl>
             </div>
           )}
         </div>
       </div>
 
-      {(appointment.status === 'PENDING' || appointment.status === 'CONFIRMED') && (
+      {canCancel && (
         <div className="island-foot">
           <span className="small muted">Отмена доступна до начала приёма</span>
           <button

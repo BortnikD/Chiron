@@ -14,8 +14,6 @@ export function useClientDashboard() {
   const [summary, setSummary] = useState<ClientSummary | null>(null);
   const [pets, setPets] = useState<Pet[]>([]);
   const [appointments, setAppointments] = useState<Appointment[]>([]);
-  const [upcomingTotal, setUpcomingTotal] = useState<number | undefined>(undefined);
-  const [pastTotal, setPastTotal] = useState<number | undefined>(undefined);
   const [vaccinations, setVaccinations] = useState<Vaccination[]>([]);
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
   const [speciesList, setSpeciesList] = useState<Species[]>([]);
@@ -46,7 +44,6 @@ export function useClientDashboard() {
         summaryData,
         petsData,
         upcomingRes,
-        pastRes,
         vacData,
         spData,
         svcData,
@@ -61,12 +58,6 @@ export function useClientDashboard() {
           page: 0,
           size: 30,
         }),
-        clientApi.getAppointments({
-          status: ['COMPLETED', 'CANCELLED', 'NO_SHOW'],
-          direction: 'DESC',
-          page: 0,
-          size: 30,
-        }),
         clientApi.getVaccinations(),
         clinicApi.getSpecies(),
         clinicApi.getServices(),
@@ -78,19 +69,10 @@ export function useClientDashboard() {
 
       const safePets = Array.isArray(petsData) ? petsData : [];
       const upcomingItems = upcomingRes?.items ?? (Array.isArray(upcomingRes) ? upcomingRes : []);
-      const pastItems = pastRes?.items ?? (Array.isArray(pastRes) ? pastRes : []);
-
-      const mergedMap = new Map<string, Appointment>();
-      upcomingItems.forEach((a) => mergedMap.set(a.id, a));
-      pastItems.forEach((a) => {
-        if (!mergedMap.has(a.id)) mergedMap.set(a.id, a);
-      });
 
       setSummary(summaryData);
       setPets(safePets);
-      setAppointments(Array.from(mergedMap.values()));
-      setUpcomingTotal(upcomingRes?.totalElements ?? upcomingItems.length);
-      setPastTotal(pastRes?.totalElements ?? pastItems.length);
+      setAppointments(upcomingItems);
       setVaccinations(Array.isArray(vacData) ? vacData : []);
       setSpeciesList(Array.isArray(spData) ? spData : []);
       setServices(Array.isArray(svcData) ? svcData : []);
@@ -150,8 +132,13 @@ export function useClientDashboard() {
   }, []);
 
   const derivedVacAttnCount = useMemo(() => {
-    return vaccinations.filter((v) => isVaccinationDueSoonOrOverdue(v.nextDueOn || v.validUntil)).length;
-  }, [vaccinations]);
+    const activeIds = new Set(pets.filter((p) => !p.isArchived).map((p) => p.id));
+    return vaccinations.filter(
+      (v) =>
+        (activeIds.size === 0 || activeIds.has(v.petId)) &&
+        isVaccinationDueSoonOrOverdue(v.nextDueOn || v.validUntil)
+    ).length;
+  }, [vaccinations, pets]);
 
   const upcomingCount = summary?.upcomingAppointments ?? upcomingAppts.length;
   const petsCount = summary?.activePets ?? pets.length;
@@ -166,7 +153,7 @@ export function useClientDashboard() {
   return {
     summary,
     pets,
-    appointments,
+    appointments: upcomingAppts,
     vaccinations,
     notifications,
     loading,
@@ -175,15 +162,12 @@ export function useClientDashboard() {
     speciesMap,
     servicesMap,
     vetsMap,
-    upcomingAppts,
     upcomingCount,
     petsCount,
-    upcomingTotal,
-    pastTotal,
-    nextAppt,
-    todayWord,
     vacAttnCount,
     unreadNotifsCount,
+    nextAppt,
+    todayWord,
     nextApptPet,
     nextApptService,
     nextApptVet,

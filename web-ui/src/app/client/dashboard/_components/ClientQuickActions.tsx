@@ -67,7 +67,7 @@ export function ClientQuickActions({
         </Link>
 
         <Link
-          href="/client/dashboard#notifs"
+          href="/client/notifications"
           className="hm-stat"
           style={{ '--tone': 'var(--chart-3)', textDecoration: 'none' } as React.CSSProperties}
         >
