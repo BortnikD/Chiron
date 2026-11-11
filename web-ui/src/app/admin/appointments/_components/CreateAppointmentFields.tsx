@@ -1,11 +1,12 @@
 'use client';
 
-import React from 'react';
+import React, { useMemo } from 'react';
 import { Check, AlertCircle } from 'lucide-react';
-import type { Pet } from '@/modules/client/types';
+import type { Appointment, Pet } from '@/modules/client/types';
 import type { Veterinarian, Service } from '@/modules/clinic/types';
-import type { User } from '@/shared/types';
-import { formatCurrency } from '@/shared/lib';
+import type { AppointmentStatus, User } from '@/shared/types';
+import { DatePicker, SearchCombobox, type SearchComboboxOption } from '@/shared/components';
+import { formatCurrency, formatDateTimeCompact } from '@/shared/lib';
 import { getDoctorDisplay } from '@/utils/doctorHelpers';
 
 export interface CreateAppointmentFormState {
@@ -16,6 +17,8 @@ export interface CreateAppointmentFormState {
   start: string;
   end: string;
   price: number;
+  status: AppointmentStatus;
+  followUpOf: string;
   clientComment: string;
 }
 
@@ -25,6 +28,7 @@ export interface CreateAppointmentFieldsProps {
   services: Service[];
   pets: Pet[];
   users: User[];
+  appointments: Appointment[];
   availStatus: 'idle' | 'ok' | 'err';
   availMsg: string;
   checkingSlot: boolean;
@@ -43,6 +47,7 @@ export const CreateAppointmentFields: React.FC<CreateAppointmentFieldsProps> = (
   services,
   pets,
   users,
+  appointments,
   availStatus,
   availMsg,
   checkingSlot,
@@ -54,69 +59,120 @@ export const CreateAppointmentFields: React.FC<CreateAppointmentFieldsProps> = (
   onClearAvailStatus,
   onCheckSlot,
 }) => {
+  const selectedPet = pets.find((p) => p.id === form.petId);
+  const selectedSpeciesId = selectedPet?.speciesId;
+
+  const petOptions = useMemo<SearchComboboxOption[]>(
+    () =>
+      pets.map((p) => ({
+        value: p.id,
+        label: p.name,
+        hint: users.find((u) => u.id === p.ownerId)?.fullName || undefined,
+        disabled: p.isArchived,
+        title: p.isArchived ? 'Питомец в архиве' : undefined,
+      })),
+    [pets, users]
+  );
+
+  const serviceOptions = useMemo<SearchComboboxOption[]>(
+    () =>
+      services.map((s) => ({
+        value: s.id,
+        label: s.name,
+        hint: `${formatCurrency(s.basePrice)}, ${s.baseDurationMin} мин`,
+        disabled: !s.isActive,
+        title: !s.isActive ? 'Услуга отключена' : undefined,
+      })),
+    [services]
+  );
+
+  const vetOptions = useMemo<SearchComboboxOption[]>(
+    () =>
+      veterinarians.map((v) => {
+        const d = getDoctorDisplay(v);
+        const noSpecies =
+          Boolean(selectedSpeciesId) &&
+          Array.isArray(v.speciesIds) &&
+          v.speciesIds.length > 0 &&
+          !v.speciesIds.includes(selectedSpeciesId!);
+        const disabled = !v.isActive || noSpecies;
+        return {
+          value: v.id,
+          label: d.fullName,
+          hint: d.specName,
+          disabled,
+          title: !v.isActive
+            ? 'Профиль врача неактивен'
+            : noSpecies
+              ? 'Нет допуска к виду животного'
+              : undefined,
+        };
+      }),
+    [veterinarians, selectedSpeciesId]
+  );
+
+  const followOptions = useMemo<SearchComboboxOption[]>(() => {
+    const eligible = appointments.filter(
+      (a) =>
+        a.petId === form.petId && (a.status === 'CONFIRMED' || a.status === 'COMPLETED')
+    );
+    return [
+      { value: '', label: 'Нет' },
+      ...eligible.map((a) => {
+        const dt = formatDateTimeCompact(a.startAt);
+        const sName = services.find((s) => s.id === a.serviceId)?.name || 'Приём';
+        return { value: a.id, label: `${dt.date} ${dt.time} — ${sName}` };
+      }),
+    ];
+  }, [appointments, form.petId, services]);
+
   return (
     <div className="dialog-body">
       <div className="field">
         <label className="field-label" htmlFor="na-pet">
           Питомец <span className="req">*</span>
         </label>
-        <select
+        <SearchCombobox
           id="na-pet"
-          className="select"
           value={form.petId}
-          onChange={(e) => onChangeForm((p) => ({ ...p, petId: e.target.value }))}
-          required
-        >
-          <option value="">Выберите питомца…</option>
-          {pets.map((p) => (
-            <option key={p.id} value={p.id}>
-              {p.name} ({users.find((u) => u.id === p.ownerId)?.fullName || '—'})
-            </option>
-          ))}
-        </select>
+          options={petOptions}
+          onChange={(petId) =>
+            onChangeForm((p) => ({ ...p, petId, followUpOf: '' }))
+          }
+          placeholder="Выберите питомца…"
+        />
       </div>
 
       <div className="field">
         <label className="field-label" htmlFor="na-svc">
           Услуга <span className="req">*</span>
         </label>
-        <select
+        <SearchCombobox
           id="na-svc"
-          className="select"
           value={form.serviceId}
-          onChange={(e) => onServiceChange(e.target.value)}
-          required
-        >
-          <option value="">Выберите услугу…</option>
-          {services.map((s) => (
-            <option key={s.id} value={s.id}>
-              {s.name} ({formatCurrency(s.basePrice)}, {s.baseDurationMin} мин)
-            </option>
-          ))}
-        </select>
+          options={serviceOptions}
+          onChange={onServiceChange}
+          placeholder="Выберите услугу…"
+        />
       </div>
 
       <div className="field">
         <label className="field-label" htmlFor="na-vet">
           Врач <span className="req">*</span>
         </label>
-        <select
+        <SearchCombobox
           id="na-vet"
-          className="select"
           value={form.veterinarianId}
-          onChange={(e) => {
+          options={vetOptions}
+          onChange={(veterinarianId) => {
             onClearAvailStatus();
-            onChangeForm((p) => ({ ...p, veterinarianId: e.target.value }));
+            onChangeForm((p) => ({ ...p, veterinarianId }));
           }}
-          required
-        >
-          <option value="">Выберите врача…</option>
-          {veterinarians.map((v) => (
-            <option key={v.id} value={v.id}>
-              {getDoctorDisplay(v).fullName}
-            </option>
-          ))}
-        </select>
+          placeholder="Выберите врача…"
+        />
+        <span className="field-hint">
+          Недоступные врачи и услуги отключены — причина во всплывающей подсказке
+        </span>
       </div>
 
       <div className="form-grid" style={{ gridTemplateColumns: 'repeat(4, minmax(0, 1fr))' }}>
@@ -124,16 +180,14 @@ export const CreateAppointmentFields: React.FC<CreateAppointmentFieldsProps> = (
           <label className="field-label" htmlFor="na-date">
             Дата <span className="req">*</span>
           </label>
-          <input
+          <DatePicker
             id="na-date"
-            type="date"
-            className="input"
             value={form.date}
-            onChange={(e) => {
+            clearable={false}
+            onChange={(date) => {
               onClearAvailStatus();
-              onChangeForm((p) => ({ ...p, date: e.target.value }));
+              onChangeForm((p) => ({ ...p, date }));
             }}
-            required
           />
         </div>
         <div className="field">
@@ -183,11 +237,31 @@ export const CreateAppointmentFields: React.FC<CreateAppointmentFieldsProps> = (
         </div>
       </div>
 
-      <div className="row between">
-        <span className="small muted">Проверка доступности слота перед сохранением</span>
+      <div className="row between wrap">
+        <div className="field">
+          <span className="field-label">
+            Статус <span className="req">*</span>
+          </span>
+          <div className="seg">
+            <button
+              type="button"
+              className={`seg-item ${form.status === 'PENDING' ? 'on' : ''}`}
+              onClick={() => onChangeForm((p) => ({ ...p, status: 'PENDING' }))}
+            >
+              Ожидает
+            </button>
+            <button
+              type="button"
+              className={`seg-item ${form.status === 'CONFIRMED' ? 'on' : ''}`}
+              onClick={() => onChangeForm((p) => ({ ...p, status: 'CONFIRMED' }))}
+            >
+              Подтверждена
+            </button>
+          </div>
+        </div>
         <button
           type="button"
-          className="btn btn-outline btn-sm"
+          className="btn btn-outline"
           onClick={onCheckSlot}
           disabled={checkingSlot}
         >
@@ -208,18 +282,32 @@ export const CreateAppointmentFields: React.FC<CreateAppointmentFieldsProps> = (
         </div>
       )}
 
-      <div className="field">
-        <label className="field-label" htmlFor="na-comm">
-          Комментарий клиента
-        </label>
-        <textarea
-          id="na-comm"
-          className="textarea"
-          rows={2}
-          maxLength={1000}
-          value={form.clientComment}
-          onChange={(e) => onChangeForm((p) => ({ ...p, clientComment: e.target.value }))}
-        />
+      <div className="form-grid">
+        <div className="field">
+          <label className="field-label" htmlFor="na-follow">
+            Повторный к записи
+          </label>
+          <SearchCombobox
+            id="na-follow"
+            value={form.followUpOf}
+            options={followOptions}
+            onChange={(followUpOf) => onChangeForm((p) => ({ ...p, followUpOf }))}
+            placeholder="Нет"
+          />
+        </div>
+        <div className="field">
+          <label className="field-label" htmlFor="na-comm">
+            Комментарий клиента
+          </label>
+          <textarea
+            id="na-comm"
+            className="textarea"
+            rows={2}
+            maxLength={1000}
+            value={form.clientComment}
+            onChange={(e) => onChangeForm((p) => ({ ...p, clientComment: e.target.value }))}
+          />
+        </div>
       </div>
 
       {createError && (

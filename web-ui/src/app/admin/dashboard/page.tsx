@@ -1,6 +1,7 @@
 'use client';
 
 import { AlertCircle, RefreshCw } from 'lucide-react';
+import { useShellHeader } from '@/components/layout/AppShell';
 import { useAdminDashboard } from './_hooks/useAdminDashboard';
 import { DatePeriodSelector } from './_components/DatePeriodSelector';
 import { KpiMetricsGrid } from './_components/KpiMetricsGrid';
@@ -14,6 +15,11 @@ import { SpeciesDistributionIsland } from './_components/SpeciesDistributionIsla
  * Главная страница дашборда администратора клиники.
  */
 export default function AdminDashboardPage() {
+  useShellHeader({
+    crumbGroup: 'Аналитика',
+    crumb: 'Дашборд',
+  });
+
   const {
     period,
     stFrom,

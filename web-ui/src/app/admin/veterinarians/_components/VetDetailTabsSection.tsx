@@ -2,10 +2,17 @@
 
 import React, { useState } from 'react';
 import Link from 'next/link';
-import { AlertCircle, Calendar } from 'lucide-react';
+import { AlertCircle, Calendar, CalendarOff } from 'lucide-react';
 import type { WorkSchedule, ScheduleException } from '@/modules/admin/types';
 import type { Species } from '@/modules/clinic/types';
-import { DOW_LABELS, DOW_ORDER, formatApiError, formatIsoDateDisplay } from '@/shared/lib';
+import { SpeciesIcon } from '@/components/ui/SpeciesIcon';
+import {
+  DOW_LABELS,
+  DOW_ORDER,
+  formatApiError,
+  formatIsoDateDisplay,
+  getSpeciesTone,
+} from '@/shared/lib';
 
 export interface VetDetailTabsSectionProps {
   vetId: string;
@@ -72,8 +79,8 @@ export const VetDetailTabsSection: React.FC<VetDetailTabsSectionProps> = ({
     return (
       <div className="col" style={{ gap: 12 }}>
         <span className="small muted">
-          Включите вид, чтобы врач мог принимать таких пациентов. Без допуска запись для данного вида
-          невозможна.
+          Включите вид, чтобы врач мог принимать таких пациентов. Без допуска запись к врачу для
+          этого вида недоступна.
         </span>
 
         {detailsError && (
@@ -94,15 +101,19 @@ export const VetDetailTabsSection: React.FC<VetDetailTabsSectionProps> = ({
           {speciesList.map((sp) => {
             const isPermitted = permittedSpeciesIds.includes(sp.id);
             const busy = togglingSpeciesId === sp.id;
+            const tone = getSpeciesTone(sp.name);
             return (
               <div
                 key={sp.id}
                 className="row between"
                 style={{ padding: '8px 0', borderBottom: '1px solid var(--border)' }}
               >
-                <span className="cell-main">{sp.name}</span>
+                <span className={`sp-chip tone-${tone}`}>
+                  <SpeciesIcon species={tone} size={14} className="ic" />
+                  {sp.name}
+                </span>
                 <div className="row" style={{ gap: 10 }}>
-                  <span className="small muted">{isPermitted ? 'Разрешён' : 'Запрещён'}</span>
+                  <span className="small muted">{isPermitted ? 'допущен' : 'нет допуска'}</span>
                   <button
                     type="button"
                     className={`switch ${isPermitted ? 'on' : ''}`}
@@ -148,7 +159,7 @@ export const VetDetailTabsSection: React.FC<VetDetailTabsSectionProps> = ({
         </div>
 
         <Link
-          href={`/admin/schedules?vetId=${vetId}`}
+          href={`/admin/schedules?tab=schedules&vetId=${vetId}`}
           className="btn btn-outline btn-sm"
           style={{ alignSelf: 'flex-start' }}
         >
@@ -161,24 +172,32 @@ export const VetDetailTabsSection: React.FC<VetDetailTabsSectionProps> = ({
 
   return (
     <div className="col" style={{ gap: 0 }}>
-      {vetExceptions.map((e) => (
-        <div
-          key={e.id}
-          className="row between"
-          style={{ padding: '10px 0', borderBottom: '1px solid var(--border)' }}
-        >
-          <div className="col" style={{ gap: 0 }}>
-            <span className="cell-main tnum">
-              {formatIsoDateDisplay(e.startDate)}
-              {e.endDate && e.endDate !== e.startDate ? ` — ${formatIsoDateDisplay(e.endDate)}` : ''}
+      {vetExceptions.map((e) => {
+        const timePart =
+          e.type === 'CUSTOM_HOURS' && e.startTime && e.endTime
+            ? `${e.startTime.slice(0, 5)}–${e.endTime.slice(0, 5)} · `
+            : '';
+        return (
+          <div
+            key={e.id}
+            className="row between"
+            style={{ padding: '10px 0', borderBottom: '1px solid var(--border)' }}
+          >
+            <div className="col" style={{ gap: 0 }}>
+              <span className="cell-main tnum">
+                {formatIsoDateDisplay(e.startDate)}
+                {e.endDate && e.endDate !== e.startDate
+                  ? ` – ${formatIsoDateDisplay(e.endDate)}`
+                  : ''}
+              </span>
+              <span className="cell-sub">{`${timePart}${e.reason || '—'}`}</span>
+            </div>
+            <span className={`badge ${e.type === 'ABSENCE' ? 'due-over' : 'badge-accent'}`}>
+              {e.type === 'ABSENCE' ? 'Отсутствие' : 'Особые часы'}
             </span>
-            <span className="cell-sub">{e.reason || 'Без причины'}</span>
           </div>
-          <span className={`badge ${e.type === 'ABSENCE' ? 'badge-destructive' : 'badge-accent'}`}>
-            {e.type === 'ABSENCE' ? 'Отсутствие' : 'Свой график'}
-          </span>
-        </div>
-      ))}
+        );
+      })}
 
       {vetExceptions.length === 0 && (
         <span className="small muted" style={{ padding: '12px 0' }}>
@@ -191,7 +210,7 @@ export const VetDetailTabsSection: React.FC<VetDetailTabsSectionProps> = ({
         className="btn btn-outline btn-sm"
         style={{ alignSelf: 'flex-start', marginTop: 12 }}
       >
-        <Calendar size={14} />
+        <CalendarOff size={14} />
         Все исключения врача
       </Link>
     </div>

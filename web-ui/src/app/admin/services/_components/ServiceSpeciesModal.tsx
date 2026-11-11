@@ -1,8 +1,9 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { AlertCircle, X } from 'lucide-react';
 import type { Service, Species, ServiceSpecies } from '@/modules/clinic/types';
+import { FilterDropdown, type FilterDropdownOption } from '@/shared/components';
 import { formatApiError, formatCurrency } from '@/shared/lib';
 
 export interface ServiceSpeciesModalProps {
@@ -35,8 +36,17 @@ export const ServiceSpeciesModal: React.FC<ServiceSpeciesModalProps> = ({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const availableSpecies = speciesList.filter(
-    (sp) => !attachedSpeciesIds.includes(sp.id) || sp.id === existingOverride?.speciesId
+  const availableSpecies = useMemo(
+    () =>
+      speciesList.filter(
+        (sp) => !attachedSpeciesIds.includes(sp.id) || sp.id === existingOverride?.speciesId
+      ),
+    [speciesList, attachedSpeciesIds, existingOverride?.speciesId]
+  );
+
+  const speciesOptions = useMemo<FilterDropdownOption[]>(
+    () => availableSpecies.map((sp) => ({ value: sp.id, label: sp.name })),
+    [availableSpecies]
   );
 
   useEffect(() => {
@@ -107,7 +117,10 @@ export const ServiceSpeciesModal: React.FC<ServiceSpeciesModalProps> = ({
       onClick={() => !saving && onClose()}
     >
       <div className="dialog dialog-sm" onClick={(e) => e.stopPropagation()}>
-        <div className="dialog-head" style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+        <div
+          className="dialog-head"
+          style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}
+        >
           <div className="col" style={{ gap: 4 }}>
             <span id="ssm-modal-title" className="dialog-title">
               {isEditing
@@ -128,27 +141,24 @@ export const ServiceSpeciesModal: React.FC<ServiceSpeciesModalProps> = ({
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', minHeight: 0, flex: 1 }}>
+        <form
+          onSubmit={handleSubmit}
+          style={{ display: 'flex', flexDirection: 'column', minHeight: 0, flex: 1 }}
+        >
           <div className="dialog-body">
             {!isEditing ? (
               <div className="field">
                 <label className="field-label" htmlFor="ssm-species">
                   Вид животного <span className="req">*</span>
                 </label>
-                <select
+                <FilterDropdown
                   id="ssm-species"
-                  className="select"
                   value={speciesId}
-                  onChange={(e) => setSpeciesId(e.target.value)}
-                  required
-                >
-                  <option value="">Выберите вид…</option>
-                  {availableSpecies.map((sp) => (
-                    <option key={sp.id} value={sp.id}>
-                      {sp.name}
-                    </option>
-                  ))}
-                </select>
+                  options={speciesOptions}
+                  onChange={setSpeciesId}
+                  placeholder="Выберите вид…"
+                  ariaLabel="Вид животного"
+                />
               </div>
             ) : (
               <div className="field">
@@ -175,7 +185,7 @@ export const ServiceSpeciesModal: React.FC<ServiceSpeciesModalProps> = ({
                   min="1"
                   max="1440"
                   className="input"
-                  placeholder={`Базовая: ${service.baseDurationMin} мин`}
+                  placeholder={`база ${service.baseDurationMin}`}
                   value={durationMin}
                   onChange={(e) => {
                     const parsed = Number.parseInt(e.target.value, 10);
@@ -192,7 +202,7 @@ export const ServiceSpeciesModal: React.FC<ServiceSpeciesModalProps> = ({
                   type="number"
                   min="0"
                   className="input"
-                  placeholder={`Базовая: ${formatCurrency(service.basePrice)}`}
+                  placeholder={`база ${service.basePrice}`}
                   value={price}
                   onChange={(e) => {
                     const parsed = Number.parseInt(e.target.value, 10);

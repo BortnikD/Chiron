@@ -25,6 +25,7 @@ export interface AdminCreateAppointmentModalProps {
   services: Service[];
   pets: Pet[];
   users: User[];
+  appointments: Appointment[];
 }
 
 function calculateEndTime(startTime: string, durationMin: number): string {
@@ -44,6 +45,7 @@ export const AdminCreateAppointmentModal: React.FC<AdminCreateAppointmentModalPr
   services,
   pets,
   users,
+  appointments,
 }) => {
   const [form, setForm] = useState<CreateAppointmentFormState>({
     veterinarianId: '',
@@ -53,6 +55,8 @@ export const AdminCreateAppointmentModal: React.FC<AdminCreateAppointmentModalPr
     start: '10:00',
     end: '10:30',
     price: 1500,
+    status: 'CONFIRMED',
+    followUpOf: '',
     clientComment: '',
   });
   const [endEdited, setEndEdited] = useState(false);
@@ -68,10 +72,12 @@ export const AdminCreateAppointmentModal: React.FC<AdminCreateAppointmentModalPr
     setAvailStatus('idle');
     setAvailMsg('');
     setEndEdited(false);
-    const firstSvc = services[0];
+    const firstSvc = services.find((s) => s.isActive) || services[0];
+    const firstPet = pets.find((p) => !p.isArchived) || pets[0];
+    const firstVet = veterinarians.find((v) => v.isActive) || veterinarians[0];
     setForm({
-      veterinarianId: veterinarians[0]?.id || '',
-      petId: pets[0]?.id || '',
+      veterinarianId: firstVet?.id || '',
+      petId: firstPet?.id || '',
       serviceId: firstSvc?.id || '',
       date: getMoscowTodayIso(),
       start: '10:00',
@@ -79,6 +85,8 @@ export const AdminCreateAppointmentModal: React.FC<AdminCreateAppointmentModalPr
         ? calculateEndTime('10:00', firstSvc.baseDurationMin)
         : '10:30',
       price: firstSvc?.basePrice || 1500,
+      status: 'CONFIRMED',
+      followUpOf: '',
       clientComment: '',
     });
   }, [isOpen, veterinarians, services, pets]);
@@ -187,6 +195,8 @@ export const AdminCreateAppointmentModal: React.FC<AdminCreateAppointmentModalPr
         startAt: range.startAt,
         endAt: range.endAt,
         priceSnapshot: form.price,
+        status: form.status,
+        followUpOf: form.followUpOf || null,
         clientComment: form.clientComment.trim() || null,
       });
       onClose();
@@ -238,6 +248,7 @@ export const AdminCreateAppointmentModal: React.FC<AdminCreateAppointmentModalPr
             services={services}
             pets={pets}
             users={users}
+            appointments={appointments}
             availStatus={availStatus}
             availMsg={availMsg}
             checkingSlot={checkingSlot}

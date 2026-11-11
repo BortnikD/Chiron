@@ -1,154 +1,214 @@
 'use client';
 
-import React from 'react';
-import { Search, Plus } from 'lucide-react';
-import type { Veterinarian, Species } from '@/modules/clinic/types';
-import { APPOINTMENT_STATUS_LIST, APPOINTMENT_STATUS_META } from '@/shared/lib';
+import React, { useMemo } from 'react';
+import { CalendarPlus } from 'lucide-react';
+import type { Pet } from '@/modules/client/types';
+import type { Veterinarian, Service } from '@/modules/clinic/types';
+import type { AppointmentStatus, User } from '@/shared/types';
+import { DatePicker, SearchCombobox, type SearchComboboxOption } from '@/shared/components';
+import { APPOINTMENT_STATUS_LIST, APPOINTMENT_STATUS_META, formatCurrency } from '@/shared/lib';
 import { getDoctorDisplay } from '@/utils/doctorHelpers';
 
 export interface AdminAppointmentsFiltersProps {
-  statusFilter: string;
-  onStatusFilterChange: (value: string) => void;
   vetFilter: string;
   onVetFilterChange: (value: string) => void;
-  speciesFilter: string;
-  onSpeciesFilterChange: (value: string) => void;
+  petFilter: string;
+  onPetFilterChange: (value: string) => void;
+  ownerFilter: string;
+  onOwnerFilterChange: (value: string) => void;
+  serviceFilter: string;
+  onServiceFilterChange: (value: string) => void;
+  statusFilters: AppointmentStatus[];
+  onToggleStatusFilter: (status: AppointmentStatus) => void;
   dateFrom: string;
   onDateFromChange: (value: string) => void;
   dateTo: string;
   onDateToChange: (value: string) => void;
-  search: string;
-  onSearchChange: (value: string) => void;
   veterinarians: Veterinarian[];
-  speciesList: Species[];
+  pets: Pet[];
+  users: User[];
+  services: Service[];
   onCreateClick: () => void;
 }
 
 /**
- * Панель фильтрации записей на приём: статус, врач, вид животного, диапазон дат и текстовый поиск.
+ * Панель фильтрации записей на приём: 4 комбобокса (врач, питомец, владелец, услуга), даты и статусы.
  */
 export const AdminAppointmentsFilters: React.FC<AdminAppointmentsFiltersProps> = ({
-  statusFilter,
-  onStatusFilterChange,
   vetFilter,
   onVetFilterChange,
-  speciesFilter,
-  onSpeciesFilterChange,
+  petFilter,
+  onPetFilterChange,
+  ownerFilter,
+  onOwnerFilterChange,
+  serviceFilter,
+  onServiceFilterChange,
+  statusFilters,
+  onToggleStatusFilter,
   dateFrom,
   onDateFromChange,
   dateTo,
   onDateToChange,
-  search,
-  onSearchChange,
   veterinarians,
-  speciesList,
+  pets,
+  users,
+  services,
   onCreateClick,
 }) => {
+  const vetOptions = useMemo<SearchComboboxOption[]>(
+    () => [
+      { value: 'ALL', label: 'Все врачи' },
+      ...veterinarians.map((v) => {
+        const d = getDoctorDisplay(v);
+        return { value: v.id, label: d.fullName, hint: d.specName };
+      }),
+    ],
+    [veterinarians]
+  );
+
+  const petOptions = useMemo<SearchComboboxOption[]>(
+    () => [
+      { value: 'ALL', label: 'Все питомцы' },
+      ...pets.map((p) => ({
+        value: p.id,
+        label: p.name,
+        hint: users.find((u) => u.id === p.ownerId)?.fullName || undefined,
+      })),
+    ],
+    [pets, users]
+  );
+
+  const ownerOptions = useMemo<SearchComboboxOption[]>(
+    () => [
+      { value: 'ALL', label: 'Все владельцы' },
+      ...users
+        .filter((u) => u.role === 'CLIENT')
+        .map((u) => ({
+          value: u.id,
+          label: u.fullName || u.email,
+          hint: u.phone || u.email,
+        })),
+    ],
+    [users]
+  );
+
+  const serviceOptions = useMemo<SearchComboboxOption[]>(
+    () => [
+      { value: 'ALL', label: 'Все услуги' },
+      ...services.map((s) => ({
+        value: s.id,
+        label: s.name,
+        hint: formatCurrency(s.basePrice),
+      })),
+    ],
+    [services]
+  );
+
   return (
     <section className="island filters" aria-label="Фильтры записей">
-      <div className="field">
-        <span className="field-label">Статус</span>
-        <div className="dd">
-          <select
-            className="select dd-btn"
-            value={statusFilter}
-            onChange={(e) => onStatusFilterChange(e.target.value)}
-          >
-            <option value="ALL">Все статусы</option>
-            {APPOINTMENT_STATUS_LIST.map((st) => (
-              <option key={st} value={st}>
-                {APPOINTMENT_STATUS_META[st].short}
-              </option>
-            ))}
-          </select>
-        </div>
+      <div className="field" style={{ minWidth: 180 }}>
+        <label className="field-label" htmlFor="aa-vet">
+          Врач
+        </label>
+        <SearchCombobox
+          id="aa-vet"
+          value={vetFilter}
+          options={vetOptions}
+          onChange={onVetFilterChange}
+          placeholder="Все врачи"
+        />
       </div>
 
-      <div className="field">
-        <span className="field-label">Врач</span>
-        <div className="dd">
-          <select
-            className="select dd-btn"
-            value={vetFilter}
-            onChange={(e) => onVetFilterChange(e.target.value)}
-          >
-            <option value="ALL">Все врачи</option>
-            {veterinarians.map((v) => (
-              <option key={v.id} value={v.id}>
-                {getDoctorDisplay(v).fullName}
-              </option>
-            ))}
-          </select>
-        </div>
+      <div className="field" style={{ minWidth: 170 }}>
+        <label className="field-label" htmlFor="aa-pet">
+          Питомец
+        </label>
+        <SearchCombobox
+          id="aa-pet"
+          value={petFilter}
+          options={petOptions}
+          onChange={onPetFilterChange}
+          placeholder="Все питомцы"
+        />
       </div>
 
-      <div className="field">
-        <span className="field-label">Вид животного</span>
-        <div className="dd">
-          <select
-            className="select dd-btn"
-            value={speciesFilter}
-            onChange={(e) => onSpeciesFilterChange(e.target.value)}
-          >
-            <option value="ALL">Все виды</option>
-            {speciesList.map((s) => (
-              <option key={s.id} value={s.id}>
-                {s.name}
-              </option>
-            ))}
-          </select>
-        </div>
+      <div className="field" style={{ minWidth: 185 }}>
+        <label className="field-label" htmlFor="aa-owner">
+          Владелец
+        </label>
+        <SearchCombobox
+          id="aa-owner"
+          value={ownerFilter}
+          options={ownerOptions}
+          onChange={onOwnerFilterChange}
+          placeholder="Все владельцы"
+        />
       </div>
 
-      <div className="field" style={{ width: 140 }}>
-        <label className="field-label" htmlFor="filter-from">
+      <div className="field" style={{ minWidth: 185 }}>
+        <label className="field-label" htmlFor="aa-service">
+          Услуга
+        </label>
+        <SearchCombobox
+          id="aa-service"
+          value={serviceFilter}
+          options={serviceOptions}
+          onChange={onServiceFilterChange}
+          placeholder="Все услуги"
+        />
+      </div>
+
+      <div className="field" style={{ width: 145 }}>
+        <label className="field-label" htmlFor="aa-from">
           С
         </label>
-        <input
-          id="filter-from"
-          type="date"
-          className="input"
+        <DatePicker
+          id="aa-from"
           value={dateFrom}
-          onChange={(e) => onDateFromChange(e.target.value)}
+          max={dateTo || undefined}
+          onChange={onDateFromChange}
+          ariaLabel="Фильтр даты с"
         />
       </div>
 
-      <div className="field" style={{ width: 140 }}>
-        <label className="field-label" htmlFor="filter-to">
+      <div className="field" style={{ width: 145 }}>
+        <label className="field-label" htmlFor="aa-to">
           По
         </label>
-        <input
-          id="filter-to"
-          type="date"
-          className="input"
+        <DatePicker
+          id="aa-to"
           value={dateTo}
-          onChange={(e) => onDateToChange(e.target.value)}
+          min={dateFrom || undefined}
+          onChange={onDateToChange}
+          ariaLabel="Фильтр даты по"
         />
       </div>
 
-      <div className="field" style={{ width: 180 }}>
-        <span className="field-label">Поиск</span>
-        <div className="input-icon">
-          <Search size={14} className="ic" />
-          <input
-            type="text"
-            className="input"
-            placeholder="Питомец, услуга…"
-            value={search}
-            onChange={(e) => onSearchChange(e.target.value)}
-          />
+      <div className="field" style={{ width: 'auto' }}>
+        <span className="field-label">Статус</span>
+        <div className="chips">
+          {APPOINTMENT_STATUS_LIST.map((st) => {
+            const on = statusFilters.includes(st);
+            return (
+              <button
+                key={st}
+                type="button"
+                className={`chip ${on ? 'on' : ''}`}
+                aria-pressed={on}
+                onClick={() => onToggleStatusFilter(st)}
+              >
+                {APPOINTMENT_STATUS_META[st].short}
+              </button>
+            );
+          })}
         </div>
       </div>
 
       <div className="spacer" />
 
-      <button
-        type="button"
-        className="btn btn-primary"
-        onClick={onCreateClick}
-      >
-        <Plus size={16} />
-        Новая запись
+      <button type="button" className="btn btn-primary" onClick={onCreateClick}>
+        <CalendarPlus className="ic" size={16} />
+        Создать запись
       </button>
     </section>
   );

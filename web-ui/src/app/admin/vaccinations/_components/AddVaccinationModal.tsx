@@ -1,8 +1,11 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { AlertCircle, X } from 'lucide-react';
 import type { Vaccination, Pet } from '@/modules/client/types';
+import type { Species } from '@/modules/clinic/types';
+import type { User } from '@/shared/types';
+import { DatePicker, SearchCombobox, type SearchComboboxOption } from '@/shared/components';
 import { formatApiError } from '@/shared/lib';
 import type { VaccinationSaveInput } from '../_hooks/useAdminVaccinations';
 import type { VaccinationFormData } from './types';
@@ -12,6 +15,8 @@ export interface AddVaccinationModalProps {
   isOpen: boolean;
   vaccination?: Vaccination | null;
   pets: Pet[];
+  speciesList: Species[];
+  users: User[];
   onClose: () => void;
   onSave: (data: VaccinationSaveInput, editingId?: string) => Promise<void>;
 }
@@ -23,6 +28,8 @@ export const AddVaccinationModal: React.FC<AddVaccinationModalProps> = ({
   isOpen,
   vaccination,
   pets,
+  speciesList,
+  users,
   onClose,
   onSave,
 }) => {
@@ -33,6 +40,21 @@ export const AddVaccinationModal: React.FC<AddVaccinationModalProps> = ({
   );
   const [saving, setSaving] = useState(false);
   const [modalError, setModalError] = useState<string | null>(null);
+
+  const petOptions = useMemo<SearchComboboxOption[]>(
+    () =>
+      pets.map((p) => {
+        const spName =
+          p.species?.name ||
+          p.speciesName ||
+          speciesList.find((s) => s.id === p.speciesId)?.name ||
+          '';
+        const ownerName = users.find((u) => u.id === p.ownerId)?.fullName || '';
+        const hint = [spName, ownerName].filter(Boolean).join(' · ');
+        return { value: p.id, label: p.name, hint: hint || undefined };
+      }),
+    [pets, speciesList, users]
+  );
 
   useEffect(() => {
     if (!isOpen) return;
@@ -112,10 +134,10 @@ export const AddVaccinationModal: React.FC<AddVaccinationModalProps> = ({
         >
           <div className="col" style={{ gap: 4 }}>
             <span id="add-vax-title" className="dialog-title">
-              {isEditing ? 'Редактирование вакцинации' : 'Новая запись о вакцинации'}
+              {isEditing ? 'Редактирование прививки' : 'Новая прививка'}
             </span>
             <span className="dialog-desc">
-              Внесение данных о введённом биопрепарате в электронный паспорт питомца
+              Внесение данных о вакцинации в электронный паспорт питомца
             </span>
           </div>
           <button
@@ -138,30 +160,24 @@ export const AddVaccinationModal: React.FC<AddVaccinationModalProps> = ({
               <label className="field-label" htmlFor="m-pet">
                 Питомец <span className="req">*</span>
               </label>
-              <select
+              <SearchCombobox
                 id="m-pet"
-                className="select"
                 value={form.petId}
-                onChange={(e) => setForm({ ...form, petId: e.target.value })}
+                options={petOptions}
+                onChange={(petId) => setForm({ ...form, petId })}
+                placeholder="Выберите питомца…"
                 disabled={isEditing}
-                required
-              >
-                <option value="">Выберите питомца…</option>
-                {pets.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.name} ({p.species?.name || 'Питомец'})
-                  </option>
-                ))}
-              </select>
+              />
             </div>
 
             <div className="field">
               <label className="field-label" htmlFor="m-name">
-                Название вакцины <span className="req">*</span>
+                Вакцина <span className="req">*</span>
               </label>
               <input
                 id="m-name"
                 className="input"
+                maxLength={150}
                 placeholder="Например, Нобивак DHPPi + L"
                 value={form.name}
                 onChange={(e) => setForm({ ...form, name: e.target.value })}
@@ -169,18 +185,16 @@ export const AddVaccinationModal: React.FC<AddVaccinationModalProps> = ({
               />
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+            <div className="form-grid">
               <div className="field">
                 <label className="field-label" htmlFor="m-date">
                   Дата введения <span className="req">*</span>
                 </label>
-                <input
+                <DatePicker
                   id="m-date"
-                  type="date"
-                  className="input"
                   value={form.administeredOn}
-                  onChange={(e) => setForm({ ...form, administeredOn: e.target.value })}
-                  required
+                  clearable={false}
+                  onChange={(administeredOn) => setForm({ ...form, administeredOn })}
                 />
               </div>
 
@@ -188,12 +202,11 @@ export const AddVaccinationModal: React.FC<AddVaccinationModalProps> = ({
                 <label className="field-label" htmlFor="m-next">
                   Следующая доза
                 </label>
-                <input
+                <DatePicker
                   id="m-next"
-                  type="date"
-                  className="input"
                   value={form.nextDueOn}
-                  onChange={(e) => setForm({ ...form, nextDueOn: e.target.value })}
+                  min={form.administeredOn || undefined}
+                  onChange={(nextDueOn) => setForm({ ...form, nextDueOn })}
                 />
               </div>
             </div>
@@ -219,8 +232,8 @@ export const AddVaccinationModal: React.FC<AddVaccinationModalProps> = ({
               {saving
                 ? 'Сохранение…'
                 : isEditing
-                  ? 'Сохранить изменения'
-                  : 'Добавить вакцинацию'}
+                  ? 'Сохранить'
+                  : 'Добавить прививку'}
             </button>
           </div>
         </form>

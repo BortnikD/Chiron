@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { AlertCircle, Check, Trash2, Plus, Edit2 } from 'lucide-react';
 import type { Service, Species, ServiceSpecies } from '@/modules/clinic/types';
+import { SearchCombobox, type SearchComboboxOption } from '@/shared/components';
 import { formatApiError, formatCurrency, toIdNameMap } from '@/shared/lib';
 
 export interface ServiceSpeciesOverridesSectionProps {
@@ -40,8 +41,12 @@ export const ServiceSpeciesOverridesSection: React.FC<ServiceSpeciesOverridesSec
     setSpeciesSuccess(null);
   }, [service.id]);
 
-  const attachedSpeciesIds = new Set(serviceLinks.map((l) => l.speciesId));
-  const unattachedSpecies = speciesList.filter((sp) => !attachedSpeciesIds.has(sp.id));
+  const unattachedOptions = useMemo<SearchComboboxOption[]>(() => {
+    const attachedIds = new Set(serviceLinks.map((l) => l.speciesId));
+    return speciesList
+      .filter((sp) => !attachedIds.has(sp.id))
+      .map((sp) => ({ value: sp.id, label: sp.name }));
+  }, [speciesList, serviceLinks]);
 
   const handleAttach = async () => {
     if (!attachSpeciesId) return;
@@ -108,7 +113,7 @@ export const ServiceSpeciesOverridesSection: React.FC<ServiceSpeciesOverridesSec
               min="1"
               max="1440"
               aria-label={`Длительность для вида ${speciesMap[l.speciesId] || ''}`}
-              placeholder={`${service.baseDurationMin} мин`}
+              placeholder={`база ${service.baseDurationMin}`}
               value={l.durationMin != null ? l.durationMin : ''}
               onChange={(e) => {
                 const parsed = Number.parseInt(e.target.value, 10);
@@ -123,7 +128,7 @@ export const ServiceSpeciesOverridesSection: React.FC<ServiceSpeciesOverridesSec
               type="number"
               min="0"
               aria-label={`Цена для вида ${speciesMap[l.speciesId] || ''}`}
-              placeholder={formatCurrency(service.basePrice)}
+              placeholder={`база ${service.basePrice}`}
               value={l.price != null ? l.price : ''}
               onChange={(e) => {
                 const parsed = Number.parseInt(e.target.value, 10);
@@ -159,22 +164,16 @@ export const ServiceSpeciesOverridesSection: React.FC<ServiceSpeciesOverridesSec
         ))}
       </div>
 
-      {unattachedSpecies.length > 0 && (
+      {unattachedOptions.length > 0 && (
         <div className="row wrap" style={{ gap: 6, alignItems: 'center' }}>
-          <div style={{ width: 180 }}>
-            <select
-              className="select"
-              aria-label="Выбрать вид для привязки"
+          <div style={{ width: 200 }}>
+            <SearchCombobox
               value={attachSpeciesId}
-              onChange={(e) => setAttachSpeciesId(e.target.value)}
-            >
-              <option value="">Привязать вид…</option>
-              {unattachedSpecies.map((sp) => (
-                <option key={sp.id} value={sp.id}>
-                  {sp.name}
-                </option>
-              ))}
-            </select>
+              options={unattachedOptions}
+              onChange={setAttachSpeciesId}
+              placeholder="Привязать вид…"
+              ariaLabel="Привязать вид"
+            />
           </div>
           <button
             type="button"
@@ -192,14 +191,14 @@ export const ServiceSpeciesOverridesSection: React.FC<ServiceSpeciesOverridesSec
               onClick={() => onOpenSpeciesModal(null)}
             >
               <Plus size={14} />
-              В модалке
+              С параметрами
             </button>
           )}
         </div>
       )}
 
       {serviceLinks.length === 0 && (
-        <div className="alert alert-info">
+        <div className="alert">
           <AlertCircle size={16} className="ic" />
           <div>Услуга не привязана ни к одному виду — записаться на неё нельзя</div>
         </div>

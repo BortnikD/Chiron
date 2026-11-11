@@ -1,23 +1,40 @@
 'use client';
 
 import React, { useState } from 'react';
-import { PawPrint, Edit2, Archive, Trash2, Syringe, X, AlertCircle } from 'lucide-react';
+import Link from 'next/link';
+import { Edit2, Archive, Trash2, Syringe, X, AlertCircle } from 'lucide-react';
+import { SpeciesIcon } from '@/components/ui/SpeciesIcon';
 import {
   APPOINTMENT_STATUS_META,
   calculateAgeRu,
   formatDateTimeCompact,
   formatIsoDateDisplay,
+  getMoscowTodayIso,
+  getSpeciesTone,
 } from '@/shared/lib';
+import { getDoctorDisplay } from '@/utils/doctorHelpers';
 import type { PetDetailIslandProps, PetDetailTab } from './types';
+
+function getVaccinationBadgeClass(nextDueOn?: string | null): string {
+  if (!nextDueOn) return 'due-none';
+  const today = getMoscowTodayIso();
+  const iso = nextDueOn.slice(0, 10);
+  if (iso < today) return 'due-over';
+  const soonIso = getMoscowTodayIso(30);
+  if (iso <= soonIso) return 'due-soon';
+  return 'badge-accent';
+}
 
 /**
  * Правая панель детального просмотра питомца:
- * вкладки «Обзор», «Приёмы», «Вакцинация», карточки истории, быстрые действия.
+ * вкладки «Обзор», «Записи», «Прививки», карточки истории, быстрые действия.
  */
 export const PetDetailIsland: React.FC<PetDetailIslandProps> = ({
   pet,
   speciesList,
   users,
+  services,
+  veterinarians,
   appointments,
   vaccinations,
   loadingDetails,
@@ -31,15 +48,17 @@ export const PetDetailIsland: React.FC<PetDetailIslandProps> = ({
   const [activeTab, setActiveTab] = useState<PetDetailTab>('overview');
 
   const speciesName = speciesList.find((s) => s.id === pet.speciesId)?.name || '—';
-  const ownerName = users.find((u) => u.id === pet.ownerId)?.fullName || '—';
+  const owner = users.find((u) => u.id === pet.ownerId);
+  const ownerName = owner?.fullName || owner?.email || '—';
   const weightText = pet.weightKg != null ? `${String(pet.weightKg).replace('.', ',')} кг` : '—';
+  const tone = getSpeciesTone(pet.species?.name || speciesName || pet.speciesId, speciesList);
 
   return (
     <section className="island detail-island" aria-label="Питомец">
       <div className="island-head">
         <div className="row">
           <span className="pet-ava">
-            <PawPrint size={20} />
+            <SpeciesIcon species={tone} size={20} />
           </span>
           <div className="col" style={{ gap: 0 }}>
             <span className="h2">{pet.name}</span>
@@ -60,7 +79,6 @@ export const PetDetailIsland: React.FC<PetDetailIslandProps> = ({
         </button>
       </div>
 
-      {/* Actions Row */}
       <div className="row wrap" style={{ gap: 6, padding: '0 16px 12px' }}>
         <button type="button" className="btn btn-outline btn-sm" onClick={onEdit}>
           <Edit2 size={14} />
@@ -80,7 +98,6 @@ export const PetDetailIsland: React.FC<PetDetailIslandProps> = ({
         </button>
       </div>
 
-      {/* Tabs Header */}
       <div className="tabs-line">
         <button
           type="button"
@@ -118,12 +135,16 @@ export const PetDetailIsland: React.FC<PetDetailIslandProps> = ({
             <span className="small muted">Загружаем историю…</span>
           </div>
         )}
-        {/* Tab 1: Overview */}
+
         {activeTab === 'overview' && (
           <div className="col" style={{ gap: 14 }}>
             <dl className="kv" style={{ margin: 0 }}>
               <dt>Владелец</dt>
-              <dd>{ownerName}</dd>
+              <dd>
+                <Link href={`/admin/users?sel=${pet.ownerId}`} className="linkish">
+                  {ownerName}
+                </Link>
+              </dd>
               <dt>Вид</dt>
               <dd>{speciesName}</dd>
               <dt>Пол</dt>
@@ -142,28 +163,37 @@ export const PetDetailIsland: React.FC<PetDetailIslandProps> = ({
           </div>
         )}
 
-        {/* Tab 2: Appointments */}
         {activeTab === 'appointments' && (
           <div className="col" style={{ gap: 4, margin: '0 -10px' }}>
             {appointments.map((a) => {
               const dt = formatDateTimeCompact(a.startAt);
               const [day, month] = dt.date.split(' ');
               const stMeta = APPOINTMENT_STATUS_META[a.status];
+              const svcName =
+                a.service?.name ||
+                a.serviceName ||
+                services.find((s) => s.id === a.serviceId)?.name ||
+                'Услуга клиники';
+              const vet = veterinarians.find((v) => v.id === a.veterinarianId);
+              const vetName = vet ? getDoctorDisplay(vet).name : a.veterinarianName;
 
               return (
-                <div key={a.id} className="lrow">
+                <Link key={a.id} href={`/admin/appointments?sel=${a.id}`} className="lrow">
                   <span className="datebox">
                     <b>{day}</b>
                     <span>{month}</span>
                   </span>
                   <span className="col" style={{ gap: 1 }}>
-                    <span className="cell-main">{a.service?.name || a.serviceName || 'Услуга'}</span>
-                    <span className="cell-sub">{dt.time}</span>
+                    <span className="cell-main">{svcName}</span>
+                    <span className="cell-sub">
+                      {dt.time}
+                      {vetName ? ` · ${vetName}` : ''}
+                    </span>
                   </span>
                   <span className={`badge st ${stMeta?.cls || `badge-${a.status}`}`}>
                     {stMeta?.short || a.status}
                   </span>
-                </div>
+                </Link>
               );
             })}
 
@@ -175,7 +205,6 @@ export const PetDetailIsland: React.FC<PetDetailIslandProps> = ({
           </div>
         )}
 
-        {/* Tab 3: Vaccinations */}
         {activeTab === 'vaccinations' && (
           <div className="col" style={{ gap: 6 }}>
             <button
@@ -190,7 +219,7 @@ export const PetDetailIsland: React.FC<PetDetailIslandProps> = ({
 
             <div className="col" style={{ gap: 4, margin: '0 -10px' }}>
               {vaccinations.map((v) => (
-                <div key={v.id} className="lrow">
+                <Link key={v.id} href={`/admin/vaccinations?sel=${v.id}`} className="lrow">
                   <span
                     className="pet-ava"
                     style={{ width: 36, height: 36, borderRadius: 10 }}
@@ -204,11 +233,11 @@ export const PetDetailIsland: React.FC<PetDetailIslandProps> = ({
                     </span>
                   </span>
                   {v.nextDueOn && (
-                    <span className="badge badge-accent">
+                    <span className={`badge ${getVaccinationBadgeClass(v.nextDueOn)}`}>
                       до {formatIsoDateDisplay(v.nextDueOn.slice(0, 10))}
                     </span>
                   )}
-                </div>
+                </Link>
               ))}
 
               {vaccinations.length === 0 && (

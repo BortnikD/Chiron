@@ -1,9 +1,14 @@
 'use client';
 
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { adminApi } from '@/modules/admin/api';
+import { clinicApi } from '@/modules/clinic/api';
 import type { Vaccination, Pet } from '@/modules/client/types';
-import { formatApiError } from '@/shared/lib';
+import type { Species } from '@/modules/clinic/types';
+import type { User } from '@/shared/types';
+import { useToast } from '@/shared/components';
+import { fetchAllPages, formatApiError } from '@/shared/lib';
 import type { VaccinationStatusTone } from '../_components/types';
 import { filterVaccinations, countVaccinationTones } from '../_components/utils';
 
@@ -15,14 +20,22 @@ export interface VaccinationSaveInput {
 }
 
 export function useAdminVaccinations() {
+  const searchParams = useSearchParams();
+  const { toast } = useToast();
+  const initialSel = searchParams.get('sel');
+
   const [vaccinations, setVaccinations] = useState<Vaccination[]>([]);
   const [pets, setPets] = useState<Pet[]>([]);
+  const [speciesList, setSpeciesList] = useState<Species[]>([]);
+  const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<VaccinationStatusTone>('all');
   const [petFilter, setPetFilter] = useState<string>('all');
+  const [nextDueFrom, setNextDueFrom] = useState<string>('');
+  const [nextDueTo, setNextDueTo] = useState<string>('');
 
   const [selectedVaccination, setSelectedVaccination] = useState<Vaccination | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -33,31 +46,62 @@ export function useAdminVaccinations() {
   const [deleteError, setDeleteError] = useState<string | null>(null);
 
   const loadReqIdRef = useRef(0);
+  const appliedSelRef = useRef<string | null>(null);
 
   const loadData = useCallback(async () => {
     const reqId = ++loadReqIdRef.current;
     setLoading(true);
     setError(null);
     try {
-      const [vaxRes, petsRes] = await Promise.all([
-        adminApi.getVaccinations(undefined, 0, 100),
-        adminApi.getPets(0, 100),
+      const [vaxItems, petItems, speciesRes, userItems] = await Promise.all([
+        fetchAllPages(
+          (p, s) =>
+            adminApi.getVaccinations(
+              {
+                petId: petFilter !== 'all' ? petFilter : undefined,
+                nextDueFrom: nextDueFrom || undefined,
+                nextDueTo: nextDueTo || undefined,
+              },
+              p,
+              s
+            ),
+          { pageSize: 100, maxPages: 50, concurrency: 4 }
+        ),
+        fetchAllPages((p, s) => adminApi.getPets(p, s), { pageSize: 100, maxPages: 50, concurrency: 4 }),
+        clinicApi.getSpecies(),
+        fetchAllPages((p, s) => adminApi.getUsers(p, s), { pageSize: 100, maxPages: 50, concurrency: 4 }),
       ]);
       if (loadReqIdRef.current !== reqId) return;
-      const vaxItems: Vaccination[] = Array.isArray(vaxRes) ? vaxRes : vaxRes?.items || [];
-      const petItems: Pet[] = Array.isArray(petsRes) ? petsRes : petsRes?.items || [];
       setVaccinations(vaxItems);
       setPets(petItems);
-      setSelectedVaccination((prev) =>
-        prev ? vaxItems.find((v) => v.id === prev.id) ?? null : null
-      );
+      setSpeciesList(Array.isArray(speciesRes) ? speciesRes : []);
+      setUsers(userItems);
+
+      if (initialSel && appliedSelRef.current !== initialSel) {
+        appliedSelRef.current = initialSel;
+        const found = vaxItems.find((v) => v.id === initialSel);
+        if (found) {
+          setSelectedVaccination(found);
+        } else {
+          try {
+            const byId = await adminApi.getVaccinationById(initialSel);
+            if (loadReqIdRef.current === reqId && byId) setSelectedVaccination(byId);
+          } catch {
+            // ignore missing target
+          }
+        }
+      } else {
+        setSelectedVaccination((prev) =>
+          prev ? vaxItems.find((v) => v.id === prev.id) ?? prev : null
+        );
+      }
     } catch (err: unknown) {
       if (loadReqIdRef.current !== reqId) return;
       setError(formatApiError(err, 'Не удалось загрузить реестр вакцинаций'));
     } finally {
       if (loadReqIdRef.current === reqId) setLoading(false);
     }
-  }, []);
+  }, [petFilter, nextDueFrom, nextDueTo, initialSel]);
 
   useEffect(() => {
     void loadData();
@@ -73,8 +117,17 @@ export function useAdminVaccinations() {
   }, [pets]);
 
   const filteredVaccinations = useMemo(
-    () => filterVaccinations(vaccinations, petMap, search, statusFilter, petFilter),
-    [vaccinations, petMap, search, statusFilter, petFilter]
+    () =>
+      filterVaccinations(
+        vaccinations,
+        petMap,
+        search,
+        statusFilter,
+        petFilter,
+        nextDueFrom,
+        nextDueTo
+      ),
+    [vaccinations, petMap, search, statusFilter, petFilter, nextDueFrom, nextDueTo]
   );
 
   const { overdue, soon, total } = useMemo(
@@ -105,6 +158,7 @@ export function useAdminVaccinations() {
           administeredOn: data.administeredOn,
           nextDueOn: data.nextDueOn,
         });
+        toast('Прививка обновлена', data.name);
       } else {
         await adminApi.createVaccination({
           petId: data.petId,
@@ -112,12 +166,13 @@ export function useAdminVaccinations() {
           administeredOn: data.administeredOn,
           nextDueOn: data.nextDueOn,
         });
+        toast('Прививка добавлена', data.name);
       }
       setIsModalOpen(false);
       setEditingVaccination(null);
       await loadData();
     },
-    [loadData]
+    [loadData, toast]
   );
 
   const requestDelete = useCallback(
@@ -146,18 +201,21 @@ export function useAdminVaccinations() {
       await adminApi.deleteVaccination(deleteTarget.id);
       setVaccinations((prev) => prev.filter((v) => v.id !== deleteTarget.id));
       setSelectedVaccination((prev) => (prev?.id === deleteTarget.id ? null : prev));
+      toast('Запись о вакцинации удалена');
       setDeleteTarget(null);
     } catch (err: unknown) {
       setDeleteError(formatApiError(err, 'Ошибка при удалении'));
     } finally {
       setDeleting(false);
     }
-  }, [deleteTarget]);
+  }, [deleteTarget, toast]);
 
   return {
     vaccinations: filteredVaccinations,
     pets,
     petMap,
+    speciesList,
+    users,
     loading,
     error,
     reload: loadData,
@@ -167,6 +225,10 @@ export function useAdminVaccinations() {
     setStatusFilter,
     petFilter,
     setPetFilter,
+    nextDueFrom,
+    setNextDueFrom,
+    nextDueTo,
+    setNextDueTo,
     selectedVaccination,
     setSelectedVaccination,
     isModalOpen,

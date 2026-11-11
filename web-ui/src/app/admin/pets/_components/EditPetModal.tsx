@@ -1,8 +1,9 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { AlertCircle, X } from 'lucide-react';
-import { formatApiError } from '@/shared/lib';
+import { DatePicker, FilterDropdown, type FilterDropdownOption } from '@/shared/components';
+import { formatApiError, getMoscowTodayIso } from '@/shared/lib';
 import type { EditPetModalProps, EditPetFormData } from './types';
 
 /**
@@ -26,6 +27,12 @@ export const EditPetModal: React.FC<EditPetModalProps> = ({
   });
   const [savingEdit, setSavingEdit] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const todayIso = getMoscowTodayIso();
+
+  const speciesOptions = useMemo<FilterDropdownOption[]>(
+    () => speciesList.map((s) => ({ value: s.id, label: s.name })),
+    [speciesList]
+  );
 
   useEffect(() => {
     if (pet && isOpen) {
@@ -134,19 +141,13 @@ export const EditPetModal: React.FC<EditPetModalProps> = ({
                 <label className="field-label" htmlFor="ed-pspecies">
                   Вид <span className="req">*</span>
                 </label>
-                <select
+                <FilterDropdown
                   id="ed-pspecies"
-                  className="select"
                   value={form.speciesId}
-                  onChange={(e) => setForm({ ...form, speciesId: e.target.value })}
-                  required
-                >
-                  {speciesList.map((s) => (
-                    <option key={s.id} value={s.id}>
-                      {s.name}
-                    </option>
-                  ))}
-                </select>
+                  options={speciesOptions}
+                  onChange={(speciesId) => setForm({ ...form, speciesId })}
+                  placeholder="Выберите вид…"
+                />
               </div>
 
               <div className="field">
@@ -174,8 +175,9 @@ export const EditPetModal: React.FC<EditPetModalProps> = ({
                 <input
                   id="ed-pweight"
                   type="number"
-                  step="0.1"
+                  step="0.01"
                   min="0"
+                  max="9999.99"
                   className="input"
                   value={form.weightKg}
                   onChange={(e) => setForm({ ...form, weightKg: e.target.value })}
@@ -184,12 +186,12 @@ export const EditPetModal: React.FC<EditPetModalProps> = ({
 
               <div className="field span-2">
                 <label className="field-label" htmlFor="ed-pbirth">Дата рождения</label>
-                <input
+                <DatePicker
                   id="ed-pbirth"
-                  type="date"
-                  className="input"
                   value={form.birthDate}
-                  onChange={(e) => setForm({ ...form, birthDate: e.target.value })}
+                  max={todayIso}
+                  onChange={(birthDate) => setForm({ ...form, birthDate })}
+                  ariaLabel="Дата рождения питомца"
                 />
               </div>
 
@@ -199,6 +201,7 @@ export const EditPetModal: React.FC<EditPetModalProps> = ({
                   id="ed-pnotes"
                   className="textarea"
                   rows={2}
+                  maxLength={2000}
                   value={form.notes}
                   onChange={(e) => setForm({ ...form, notes: e.target.value })}
                 />

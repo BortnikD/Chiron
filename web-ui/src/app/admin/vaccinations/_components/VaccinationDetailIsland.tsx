@@ -1,14 +1,17 @@
 'use client';
 
 import React from 'react';
+import Link from 'next/link';
 import { X, Edit2, Trash2 } from 'lucide-react';
 import type { Vaccination, Pet } from '@/modules/client/types';
+import type { Species } from '@/modules/clinic/types';
 import { formatIsoDateDisplay } from '@/shared/lib';
 import { calculateVaccinationStatus } from './utils';
 
 export interface VaccinationDetailIslandProps {
   vaccination: Vaccination;
   pet?: Pet;
+  speciesList: Species[];
   onClose: () => void;
   onEdit: (vaccination: Vaccination) => void;
   onDelete: (id: string) => void;
@@ -21,12 +24,18 @@ export interface VaccinationDetailIslandProps {
 export const VaccinationDetailIsland: React.FC<VaccinationDetailIslandProps> = ({
   vaccination,
   pet,
+  speciesList,
   onClose,
   onEdit,
   onDelete,
 }) => {
   const vaxName = vaccination.name || vaccination.vaccineName || 'Вакцинация';
   const petName = pet?.name || 'Питомец';
+  const speciesName =
+    pet?.species?.name ||
+    pet?.speciesName ||
+    speciesList.find((sp) => sp.id === pet?.speciesId)?.name ||
+    '';
   const adminRaw = vaccination.administeredOn || vaccination.administeredAt;
   const nextDueRaw = vaccination.nextDueOn || vaccination.validUntil;
   const adminDate = formatIsoDateDisplay(adminRaw ? adminRaw.slice(0, 10) : null);
@@ -42,7 +51,7 @@ export const VaccinationDetailIsland: React.FC<VaccinationDetailIslandProps> = (
           </span>
           <span className="cell-sub tnum">
             {petName}
-            {pet?.species?.name ? ` (${pet.species.name})` : ''}
+            {speciesName ? ` (${speciesName})` : ''}
           </span>
         </div>
         <button
@@ -66,12 +75,20 @@ export const VaccinationDetailIsland: React.FC<VaccinationDetailIslandProps> = (
 
           <dl className="kv" style={{ margin: 0 }}>
             <dt>Питомец</dt>
-            <dd className="font-semibold">{petName}</dd>
+            <dd>
+              {pet ? (
+                <Link href={`/admin/pets?sel=${pet.id}`} className="linkish">
+                  {petName}
+                </Link>
+              ) : (
+                petName
+              )}
+            </dd>
 
-            {pet?.species?.name && (
+            {speciesName && (
               <>
                 <dt>Вид</dt>
-                <dd>{pet.species.name}</dd>
+                <dd>{speciesName}</dd>
               </>
             )}
 
@@ -85,23 +102,23 @@ export const VaccinationDetailIsland: React.FC<VaccinationDetailIslandProps> = (
             {pet?.birthDate && (
               <>
                 <dt>Дата рождения</dt>
-                <dd className="tnum font-mono">{formatIsoDateDisplay(pet.birthDate.slice(0, 10))}</dd>
+                <dd className="tnum">{formatIsoDateDisplay(pet.birthDate.slice(0, 10))}</dd>
               </>
             )}
 
             <dt>Препарат</dt>
-            <dd className="font-semibold">{vaxName}</dd>
+            <dd>{vaxName}</dd>
 
             <dt>Дата введения</dt>
-            <dd className="tnum font-mono">{adminDate}</dd>
+            <dd className="tnum">{adminDate}</dd>
 
             <dt>След. доза</dt>
-            <dd className="tnum font-mono">{nextDue || 'Не запланирована'}</dd>
+            <dd className="tnum">{nextDue || 'Не запланирована'}</dd>
 
             {vaccination.batchNumber && (
               <>
                 <dt>Серия партии</dt>
-                <dd className="font-mono">{vaccination.batchNumber}</dd>
+                <dd className="tnum">{vaccination.batchNumber}</dd>
               </>
             )}
 
@@ -115,21 +132,11 @@ export const VaccinationDetailIsland: React.FC<VaccinationDetailIslandProps> = (
         </div>
       </div>
 
-      <div
-        className="island-foot"
-        style={{
-          marginTop: 'auto',
-          paddingTop: '14px',
-          display: 'flex',
-          justifyContent: 'space-between',
-          borderTop: '1px solid var(--border)',
-        }}
-      >
+      <div className="island-foot">
         <button
           type="button"
-          className="btn btn-ghost btn-sm"
+          className="btn btn-destructive-outline btn-sm"
           onClick={() => onDelete(vaccination.id)}
-          style={{ color: 'var(--destructive)', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
         >
           <Trash2 size={14} />
           <span>Удалить</span>
@@ -139,7 +146,6 @@ export const VaccinationDetailIsland: React.FC<VaccinationDetailIslandProps> = (
           type="button"
           className="btn btn-primary btn-sm"
           onClick={() => onEdit(vaccination)}
-          style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}
         >
           <Edit2 size={14} />
           <span>Редактировать</span>

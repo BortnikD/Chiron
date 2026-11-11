@@ -5,13 +5,21 @@ import { useSearchParams, useRouter } from 'next/navigation';
 import { adminApi } from '@/modules/admin/api';
 import { clinicApi } from '@/modules/clinic/api';
 import type { WorkSchedule, ScheduleException } from '@/modules/admin/types';
-import type { Veterinarian } from '@/modules/clinic/types';
-import { DOW_ORDER, formatApiError, formatIsoDateDisplay } from '@/shared/lib';
-import { getDoctorDisplay } from '@/utils/doctorHelpers';
-import type {
-  WorkScheduleSavePayload,
-  ScheduleExceptionSavePayload,
-  DeleteScheduleTarget,
+import type { Specialization, Veterinarian } from '@/modules/clinic/types';
+import { useToast } from '@/shared/components';
+import { fetchAllPages, formatApiError, toIdNameMap } from '@/shared/lib';
+import {
+  buildDeleteConfirmMeta,
+  buildExceptionCreatePayload,
+  buildExceptionUpdatePayload,
+  buildWorkScheduleCreatePayload,
+  buildWorkScheduleUpdatePayload,
+  findVetDisplayName,
+  resolveFreeDayIndex,
+  resolveScheduleTab,
+  type WorkScheduleSavePayload,
+  type ScheduleExceptionSavePayload,
+  type DeleteScheduleTarget,
 } from '../_components/types';
 
 export type { WorkScheduleSavePayload, ScheduleExceptionSavePayload, DeleteScheduleTarget };
@@ -19,18 +27,19 @@ export type { WorkScheduleSavePayload, ScheduleExceptionSavePayload, DeleteSched
 export function useAdminSchedules() {
   const searchParams = useSearchParams();
   const router = useRouter();
+  const { toast } = useToast();
 
   const tabParam = searchParams.get('tab');
-  const vetParam = searchParams.get('vetId') || searchParams.get('vet');
+  const vetParam = searchParams.get('vetId') || searchParams.get('vet') || '';
 
-  const [activeTab, setActiveTab] = useState<'sched' | 'exc'>(
-    tabParam === 'exc' || tabParam === 'exceptions' ? 'exc' : 'sched'
-  );
+  const [activeTab, setActiveTab] = useState<'sched' | 'exc'>(() => resolveScheduleTab(tabParam));
   const [vets, setVets] = useState<Veterinarian[]>([]);
+  const [specializations, setSpecializations] = useState<Specialization[]>([]);
   const [loadingVets, setLoadingVets] = useState(true);
   const [vetsError, setVetsError] = useState<string | null>(null);
 
   const [selectedVetId, setSelectedVetId] = useState<string>('');
+  const [excVetFilter, setExcVetFilter] = useState<string>(vetParam);
   const [schedules, setSchedules] = useState<WorkSchedule[]>([]);
   const [loadingSchedule, setLoadingSchedule] = useState(false);
   const [scheduleError, setScheduleError] = useState<string | null>(null);
@@ -59,18 +68,31 @@ export function useAdminSchedules() {
   const excReqIdRef = useRef(0);
 
   useEffect(() => {
-    setActiveTab(tabParam === 'exc' || tabParam === 'exceptions' ? 'exc' : 'sched');
+    setActiveTab(resolveScheduleTab(tabParam));
   }, [tabParam]);
+
+  useEffect(() => {
+    if (vetParam) {
+      setExcVetFilter(vetParam);
+    }
+  }, [vetParam]);
 
   const loadVets = useCallback(async () => {
     const reqId = ++vetsReqIdRef.current;
     setLoadingVets(true);
     setVetsError(null);
     try {
-      const res = await adminApi.getVeterinarians();
+      const [res, vetUsers, specsRes] = await Promise.all([
+        adminApi.getVeterinarians(),
+        fetchAllPages((p, s) => adminApi.getUsers(p, s, 'VETERINARIAN'), { pageSize: 100, maxPages: 20, concurrency: 4 }),
+        clinicApi.getSpecializations(),
+      ]);
       if (reqId !== vetsReqIdRef.current) return;
-      const list = Array.isArray(res) ? res : [];
+      const list = (Array.isArray(res) ? res : []).map((v) =>
+        v.user ? v : { ...v, user: vetUsers.find((u) => u.id === v.userId) }
+      );
       setVets(list);
+      setSpecializations(Array.isArray(specsRes) ? specsRes : []);
       if (list.length > 0) {
         setSelectedVetId((prev) => {
           if (vetParam && list.some((v) => v.id === vetParam)) return vetParam;
@@ -107,9 +129,13 @@ export function useAdminSchedules() {
     setLoadingExceptions(true);
     setExceptionsError(null);
     try {
-      const res = await adminApi.getScheduleExceptions(0, 100);
+      const items = await fetchAllPages((p, s) => adminApi.getScheduleExceptions(p, s), {
+        pageSize: 100,
+        maxPages: 30,
+        concurrency: 4,
+      });
       if (reqId !== excReqIdRef.current) return;
-      setExceptions(res?.items ?? []);
+      setExceptions(items);
     } catch (err: unknown) {
       if (reqId !== excReqIdRef.current) return;
       setExceptionsError(formatApiError(err, 'Не удалось загрузить исключения из расписания.'));
@@ -145,26 +171,35 @@ export function useAdminSchedules() {
     void loadExceptions();
   }, [vetsError, vets.length, loadVets, selectedVetId, loadSchedule, loadExceptions]);
 
-  const selectedVet = useMemo(() => vets.find((v) => v.id === selectedVetId), [vets, selectedVetId]);
-  const selectedVetName = selectedVet ? getDoctorDisplay(selectedVet).fullName : 'Врач';
+  const specsMap = useMemo(() => toIdNameMap(specializations), [specializations]);
+
+  const selectedVetName = useMemo(
+    () => findVetDisplayName(vets, selectedVetId, specsMap) || 'Врач',
+    [vets, selectedVetId, specsMap]
+  );
+
+  const excVetName = useMemo(
+    () => (excVetFilter ? findVetDisplayName(vets, excVetFilter, specsMap) || '' : ''),
+    [excVetFilter, vets, specsMap]
+  );
 
   const switchTab = useCallback(
     (tab: 'sched' | 'exc') => {
       setActiveTab(tab);
-      router.replace(tab === 'exc' ? '/admin/schedules?tab=exc' : '/admin/schedules');
+      router.replace(
+        tab === 'exc' ? '/admin/schedules?tab=exc' : '/admin/schedules?tab=schedules'
+      );
     },
     [router]
   );
 
   const openAddDay = useCallback(
     (dayIdx?: number) => {
-      let targetDay = dayIdx ?? 0;
-      if (dayIdx === undefined) {
-        const scheduledDows = new Set(schedules.map((s) => s.dayOfWeek));
-        const firstFree = DOW_ORDER.findIndex((d) => !scheduledDows.has(d));
-        targetDay = firstFree >= 0 ? firstFree : 0;
-      }
-      setScheduleModal({ open: true, schedule: null, dayIndex: targetDay });
+      setScheduleModal({
+        open: true,
+        schedule: null,
+        dayIndex: resolveFreeDayIndex(schedules, dayIdx),
+      });
     },
     [schedules]
   );
@@ -177,24 +212,19 @@ export function useAdminSchedules() {
 
   const saveWorkSchedule = useCallback(
     async (data: WorkScheduleSavePayload) => {
-      const payload = {
-        startTime: data.startTime,
-        endTime: data.endTime,
-        breakStart: data.breakStart,
-        breakEnd: data.breakEnd,
-      };
       if (data.scheduleId) {
-        await adminApi.updateWorkSchedule(data.scheduleId, payload);
+        await adminApi.updateWorkSchedule(data.scheduleId, buildWorkScheduleUpdatePayload(data));
       } else {
-        await adminApi.createWorkSchedule({
-          veterinarianId: data.veterinarianId,
-          dayOfWeek: data.dayOfWeek,
-          ...payload,
-        });
+        await adminApi.createWorkSchedule(buildWorkScheduleCreatePayload(data));
       }
-      if (selectedVetId) await loadSchedule(selectedVetId);
+      if (data.veterinarianId !== selectedVetId) {
+        setSelectedVetId(data.veterinarianId);
+      } else if (selectedVetId) {
+        await loadSchedule(selectedVetId);
+      }
+      toast('Расписание сохранено', findVetDisplayName(vets, data.veterinarianId, specsMap));
     },
-    [selectedVetId, loadSchedule]
+    [selectedVetId, loadSchedule, vets, specsMap, toast]
   );
 
   const openAddException = useCallback(() => setExceptionModal({ open: true, exception: null }), []);
@@ -207,28 +237,14 @@ export function useAdminSchedules() {
   const saveScheduleException = useCallback(
     async (data: ScheduleExceptionSavePayload) => {
       if (data.exceptionId) {
-        await adminApi.updateScheduleException(data.exceptionId, {
-          type: data.type,
-          startDate: data.startDate,
-          endDate: data.endDate,
-          startTime: data.type === 'CUSTOM_HOURS' ? data.startTime : null,
-          endTime: data.type === 'CUSTOM_HOURS' ? data.endTime : null,
-          reason: data.reason || null,
-        });
+        await adminApi.updateScheduleException(data.exceptionId, buildExceptionUpdatePayload(data));
       } else {
-        await adminApi.createScheduleException({
-          veterinarianId: data.veterinarianId,
-          type: data.type,
-          startDate: data.startDate,
-          endDate: data.endDate,
-          startTime: data.startTime,
-          endTime: data.endTime,
-          reason: data.reason,
-        });
+        await adminApi.createScheduleException(buildExceptionCreatePayload(data));
       }
       await loadExceptions();
+      toast('Исключение сохранено', findVetDisplayName(vets, data.veterinarianId, specsMap));
     },
-    [loadExceptions]
+    [loadExceptions, vets, specsMap, toast]
   );
 
   const requestDeleteSchedule = useCallback((id: string, dowName: string) => {
@@ -256,9 +272,11 @@ export function useAdminSchedules() {
       if (deleteTarget.type === 'schedule') {
         await adminApi.deleteWorkSchedule(deleteTarget.id);
         await loadSchedule(selectedVetId);
+        toast('День удалён из графика');
       } else {
         await adminApi.deleteScheduleException(deleteTarget.exception.id);
         await loadExceptions();
+        toast('Исключение удалено');
       }
       setDeleteTarget(null);
     } catch (err: unknown) {
@@ -266,38 +284,23 @@ export function useAdminSchedules() {
     } finally {
       setIsDeleting(false);
     }
-  }, [deleteTarget, selectedVetId, loadSchedule, loadExceptions]);
+  }, [deleteTarget, selectedVetId, loadSchedule, loadExceptions, toast]);
 
-  const deleteConfirmMeta = useMemo(() => {
-    if (!deleteTarget) return { title: '', description: '' };
-    if (deleteTarget.type === 'schedule') {
-      return {
-        title: `Удалить рабочий график на ${deleteTarget.dowName}?`,
-        description: `Рабочий график на ${deleteTarget.dowName} будет удален, день станет выходным.`,
-      };
-    }
-    const ex = deleteTarget.exception;
-    const typeLabel = ex.type === 'ABSENCE' ? 'Отсутствие' : 'Особые часы';
-    const range =
-      ex.startDate === ex.endDate
-        ? formatIsoDateDisplay(ex.startDate)
-        : `${formatIsoDateDisplay(ex.startDate)} – ${formatIsoDateDisplay(ex.endDate)}`;
-    return {
-      title: 'Удалить исключение из расписания?',
-      description: `Исключение (${typeLabel}, ${range}) будет удалено.`,
-    };
-  }, [deleteTarget]);
-
+  const deleteConfirmMeta = useMemo(() => buildDeleteConfirmMeta(deleteTarget), [deleteTarget]);
   const error = vetsError || (activeTab === 'sched' ? scheduleError : exceptionsError);
 
   return {
     activeTab,
     switchTab,
     vets,
+    specsMap,
     loadingVets,
     selectedVetId,
     setSelectedVetId,
     selectedVetName,
+    excVetFilter,
+    setExcVetFilter,
+    excVetName,
     schedules,
     loadingSchedule,
     exceptions,

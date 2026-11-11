@@ -10,7 +10,9 @@ import { getDoctorDisplay } from '@/utils/doctorHelpers';
 export interface ExceptionsCalendarViewProps {
   exceptions: ScheduleException[];
   vets: Veterinarian[];
+  specsMap?: Record<string, string>;
   vetFilter: string;
+  typeFilter?: string;
   onEdit: (exception: ScheduleException) => void;
 }
 
@@ -19,7 +21,9 @@ const NDAYS = 35;
 export const ExceptionsCalendarView: React.FC<ExceptionsCalendarViewProps> = ({
   exceptions,
   vets,
+  specsMap,
   vetFilter,
+  typeFilter = '',
   onEdit,
 }) => {
   const todayIso = getMoscowTodayIso();
@@ -35,7 +39,7 @@ export const ExceptionsCalendarView: React.FC<ExceptionsCalendarViewProps> = ({
       const yyyy = d.getUTCFullYear();
       const mm = String(d.getUTCMonth() + 1).padStart(2, '0');
       const dd = String(d.getUTCDate()).padStart(2, '0');
-      const label = isMonday || i === 0 ? `${d.getUTCDate()}.${mm}` : '';
+      const label = isMonday || i === 0 ? `${dd}.${mm}` : '';
       return { i, iso: `${yyyy}-${mm}-${dd}`, label, isWeekend };
     });
   }, [todayIso]);
@@ -45,8 +49,10 @@ export const ExceptionsCalendarView: React.FC<ExceptionsCalendarViewProps> = ({
     const targetVets = vetFilter ? vets.filter((v) => v.id === vetFilter) : vets;
 
     return targetVets.map((v) => {
-      const vetName = getDoctorDisplay(v).fullName;
-      const vetExc = exceptions.filter((e) => e.veterinarianId === v.id);
+      const vetName = getDoctorDisplay(v, specsMap).fullName;
+      const vetExc = exceptions.filter(
+        (e) => e.veterinarianId === v.id && (!typeFilter || e.type === typeFilter)
+      );
 
       const bars = vetExc
         .map((e) => {
@@ -63,7 +69,7 @@ export const ExceptionsCalendarView: React.FC<ExceptionsCalendarViewProps> = ({
             left: `${(a / NDAYS) * 100}%`,
             width: `${Math.max(1, ((b - a + 1) / NDAYS) * 100)}%`,
             bg: isAbsence
-              ? 'color-mix(in srgb, var(--destructive) 70%, transparent)'
+              ? 'color-mix(in srgb, var(--destructive) 65%, transparent)'
               : 'var(--primary)',
             tip: `${vetName}: ${isAbsence ? 'Отсутствие' : 'Особые часы'}, ${formatIsoDateDisplay(e.startDate)}–${formatIsoDateDisplay(e.endDate)}${e.reason ? ` · ${e.reason}` : ''}`,
             exception: e,
@@ -73,7 +79,7 @@ export const ExceptionsCalendarView: React.FC<ExceptionsCalendarViewProps> = ({
 
       return { vetId: v.id, vetName, bars };
     });
-  }, [vets, exceptions, vetFilter, todayIso]);
+  }, [vets, specsMap, exceptions, vetFilter, typeFilter, todayIso]);
 
   return (
     <section className="island" style={{ flex: 'none' }} aria-label="Календарь исключений">

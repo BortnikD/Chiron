@@ -2,14 +2,25 @@
 
 import React from 'react';
 import Link from 'next/link';
-import { AlertCircle, PawPrint } from 'lucide-react';
+import { AlertCircle } from 'lucide-react';
 import type { Pet, Appointment } from '@/modules/client/types';
-import { APPOINTMENT_STATUS_META, formatDateTimeCompact } from '@/shared/lib';
+import type { Service, Species, Veterinarian } from '@/modules/clinic/types';
+import { SpeciesIcon } from '@/components/ui/SpeciesIcon';
+import {
+  APPOINTMENT_STATUS_META,
+  calculateAgeRu,
+  formatDateTimeCompact,
+  getSpeciesTone,
+} from '@/shared/lib';
+import { getDoctorDisplay } from '@/utils/doctorHelpers';
 
 export interface UserRelationsTabsProps {
   activeTab: 'pets' | 'appointments';
   pets: Pet[];
   appointments: Appointment[];
+  speciesList: Species[];
+  services: Service[];
+  veterinarians: Veterinarian[];
   loading: boolean;
   error: string | null;
 }
@@ -18,6 +29,9 @@ export const UserRelationsTabs: React.FC<UserRelationsTabsProps> = ({
   activeTab,
   pets,
   appointments,
+  speciesList,
+  services,
+  veterinarians,
   loading,
   error,
 }) => {
@@ -42,18 +56,28 @@ export const UserRelationsTabs: React.FC<UserRelationsTabsProps> = ({
   if (activeTab === 'pets') {
     return (
       <div className="col" style={{ gap: 4, margin: '0 -10px' }}>
-        {pets.map((p) => (
-          <Link key={p.id} href="/admin/pets" className="lrow">
-            <span className="pet-ava" style={{ width: 36, height: 36, borderRadius: 10 }}>
-              <PawPrint size={16} />
-            </span>
-            <span className="col" style={{ gap: 1 }}>
-              <span className="cell-main">{p.name}</span>
-              <span className="cell-sub">{p.gender === 'MALE' ? 'Самец' : 'Самка'}</span>
-            </span>
-            {p.isArchived && <span className="badge">Архив</span>}
-          </Link>
-        ))}
+        {pets.map((p) => {
+          const speciesName =
+            p.species?.name ||
+            p.speciesName ||
+            speciesList.find((s) => s.id === p.speciesId)?.name ||
+            'Питомец';
+          const tone = getSpeciesTone(speciesName || p.speciesId, speciesList);
+          return (
+            <Link key={p.id} href={`/admin/pets?sel=${p.id}`} className="lrow">
+              <span className="pet-ava" style={{ width: 36, height: 36, borderRadius: 10 }}>
+                <SpeciesIcon species={tone} size={16} />
+              </span>
+              <span className="col" style={{ gap: 1 }}>
+                <span className="cell-main">{p.name}</span>
+                <span className="cell-sub">
+                  {speciesName} · {calculateAgeRu(p.birthDate)}
+                </span>
+              </span>
+              {p.isArchived && <span className="badge">Архив</span>}
+            </Link>
+          );
+        })}
 
         {pets.length === 0 && (
           <div className="empty" style={{ padding: 24 }}>
@@ -70,16 +94,29 @@ export const UserRelationsTabs: React.FC<UserRelationsTabsProps> = ({
         const dt = formatDateTimeCompact(a.startAt);
         const [dd, mon] = dt.date.split(' ');
         const stMeta = APPOINTMENT_STATUS_META[a.status];
+        const petName = pets.find((p) => p.id === a.petId)?.name || a.petName;
+        const svcName =
+          a.service?.name ||
+          a.serviceName ||
+          services.find((s) => s.id === a.serviceId)?.name ||
+          'Услуга';
+        const vet = veterinarians.find((v) => v.id === a.veterinarianId);
+        const vetName = vet ? getDoctorDisplay(vet).name : a.veterinarianName;
 
         return (
-          <Link key={a.id} href="/admin/appointments" className="lrow">
+          <Link key={a.id} href={`/admin/appointments?sel=${a.id}`} className="lrow">
             <span className="datebox">
               <b>{dd}</b>
               <span>{mon}</span>
             </span>
             <span className="col" style={{ gap: 1 }}>
-              <span className="cell-main">{a.service?.name || 'Услуга'}</span>
-              <span className="cell-sub">{dt.time}</span>
+              <span className="cell-main">
+                {petName ? `${petName} — ${svcName}` : svcName}
+              </span>
+              <span className="cell-sub">
+                {dt.time}
+                {vetName ? ` · ${vetName}` : ''}
+              </span>
             </span>
             <span className={`badge st ${stMeta?.cls || `badge-${a.status}`}`}>
               {stMeta?.short || a.status}

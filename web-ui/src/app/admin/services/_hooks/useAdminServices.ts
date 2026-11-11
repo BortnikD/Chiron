@@ -9,26 +9,35 @@ import type {
   Specialization,
   Species,
   ServiceSpecies,
+  Veterinarian,
 } from '@/modules/clinic/types';
+import { useToast } from '@/shared/components';
 import { formatApiError, toIdNameMap } from '@/shared/lib';
 import {
   SERVICE_NAV_TABS,
+  filterAdminServices,
   resolveServicesTab,
   type ServicesMainTab,
+  type ServiceActiveFilter,
   type SaveServiceInput,
 } from '../_components/constants';
+import { useServiceDictionaries } from './useServiceDictionaries';
 
 export { SERVICE_NAV_TABS };
-export type { ServicesMainTab, SaveServiceInput };
+export type { ServicesMainTab, ServiceActiveFilter, SaveServiceInput };
 
 export function useAdminServices() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const { toast } = useToast();
+
   const tabParam = searchParams.get('tab');
+  const selParam = searchParams.get('sel');
 
   const [services, setServices] = useState<Service[]>([]);
   const [specializations, setSpecializations] = useState<Specialization[]>([]);
   const [speciesList, setSpeciesList] = useState<Species[]>([]);
+  const [veterinarians, setVeterinarians] = useState<Veterinarian[]>([]);
   const [serviceSpeciesMap, setServiceSpeciesMap] = useState<Record<string, ServiceSpecies[]>>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -36,6 +45,7 @@ export function useAdminServices() {
   const [mainTab, setMainTab] = useState<ServicesMainTab>(() => resolveServicesTab(tabParam));
   const [filterSpec, setFilterSpec] = useState<string>('ALL');
   const [filterSpecies, setFilterSpecies] = useState<string>('ALL');
+  const [filterActive, setFilterActive] = useState<ServiceActiveFilter>('ALL');
   const [search, setSearch] = useState('');
 
   const [selectedService, setSelectedService] = useState<Service | null>(null);
@@ -51,6 +61,7 @@ export function useAdminServices() {
   const [deleteError, setDeleteError] = useState<string | null>(null);
 
   const loadRequestIdRef = useRef(0);
+  const appliedSelRef = useRef<string | null>(null);
 
   useEffect(() => {
     setMainTab(resolveServicesTab(tabParam));
@@ -61,10 +72,11 @@ export function useAdminServices() {
     setLoading(true);
     setError(null);
     try {
-      const [svcData, specData, speciesData] = await Promise.all([
+      const [svcData, specData, speciesData, vetsData] = await Promise.all([
         adminApi.getServices(),
         clinicApi.getSpecializations(),
         clinicApi.getSpecies(),
+        adminApi.getVeterinarians(),
       ]);
       const safeServices = Array.isArray(svcData) ? svcData : [];
       const linkEntries = await Promise.all(
@@ -78,18 +90,25 @@ export function useAdminServices() {
       setServices(safeServices);
       setSpecializations(Array.isArray(specData) ? specData : []);
       setSpeciesList(Array.isArray(speciesData) ? speciesData : []);
+      setVeterinarians(Array.isArray(vetsData) ? vetsData : []);
       setServiceSpeciesMap(Object.fromEntries(linkEntries));
 
-      setSelectedService((prev) =>
-        prev ? safeServices.find((s) => s.id === prev.id) || null : null
-      );
+      if (selParam && appliedSelRef.current !== selParam) {
+        appliedSelRef.current = selParam;
+        const found = safeServices.find((s) => s.id === selParam);
+        if (found) setSelectedService(found);
+      } else {
+        setSelectedService((prev) =>
+          prev ? safeServices.find((s) => s.id === prev.id) || null : null
+        );
+      }
     } catch (err: unknown) {
       if (loadRequestIdRef.current !== reqId) return;
       setError(formatApiError(err, 'Не удалось загрузить справочники и услуги'));
     } finally {
       if (loadRequestIdRef.current === reqId) setLoading(false);
     }
-  }, []);
+  }, [selParam]);
 
   useEffect(() => {
     void loadData();
@@ -99,24 +118,21 @@ export function useAdminServices() {
   }, [loadData]);
 
   const specsMap = useMemo(() => toIdNameMap(specializations), [specializations]);
+  const speciesMap = useMemo(() => toIdNameMap(speciesList), [speciesList]);
 
-  const filteredServices = useMemo(() => {
-    const q = search.trim().toLowerCase();
-    return services.filter((s) => {
-      if (filterSpec !== 'ALL' && s.specializationId !== filterSpec) return false;
-      if (
-        filterSpecies !== 'ALL' &&
-        !(serviceSpeciesMap[s.id] || []).some((l) => l.speciesId === filterSpecies)
-      ) {
-        return false;
-      }
-      if (q) {
-        const specName = (specsMap[s.specializationId] || '').toLowerCase();
-        if (!s.name.toLowerCase().includes(q) && !specName.includes(q)) return false;
-      }
-      return true;
-    });
-  }, [services, filterSpec, filterSpecies, search, serviceSpeciesMap, specsMap]);
+  const filteredServices = useMemo(
+    () =>
+      filterAdminServices({
+        services,
+        filterSpec,
+        filterSpecies,
+        filterActive,
+        search,
+        serviceSpeciesMap,
+        specsMap,
+      }),
+    [services, filterSpec, filterSpecies, filterActive, search, serviceSpeciesMap, specsMap]
+  );
 
   const activeTabItem = useMemo(
     () => SERVICE_NAV_TABS.find((t) => t.key === mainTab) || SERVICE_NAV_TABS[0],
@@ -158,9 +174,10 @@ export function useAdminServices() {
         : await adminApi.createService(data);
       await loadData();
       setSelectedService(saved);
+      toast(id ? 'Услуга сохранена' : 'Услуга создана', saved.name);
       return saved;
     },
-    [loadData]
+    [loadData, toast]
   );
 
   const attachServiceSpecies = useCallback(
@@ -170,9 +187,10 @@ export function useAdminServices() {
       const safeLinks = Array.isArray(links) ? links : [];
       setServiceSpeciesMap((prev) => ({ ...prev, [serviceId]: safeLinks }));
       await loadData();
+      toast('Вид привязан', speciesMap[speciesId] || undefined);
       return safeLinks;
     },
-    [loadData]
+    [loadData, speciesMap, toast]
   );
 
   const detachServiceSpecies = useCallback(
@@ -183,8 +201,9 @@ export function useAdminServices() {
         [serviceId]: (prev[serviceId] || []).filter((l) => l.speciesId !== speciesId),
       }));
       await loadData();
+      toast('Вид отвязан', speciesMap[speciesId] || undefined);
     },
-    [loadData]
+    [loadData, speciesMap, toast]
   );
 
   const saveServiceSpeciesOverrides = useCallback(
@@ -198,8 +217,9 @@ export function useAdminServices() {
         )
       );
       await loadData();
+      toast('Переопределения сохранены');
     },
-    [loadData]
+    [loadData, toast]
   );
 
   const saveServiceSpeciesOverride = useCallback(
@@ -212,42 +232,18 @@ export function useAdminServices() {
       if (isEdit) await adminApi.updateServiceSpecies(serviceId, speciesId, data);
       else await adminApi.createServiceSpecies(serviceId, { speciesId, ...data });
       await loadData();
+      toast(isEdit ? 'Переопределение обновлено' : 'Вид привязан', speciesMap[speciesId] || undefined);
     },
-    [loadData]
+    [loadData, speciesMap, toast]
   );
 
-  const createSpecies = useCallback(
-    async (name: string): Promise<void> => {
-      await adminApi.createSpecies(name);
-      await loadData();
-    },
-    [loadData]
-  );
-
-  const deleteSpecies = useCallback(
-    async (id: string): Promise<void> => {
-      await adminApi.deleteSpecies(id);
-      await loadData();
-    },
-    [loadData]
-  );
-
-  const saveSpecialization = useCallback(
-    async (data: { name: string; description: string }, id?: string): Promise<void> => {
-      if (id) await adminApi.updateSpecialization(id, data);
-      else await adminApi.createSpecialization(data);
-      await loadData();
-    },
-    [loadData]
-  );
-
-  const deleteSpecialization = useCallback(
-    async (id: string): Promise<void> => {
-      await adminApi.deleteSpecialization(id);
-      await loadData();
-    },
-    [loadData]
-  );
+  const {
+    createSpecies,
+    updateSpecies,
+    deleteSpecies,
+    saveSpecialization,
+    deleteSpecialization,
+  } = useServiceDictionaries(loadData);
 
   const requestDeleteService = useCallback((service: Service) => {
     setDeleteError(null);
@@ -270,12 +266,13 @@ export function useAdminServices() {
       if (selectedService?.id === deleteTarget.id) setSelectedService(null);
       setDeleteTarget(null);
       await loadData();
+      toast('Услуга удалена');
     } catch (err: unknown) {
       setDeleteError(formatApiError(err, 'Ошибка удаления услуги'));
     } finally {
       setDeleting(false);
     }
-  }, [deleteTarget, selectedService?.id, loadData]);
+  }, [deleteTarget, selectedService?.id, loadData, toast]);
 
   const openSpeciesOverrideModal = useCallback(
     (link?: ServiceSpecies | null) => setSpeciesOverrideModal({ open: true, link }),
@@ -284,9 +281,11 @@ export function useAdminServices() {
   const closeSpeciesOverrideModal = useCallback(() => setSpeciesOverrideModal({ open: false }), []);
 
   return {
+    allServices: services,
     services: filteredServices,
     specializations,
     speciesList,
+    veterinarians,
     serviceSpeciesMap,
     loading,
     error,
@@ -298,6 +297,8 @@ export function useAdminServices() {
     setFilterSpec,
     filterSpecies,
     setFilterSpecies,
+    filterActive,
+    setFilterActive,
     search,
     setSearch,
     selectedService,
@@ -313,6 +314,7 @@ export function useAdminServices() {
     saveServiceSpeciesOverrides,
     saveServiceSpeciesOverride,
     createSpecies,
+    updateSpecies,
     deleteSpecies,
     saveSpecialization,
     deleteSpecialization,

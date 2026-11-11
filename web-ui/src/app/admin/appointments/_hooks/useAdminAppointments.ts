@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { adminApi } from '@/modules/admin/api';
 import { clinicApi } from '@/modules/clinic/api';
 import type {
@@ -10,27 +11,25 @@ import type {
 import type { Appointment, Pet } from '@/modules/client/types';
 import type { Veterinarian, Service, Species } from '@/modules/clinic/types';
 import type { AppointmentStatus, User } from '@/shared/types';
-import { formatApiError, getMoscowDateKey } from '@/shared/lib';
-import { getDoctorDisplay } from '@/utils/doctorHelpers';
-
-export const CANCEL_REASONS = [
-  'По просьбе клиента',
-  'Врач не может принять',
-  'Питомец выздоровел',
-  'Ошибка при записи',
-  'Клиент не выходит на связь',
-];
-
-function nextMoscowDayIso(dateIso: string): string {
-  const [y, m, d] = dateIso.split('-').map(Number);
-  return new Date(Date.UTC(y, m - 1, d + 1, 12, 0, 0)).toISOString().slice(0, 10);
-}
+import { useToast } from '@/shared/components';
+import { fetchAllPages, formatApiError } from '@/shared/lib';
+import { buildActiveFilterChips, nextMoscowDayIso } from '../_components/utils';
 
 export function useAdminAppointments() {
+  const searchParams = useSearchParams();
+  const { toast } = useToast();
+
+  const initialSel = searchParams.get('sel');
+  const initialPetId = searchParams.get('petId') || 'ALL';
+  const initialOwnerId = searchParams.get('ownerId') || 'ALL';
+  const initialVetId = searchParams.get('veterinarianId') || 'ALL';
+  const initialServiceId = searchParams.get('serviceId') || 'ALL';
+
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [totalElements, setTotalElements] = useState(0);
-  const [totalPages, setTotalPages] = useState(0);
+  const [totalPages, setTotalPages] = useState(1);
   const [page, setPage] = useState(0);
+  const [pageSize, setPageSizeState] = useState<number>(25);
 
   const [veterinarians, setVeterinarians] = useState<Veterinarian[]>([]);
   const [services, setServices] = useState<Service[]>([]);
@@ -40,10 +39,11 @@ export function useAdminAppointments() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const [statusFilter, setStatusFilterState] = useState<string>('ALL');
-  const [vetFilter, setVetFilterState] = useState<string>('ALL');
-  const [speciesFilter, setSpeciesFilter] = useState<string>('ALL');
-  const [search, setSearch] = useState<string>('');
+  const [statusFilters, setStatusFiltersState] = useState<AppointmentStatus[]>([]);
+  const [vetFilter, setVetFilterState] = useState<string>(initialVetId);
+  const [petFilter, setPetFilterState] = useState<string>(initialPetId);
+  const [ownerFilter, setOwnerFilterState] = useState<string>(initialOwnerId);
+  const [serviceFilter, setServiceFilterState] = useState<string>(initialServiceId);
   const [dateFrom, setDateFromState] = useState<string>('');
   const [dateTo, setDateToState] = useState<string>('');
 
@@ -61,6 +61,29 @@ export function useAdminAppointments() {
   const [deleteError, setDeleteError] = useState<string | null>(null);
 
   const requestIdRef = useRef(0);
+  const refsReqIdRef = useRef(0);
+  const appliedInitialSelRef = useRef<string | null>(null);
+
+  const loadRefs = useCallback(async () => {
+    const reqId = ++refsReqIdRef.current;
+    try {
+      const [vetsRes, svcsRes, speciesRes, allPets, allUsers] = await Promise.all([
+        adminApi.getVeterinarians(),
+        adminApi.getServices(),
+        clinicApi.getSpecies(),
+        fetchAllPages((p, s) => adminApi.getPets(p, s), { pageSize: 100, maxPages: 50, concurrency: 4 }),
+        fetchAllPages((p, s) => adminApi.getUsers(p, s), { pageSize: 100, maxPages: 50, concurrency: 4 }),
+      ]);
+      if (reqId !== refsReqIdRef.current) return;
+      setVeterinarians(Array.isArray(vetsRes) ? vetsRes : []);
+      setServices(Array.isArray(svcsRes) ? svcsRes : []);
+      setSpeciesList(Array.isArray(speciesRes) ? speciesRes : []);
+      setPets(allPets);
+      setUsers(allUsers);
+    } catch {
+      // справочные ошибки обрабатываются при основном запросе, либо доступны при повторном reload
+    }
+  }, []);
 
   const loadData = useCallback(async () => {
     const reqId = ++requestIdRef.current;
@@ -72,107 +95,116 @@ export function useAdminAppointments() {
         ? new Date(`${nextMoscowDayIso(dateTo)}T00:00:00+03:00`).toISOString()
         : undefined;
 
-      const [apptsRes, vetsRes, svcsRes, speciesRes, petsRes, usersRes] = await Promise.all([
-        adminApi.getAppointments(page, 100, {
-          status: statusFilter !== 'ALL' ? (statusFilter as AppointmentStatus) : undefined,
-          veterinarianId: vetFilter !== 'ALL' ? vetFilter : undefined,
-          from: fromIso,
-          to: toIso,
-        }),
-        adminApi.getVeterinarians(),
-        clinicApi.getServices(),
-        clinicApi.getSpecies(),
-        adminApi.getPets(0, 100),
-        adminApi.getUsers(0, 100),
-      ]);
+      const apptsRes = await adminApi.getAppointments(page, pageSize, {
+        status: statusFilters.length > 0 ? statusFilters : undefined,
+        veterinarianId: vetFilter !== 'ALL' ? vetFilter : undefined,
+        petId: petFilter !== 'ALL' ? petFilter : undefined,
+        ownerId: ownerFilter !== 'ALL' ? ownerFilter : undefined,
+        serviceId: serviceFilter !== 'ALL' ? serviceFilter : undefined,
+        from: fromIso,
+        to: toIso,
+      });
 
       if (reqId !== requestIdRef.current) return;
 
       const appts = apptsRes?.items || [];
       setAppointments(appts);
       setTotalElements(apptsRes?.totalElements ?? appts.length);
-      setTotalPages(apptsRes?.totalPages ?? 1);
-      setVeterinarians(Array.isArray(vetsRes) ? vetsRes : []);
-      setServices(Array.isArray(svcsRes) ? svcsRes : []);
-      setSpeciesList(Array.isArray(speciesRes) ? speciesRes : []);
-      setPets(petsRes?.items || []);
-      setUsers(usersRes?.items || []);
+      setTotalPages(Math.max(1, apptsRes?.totalPages ?? 1));
 
-      setSelectedAppt((prev) => (prev ? appts.find((a) => a.id === prev.id) ?? null : null));
+      if (initialSel && appliedInitialSelRef.current !== initialSel) {
+        appliedInitialSelRef.current = initialSel;
+        const foundInPage = appts.find((a) => a.id === initialSel);
+        if (foundInPage) {
+          setSelectedAppt(foundInPage);
+        } else {
+          try {
+            const byId = await adminApi.getAppointmentById(initialSel);
+            if (reqId === requestIdRef.current && byId) setSelectedAppt(byId);
+          } catch {
+            // ignore missing deep link target
+          }
+        }
+      } else {
+        setSelectedAppt((prev) => (prev ? appts.find((a) => a.id === prev.id) ?? prev : null));
+      }
     } catch (err: unknown) {
       if (reqId !== requestIdRef.current) return;
       setError(formatApiError(err, 'Не удалось загрузить список записей на приём.'));
     } finally {
-      if (reqId === requestIdRef.current) {
-        setLoading(false);
-      }
+      if (reqId === requestIdRef.current) setLoading(false);
     }
-  }, [page, statusFilter, vetFilter, dateFrom, dateTo]);
+  }, [page, pageSize, statusFilters, vetFilter, petFilter, ownerFilter, serviceFilter, dateFrom, dateTo, initialSel]);
 
   useEffect(() => {
-    loadData();
+    void loadRefs();
+    return () => {
+      refsReqIdRef.current += 1;
+    };
+  }, [loadRefs]);
+
+  useEffect(() => {
+    void loadData();
     return () => {
       requestIdRef.current += 1;
     };
   }, [loadData]);
 
-  const setStatusFilter = useCallback((v: string) => {
+  const reloadAll = useCallback(() => {
+    void loadRefs();
+    void loadData();
+  }, [loadRefs, loadData]);
+
+  const toggleStatusFilter = useCallback((st: AppointmentStatus) => {
     setPage(0);
-    setStatusFilterState(v);
+    setStatusFiltersState((prev) =>
+      prev.includes(st) ? prev.filter((item) => item !== st) : [...prev, st]
+    );
   }, []);
 
-  const setVetFilter = useCallback((v: string) => {
-    setPage(0);
-    setVetFilterState(v);
-  }, []);
+  const setVetFilter = useCallback((v: string) => { setPage(0); setVetFilterState(v); }, []);
+  const setPetFilter = useCallback((v: string) => { setPage(0); setPetFilterState(v); }, []);
+  const setOwnerFilter = useCallback((v: string) => { setPage(0); setOwnerFilterState(v); }, []);
+  const setServiceFilter = useCallback((v: string) => { setPage(0); setServiceFilterState(v); }, []);
+  const setDateFrom = useCallback((v: string) => { setPage(0); setDateFromState(v); }, []);
+  const setDateTo = useCallback((v: string) => { setPage(0); setDateToState(v); }, []);
+  const setPageSize = useCallback((size: number) => { setPage(0); setPageSizeState(size); }, []);
 
-  const setDateFrom = useCallback((v: string) => {
+  const resetFilters = useCallback(() => {
     setPage(0);
-    setDateFromState(v);
-  }, []);
-
-  const setDateTo = useCallback((v: string) => {
-    setPage(0);
-    setDateToState(v);
+    setStatusFiltersState([]);
+    setVetFilterState('ALL');
+    setPetFilterState('ALL');
+    setOwnerFilterState('ALL');
+    setServiceFilterState('ALL');
+    setDateFromState('');
+    setDateToState('');
   }, []);
 
   const enrichedVeterinarians = useMemo(
-    () =>
-      veterinarians.map((v) =>
-        v.user ? v : { ...v, user: users.find((u) => u.id === v.userId) }
-      ),
+    () => veterinarians.map((v) => (v.user ? v : { ...v, user: users.find((u) => u.id === v.userId) })),
     [veterinarians, users]
   );
 
-  const filteredAppointments = useMemo(() => {
-    return appointments.filter((a) => {
-      const p = pets.find((item) => item.id === a.petId);
-      if (speciesFilter !== 'ALL' && (!p || p.speciesId !== speciesFilter)) return false;
-      if (search) {
-        const q = search.toLowerCase();
-        const sName = (services.find((s) => s.id === a.serviceId)?.name || 'Услуга клиники').toLowerCase();
-        const vet = enrichedVeterinarians.find((v) => v.id === a.veterinarianId);
-        const vName = getDoctorDisplay(vet).fullName.toLowerCase();
-        const pName = (p?.name || '').toLowerCase();
-        const oName = (users.find((u) => u.id === p?.ownerId)?.fullName || '').toLowerCase();
-        if (!sName.includes(q) && !vName.includes(q) && !pName.includes(q) && !oName.includes(q)) {
-          return false;
-        }
-      }
-      const mskDate = getMoscowDateKey(a.startAt);
-      if (dateFrom && mskDate < dateFrom) return false;
-      if (dateTo && mskDate > dateTo) return false;
-      return true;
-    });
-  }, [appointments, speciesFilter, search, dateFrom, dateTo, pets, services, enrichedVeterinarians, users]);
+  const activeFilters = useMemo(
+    () =>
+      buildActiveFilterChips({
+        vetFilter, petFilter, ownerFilter, serviceFilter, statusFilters, dateFrom, dateTo,
+        veterinarians: enrichedVeterinarians, pets, users, services,
+        setVetFilter, setPetFilter, setOwnerFilter, setServiceFilter,
+        toggleStatusFilter, setDateFrom, setDateTo,
+      }),
+    [
+      vetFilter, petFilter, ownerFilter, serviceFilter, statusFilters, dateFrom, dateTo,
+      enrichedVeterinarians, pets, users, services,
+      setVetFilter, setPetFilter, setOwnerFilter, setServiceFilter,
+      toggleStatusFilter, setDateFrom, setDateTo,
+    ]
+  );
 
   const checkSlotAvailability = useCallback(
-    async (params: {
-      veterinarianId: string;
-      startAt: string;
-      endAt: string;
-      excludeAppointmentId?: string;
-    }) => clinicApi.checkAvailability(params),
+    async (params: { veterinarianId: string; startAt: string; endAt: string; excludeAppointmentId?: string }) =>
+      clinicApi.checkAvailability(params),
     []
   );
 
@@ -180,22 +212,22 @@ export function useAdminAppointments() {
     async (payload: AdminCreateAppointmentRequest) => {
       const created = await adminApi.createAppointment(payload);
       setSelectedAppt(created);
+      toast('Запись создана');
       await loadData();
       return created;
     },
-    [loadData]
+    [loadData, toast]
   );
 
   const updateAppointment = useCallback(
     async (id: string, payload: AdminUpdateAppointmentRequest) => {
       const updated = await adminApi.updateAppointment(id, payload);
-      setSelectedAppt((prev) =>
-        updated || (prev?.id === id ? { ...prev, ...payload } : prev)
-      );
+      setSelectedAppt((prev) => updated || (prev?.id === id ? { ...prev, ...payload } : prev));
+      toast('Изменения сохранены');
       await loadData();
       return updated;
     },
-    [loadData]
+    [loadData, toast]
   );
 
   const openCancelModal = useCallback((appt: Appointment) => {
@@ -225,13 +257,14 @@ export function useAdminAppointments() {
       const updated = await adminApi.updateAppointment(cancelAppt.id, payload);
       setSelectedAppt(updated || { ...cancelAppt, ...payload });
       setCancelAppt(null);
+      toast('Запись отменена');
       await loadData();
     } catch (err: unknown) {
       setCancelError(formatApiError(err, 'Ошибка при отмене записи'));
     } finally {
       setIsCancelling(false);
     }
-  }, [cancelAppt, cancelReason, loadData]);
+  }, [cancelAppt, cancelReason, loadData, toast]);
 
   const openDeleteModal = useCallback((appt: Appointment) => {
     setDeleteError(null);
@@ -251,62 +284,33 @@ export function useAdminAppointments() {
       await adminApi.deleteAppointment(deleteAppt.id);
       if (selectedAppt?.id === deleteAppt.id) setSelectedAppt(null);
       setDeleteAppt(null);
+      toast('Запись удалена');
       await loadData();
     } catch (err: unknown) {
       setDeleteError(formatApiError(err, 'Ошибка при удалении записи'));
     } finally {
       setIsDeleting(false);
     }
-  }, [deleteAppt, selectedAppt?.id, loadData]);
+  }, [deleteAppt, selectedAppt?.id, loadData, toast]);
 
   return {
-    appointments: filteredAppointments,
-    totalElements,
-    totalPages,
-    page,
-    setPage,
-    veterinarians: enrichedVeterinarians,
-    services,
-    speciesList,
-    pets,
-    users,
-    loading,
-    error,
-    reload: loadData,
-    statusFilter,
-    setStatusFilter,
-    vetFilter,
-    setVetFilter,
-    speciesFilter,
-    setSpeciesFilter,
-    search,
-    setSearch,
-    dateFrom,
-    setDateFrom,
-    dateTo,
-    setDateTo,
-    selectedAppt,
-    setSelectedAppt,
-    isCreateOpen,
-    setIsCreateOpen,
-    editAppt,
-    setEditAppt,
-    cancelAppt,
-    cancelReason,
-    setCancelReason,
-    isCancelling,
-    cancelError,
-    openCancelModal,
-    closeCancelModal,
-    confirmCancelAppt,
-    deleteAppt,
-    isDeleting,
-    deleteError,
-    openDeleteModal,
-    closeDeleteModal,
-    confirmDeleteAppt,
-    checkSlotAvailability,
-    createAppointment,
-    updateAppointment,
+    appointments, totalElements, totalPages, page, setPage, pageSize, setPageSize,
+    veterinarians: enrichedVeterinarians, services, speciesList, pets, users,
+    loading, error, reload: reloadAll,
+    statusFilters, toggleStatusFilter,
+    vetFilter, setVetFilter,
+    petFilter, setPetFilter,
+    ownerFilter, setOwnerFilter,
+    serviceFilter, setServiceFilter,
+    dateFrom, setDateFrom, dateTo, setDateTo,
+    activeFilters, resetFilters,
+    selectedAppt, setSelectedAppt,
+    isCreateOpen, setIsCreateOpen,
+    editAppt, setEditAppt,
+    cancelAppt, cancelReason, setCancelReason, isCancelling, cancelError,
+    openCancelModal, closeCancelModal, confirmCancelAppt,
+    deleteAppt, isDeleting, deleteError,
+    openDeleteModal, closeDeleteModal, confirmDeleteAppt,
+    checkSlotAvailability, createAppointment, updateAppointment,
   };
 }

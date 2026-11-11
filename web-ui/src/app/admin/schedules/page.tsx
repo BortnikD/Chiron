@@ -3,7 +3,7 @@
 import React, { useMemo, Suspense } from 'react';
 import { CalendarDays, CalendarOff, Plus, AlertCircle, RefreshCw } from 'lucide-react';
 import { useShellHeader } from '@/components/layout/AppShell';
-import { ConfirmModal } from '@/shared/components/ConfirmModal';
+import { ConfirmModal } from '@/shared/components';
 import { useAdminSchedules } from './_hooks/useAdminSchedules';
 import { WeeklyScheduleMatrix } from './_components/WeeklyScheduleMatrix';
 import { ExceptionsTable } from './_components/ExceptionsTable';
@@ -27,9 +27,17 @@ function AdminSchedulesContent() {
     [s.activeTab, s.openAddDay, s.openAddException]
   );
 
+  const crumb2 = useMemo(() => {
+    if (s.activeTab === 'sched') {
+      return s.selectedVetId ? s.selectedVetName : undefined;
+    }
+    return s.excVetName || undefined;
+  }, [s.activeTab, s.selectedVetId, s.selectedVetName, s.excVetName]);
+
   useShellHeader({
     crumbGroup: 'Персонал',
-    crumb: s.activeTab === 'sched' ? 'Расписания' : 'Исключения из расписания',
+    crumb: s.activeTab === 'exc' ? 'Исключения' : 'Расписания',
+    crumb2,
     actions: headerActions,
   });
 
@@ -48,22 +56,26 @@ function AdminSchedulesContent() {
         )}
 
         <section className="island filters" style={{ padding: '8px 12px' }}>
-          <div className="seg">
+          <div className="seg" role="tablist" aria-label="Разделы расписания">
             <button
               type="button"
+              role="tab"
+              aria-selected={s.activeTab === 'sched'}
               className={`seg-item ${s.activeTab === 'sched' ? 'on' : ''}`}
               onClick={() => s.switchTab('sched')}
             >
               <CalendarDays className="ic" style={{ width: '15px', height: '15px' }} />
-              <span>Недельные графики</span>
+              <span>Расписания</span>
             </button>
             <button
               type="button"
+              role="tab"
+              aria-selected={s.activeTab === 'exc'}
               className={`seg-item ${s.activeTab === 'exc' ? 'on' : ''}`}
               onClick={() => s.switchTab('exc')}
             >
               <CalendarOff className="ic" style={{ width: '15px', height: '15px' }} />
-              <span>Исключения из расписания</span>
+              <span>Исключения</span>
             </button>
           </div>
         </section>
@@ -71,6 +83,7 @@ function AdminSchedulesContent() {
         {s.activeTab === 'sched' ? (
           <WeeklyScheduleMatrix
             vets={s.vets}
+            specsMap={s.specsMap}
             selectedVetId={s.selectedVetId}
             selectedVetName={s.selectedVetName}
             schedules={s.schedules}
@@ -86,11 +99,13 @@ function AdminSchedulesContent() {
           <ExceptionsTable
             exceptions={s.exceptions}
             vets={s.vets}
+            specsMap={s.specsMap}
             loading={s.loadingExceptions}
+            vetFilter={s.excVetFilter}
+            onVetFilterChange={s.setExcVetFilter}
             onRefresh={s.loadExceptions}
             onEdit={s.openEditException}
             onDelete={s.requestDeleteException}
-            initialVetFilter={s.selectedVetId}
           />
         )}
       </div>
@@ -99,6 +114,8 @@ function AdminSchedulesContent() {
         isOpen={s.scheduleModal.open}
         schedule={s.scheduleModal.schedule}
         dayIndex={s.scheduleModal.dayIndex}
+        vets={s.vets}
+        specsMap={s.specsMap}
         veterinarianId={s.selectedVetId}
         doctorName={s.selectedVetName}
         onClose={s.closeScheduleModal}
@@ -109,7 +126,8 @@ function AdminSchedulesContent() {
         isOpen={s.exceptionModal.open}
         exception={s.exceptionModal.exception}
         vets={s.vets}
-        defaultVetId={s.selectedVetId}
+        specsMap={s.specsMap}
+        defaultVetId={s.excVetFilter || s.selectedVetId}
         onClose={s.closeExceptionModal}
         onSave={s.saveScheduleException}
       />
@@ -119,6 +137,8 @@ function AdminSchedulesContent() {
         title={s.deleteConfirmMeta.title}
         description={s.deleteConfirmMeta.description}
         confirmLabel="Удалить"
+        cancelLabel="Отмена"
+        tone="destructive"
         loading={s.isDeleting}
         error={s.deleteError}
         onClose={s.closeDeleteModal}

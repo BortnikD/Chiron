@@ -4,6 +4,11 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { RefreshCw, Trash2, Pencil, X, ChevronLeft, ChevronRight } from 'lucide-react';
 import type { ScheduleException } from '@/modules/admin/types';
 import type { Veterinarian } from '@/modules/clinic/types';
+import {
+  DatePicker,
+  SearchCombobox,
+  type SearchComboboxOption,
+} from '@/shared/components';
 import { formatIsoDateDisplay } from '@/shared/lib';
 import { getDoctorDisplay } from '@/utils/doctorHelpers';
 import { ExceptionsCalendarView } from './ExceptionsCalendarView';
@@ -11,11 +16,13 @@ import { ExceptionsCalendarView } from './ExceptionsCalendarView';
 export interface ExceptionsTableProps {
   exceptions: ScheduleException[];
   vets: Veterinarian[];
+  specsMap?: Record<string, string>;
   loading: boolean;
+  vetFilter: string;
+  onVetFilterChange: (vetId: string) => void;
   onRefresh: () => void;
   onEdit: (exception: ScheduleException) => void;
   onDelete: (exception: ScheduleException) => void;
-  initialVetFilter?: string;
 }
 
 const PAGE_SIZE = 10;
@@ -23,36 +30,46 @@ const PAGE_SIZE = 10;
 export const ExceptionsTable: React.FC<ExceptionsTableProps> = ({
   exceptions,
   vets,
+  specsMap,
   loading,
+  vetFilter,
+  onVetFilterChange,
   onRefresh,
   onEdit,
   onDelete,
-  initialVetFilter = '',
 }) => {
-  const [exVetFilter, setExVetFilter] = useState<string>(initialVetFilter);
   const [exTypeFilter, setExTypeFilter] = useState<string>('');
   const [exFromFilter, setExFromFilter] = useState<string>('');
   const [exToFilter, setExToFilter] = useState<string>('');
   const [currentPage, setCurrentPage] = useState<number>(1);
 
   useEffect(() => {
-    if (initialVetFilter) setExVetFilter(initialVetFilter);
-  }, [initialVetFilter]);
-
-  useEffect(() => {
     setCurrentPage(1);
-  }, [exVetFilter, exTypeFilter, exFromFilter, exToFilter]);
+  }, [vetFilter, exTypeFilter, exFromFilter, exToFilter]);
+
+  const vetOptions = useMemo<SearchComboboxOption[]>(
+    () => [
+      { value: 'ALL', label: 'Все врачи' },
+      ...vets.map((v) => {
+        const doc = getDoctorDisplay(v, specsMap);
+        return { value: v.id, label: doc.fullName, hint: doc.specName };
+      }),
+    ],
+    [vets, specsMap]
+  );
 
   const filteredExceptions = useMemo(
     () =>
-      exceptions.filter((e) => {
-        if (exVetFilter && e.veterinarianId !== exVetFilter) return false;
-        if (exTypeFilter && e.type !== exTypeFilter) return false;
-        if (exFromFilter && e.endDate < exFromFilter) return false;
-        if (exToFilter && e.startDate > exToFilter) return false;
-        return true;
-      }),
-    [exceptions, exVetFilter, exTypeFilter, exFromFilter, exToFilter]
+      [...exceptions]
+        .sort((a, b) => a.startDate.localeCompare(b.startDate))
+        .filter((e) => {
+          if (vetFilter && e.veterinarianId !== vetFilter) return false;
+          if (exTypeFilter && e.type !== exTypeFilter) return false;
+          if (exFromFilter && e.endDate < exFromFilter) return false;
+          if (exToFilter && e.startDate > exToFilter) return false;
+          return true;
+        }),
+    [exceptions, vetFilter, exTypeFilter, exFromFilter, exToFilter]
   );
 
   const totalPages = Math.max(1, Math.ceil(filteredExceptions.length / PAGE_SIZE));
@@ -61,26 +78,23 @@ export const ExceptionsTable: React.FC<ExceptionsTableProps> = ({
     return filteredExceptions.slice(start, start + PAGE_SIZE);
   }, [filteredExceptions, currentPage]);
 
-  const hasActiveFilters = Boolean(exVetFilter || exTypeFilter || exFromFilter || exToFilter);
+  const hasActiveFilters = Boolean(vetFilter || exTypeFilter || exFromFilter || exToFilter);
 
   return (
     <>
       <section className="island filters" aria-label="Фильтры исключений">
-        <div className="field">
-          <label className="field-label" htmlFor="exc-vet-filter">Врач</label>
-          <select
+        <div className="field" style={{ minWidth: 210 }}>
+          <label className="field-label" htmlFor="exc-vet-filter">
+            Врач
+          </label>
+          <SearchCombobox
             id="exc-vet-filter"
-            className="select"
-            value={exVetFilter}
-            onChange={(e) => setExVetFilter(e.target.value)}
-          >
-            <option value="">Все врачи</option>
-            {vets.map((v) => (
-              <option key={v.id} value={v.id}>
-                {getDoctorDisplay(v).fullName}
-              </option>
-            ))}
-          </select>
+            value={vetFilter || 'ALL'}
+            options={vetOptions}
+            onChange={(val) => onVetFilterChange(val === 'ALL' ? '' : val)}
+            placeholder="Все врачи"
+            ariaLabel="Фильтр по врачу"
+          />
         </div>
 
         <div className="field" style={{ width: 'auto' }}>
@@ -103,25 +117,27 @@ export const ExceptionsTable: React.FC<ExceptionsTableProps> = ({
           </div>
         </div>
 
-        <div className="field" style={{ width: '160px' }}>
-          <label className="field-label" htmlFor="exc-from-filter">Заканчиваются с</label>
-          <input
+        <div className="field" style={{ width: 155 }}>
+          <label className="field-label" htmlFor="exc-from-filter">
+            Заканчиваются с
+          </label>
+          <DatePicker
             id="exc-from-filter"
-            type="date"
-            className="input input-sm"
             value={exFromFilter}
-            onChange={(e) => setExFromFilter(e.target.value)}
+            onChange={setExFromFilter}
+            ariaLabel="Заканчиваются с"
           />
         </div>
 
-        <div className="field" style={{ width: '160px' }}>
-          <label className="field-label" htmlFor="exc-to-filter">Начинаются до</label>
-          <input
+        <div className="field" style={{ width: 155 }}>
+          <label className="field-label" htmlFor="exc-to-filter">
+            Начинаются до
+          </label>
+          <DatePicker
             id="exc-to-filter"
-            type="date"
-            className="input input-sm"
             value={exToFilter}
-            onChange={(e) => setExToFilter(e.target.value)}
+            onChange={setExToFilter}
+            ariaLabel="Начинаются до"
           />
         </div>
 
@@ -132,7 +148,7 @@ export const ExceptionsTable: React.FC<ExceptionsTableProps> = ({
               type="button"
               className="btn btn-ghost btn-sm"
               onClick={() => {
-                setExVetFilter('');
+                onVetFilterChange('');
                 setExTypeFilter('');
                 setExFromFilter('');
                 setExToFilter('');
@@ -148,7 +164,9 @@ export const ExceptionsTable: React.FC<ExceptionsTableProps> = ({
       <ExceptionsCalendarView
         exceptions={exceptions}
         vets={vets}
-        vetFilter={exVetFilter}
+        specsMap={specsMap}
+        vetFilter={vetFilter}
+        typeFilter={exTypeFilter}
         onEdit={onEdit}
       />
 
@@ -172,12 +190,12 @@ export const ExceptionsTable: React.FC<ExceptionsTableProps> = ({
         <div className="table-wrap">
           <div
             className="dtable"
-            style={{ '--cols': '1.3fr 0.9fr 1.3fr 0.9fr 1.6fr 70px', minWidth: '820px' } as React.CSSProperties}
+            style={{ '--cols': '1.3fr 0.9fr 1.3fr 0.9fr 1.6fr 80px', minWidth: '820px' } as React.CSSProperties}
           >
             <div className="thead">
               <span>Врач</span>
               <span>Тип</span>
-              <span>Даты</span>
+              <span>Даты ↑</span>
               <span>Время</span>
               <span>Причина</span>
               <span />
@@ -203,7 +221,7 @@ export const ExceptionsTable: React.FC<ExceptionsTableProps> = ({
 
                 return (
                   <div key={ex.id} className="trow static">
-                    <span className="cell-main">{getDoctorDisplay(vet).fullName}</span>
+                    <span className="cell-main">{getDoctorDisplay(vet, specsMap).fullName}</span>
                     <span>
                       <span className={`badge ${isAbsence ? 'due-over' : 'badge-accent'}`}>
                         {isAbsence ? 'Отсутствие' : 'Особые часы'}
@@ -216,15 +234,16 @@ export const ExceptionsTable: React.FC<ExceptionsTableProps> = ({
                       <button
                         type="button"
                         className="btn btn-ghost btn-icon btn-sm"
-                        aria-label="Редактировать"
-                        title="Редактировать исключение"
+                        aria-label="Изменить"
+                        title="Изменить исключение"
                         onClick={() => onEdit(ex)}
                       >
                         <Pencil className="ic" />
                       </button>
                       <button
                         type="button"
-                        className="btn btn-ghost btn-icon btn-sm text-[var(--destructive)]"
+                        className="btn btn-ghost btn-icon btn-sm"
+                        style={{ color: 'var(--destructive)' }}
                         aria-label="Удалить"
                         title="Удалить исключение"
                         onClick={() => onDelete(ex)}
@@ -239,21 +258,9 @@ export const ExceptionsTable: React.FC<ExceptionsTableProps> = ({
           </div>
         </div>
 
-        {filteredExceptions.length > PAGE_SIZE && (
-          <div
-            className="row between"
-            style={{
-              padding: '12px 16px',
-              borderTop: '1px solid var(--border)',
-              alignItems: 'center',
-            }}
-          >
-            <span className="small muted">
-              Показано {(currentPage - 1) * PAGE_SIZE + 1}–
-              {Math.min(currentPage * PAGE_SIZE, filteredExceptions.length)} из{' '}
-              {filteredExceptions.length}
-            </span>
-
+        <div className="island-foot">
+          <span className="small muted">Сортировка по дате начала</span>
+          {filteredExceptions.length > PAGE_SIZE && (
             <div className="pager">
               <button
                 type="button"
@@ -269,7 +276,7 @@ export const ExceptionsTable: React.FC<ExceptionsTableProps> = ({
                 <button
                   key={p}
                   type="button"
-                  className={`btn btn-sm ${p === currentPage ? 'on' : 'btn-ghost'}`}
+                  className={`btn btn-ghost btn-sm ${p === currentPage ? 'on' : ''}`}
                   onClick={() => setCurrentPage(p)}
                 >
                   {p}
@@ -286,8 +293,8 @@ export const ExceptionsTable: React.FC<ExceptionsTableProps> = ({
                 <ChevronRight className="ic" />
               </button>
             </div>
-          </div>
-        )}
+          )}
+        </div>
       </section>
     </>
   );

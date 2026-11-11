@@ -4,7 +4,8 @@ import React, { useMemo } from 'react';
 import { Stethoscope } from 'lucide-react';
 import type { Veterinarian, Specialization, Species } from '@/modules/clinic/types';
 import type { User } from '@/shared/types';
-import { getSpecTone, getSpeciesTone, toIdNameMap } from '@/shared/lib';
+import { getSpecTone, getSpeciesTone, pluralRu, toIdNameMap } from '@/shared/lib';
+import { SpeciesIcon } from '@/components/ui/SpeciesIcon';
 import { getDoctorDisplay } from '@/utils/doctorHelpers';
 
 export interface AdminVetsTableProps {
@@ -85,15 +86,21 @@ export const AdminVetsTable: React.FC<AdminVetsTableProps> = ({
                   <span className={`t-badge tone-${getSpecTone(v.specializationId)}`}>{specName}</span>
                 </span>
                 <span className="right tnum">
-                  {v.experienceYears != null ? `${v.experienceYears} г.` : '—'}
+                  {v.experienceYears != null
+                    ? `${v.experienceYears} ${pluralRu(v.experienceYears, 'год', 'года', 'лет')}`
+                    : '—'}
                 </span>
                 <span className="chips">
                   {permittedSpecies.length > 0 ? (
-                    permittedSpecies.map((sp) => (
-                      <span key={sp.id} className={`sp-chip tone-${getSpeciesTone(sp.name)}`}>
-                        {sp.name}
-                      </span>
-                    ))
+                    permittedSpecies.map((sp) => {
+                      const tone = getSpeciesTone(sp.name);
+                      return (
+                        <span key={sp.id} className={`sp-chip tone-${tone}`}>
+                          <SpeciesIcon species={tone} size={14} className="ic" />
+                          {sp.name}
+                        </span>
+                      );
+                    })
                   ) : (
                     <span className="small muted">Нет допусков</span>
                   )}

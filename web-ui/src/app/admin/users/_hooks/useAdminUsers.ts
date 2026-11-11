@@ -1,9 +1,13 @@
 'use client';
 
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { adminApi } from '@/modules/admin/api';
+import { clinicApi } from '@/modules/clinic/api';
 import type { Pet, Appointment } from '@/modules/client/types';
-import { formatApiError } from '@/shared/lib';
+import type { Service, Species, Veterinarian } from '@/modules/clinic/types';
+import { useToast } from '@/shared/components';
+import { fetchAllPages, formatApiError, getMoscowDateKey } from '@/shared/lib';
 import type { User, UserRole } from '@/shared/types';
 
 export interface CreateUserInput {
@@ -17,12 +21,21 @@ export interface CreateUserInput {
 }
 
 export function useAdminUsers() {
+  const searchParams = useSearchParams();
+  const { toast } = useToast();
+  const initialSel = searchParams.get('sel');
+
   const [users, setUsers] = useState<User[]>([]);
+  const [veterinarians, setVeterinarians] = useState<Veterinarian[]>([]);
+  const [speciesList, setSpeciesList] = useState<Species[]>([]);
+  const [services, setServices] = useState<Service[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   const [roleFilter, setRoleFilter] = useState<string>('ALL');
   const [search, setSearch] = useState('');
+  const [createdFrom, setCreatedFrom] = useState('');
+  const [createdTo, setCreatedTo] = useState('');
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
 
   const [userPets, setUserPets] = useState<Pet[]>([]);
@@ -32,34 +45,62 @@ export function useAdminUsers() {
 
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
+  const [vetOfferUser, setVetOfferUser] = useState<User | null>(null);
   const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
 
   const loadReqIdRef = useRef(0);
   const detailsReqIdRef = useRef(0);
+  const appliedSelRef = useRef<string | null>(null);
 
   const loadUsers = useCallback(async () => {
     const reqId = ++loadReqIdRef.current;
     setLoading(true);
     setError(null);
     try {
-      const res = await adminApi.getUsers(
-        0,
-        100,
-        roleFilter !== 'ALL' ? (roleFilter as UserRole) : undefined
-      );
+      const [items, vetsRes, speciesRes, servicesRes] = await Promise.all([
+        fetchAllPages(
+          (p, s) => adminApi.getUsers(p, s, roleFilter !== 'ALL' ? (roleFilter as UserRole) : undefined),
+          { pageSize: 100, maxPages: 50, concurrency: 4 }
+        ),
+        adminApi.getVeterinarians(),
+        clinicApi.getSpecies(),
+        adminApi.getServices(),
+      ]);
       if (loadReqIdRef.current !== reqId) return;
-      const items = res?.items || [];
       setUsers(items);
-      setSelectedUser((prev) => (prev ? items.find((u) => u.id === prev.id) ?? null : null));
+      setVeterinarians(
+        (Array.isArray(vetsRes) ? vetsRes : []).map((v) =>
+          v.user ? v : { ...v, user: items.find((u) => u.id === v.userId) }
+        )
+      );
+      setSpeciesList(Array.isArray(speciesRes) ? speciesRes : []);
+      setServices(Array.isArray(servicesRes) ? servicesRes : []);
+
+      if (initialSel && appliedSelRef.current !== initialSel) {
+        appliedSelRef.current = initialSel;
+        const found = items.find((u) => u.id === initialSel);
+        if (found) {
+          setSelectedUser(found);
+        } else {
+          try {
+            const byId = await adminApi.getUserById(initialSel);
+            if (loadReqIdRef.current === reqId && byId) setSelectedUser(byId);
+          } catch {
+            // ignore missing target
+          }
+        }
+      } else {
+        setSelectedUser((prev) => (prev ? items.find((u) => u.id === prev.id) ?? prev : null));
+      }
     } catch (err: unknown) {
       if (loadReqIdRef.current !== reqId) return;
       setError(formatApiError(err, 'Не удалось загрузить пользователей'));
     } finally {
       if (loadReqIdRef.current === reqId) setLoading(false);
     }
-  }, [roleFilter]);
+  }, [roleFilter, initialSel]);
 
   useEffect(() => {
     void loadUsers();
@@ -126,6 +167,7 @@ export function useAdminUsers() {
     try {
       await adminApi.deleteUser(selectedUser.id);
       setIsDeleteConfirmOpen(false);
+      toast('Пользователь удалён');
       setSelectedUser(null);
       await loadUsers();
     } catch (err: unknown) {
@@ -133,41 +175,54 @@ export function useAdminUsers() {
     } finally {
       setDeleting(false);
     }
-  }, [selectedUser, loadUsers]);
+  }, [selectedUser, loadUsers, toast]);
 
   const createUser = useCallback(
     async (data: CreateUserInput): Promise<User> => {
       const created = await adminApi.createUser(data);
+      toast('Пользователь создан', created.fullName || created.email);
       await loadUsers();
       setSelectedUser(created);
+      if (created.role === 'VETERINARIAN') {
+        setVetOfferUser(created);
+      }
       return created;
     },
-    [loadUsers]
+    [loadUsers, toast]
   );
 
   const updateUser = useCallback(
     async (id: string, data: Partial<User>): Promise<User> => {
       const updated = await adminApi.updateUser(id, data);
+      toast('Данные пользователя сохранены');
       await loadUsers();
       setSelectedUser((prev) => (prev?.id === id ? updated : prev));
       return updated;
     },
-    [loadUsers]
+    [loadUsers, toast]
   );
 
   const filteredUsers = useMemo(() => {
-    if (!search) return users;
-    const q = search.toLowerCase();
+    const q = search.trim().toLowerCase();
     return users.filter((u) => {
-      const name = (u.fullName || `${u.firstName} ${u.lastName}`).toLowerCase();
-      const email = (u.email || '').toLowerCase();
-      const phone = (u.phone || '').toLowerCase();
-      return name.includes(q) || email.includes(q) || phone.includes(q);
+      if (q) {
+        const name = (u.fullName || `${u.firstName} ${u.lastName}`).toLowerCase();
+        const email = (u.email || '').toLowerCase();
+        const phone = (u.phone || '').toLowerCase();
+        if (!name.includes(q) && !email.includes(q) && !phone.includes(q)) return false;
+      }
+      const createdIso = getMoscowDateKey(u.createdAt);
+      if (createdFrom && (!createdIso || createdIso < createdFrom)) return false;
+      if (createdTo && (!createdIso || createdIso > createdTo)) return false;
+      return true;
     });
-  }, [users, search]);
+  }, [users, search, createdFrom, createdTo]);
 
   return {
     users: filteredUsers,
+    veterinarians,
+    speciesList,
+    services,
     loading,
     error,
     reload: loadUsers,
@@ -175,6 +230,10 @@ export function useAdminUsers() {
     setRoleFilter,
     search,
     setSearch,
+    createdFrom,
+    setCreatedFrom,
+    createdTo,
+    setCreatedTo,
     selectedUser,
     setSelectedUser,
     userPets,
@@ -185,6 +244,8 @@ export function useAdminUsers() {
     setIsCreateOpen,
     isEditOpen,
     setIsEditOpen,
+    vetOfferUser,
+    closeVetOffer: useCallback(() => setVetOfferUser(null), []),
     isDeleteConfirmOpen,
     openDeleteConfirm,
     closeDeleteConfirm,

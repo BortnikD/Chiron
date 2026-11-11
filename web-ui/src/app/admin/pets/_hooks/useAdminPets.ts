@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { adminApi } from '@/modules/admin/api';
 import { clinicApi } from '@/modules/clinic/api';
 import type {
@@ -11,8 +12,9 @@ import type {
   UpdatePetRequest,
   CreateVaccinationRequest,
 } from '@/modules/client/types';
-import type { Species } from '@/modules/clinic/types';
-import { formatApiError } from '@/shared/lib';
+import type { Service, Species, Veterinarian } from '@/modules/clinic/types';
+import { useToast } from '@/shared/components';
+import { fetchAllPages, formatApiError } from '@/shared/lib';
 import type { User } from '@/shared/types';
 import type { GenderFilter, StatusFilter } from '../_components/types';
 
@@ -21,13 +23,22 @@ function getErrMsg(err: unknown, fallback: string): string {
 }
 
 export function useAdminPets() {
+  const searchParams = useSearchParams();
+  const { toast } = useToast();
+
+  const initialSel = searchParams.get('sel');
+  const initialOwner = searchParams.get('ownerId') || 'ALL';
+
   const [pets, setPets] = useState<Pet[]>([]);
   const [speciesList, setSpeciesList] = useState<Species[]>([]);
   const [users, setUsers] = useState<User[]>([]);
+  const [services, setServices] = useState<Service[]>([]);
+  const [veterinarians, setVeterinarians] = useState<Veterinarian[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   const [search, setSearch] = useState('');
+  const [ownerFilter, setOwnerFilter] = useState(initialOwner);
   const [speciesFilter, setSpeciesFilter] = useState('ALL');
   const [genderFilter, setGenderFilter] = useState<GenderFilter>('ALL');
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('ALL');
@@ -47,6 +58,7 @@ export function useAdminPets() {
 
   const loadReqIdRef = useRef(0);
   const detailsReqIdRef = useRef(0);
+  const appliedSelRef = useRef<string | null>(null);
 
   const loadData = useCallback(async () => {
     const reqId = ++loadReqIdRef.current;
@@ -55,31 +67,57 @@ export function useAdminPets() {
     try {
       const isArchived =
         statusFilter === 'ACTIVE' ? false : statusFilter === 'ARCHIVED' ? true : undefined;
-      const [petsRes, speciesRes, usersRes] = await Promise.all([
-        adminApi.getPets(0, 100, {
-          speciesId: speciesFilter !== 'ALL' ? speciesFilter : undefined,
-          isArchived,
-        }),
+      const [safePets, speciesRes, safeUsers, servicesRes, vetsRes] = await Promise.all([
+        fetchAllPages(
+          (p, s) =>
+            adminApi.getPets(p, s, {
+              ownerId: ownerFilter !== 'ALL' ? ownerFilter : undefined,
+              speciesId: speciesFilter !== 'ALL' ? speciesFilter : undefined,
+              isArchived,
+            }),
+          { pageSize: 100, maxPages: 50, concurrency: 4 }
+        ),
         clinicApi.getSpecies(),
-        adminApi.getUsers(0, 100),
+        fetchAllPages((p, s) => adminApi.getUsers(p, s), { pageSize: 100, maxPages: 50, concurrency: 4 }),
+        adminApi.getServices(),
+        adminApi.getVeterinarians(),
       ]);
 
       if (reqId !== loadReqIdRef.current) return;
 
-      const safePets = petsRes?.items || [];
       setPets(safePets);
       setSpeciesList(Array.isArray(speciesRes) ? speciesRes : []);
-      setUsers(usersRes?.items || []);
-      setSelectedPet((prev) => (prev ? safePets.find((p) => p.id === prev.id) ?? null : null));
+      setUsers(safeUsers);
+      setServices(Array.isArray(servicesRes) ? servicesRes : []);
+      setVeterinarians(
+        (Array.isArray(vetsRes) ? vetsRes : []).map((v) =>
+          v.user ? v : { ...v, user: safeUsers.find((u) => u.id === v.userId) }
+        )
+      );
+
+      if (initialSel && appliedSelRef.current !== initialSel) {
+        appliedSelRef.current = initialSel;
+        const found = safePets.find((p) => p.id === initialSel);
+        if (found) {
+          setSelectedPet(found);
+        } else {
+          try {
+            const byId = await adminApi.getPetById(initialSel);
+            if (reqId === loadReqIdRef.current && byId) setSelectedPet(byId);
+          } catch {
+            // ignore
+          }
+        }
+      } else {
+        setSelectedPet((prev) => (prev ? safePets.find((p) => p.id === prev.id) ?? prev : null));
+      }
     } catch (err: unknown) {
       if (reqId !== loadReqIdRef.current) return;
       setError(getErrMsg(err, 'Не удалось загрузить список питомцев.'));
     } finally {
-      if (reqId === loadReqIdRef.current) {
-        setLoading(false);
-      }
+      if (reqId === loadReqIdRef.current) setLoading(false);
     }
-  }, [speciesFilter, statusFilter]);
+  }, [ownerFilter, speciesFilter, statusFilter, initialSel]);
 
   const loadPetDetails = useCallback(async (petId: string) => {
     const reqId = ++detailsReqIdRef.current;
@@ -97,9 +135,7 @@ export function useAdminPets() {
       if (reqId !== detailsReqIdRef.current) return;
       setDetailsError(getErrMsg(err, 'Не удалось загрузить историю питомца.'));
     } finally {
-      if (reqId === detailsReqIdRef.current) {
-        setLoadingDetails(false);
-      }
+      if (reqId === detailsReqIdRef.current) setLoadingDetails(false);
     }
   }, []);
 
@@ -125,41 +161,46 @@ export function useAdminPets() {
   const createPet = useCallback(
     async (payload: CreatePetRequest) => {
       const created = await adminApi.createPet(payload);
+      toast('Питомец добавлен', created.name);
       await loadData();
       if (created) setSelectedPet(created);
       return created;
     },
-    [loadData]
+    [loadData, toast]
   );
 
   const updatePet = useCallback(
     async (id: string, payload: UpdatePetRequest) => {
       const updated = await adminApi.updatePet(id, payload);
+      toast('Данные питомца обновлены');
       await loadData();
       return updated;
     },
-    [loadData]
+    [loadData, toast]
   );
 
   const createVaccination = useCallback(
     async (payload: CreateVaccinationRequest) => {
       const created = await adminApi.createVaccination(payload);
+      toast('Прививка внесена', created.name);
       await loadPetDetails(payload.petId);
       return created;
     },
-    [loadPetDetails]
+    [loadPetDetails, toast]
   );
 
   const handleToggleArchive = useCallback(async () => {
     if (!selectedPet) return;
     setActionError(null);
+    const nextArchived = !selectedPet.isArchived;
     try {
-      await adminApi.updatePet(selectedPet.id, { isArchived: !selectedPet.isArchived });
+      await adminApi.updatePet(selectedPet.id, { isArchived: nextArchived });
+      toast(nextArchived ? 'Питомец перенесён в архив' : 'Питомец возвращён из архива');
       await loadData();
     } catch (err: unknown) {
       setActionError(getErrMsg(err, 'Ошибка обновления статуса питомца'));
     }
-  }, [selectedPet, loadData]);
+  }, [selectedPet, loadData, toast]);
 
   const openDeleteConfirm = useCallback(() => {
     setDeleteError(null);
@@ -178,6 +219,7 @@ export function useAdminPets() {
     try {
       await adminApi.deletePet(selectedPet.id);
       setIsDeleteConfirmOpen(false);
+      toast('Питомец удалён', selectedPet.name);
       setSelectedPet(null);
       await loadData();
     } catch (err: unknown) {
@@ -185,7 +227,7 @@ export function useAdminPets() {
     } finally {
       setDeleting(false);
     }
-  }, [selectedPet, loadData]);
+  }, [selectedPet, loadData, toast]);
 
   const filteredPets = useMemo(() => {
     return pets.filter((p) => {
@@ -204,11 +246,15 @@ export function useAdminPets() {
     pets: filteredPets,
     speciesList,
     users,
+    services,
+    veterinarians,
     loading,
     error,
     reload: loadData,
     search,
     setSearch,
+    ownerFilter,
+    setOwnerFilter,
     speciesFilter,
     setSpeciesFilter,
     genderFilter,

@@ -1,8 +1,10 @@
 'use client';
 
-import React from 'react';
+import React, { useMemo } from 'react';
 import { Search, Plus } from 'lucide-react';
 import type { Pet } from '@/modules/client/types';
+import type { User } from '@/shared/types';
+import { DatePicker, SearchCombobox, type SearchComboboxOption } from '@/shared/components';
 import type { VaccinationStatusTone } from './types';
 import { STATUS_FILTERS } from './constants';
 
@@ -11,40 +13,69 @@ export interface VaccinationsFiltersProps {
   onSearchChange: (value: string) => void;
   selectedPetId: string;
   onPetChange: (petId: string) => void;
+  nextDueFrom: string;
+  onNextDueFromChange: (iso: string) => void;
+  nextDueTo: string;
+  onNextDueToChange: (iso: string) => void;
   statusFilter: VaccinationStatusTone;
   onStatusFilterChange: (status: VaccinationStatusTone) => void;
   pets: Pet[];
+  users: User[];
   onCreateClick: () => void;
 }
 
 /**
- * Панель фильтров: поиск по названию вакцины или питомцу, выбор питомца, статуса ревакцинации.
+ * Панель фильтров вакцинаций: питомец (SearchCombobox), вакцина, диапазон ревакцинации (DatePicker), статус (.seg).
  */
 export const VaccinationsFilters: React.FC<VaccinationsFiltersProps> = ({
   search,
   onSearchChange,
   selectedPetId,
   onPetChange,
+  nextDueFrom,
+  onNextDueFromChange,
+  nextDueTo,
+  onNextDueToChange,
   statusFilter,
   onStatusFilterChange,
   pets,
+  users,
   onCreateClick,
 }) => {
+  const petOptions = useMemo<SearchComboboxOption[]>(
+    () => [
+      { value: 'all', label: 'Все питомцы' },
+      ...pets.map((p) => ({
+        value: p.id,
+        label: p.name,
+        hint: users.find((u) => u.id === p.ownerId)?.fullName || undefined,
+      })),
+    ],
+    [pets, users]
+  );
+
   return (
     <section
       className="island filters"
-      style={{
-        display: 'flex',
-        flexWrap: 'wrap',
-        gap: '12px',
-        alignItems: 'flex-end',
-        marginBottom: '14px',
-      }}
-      aria-label="Фильтры вакцинаций"
+      style={{ marginBottom: '14px' }}
+      aria-label="Фильтры прививок"
     >
-      <div className="field" style={{ minWidth: '220px', flex: 1 }}>
+      <div className="field" style={{ minWidth: '185px' }}>
+        <label className="field-label" htmlFor="vx-pet-filter">
+          Питомец
+        </label>
+        <SearchCombobox
+          id="vx-pet-filter"
+          value={selectedPetId}
+          options={petOptions}
+          onChange={onPetChange}
+          placeholder="Все питомцы"
+        />
+      </div>
+
+      <div className="field" style={{ minWidth: '200px', flex: 1 }}>
         <label className="field-label" htmlFor="vx-search">
-          Поиск вакцины или питомца
+          Вакцина
         </label>
         <div className="input-icon">
           <Search className="ic" />
@@ -58,33 +89,40 @@ export const VaccinationsFilters: React.FC<VaccinationsFiltersProps> = ({
         </div>
       </div>
 
-      <div className="field" style={{ minWidth: '180px' }}>
-        <label className="field-label" htmlFor="vx-pet-filter">
-          Питомец
+      <div className="field" style={{ width: '150px' }}>
+        <label className="field-label" htmlFor="vx-from">
+          Ревакцинация с
         </label>
-        <select
-          id="vx-pet-filter"
-          className="select"
-          value={selectedPetId}
-          onChange={(e) => onPetChange(e.target.value)}
-        >
-          <option value="all">Все питомцы</option>
-          {pets.map((p) => (
-            <option key={p.id} value={p.id}>
-              {p.name}
-            </option>
-          ))}
-        </select>
+        <DatePicker
+          id="vx-from"
+          value={nextDueFrom}
+          max={nextDueTo || undefined}
+          onChange={onNextDueFromChange}
+          ariaLabel="Ревакцинация с"
+        />
       </div>
 
-      <div className="field">
-        <span className="field-label">Статус ревакцинации</span>
+      <div className="field" style={{ width: '150px' }}>
+        <label className="field-label" htmlFor="vx-to">
+          по
+        </label>
+        <DatePicker
+          id="vx-to"
+          value={nextDueTo}
+          min={nextDueFrom || undefined}
+          onChange={onNextDueToChange}
+          ariaLabel="Ревакцинация по"
+        />
+      </div>
+
+      <div className="field" style={{ width: 'auto' }}>
+        <span className="field-label">Статус</span>
         <div className="seg" role="tablist">
           {STATUS_FILTERS.map((item) => (
             <button
               key={item.value}
               type="button"
-              className={`seg-item ${statusFilter === item.value ? 'on font-semibold' : ''}`}
+              className={`seg-item ${statusFilter === item.value ? 'on' : ''}`}
               onClick={() => onStatusFilterChange(item.value)}
             >
               {item.label}
@@ -93,14 +131,11 @@ export const VaccinationsFilters: React.FC<VaccinationsFiltersProps> = ({
         </div>
       </div>
 
-      <button
-        type="button"
-        className="btn btn-primary"
-        onClick={onCreateClick}
-        style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}
-      >
-        <Plus className="ic" style={{ width: '16px', height: '16px' }} />
-        <span>Вакцинация</span>
+      <div className="spacer" />
+
+      <button type="button" className="btn btn-primary" onClick={onCreateClick}>
+        <Plus className="ic" size={16} />
+        <span>Добавить прививку</span>
       </button>
     </section>
   );

@@ -3,13 +3,16 @@
 import React, { useMemo } from 'react';
 import { Syringe, Edit2, Trash2 } from 'lucide-react';
 import type { Vaccination, Pet } from '@/modules/client/types';
-import { formatIsoDateDisplay } from '@/shared/lib';
+import type { Species } from '@/modules/clinic/types';
+import { SpeciesIcon } from '@/components/ui/SpeciesIcon';
+import { formatIsoDateDisplay, getSpeciesTone } from '@/shared/lib';
 import { calculateVaccinationStatus } from './utils';
 import { VACCINATIONS_TABLE_COLS } from './constants';
 
 export interface VaccinationsTableProps {
   vaccinations: Vaccination[];
   pets: Pet[];
+  speciesList: Species[];
   selectedVaccination?: Vaccination | null;
   loading: boolean;
   onSelect: (vaccination: Vaccination) => void;
@@ -18,11 +21,12 @@ export interface VaccinationsTableProps {
 }
 
 /**
- * Таблица списка вакцинаций (.dtable, дата, питомец, вакцина, доза, следующая ревакцинация, бейдж статуса).
+ * Таблица списка вакцинаций (.dtable, дата, питомец, вакцина, следующая ревакцинация, бейдж статуса).
  */
 export const VaccinationsTable: React.FC<VaccinationsTableProps> = ({
   vaccinations,
   pets,
+  speciesList,
   selectedVaccination,
   loading,
   onSelect,
@@ -40,7 +44,7 @@ export const VaccinationsTable: React.FC<VaccinationsTableProps> = ({
       <div className="island-head">
         <span className="island-title">
           <Syringe className="ic" />
-          Вакцинации
+          Прививки
           <span className="count">Найдено: {vaccinations.length}</span>
         </span>
       </div>
@@ -58,7 +62,7 @@ export const VaccinationsTable: React.FC<VaccinationsTableProps> = ({
           <div className="thead">
             <span>Питомец</span>
             <span>Вакцина</span>
-            <span>Введено</span>
+            <span>Введена ↓</span>
             <span>Следующая</span>
             <span>Срок</span>
             <span className="right">Действия</span>
@@ -69,6 +73,10 @@ export const VaccinationsTable: React.FC<VaccinationsTableProps> = ({
               const isSelected = selectedVaccination?.id === v.id;
               const pet = petMap.get(v.petId);
               const petName = pet?.name || 'Питомец';
+              const tone = getSpeciesTone(
+                pet?.species?.name || pet?.speciesName || pet?.speciesId,
+                speciesList
+              );
               const vaxName = v.name || v.vaccineName || 'Вакцинация';
               const adminRaw = v.administeredOn || v.administeredAt;
               const nextDueRaw = v.nextDueOn || v.validUntil;
@@ -92,15 +100,15 @@ export const VaccinationsTable: React.FC<VaccinationsTableProps> = ({
                   }}
                 >
                   <span className="pet-cell">
-                    <span className="avatar sm font-bold bg-[var(--primary)] text-[var(--primary-foreground)]">
-                      {petName.charAt(0).toUpperCase()}
+                    <span className={`t-ava xs tone-${tone}`}>
+                      <SpeciesIcon species={tone} size={14} />
                     </span>
                     <span className="cell-main">{petName}</span>
                   </span>
 
-                  <span className="font-semibold">{vaxName}</span>
-                  <span className="tnum font-mono">{adminDate}</span>
-                  <span className="tnum font-mono">{nextDue || '—'}</span>
+                  <span className="cell-main">{vaxName}</span>
+                  <span className="tnum">{adminDate}</span>
+                  <span className="tnum">{nextDue || '—'}</span>
 
                   <span>
                     <span className={`badge ${status.cls}`}>{status.label}</span>
@@ -117,20 +125,19 @@ export const VaccinationsTable: React.FC<VaccinationsTableProps> = ({
                         onEdit(v);
                       }}
                     >
-                      <Edit2 className="ic" style={{ width: '13px', height: '13px' }} />
+                      <Edit2 className="ic" size={14} />
                     </button>
                     <button
                       type="button"
-                      className="btn btn-ghost btn-icon btn-sm"
+                      className="btn btn-ghost btn-icon btn-sm text-destructive"
                       aria-label={`Удалить вакцинацию «${vaxName}»`}
                       title="Удалить"
-                      style={{ color: 'var(--destructive)' }}
                       onClick={(e) => {
                         e.stopPropagation();
                         onDelete(v.id);
                       }}
                     >
-                      <Trash2 className="ic" style={{ width: '13px', height: '13px' }} />
+                      <Trash2 className="ic" size={14} />
                     </button>
                   </span>
                 </div>
@@ -147,7 +154,7 @@ export const VaccinationsTable: React.FC<VaccinationsTableProps> = ({
 
         {!loading && vaccinations.length === 0 && (
           <div className="empty">
-            <span className="empty-title">Записей по заданным критериям не найдено</span>
+            <span className="empty-title">Ничего не найдено</span>
           </div>
         )}
       </div>

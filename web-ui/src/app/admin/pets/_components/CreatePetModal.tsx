@@ -1,8 +1,15 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { AlertCircle, X } from 'lucide-react';
-import { formatApiError } from '@/shared/lib';
+import {
+  DatePicker,
+  FilterDropdown,
+  SearchCombobox,
+  type FilterDropdownOption,
+  type SearchComboboxOption,
+} from '@/shared/components';
+import { formatApiError, getMoscowTodayIso } from '@/shared/lib';
 import type { CreatePetModalProps, CreatePetFormData } from './types';
 import { DEFAULT_CREATE_FORM } from './constants';
 
@@ -19,14 +26,32 @@ export const CreatePetModal: React.FC<CreatePetModalProps> = ({
   const [form, setForm] = useState<CreatePetFormData>(DEFAULT_CREATE_FORM);
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
+  const todayIso = getMoscowTodayIso();
+
+  const ownerOptions = useMemo<SearchComboboxOption[]>(() => {
+    const clients = users.filter((u) => u.role === 'CLIENT');
+    const source = clients.length > 0 ? clients : users;
+    return source.map((u) => ({
+      value: u.id,
+      label: u.fullName || u.email,
+      hint: u.phone || u.email,
+    }));
+  }, [users]);
+
+  const speciesOptions = useMemo<FilterDropdownOption[]>(
+    () => speciesList.map((s) => ({ value: s.id, label: s.name })),
+    [speciesList]
+  );
 
   useEffect(() => {
     if (isOpen) {
       setCreateError(null);
+      const clients = users.filter((u) => u.role === 'CLIENT');
+      const firstOwner = (clients[0] || users[0])?.id || '';
       setForm({
         ...DEFAULT_CREATE_FORM,
         speciesId: speciesList[0]?.id || '',
-        ownerId: users[0]?.id || '',
+        ownerId: firstOwner,
       });
     }
   }, [isOpen, speciesList, users]);
@@ -104,20 +129,13 @@ export const CreatePetModal: React.FC<CreatePetModalProps> = ({
               <label className="field-label" htmlFor="cr-powner">
                 Владелец <span className="req">*</span>
               </label>
-              <select
+              <SearchCombobox
                 id="cr-powner"
-                className="select"
                 value={form.ownerId}
-                onChange={(e) => setForm({ ...form, ownerId: e.target.value })}
-                required
-              >
-                <option value="">Выберите владельца…</option>
-                {users.map((u) => (
-                  <option key={u.id} value={u.id}>
-                    {u.fullName} ({u.email})
-                  </option>
-                ))}
-              </select>
+                options={ownerOptions}
+                onChange={(ownerId) => setForm({ ...form, ownerId })}
+                placeholder="Выберите владельца…"
+              />
             </div>
 
             <div className="form-grid">
@@ -138,20 +156,13 @@ export const CreatePetModal: React.FC<CreatePetModalProps> = ({
                 <label className="field-label" htmlFor="cr-pspecies">
                   Вид <span className="req">*</span>
                 </label>
-                <select
+                <FilterDropdown
                   id="cr-pspecies"
-                  className="select"
                   value={form.speciesId}
-                  onChange={(e) => setForm({ ...form, speciesId: e.target.value })}
-                  required
-                >
-                  <option value="">Выберите вид…</option>
-                  {speciesList.map((s) => (
-                    <option key={s.id} value={s.id}>
-                      {s.name}
-                    </option>
-                  ))}
-                </select>
+                  options={speciesOptions}
+                  onChange={(speciesId) => setForm({ ...form, speciesId })}
+                  placeholder="Выберите вид…"
+                />
               </div>
 
               <div className="field">
@@ -179,8 +190,9 @@ export const CreatePetModal: React.FC<CreatePetModalProps> = ({
                 <input
                   id="cr-pweight"
                   type="number"
-                  step="0.1"
+                  step="0.01"
                   min="0"
+                  max="9999.99"
                   className="input"
                   value={form.weightKg}
                   onChange={(e) => setForm({ ...form, weightKg: e.target.value })}
@@ -189,12 +201,12 @@ export const CreatePetModal: React.FC<CreatePetModalProps> = ({
 
               <div className="field span-2">
                 <label className="field-label" htmlFor="cr-pbirth">Дата рождения</label>
-                <input
+                <DatePicker
                   id="cr-pbirth"
-                  type="date"
-                  className="input"
                   value={form.birthDate}
-                  onChange={(e) => setForm({ ...form, birthDate: e.target.value })}
+                  max={todayIso}
+                  onChange={(birthDate) => setForm({ ...form, birthDate })}
+                  ariaLabel="Дата рождения питомца"
                 />
               </div>
 
@@ -204,6 +216,7 @@ export const CreatePetModal: React.FC<CreatePetModalProps> = ({
                   id="cr-pnotes"
                   className="textarea"
                   rows={2}
+                  maxLength={2000}
                   value={form.notes}
                   onChange={(e) => setForm({ ...form, notes: e.target.value })}
                 />

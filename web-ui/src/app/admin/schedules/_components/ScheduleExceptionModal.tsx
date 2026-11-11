@@ -1,18 +1,24 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { X, AlertCircle } from 'lucide-react';
 import type { ScheduleException } from '@/modules/admin/types';
 import type { Veterinarian } from '@/modules/clinic/types';
+import {
+  DatePicker,
+  SearchCombobox,
+  type SearchComboboxOption,
+} from '@/shared/components';
 import type { ScheduleExceptionType } from '@/shared/types';
 import { formatApiError, getMoscowTodayIso, timeToMinutes } from '@/shared/lib';
 import { getDoctorDisplay } from '@/utils/doctorHelpers';
-import type { ScheduleExceptionSavePayload } from '../_hooks/useAdminSchedules';
+import type { ScheduleExceptionSavePayload } from './types';
 
 export interface ScheduleExceptionModalProps {
   isOpen: boolean;
   exception?: ScheduleException | null;
   vets: Veterinarian[];
+  specsMap?: Record<string, string>;
   defaultVetId?: string;
   onClose: () => void;
   onSave: (data: ScheduleExceptionSavePayload) => Promise<void>;
@@ -22,6 +28,7 @@ export const ScheduleExceptionModal: React.FC<ScheduleExceptionModalProps> = ({
   isOpen,
   exception,
   vets,
+  specsMap,
   defaultVetId,
   onClose,
   onSave,
@@ -37,6 +44,15 @@ export const ScheduleExceptionModal: React.FC<ScheduleExceptionModalProps> = ({
   const [reason, setReason] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+
+  const vetOptions = useMemo<SearchComboboxOption[]>(
+    () =>
+      vets.map((v) => {
+        const doc = getDoctorDisplay(v, specsMap);
+        return { value: v.id, label: doc.fullName, hint: doc.specName };
+      }),
+    [vets, specsMap]
+  );
 
   useEffect(() => {
     if (!isOpen) return;
@@ -80,14 +96,14 @@ export const ScheduleExceptionModal: React.FC<ScheduleExceptionModalProps> = ({
       return;
     }
     if (!startDate || !endDate || endDate < startDate) {
-      setError('Дата окончания не может быть раньше даты начала');
+      setError('Дата «по» не может быть раньше даты «с»');
       return;
     }
     if (
       type === 'CUSTOM_HOURS' &&
       (!startTime || !endTime || timeToMinutes(endTime) <= timeToMinutes(startTime))
     ) {
-      setError('Для особых часов укажите корректное время начала и окончания');
+      setError('Для особых часов укажите время с–по');
       return;
     }
 
@@ -136,140 +152,145 @@ export const ScheduleExceptionModal: React.FC<ScheduleExceptionModalProps> = ({
               <X className="ic" />
             </button>
           </div>
-          <p className="dialog-desc">Отпуск, болезнь, командировка или индивидуальные часы работы</p>
+          <p className="dialog-desc">
+            Диапазон дат включительно. «Особые часы» заменяют недельные часы, перерыв не
+            применяется.
+          </p>
         </div>
 
-        <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', flex: 1 }}>
+        <form
+          onSubmit={handleSubmit}
+          style={{ display: 'flex', flexDirection: 'column', minHeight: 0, flex: 1 }}
+        >
           <div className="dialog-body">
+            <div className="field">
+              <label className="field-label" htmlFor="exc-vet">
+                Врач <span className="req">*</span>
+              </label>
+              <SearchCombobox
+                id="exc-vet"
+                value={vetId}
+                options={vetOptions}
+                onChange={setVetId}
+                disabled={saving || isEdit}
+                placeholder="Найдите врача…"
+                ariaLabel="Найдите врача"
+              />
+            </div>
+
+            <div className="field">
+              <span className="field-label">
+                Тип <span className="req">*</span>
+              </span>
+              <div className="seg">
+                <button
+                  type="button"
+                  className={`seg-item ${type === 'ABSENCE' ? 'on' : ''}`}
+                  onClick={() => setType('ABSENCE')}
+                  disabled={saving}
+                >
+                  Отсутствие
+                </button>
+                <button
+                  type="button"
+                  className={`seg-item ${type === 'CUSTOM_HOURS' ? 'on' : ''}`}
+                  onClick={() => setType('CUSTOM_HOURS')}
+                  disabled={saving}
+                >
+                  Особые часы
+                </button>
+              </div>
+            </div>
+
+            <div className="form-grid">
+              <div className="field">
+                <label className="field-label" htmlFor="exc-sdate">
+                  С <span className="req">*</span>
+                </label>
+                <DatePicker
+                  id="exc-sdate"
+                  value={startDate}
+                  onChange={setStartDate}
+                  clearable={false}
+                  disabled={saving}
+                  ariaLabel="Дата с"
+                />
+              </div>
+
+              <div className="field">
+                <label className="field-label" htmlFor="exc-edate">
+                  По <span className="req">*</span>
+                </label>
+                <DatePicker
+                  id="exc-edate"
+                  value={endDate}
+                  min={startDate || undefined}
+                  onChange={setEndDate}
+                  clearable={false}
+                  disabled={saving}
+                  ariaLabel="Дата по"
+                />
+              </div>
+
+              {type === 'CUSTOM_HOURS' && (
+                <>
+                  <div className="field">
+                    <label className="field-label" htmlFor="exc-stime">
+                      Время с <span className="req">*</span>
+                    </label>
+                    <input
+                      id="exc-stime"
+                      type="time"
+                      step={900}
+                      className="input"
+                      value={startTime}
+                      onChange={(e) => setStartTime(e.target.value)}
+                      disabled={saving}
+                      required
+                    />
+                  </div>
+
+                  <div className="field">
+                    <label className="field-label" htmlFor="exc-etime">
+                      Время по <span className="req">*</span>
+                    </label>
+                    <input
+                      id="exc-etime"
+                      type="time"
+                      step={900}
+                      className="input"
+                      value={endTime}
+                      onChange={(e) => setEndTime(e.target.value)}
+                      disabled={saving}
+                      required
+                    />
+                  </div>
+                </>
+              )}
+
+              <div className="field span-2">
+                <label className="field-label" htmlFor="exc-reason">
+                  Причина
+                </label>
+                <textarea
+                  id="exc-reason"
+                  className="textarea"
+                  style={{ minHeight: 60 }}
+                  maxLength={1000}
+                  placeholder="Например: Отпуск, Конференция, Вечерний приём"
+                  value={reason}
+                  onChange={(e) => setReason(e.target.value)}
+                  disabled={saving}
+                />
+              </div>
+            </div>
+
             {error && (
-              <div className="alert alert-destructive" role="alert" style={{ marginBottom: '12px' }}>
+              <div className="alert alert-destructive" role="alert">
                 <AlertCircle className="ic" />
                 <span>{error}</span>
               </div>
             )}
-
-            <div className="col" style={{ gap: '12px' }}>
-              <div className="field">
-                <label className="field-label" htmlFor="exc-vet">Врач</label>
-                <select
-                  id="exc-vet"
-                  className="select"
-                  value={vetId}
-                  onChange={(e) => setVetId(e.target.value)}
-                  disabled={saving || isEdit}
-                  required
-                >
-                  {vets.map((v) => (
-                    <option key={v.id} value={v.id}>
-                      {getDoctorDisplay(v).fullName}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="field">
-                <span className="field-label">Тип исключения</span>
-                <div className="seg">
-                  <button
-                    type="button"
-                    className={`seg-item ${type === 'ABSENCE' ? 'on' : ''}`}
-                    onClick={() => setType('ABSENCE')}
-                    disabled={saving}
-                  >
-                    Отсутствие
-                  </button>
-                  <button
-                    type="button"
-                    className={`seg-item ${type === 'CUSTOM_HOURS' ? 'on' : ''}`}
-                    onClick={() => setType('CUSTOM_HOURS')}
-                    disabled={saving}
-                  >
-                    Особые часы
-                  </button>
-                </div>
-              </div>
-
-              <div className="form-grid">
-                <div className="field">
-                  <label className="field-label" htmlFor="exc-sdate">
-                    С даты <span className="req">*</span>
-                  </label>
-                  <input
-                    id="exc-sdate"
-                    type="date"
-                    className="input"
-                    value={startDate}
-                    onChange={(e) => setStartDate(e.target.value)}
-                    disabled={saving}
-                    required
-                  />
-                </div>
-
-                <div className="field">
-                  <label className="field-label" htmlFor="exc-edate">
-                    По дату <span className="req">*</span>
-                  </label>
-                  <input
-                    id="exc-edate"
-                    type="date"
-                    className="input"
-                    value={endDate}
-                    onChange={(e) => setEndDate(e.target.value)}
-                    disabled={saving}
-                    required
-                  />
-                </div>
-
-                {type === 'CUSTOM_HOURS' && (
-                  <>
-                    <div className="field">
-                      <label className="field-label" htmlFor="exc-stime">
-                        Время с <span className="req">*</span>
-                      </label>
-                      <input
-                        id="exc-stime"
-                        type="time"
-                        step={900}
-                        className="input"
-                        value={startTime}
-                        onChange={(e) => setStartTime(e.target.value)}
-                        disabled={saving}
-                        required
-                      />
-                    </div>
-
-                    <div className="field">
-                      <label className="field-label" htmlFor="exc-etime">
-                        Время по <span className="req">*</span>
-                      </label>
-                      <input
-                        id="exc-etime"
-                        type="time"
-                        step={900}
-                        className="input"
-                        value={endTime}
-                        onChange={(e) => setEndTime(e.target.value)}
-                        disabled={saving}
-                        required
-                      />
-                    </div>
-                  </>
-                )}
-              </div>
-
-              <div className="field">
-                <label className="field-label" htmlFor="exc-reason">Причина</label>
-                <textarea
-                  id="exc-reason"
-                  className="textarea"
-                  placeholder="Например: Ежегодный отпуск, Обучение, Дежурство"
-                  value={reason}
-                  onChange={(e) => setReason(e.target.value)}
-                  disabled={saving}
-                  rows={2}
-                />
-              </div>
-            </div>
           </div>
 
           <div className="dialog-foot">
@@ -277,7 +298,7 @@ export const ScheduleExceptionModal: React.FC<ScheduleExceptionModalProps> = ({
               Отмена
             </button>
             <button type="submit" className="btn btn-primary" disabled={saving}>
-              {saving ? 'Сохранение...' : 'Сохранить'}
+              {saving ? 'Сохранение…' : isEdit ? 'Сохранить' : 'Создать'}
             </button>
           </div>
         </form>

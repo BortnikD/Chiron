@@ -1,14 +1,16 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { AlertCircle, X } from 'lucide-react';
 import type { Veterinarian, Specialization } from '@/modules/clinic/types';
 import type { User } from '@/shared/types';
+import { SearchCombobox, type SearchComboboxOption } from '@/shared/components';
 import { formatApiError } from '@/shared/lib';
 import type { CreateVetInput } from '../_hooks/useAdminVeterinarians';
 
 export interface AdminCreateVetModalProps {
   isOpen: boolean;
+  defaultUserId?: string;
   onClose: () => void;
   usersWithoutProfile: User[];
   specializations: Specialization[];
@@ -20,12 +22,13 @@ const INITIAL_FORM = {
   specializationId: '',
   bio: '',
   photoUrl: '',
-  experienceYears: 3,
+  experienceYears: 0,
   isActive: true,
 };
 
 export const AdminCreateVetModal: React.FC<AdminCreateVetModalProps> = ({
   isOpen,
+  defaultUserId = '',
   onClose,
   usersWithoutProfile,
   specializations,
@@ -35,13 +38,40 @@ export const AdminCreateVetModal: React.FC<AdminCreateVetModalProps> = ({
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
 
+  const userOptions = useMemo<SearchComboboxOption[]>(
+    () =>
+      usersWithoutProfile.map((u) => ({
+        value: u.id,
+        label: u.fullName || `${u.firstName} ${u.lastName}`.trim() || u.email,
+        hint: u.email,
+      })),
+    [usersWithoutProfile]
+  );
+
+  const specOptions = useMemo<SearchComboboxOption[]>(
+    () =>
+      specializations.map((s) => ({
+        value: s.id,
+        label: s.name,
+        hint: s.description || undefined,
+      })),
+    [specializations]
+  );
+
   useEffect(() => {
     if (isOpen) {
-      setCreateForm(INITIAL_FORM);
+      const matchedUser =
+        defaultUserId && usersWithoutProfile.some((u) => u.id === defaultUserId)
+          ? defaultUserId
+          : '';
+      setCreateForm({
+        ...INITIAL_FORM,
+        userId: matchedUser,
+      });
       setCreateError(null);
       setCreating(false);
     }
-  }, [isOpen]);
+  }, [isOpen, defaultUserId, usersWithoutProfile]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -68,7 +98,7 @@ export const AdminCreateVetModal: React.FC<AdminCreateVetModalProps> = ({
         specializationId: createForm.specializationId,
         bio: createForm.bio,
         photoUrl: createForm.photoUrl,
-        experienceYears: Number(createForm.experienceYears),
+        experienceYears: Number(createForm.experienceYears) || 0,
         isActive: createForm.isActive,
       });
       setCreateForm(INITIAL_FORM);
@@ -95,10 +125,10 @@ export const AdminCreateVetModal: React.FC<AdminCreateVetModalProps> = ({
         >
           <div className="col" style={{ gap: 4 }}>
             <span id="create-vet-title" className="dialog-title">
-              Создание профиля врача
+              Новый профиль врача
             </span>
             <span className="dialog-desc">
-              Привязка врача к учётной записи пользователя с ролью ВЕТЕРИНАР
+              Пользователь с ролью ветеринара, у которого ещё нет профиля
             </span>
           </div>
           <button
@@ -120,24 +150,20 @@ export const AdminCreateVetModal: React.FC<AdminCreateVetModalProps> = ({
               <label className="field-label" htmlFor="cr-vet-user">
                 Пользователь <span className="req">*</span>
               </label>
-              <select
+              <SearchCombobox
                 id="cr-vet-user"
-                className="select"
                 value={createForm.userId}
-                onChange={(e) => setCreateForm({ ...createForm, userId: e.target.value })}
-                required
-              >
-                <option value="">Выберите пользователя…</option>
-                {usersWithoutProfile.map((u) => (
-                  <option key={u.id} value={u.id}>
-                    {u.fullName} ({u.email})
-                  </option>
-                ))}
-              </select>
+                options={userOptions}
+                onChange={(val) => {
+                  setCreateForm({ ...createForm, userId: val });
+                  setCreateError(null);
+                }}
+                placeholder="Найдите пользователя…"
+                ariaLabel="Найдите пользователя"
+              />
               {usersWithoutProfile.length === 0 && (
-                <span className="field-hint" style={{ color: 'var(--amber-fg, #b45309)' }}>
-                  Нет свободных пользователей с ролью ВЕТЕРИНАР. Сначала создайте пользователя в
-                  разделе «Пользователи».
+                <span className="field-hint">
+                  Нет ветеринаров без профиля — сначала создайте пользователя с ролью «Ветеринар»
                 </span>
               )}
             </div>
@@ -146,22 +172,17 @@ export const AdminCreateVetModal: React.FC<AdminCreateVetModalProps> = ({
               <label className="field-label" htmlFor="cr-vet-spec">
                 Специализация <span className="req">*</span>
               </label>
-              <select
+              <SearchCombobox
                 id="cr-vet-spec"
-                className="select"
                 value={createForm.specializationId}
-                onChange={(e) =>
-                  setCreateForm({ ...createForm, specializationId: e.target.value })
-                }
-                required
-              >
-                <option value="">Выберите специализацию…</option>
-                {specializations.map((s) => (
-                  <option key={s.id} value={s.id}>
-                    {s.name}
-                  </option>
-                ))}
-              </select>
+                options={specOptions}
+                onChange={(val) => {
+                  setCreateForm({ ...createForm, specializationId: val });
+                  setCreateError(null);
+                }}
+                placeholder="Выберите специализацию"
+                ariaLabel="Выберите специализацию"
+              />
             </div>
 
             <div className="form-grid">
@@ -224,6 +245,7 @@ export const AdminCreateVetModal: React.FC<AdminCreateVetModalProps> = ({
                 <textarea
                   className="textarea"
                   id="cr-bio"
+                  maxLength={4000}
                   rows={2}
                   value={createForm.bio}
                   onChange={(e) => setCreateForm({ ...createForm, bio: e.target.value })}
@@ -248,7 +270,7 @@ export const AdminCreateVetModal: React.FC<AdminCreateVetModalProps> = ({
               className="btn btn-primary"
               disabled={creating || usersWithoutProfile.length === 0}
             >
-              {creating ? 'Создание…' : 'Создать врача'}
+              {creating ? 'Создание…' : 'Создать'}
             </button>
           </div>
         </form>

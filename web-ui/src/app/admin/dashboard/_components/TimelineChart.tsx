@@ -87,7 +87,7 @@ export function TimelineChart({
               className={`seg-item ${metric === 'count' ? 'on' : ''}`}
               onClick={() => handleMetricChange('count')}
             >
-              Записи
+              Количество
             </button>
             <button
               type="button"

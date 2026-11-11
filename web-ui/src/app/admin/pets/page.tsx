@@ -1,7 +1,9 @@
 'use client';
 
+import React, { Suspense } from 'react';
 import { AlertCircle, RefreshCw, X } from 'lucide-react';
-import { ConfirmModal } from '@/shared/components/ConfirmModal';
+import { useShellHeader } from '@/components/layout/AppShell';
+import { ConfirmModal } from '@/shared/components';
 import { useAdminPets } from './_hooks/useAdminPets';
 import { PetsFilters } from './_components/PetsFilters';
 import { PetsTable } from './_components/PetsTable';
@@ -10,11 +12,14 @@ import { CreatePetModal } from './_components/CreatePetModal';
 import { EditPetModal } from './_components/EditPetModal';
 import { AddVaccinationModal } from './_components/AddVaccinationModal';
 
-/**
- * Страница управления питомцами администратором клиники.
- */
-export default function AdminPetsPage() {
+function AdminPetsContent() {
   const vm = useAdminPets();
+
+  useShellHeader({
+    crumbGroup: 'Работа клиники',
+    crumb: 'Питомцы',
+    crumb2: vm.selectedPet?.name,
+  });
 
   return (
     <>
@@ -49,38 +54,63 @@ export default function AdminPetsPage() {
       <div className="content-row">
         <div className="content-col grow">
           <PetsFilters
-            speciesFilter={vm.speciesFilter} onSpeciesFilterChange={vm.setSpeciesFilter}
-            genderFilter={vm.genderFilter} onGenderFilterChange={vm.setGenderFilter}
-            statusFilter={vm.statusFilter} onStatusFilterChange={vm.setStatusFilter}
-            search={vm.search} onSearchChange={vm.setSearch}
-            speciesList={vm.speciesList} onOpenCreate={() => vm.setIsCreateOpen(true)}
+            ownerFilter={vm.ownerFilter}
+            onOwnerFilterChange={vm.setOwnerFilter}
+            speciesFilter={vm.speciesFilter}
+            onSpeciesFilterChange={vm.setSpeciesFilter}
+            genderFilter={vm.genderFilter}
+            onGenderFilterChange={vm.setGenderFilter}
+            statusFilter={vm.statusFilter}
+            onStatusFilterChange={vm.setStatusFilter}
+            search={vm.search}
+            onSearchChange={vm.setSearch}
+            speciesList={vm.speciesList}
+            users={vm.users}
+            onOpenCreate={() => vm.setIsCreateOpen(true)}
           />
           <PetsTable
-            pets={vm.pets} selectedPet={vm.selectedPet}
-            speciesList={vm.speciesList} users={vm.users}
-            loading={vm.loading} onSelectPet={vm.setSelectedPet}
+            pets={vm.pets}
+            selectedPet={vm.selectedPet}
+            speciesList={vm.speciesList}
+            users={vm.users}
+            loading={vm.loading}
+            onSelectPet={vm.setSelectedPet}
           />
         </div>
 
         {vm.selectedPet && (
           <PetDetailIsland
-            pet={vm.selectedPet} speciesList={vm.speciesList} users={vm.users}
-            appointments={vm.petAppointments} vaccinations={vm.petVaccinations}
-            loadingDetails={vm.loadingDetails} detailsError={vm.detailsError}
-            onClose={() => vm.setSelectedPet(null)} onEdit={() => vm.setIsEditOpen(true)}
-            onToggleArchive={vm.handleToggleArchive} onDelete={vm.openDeleteConfirm}
+            pet={vm.selectedPet}
+            speciesList={vm.speciesList}
+            users={vm.users}
+            services={vm.services}
+            veterinarians={vm.veterinarians}
+            appointments={vm.petAppointments}
+            vaccinations={vm.petVaccinations}
+            loadingDetails={vm.loadingDetails}
+            detailsError={vm.detailsError}
+            onClose={() => vm.setSelectedPet(null)}
+            onEdit={() => vm.setIsEditOpen(true)}
+            onToggleArchive={vm.handleToggleArchive}
+            onDelete={vm.openDeleteConfirm}
             onAddVaccination={() => vm.setIsAddVacOpen(true)}
           />
         )}
       </div>
 
       <CreatePetModal
-        isOpen={vm.isCreateOpen} onClose={() => vm.setIsCreateOpen(false)}
-        onCreate={vm.createPet} speciesList={vm.speciesList} users={vm.users}
+        isOpen={vm.isCreateOpen}
+        onClose={() => vm.setIsCreateOpen(false)}
+        onCreate={vm.createPet}
+        speciesList={vm.speciesList}
+        users={vm.users}
       />
       <EditPetModal
-        isOpen={vm.isEditOpen} pet={vm.selectedPet} speciesList={vm.speciesList}
-        onClose={() => vm.setIsEditOpen(false)} onUpdate={vm.updatePet}
+        isOpen={vm.isEditOpen}
+        pet={vm.selectedPet}
+        speciesList={vm.speciesList}
+        onClose={() => vm.setIsEditOpen(false)}
+        onUpdate={vm.updatePet}
       />
       <ConfirmModal
         isOpen={vm.isDeleteConfirmOpen && Boolean(vm.selectedPet)}
@@ -95,10 +125,31 @@ export default function AdminPetsPage() {
         onConfirm={vm.handleDeletePet}
       />
       <AddVaccinationModal
-        isOpen={vm.isAddVacOpen} pet={vm.selectedPet}
+        isOpen={vm.isAddVacOpen}
+        pet={vm.selectedPet}
         onClose={() => vm.setIsAddVacOpen(false)}
         onCreate={vm.createVaccination}
       />
     </>
+  );
+}
+
+/**
+ * Страница управления питомцами администратором клиники.
+ */
+export default function AdminPetsPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="island grow">
+          <div className="empty">
+            <span className="spinner" aria-hidden="true" />
+            <span className="muted">Загрузка питомцев…</span>
+          </div>
+        </div>
+      }
+    >
+      <AdminPetsContent />
+    </Suspense>
   );
 }

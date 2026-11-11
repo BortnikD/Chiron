@@ -1,13 +1,17 @@
 'use client';
 
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { adminApi } from '@/modules/admin/api';
 import { clinicApi } from '@/modules/clinic/api';
 import type { WorkSchedule, ScheduleException } from '@/modules/admin/types';
 import type { Veterinarian, Specialization, Species } from '@/modules/clinic/types';
 import type { User } from '@/shared/types';
-import { formatApiError, toIdNameMap } from '@/shared/lib';
+import { useToast } from '@/shared/components';
+import { fetchAllPages, formatApiError, toIdNameMap } from '@/shared/lib';
 import { getDoctorDisplay } from '@/utils/doctorHelpers';
+
+export type VetActiveFilter = 'ALL' | 'ACTIVE' | 'INACTIVE';
 
 export interface CreateVetInput {
   userId: string;
@@ -19,6 +23,11 @@ export interface CreateVetInput {
 }
 
 export function useAdminVeterinarians() {
+  const searchParams = useSearchParams();
+  const { toast } = useToast();
+  const initialSel = searchParams.get('sel');
+  const initialUserId = searchParams.get('userId');
+
   const [veterinarians, setVeterinarians] = useState<Veterinarian[]>([]);
   const [users, setUsers] = useState<User[]>([]);
   const [specializations, setSpecializations] = useState<Specialization[]>([]);
@@ -29,7 +38,9 @@ export function useAdminVeterinarians() {
 
   const [filterSpec, setFilterSpec] = useState<string>('ALL');
   const [filterSpecies, setFilterSpecies] = useState<string>('ALL');
+  const [filterActive, setFilterActive] = useState<VetActiveFilter>('ALL');
   const [selectedVet, setSelectedVet] = useState<Veterinarian | null>(null);
+  const [preferredDetailTab, setPreferredDetailTab] = useState<'profile' | 'species'>('profile');
 
   const [vetSchedules, setVetSchedules] = useState<WorkSchedule[]>([]);
   const [vetExceptions, setVetExceptions] = useState<ScheduleException[]>([]);
@@ -37,21 +48,28 @@ export function useAdminVeterinarians() {
   const [detailsError, setDetailsError] = useState<string | null>(null);
 
   const [isCreateOpen, setIsCreateOpen] = useState(false);
+  const [prefillUserId, setPrefillUserId] = useState<string>('');
   const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
 
   const loadReqIdRef = useRef(0);
   const detailsReqIdRef = useRef(0);
+  const appliedSelRef = useRef<string | null>(null);
+  const appliedUserIdRef = useRef<string | null>(null);
 
   const loadData = useCallback(async () => {
     const reqId = ++loadReqIdRef.current;
     setLoading(true);
     setError(null);
     try {
-      const [vetsData, usersData, specsData, speciesData] = await Promise.all([
+      const [vetsData, vetUsers, specsData, speciesData] = await Promise.all([
         adminApi.getVeterinarians(),
-        adminApi.getUsers(0, 100, 'VETERINARIAN'),
+        fetchAllPages((p, s) => adminApi.getUsers(p, s, 'VETERINARIAN'), {
+          pageSize: 100,
+          maxPages: 20,
+          concurrency: 4,
+        }),
         clinicApi.getSpecializations(),
         clinicApi.getSpecies(),
       ]);
@@ -65,19 +83,37 @@ export function useAdminVeterinarians() {
       );
 
       setVeterinarians(vets);
-      setUsers(usersData?.items || []);
+      setUsers(vetUsers);
       setSpecializations(Array.isArray(specsData) ? specsData : []);
       setSpeciesList(Array.isArray(speciesData) ? speciesData : []);
       setVetPermMap(Object.fromEntries(permEntries));
 
-      setSelectedVet((prev) => (prev ? vets.find((v) => v.id === prev.id) || null : null));
+      if (initialSel && appliedSelRef.current !== initialSel) {
+        appliedSelRef.current = initialSel;
+        const found = vets.find((v) => v.id === initialSel);
+        if (found) setSelectedVet(found);
+      } else if (initialUserId && appliedUserIdRef.current !== initialUserId) {
+        appliedUserIdRef.current = initialUserId;
+        const existing = vets.find((v) => v.userId === initialUserId);
+        if (existing) {
+          setSelectedVet(existing);
+        } else {
+          const targetUser = vetUsers.find((u) => u.id === initialUserId);
+          if (targetUser) {
+            setPrefillUserId(targetUser.id);
+            setIsCreateOpen(true);
+          }
+        }
+      } else {
+        setSelectedVet((prev) => (prev ? vets.find((v) => v.id === prev.id) || null : null));
+      }
     } catch (err: unknown) {
       if (loadReqIdRef.current !== reqId) return;
       setError(formatApiError(err, 'Не удалось загрузить список врачей'));
     } finally {
       if (loadReqIdRef.current === reqId) setLoading(false);
     }
-  }, []);
+  }, [initialSel, initialUserId]);
 
   useEffect(() => {
     void loadData();
@@ -126,11 +162,9 @@ export function useAdminVeterinarians() {
     };
   }, [selectedVet?.id, loadVetDetails]);
 
-  const usersMap = useMemo(
-    () => Object.fromEntries(users.map((u) => [u.id, u])),
-    [users]
-  );
+  const usersMap = useMemo(() => Object.fromEntries(users.map((u) => [u.id, u])), [users]);
   const specsMap = useMemo(() => toIdNameMap(specializations), [specializations]);
+  const speciesMap = useMemo(() => toIdNameMap(speciesList), [speciesList]);
 
   const filteredVets = useMemo(
     () =>
@@ -139,9 +173,11 @@ export function useAdminVeterinarians() {
         if (filterSpecies !== 'ALL' && !(vetPermMap[v.id] || []).includes(filterSpecies)) {
           return false;
         }
+        if (filterActive === 'ACTIVE' && !v.isActive) return false;
+        if (filterActive === 'INACTIVE' && v.isActive) return false;
         return true;
       }),
-    [veterinarians, filterSpec, filterSpecies, vetPermMap]
+    [veterinarians, filterSpec, filterSpecies, filterActive, vetPermMap]
   );
 
   const usersWithoutProfile = useMemo(
@@ -158,6 +194,7 @@ export function useAdminVeterinarians() {
   }, [selectedVet, usersMap, specsMap]);
 
   const selectVet = useCallback((vet: Veterinarian) => {
+    setPreferredDetailTab('profile');
     setSelectedVet((prev) => (prev?.id === vet.id ? prev : vet));
   }, []);
 
@@ -166,11 +203,14 @@ export function useAdminVeterinarians() {
   const createVeterinarian = useCallback(
     async (data: CreateVetInput): Promise<Veterinarian> => {
       const created = await adminApi.createVeterinarian(data);
+      setPreferredDetailTab('species');
       await loadData();
       setSelectedVet(created);
+      setPrefillUserId('');
+      toast('Профиль врача создан', 'Выдайте допуски к видам и задайте расписание');
       return created;
     },
-    [loadData]
+    [loadData, toast]
   );
 
   const updateVeterinarian = useCallback(
@@ -178,9 +218,10 @@ export function useAdminVeterinarians() {
       const updated = await adminApi.updateVeterinarian(id, data);
       await loadData();
       setSelectedVet((prev) => (prev?.id === id ? updated : prev));
+      toast('Профиль врача сохранён');
       return updated;
     },
-    [loadData]
+    [loadData, toast]
   );
 
   const toggleVetSpeciesPermission = useCallback(
@@ -199,12 +240,23 @@ export function useAdminVeterinarians() {
             : [...current, speciesId];
         return { ...prev, [vetId]: next };
       });
+      toast(
+        isCurrentlyPermitted ? 'Допуск отозван' : 'Допуск выдан',
+        speciesMap[speciesId] || undefined
+      );
     },
-    []
+    [speciesMap, toast]
   );
 
-  const openCreateModal = useCallback(() => setIsCreateOpen(true), []);
-  const closeCreateModal = useCallback(() => setIsCreateOpen(false), []);
+  const openCreateModal = useCallback(() => {
+    setPrefillUserId('');
+    setIsCreateOpen(true);
+  }, []);
+
+  const closeCreateModal = useCallback(() => {
+    setIsCreateOpen(false);
+    setPrefillUserId('');
+  }, []);
 
   const openDeleteModal = useCallback(() => {
     setDeleteError(null);
@@ -227,12 +279,13 @@ export function useAdminVeterinarians() {
       setIsDeleteConfirmOpen(false);
       setSelectedVet(null);
       await loadData();
+      toast('Профиль врача удалён');
     } catch (err: unknown) {
       setDeleteError(formatApiError(err, 'Ошибка при удалении профиля врача'));
     } finally {
       setDeleting(false);
     }
-  }, [selectedVet, loadData]);
+  }, [selectedVet, loadData, toast]);
 
   return {
     vets: filteredVets,
@@ -247,8 +300,11 @@ export function useAdminVeterinarians() {
     setFilterSpec,
     filterSpecies,
     setFilterSpecies,
+    filterActive,
+    setFilterActive,
     selectedVet,
     selectedVetName,
+    preferredDetailTab,
     selectVet,
     closeDetail,
     vetSchedules,
@@ -256,6 +312,7 @@ export function useAdminVeterinarians() {
     loadingDetails,
     detailsError,
     usersWithoutProfile,
+    prefillUserId,
     isCreateOpen,
     openCreateModal,
     closeCreateModal,

@@ -6,7 +6,7 @@ import type {
   UpdatePetRequest,
   CreateVaccinationRequest,
 } from '@/modules/client/types';
-import type { Species } from '@/modules/clinic/types';
+import type { Service, Species, Veterinarian } from '@/modules/clinic/types';
 import type { Gender, User } from '@/shared/types';
 
 export type GenderFilter = 'ALL' | 'MALE' | 'FEMALE';
@@ -40,6 +40,8 @@ export interface AddVaccinationFormData {
 }
 
 export interface PetsFiltersProps {
+  ownerFilter: string;
+  onOwnerFilterChange: (value: string) => void;
   speciesFilter: string;
   onSpeciesFilterChange: (value: string) => void;
   genderFilter: GenderFilter;
@@ -49,6 +51,7 @@ export interface PetsFiltersProps {
   search: string;
   onSearchChange: (value: string) => void;
   speciesList: Species[];
+  users: User[];
   onOpenCreate: () => void;
 }
 
@@ -65,6 +68,8 @@ export interface PetDetailIslandProps {
   pet: Pet;
   speciesList: Species[];
   users: User[];
+  services: Service[];
+  veterinarians: Veterinarian[];
   appointments: Appointment[];
   vaccinations: Vaccination[];
   loadingDetails?: boolean;

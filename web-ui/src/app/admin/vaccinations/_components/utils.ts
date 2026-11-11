@@ -6,7 +6,7 @@ import type { VaccinationStatusInfo, VaccinationStatusTone } from './types';
  * Расчет статуса вакцинации и цветовой индикации по дате следующей дозы (в Europe/Moscow).
  */
 export const calculateVaccinationStatus = (nextDueStr?: string | null): VaccinationStatusInfo => {
-  if (!nextDueStr) return { label: 'Выполнено', cls: 'badge-accent', tone: 'ok' };
+  if (!nextDueStr) return { label: 'Без срока', cls: 'due-none', tone: 'ok' };
 
   const todayIso = getMoscowTodayIso();
   const dueIso = nextDueStr.slice(0, 10);
@@ -20,16 +20,16 @@ export const calculateVaccinationStatus = (nextDueStr?: string | null): Vaccinat
   const diffDays = Math.round((dueMs - todayMs) / (1000 * 60 * 60 * 24));
 
   if (diffDays < 0) {
-    return { label: 'Просрочена', cls: 'badge-danger', tone: 'overdue' };
+    return { label: 'Просрочена', cls: 'due-over', tone: 'overdue' };
   }
   if (diffDays <= 30) {
     return {
       label: diffDays === 0 ? 'Сегодня' : `Через ${diffDays} дн.`,
-      cls: 'badge-warn',
+      cls: 'due-soon',
       tone: 'soon',
     };
   }
-  const months = Math.round(diffDays / 30);
+  const months = Math.max(1, Math.round(diffDays / 30));
   return {
     label: `Через ${months} мес.`,
     cls: 'badge-accent',
@@ -38,15 +38,16 @@ export const calculateVaccinationStatus = (nextDueStr?: string | null): Vaccinat
 };
 
 /**
- * Фильтрация записей вакцинации по поисковому запросу (название вакцины или имя питомца),
- * статусу ревакцинации и идентификатору выбранного питомца.
+ * Фильтрация записей вакцинации по поисковому запросу, статусу, питомцу и интервалу ревакцинации.
  */
 export const filterVaccinations = (
   vaccinations: Vaccination[],
   petMap: Map<string, Pet>,
   search: string,
   statusFilter: VaccinationStatusTone,
-  petFilter = 'all'
+  petFilter = 'all',
+  nextDueFrom = '',
+  nextDueTo = ''
 ): Vaccination[] => {
   const query = search.trim().toLowerCase();
 
@@ -62,6 +63,14 @@ export const filterVaccinations = (
     if (query) {
       const matchesSearch = petName.includes(query) || vaxName.includes(query);
       if (!matchesSearch) return false;
+    }
+
+    const nextDueIso = (v.nextDueOn || v.validUntil || '').slice(0, 10);
+    if (nextDueFrom && (!nextDueIso || nextDueIso < nextDueFrom)) {
+      return false;
+    }
+    if (nextDueTo && (!nextDueIso || nextDueIso > nextDueTo)) {
+      return false;
     }
 
     if (statusFilter !== 'all') {

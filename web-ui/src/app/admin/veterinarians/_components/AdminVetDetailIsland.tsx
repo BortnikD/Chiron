@@ -1,16 +1,19 @@
 'use client';
 
 import React, { useEffect, useState, useMemo } from 'react';
-import { X, AlertCircle, Check, Trash2 } from 'lucide-react';
+import Link from 'next/link';
+import { X, AlertCircle, Check, Trash2, User as UserIcon } from 'lucide-react';
 import type { WorkSchedule, ScheduleException } from '@/modules/admin/types';
 import type { Veterinarian, Specialization, Species } from '@/modules/clinic/types';
 import type { User } from '@/shared/types';
+import { SearchCombobox, type SearchComboboxOption } from '@/shared/components';
 import { formatApiError, toIdNameMap } from '@/shared/lib';
 import { getDoctorDisplay } from '@/utils/doctorHelpers';
 import { VetDetailTabsSection } from './VetDetailTabsSection';
 
 export interface AdminVetDetailIslandProps {
   selectedVet: Veterinarian;
+  defaultTab?: 'profile' | 'species';
   users: User[];
   specializations: Specialization[];
   speciesList: Species[];
@@ -31,6 +34,7 @@ export interface AdminVetDetailIslandProps {
 
 export const AdminVetDetailIsland: React.FC<AdminVetDetailIslandProps> = ({
   selectedVet,
+  defaultTab = 'profile',
   users,
   specializations,
   speciesList,
@@ -45,7 +49,7 @@ export const AdminVetDetailIsland: React.FC<AdminVetDetailIslandProps> = ({
   onToggleSpeciesPermission,
 }) => {
   const [activeTab, setActiveTab] = useState<'profile' | 'species' | 'schedule' | 'exceptions'>(
-    'profile'
+    defaultTab
   );
   const [editForm, setEditForm] = useState({
     specializationId: selectedVet.specializationId || '',
@@ -60,6 +64,16 @@ export const AdminVetDetailIsland: React.FC<AdminVetDetailIslandProps> = ({
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const specsMap = useMemo(() => toIdNameMap(specializations), [specializations]);
+  const specOptions = useMemo<SearchComboboxOption[]>(
+    () =>
+      specializations.map((s) => ({
+        value: s.id,
+        label: s.name,
+        hint: s.description || undefined,
+      })),
+    [specializations]
+  );
+
   const user = selectedVet.user || users.find((u) => u.id === selectedVet.userId);
   const doc = getDoctorDisplay({ ...selectedVet, user }, specsMap);
   const permittedSpeciesIds = vetPermMap[selectedVet.id] || [];
@@ -72,11 +86,19 @@ export const AdminVetDetailIsland: React.FC<AdminVetDetailIslandProps> = ({
       photoUrl: selectedVet.photoUrl || '',
       bio: selectedVet.bio || '',
     });
+    setActiveTab(defaultTab);
     setSaveSuccess(false);
     setErrorMessage(null);
-  }, [selectedVet]);
+  }, [selectedVet, defaultTab]);
 
   const handleSaveProfile = async () => {
+    const exp = Number(editForm.experienceYears);
+    if (Number.isNaN(exp) || exp < 0 || exp > 70) {
+      setErrorMessage('Стаж должен быть от 0 до 70 лет');
+      setActiveTab('profile');
+      return;
+    }
+
     setSavingVet(true);
     setErrorMessage(null);
     setSaveSuccess(false);
@@ -84,7 +106,7 @@ export const AdminVetDetailIsland: React.FC<AdminVetDetailIslandProps> = ({
       await onSaveProfile(selectedVet.id, {
         bio: editForm.bio,
         photoUrl: editForm.photoUrl,
-        experienceYears: Number(editForm.experienceYears),
+        experienceYears: exp,
         isActive: editForm.isActive,
         specializationId: editForm.specializationId || undefined,
       });
@@ -99,7 +121,7 @@ export const AdminVetDetailIsland: React.FC<AdminVetDetailIslandProps> = ({
   };
 
   return (
-    <section className="island detail-island" aria-label="Врач">
+    <section className="island detail-island" style={{ width: 460 }} aria-label="Врач">
       <div className="island-head">
         <div className="row">
           <span className="avatar avatar-lg">{doc.initials}</span>
@@ -147,19 +169,14 @@ export const AdminVetDetailIsland: React.FC<AdminVetDetailIslandProps> = ({
               <label className="field-label" htmlFor="vd-spec">
                 Специализация
               </label>
-              <select
+              <SearchCombobox
                 id="vd-spec"
-                className="select"
                 value={editForm.specializationId}
-                onChange={(e) => setEditForm({ ...editForm, specializationId: e.target.value })}
-              >
-                <option value="">Выберите специализацию</option>
-                {specializations.map((s) => (
-                  <option key={s.id} value={s.id}>
-                    {s.name}
-                  </option>
-                ))}
-              </select>
+                options={specOptions}
+                onChange={(val) => setEditForm({ ...editForm, specializationId: val })}
+                placeholder="Выберите специализацию"
+                ariaLabel="Выберите специализацию"
+              />
             </div>
 
             <div className="form-grid">
@@ -196,7 +213,9 @@ export const AdminVetDetailIsland: React.FC<AdminVetDetailIslandProps> = ({
                     onClick={() => setEditForm({ ...editForm, isActive: !editForm.isActive })}
                   />
                   <span className="small muted">
-                    {editForm.isActive ? 'Принимает записи' : 'Приём закрыт'}
+                    {editForm.isActive
+                      ? 'Виден в каталоге, принимает записи'
+                      : 'Скрыт из каталога, запись закрыта'}
                   </span>
                 </div>
               </div>
@@ -241,14 +260,22 @@ export const AdminVetDetailIsland: React.FC<AdminVetDetailIslandProps> = ({
             {saveSuccess && (
               <div className="alert alert-success" role="status">
                 <Check size={16} className="ic" />
-                <div>Изменения сохранены</div>
+                <div>Профиль врача сохранён</div>
               </div>
             )}
 
-            <span className="dev-note">
-              ФИО берётся из учётной записи пользователя; смена роли или контактных данных выполняется
-              в разделе «Пользователи»
-            </span>
+            <div className="row between" style={{ alignItems: 'center' }}>
+              <span className="field-hint">
+                ФИО и контакты редактируются в учётной записи пользователя
+              </span>
+              <Link
+                href={`/admin/users?sel=${selectedVet.userId}`}
+                className="btn btn-ghost btn-sm"
+              >
+                <UserIcon size={14} />
+                Профиль
+              </Link>
+            </div>
           </div>
         ) : (
           <VetDetailTabsSection

@@ -1,15 +1,20 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { X, AlertCircle } from 'lucide-react';
 import type { WorkSchedule } from '@/modules/admin/types';
+import type { Veterinarian } from '@/modules/clinic/types';
+import { FilterDropdown, type FilterDropdownOption } from '@/shared/components';
 import { DOW_FULL, DOW_ORDER, DOW_TO_INDEX, formatApiError, timeToMinutes } from '@/shared/lib';
-import type { WorkScheduleSavePayload } from '../_hooks/useAdminSchedules';
+import { getDoctorDisplay } from '@/utils/doctorHelpers';
+import type { WorkScheduleSavePayload } from './types';
 
 export interface WorkScheduleModalProps {
   isOpen: boolean;
   schedule?: WorkSchedule | null;
   dayIndex?: number;
+  vets: Veterinarian[];
+  specsMap?: Record<string, string>;
   veterinarianId: string;
   doctorName: string;
   onClose: () => void;
@@ -20,6 +25,8 @@ export const WorkScheduleModal: React.FC<WorkScheduleModalProps> = ({
   isOpen,
   schedule,
   dayIndex: propDayIndex,
+  vets,
+  specsMap,
   veterinarianId,
   doctorName,
   onClose,
@@ -27,6 +34,7 @@ export const WorkScheduleModal: React.FC<WorkScheduleModalProps> = ({
 }) => {
   const isEdit = Boolean(schedule);
 
+  const [selectedVetId, setSelectedVetId] = useState(veterinarianId);
   const [dayIndex, setDayIndex] = useState(0);
   const [startTime, setStartTime] = useState('09:00');
   const [endTime, setEndTime] = useState('18:00');
@@ -35,15 +43,35 @@ export const WorkScheduleModal: React.FC<WorkScheduleModalProps> = ({
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
+  const vetOptions = useMemo<FilterDropdownOption[]>(
+    () =>
+      vets.map((v) => {
+        const doc = getDoctorDisplay(v, specsMap);
+        return {
+          value: v.id,
+          label: doc.fullName,
+          hint: doc.specName,
+        };
+      }),
+    [vets, specsMap]
+  );
+
+  const dowOptions = useMemo<FilterDropdownOption[]>(
+    () => DOW_FULL.map((name, idx) => ({ value: String(idx), label: name })),
+    []
+  );
+
   useEffect(() => {
     if (!isOpen) return;
     if (schedule) {
+      setSelectedVetId(schedule.veterinarianId || veterinarianId);
       setDayIndex(DOW_TO_INDEX[schedule.dayOfWeek] ?? propDayIndex ?? 0);
       setStartTime(schedule.startTime.slice(0, 5));
       setEndTime(schedule.endTime.slice(0, 5));
       setBreakStart(schedule.breakStart ? schedule.breakStart.slice(0, 5) : '');
       setBreakEnd(schedule.breakEnd ? schedule.breakEnd.slice(0, 5) : '');
     } else {
+      setSelectedVetId(veterinarianId);
       setDayIndex(propDayIndex ?? 0);
       setStartTime('09:00');
       setEndTime('18:00');
@@ -52,7 +80,7 @@ export const WorkScheduleModal: React.FC<WorkScheduleModalProps> = ({
     }
     setError(null);
     setSaving(false);
-  }, [isOpen, schedule, propDayIndex]);
+  }, [isOpen, schedule, propDayIndex, veterinarianId]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -65,9 +93,12 @@ export const WorkScheduleModal: React.FC<WorkScheduleModalProps> = ({
 
   if (!isOpen) return null;
 
+  const activeVet = vets.find((v) => v.id === selectedVetId);
+  const activeVetName = activeVet ? getDoctorDisplay(activeVet, specsMap).fullName : doctorName;
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!veterinarianId) {
+    if (!selectedVetId) {
       setError('Не выбран врач');
       return;
     }
@@ -76,7 +107,7 @@ export const WorkScheduleModal: React.FC<WorkScheduleModalProps> = ({
       return;
     }
     if ((breakStart && !breakEnd) || (!breakStart && breakEnd)) {
-      setError('Укажите обе границы перерыва или очистите обе');
+      setError('Укажите обе границы перерыва или ни одной');
       return;
     }
     if (
@@ -94,7 +125,7 @@ export const WorkScheduleModal: React.FC<WorkScheduleModalProps> = ({
     try {
       await onSave({
         scheduleId: schedule?.id,
-        veterinarianId,
+        veterinarianId: selectedVetId,
         dayOfWeek: DOW_ORDER[dayIndex],
         startTime: `${startTime}:00`,
         endTime: `${endTime}:00`,
@@ -136,37 +167,53 @@ export const WorkScheduleModal: React.FC<WorkScheduleModalProps> = ({
             </button>
           </div>
           <p className="dialog-desc">
-            {doctorName} · {isEdit ? 'Изменение графика' : 'Добавление дня в график'}
+            {activeVetName} · {isEdit ? 'Изменение графика' : 'Добавление дня в график'}
           </p>
         </div>
 
-        <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', flex: 1 }}>
+        <form
+          onSubmit={handleSubmit}
+          style={{ display: 'flex', flexDirection: 'column', minHeight: 0, flex: 1 }}
+        >
           <div className="dialog-body">
             {error && (
-              <div className="alert alert-destructive" role="alert" style={{ marginBottom: '12px' }}>
+              <div className="alert alert-destructive" role="alert">
                 <AlertCircle className="ic" />
                 <span>{error}</span>
               </div>
             )}
 
-            <div className="field">
-              <label className="field-label" htmlFor="ws-dow">День недели</label>
-              <select
-                id="ws-dow"
-                className="select"
-                value={dayIndex}
-                onChange={(e) => setDayIndex(Number(e.target.value))}
-                disabled={isEdit || saving}
-              >
-                {DOW_FULL.map((name, idx) => (
-                  <option key={idx} value={idx}>
-                    {name}
-                  </option>
-                ))}
-              </select>
-            </div>
-
             <div className="form-grid">
+              <div className="field span-2">
+                <label className="field-label" htmlFor="ws-vet">
+                  Врач
+                </label>
+                <FilterDropdown
+                  id="ws-vet"
+                  value={selectedVetId}
+                  options={vetOptions}
+                  onChange={setSelectedVetId}
+                  searchable={vets.length > 5}
+                  disabled={isEdit || saving}
+                  placeholder="Выберите врача"
+                  ariaLabel="Врач"
+                />
+              </div>
+
+              <div className="field span-2">
+                <label className="field-label" htmlFor="ws-dow">
+                  День недели
+                </label>
+                <FilterDropdown
+                  id="ws-dow"
+                  value={String(dayIndex)}
+                  options={dowOptions}
+                  onChange={(val) => setDayIndex(Number(val))}
+                  disabled={isEdit || saving}
+                  ariaLabel="День недели"
+                />
+              </div>
+
               <div className="field">
                 <label className="field-label" htmlFor="ws-start">
                   Начало <span className="req">*</span>
@@ -200,7 +247,9 @@ export const WorkScheduleModal: React.FC<WorkScheduleModalProps> = ({
               </div>
 
               <div className="field">
-                <label className="field-label" htmlFor="ws-brk-start">Перерыв с</label>
+                <label className="field-label" htmlFor="ws-brk-start">
+                  Перерыв с
+                </label>
                 <input
                   id="ws-brk-start"
                   type="time"
@@ -213,7 +262,9 @@ export const WorkScheduleModal: React.FC<WorkScheduleModalProps> = ({
               </div>
 
               <div className="field">
-                <label className="field-label" htmlFor="ws-brk-end">Перерыв до</label>
+                <label className="field-label" htmlFor="ws-brk-end">
+                  Перерыв до
+                </label>
                 <input
                   id="ws-brk-end"
                   type="time"
@@ -226,8 +277,8 @@ export const WorkScheduleModal: React.FC<WorkScheduleModalProps> = ({
               </div>
             </div>
 
-            <span className="field-hint" style={{ marginTop: '8px', display: 'block' }}>
-              Шаг интервалов — 15 минут. День недели привязан к позиции в неделе.
+            <span className="field-hint">
+              День недели и врач после создания не меняются · шаг 15 минут
             </span>
           </div>
 
@@ -236,7 +287,7 @@ export const WorkScheduleModal: React.FC<WorkScheduleModalProps> = ({
               Отмена
             </button>
             <button type="submit" className="btn btn-primary" disabled={saving}>
-              {saving ? 'Сохранение...' : isEdit ? 'Сохранить' : 'Создать'}
+              {saving ? 'Сохранение…' : isEdit ? 'Сохранить' : 'Создать'}
             </button>
           </div>
         </form>

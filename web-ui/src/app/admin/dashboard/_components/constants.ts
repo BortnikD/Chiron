@@ -6,8 +6,3 @@ export const ST_COLORS = {
   CANCELLED: 'var(--st-cancelled-fg)',
   NO_SHOW: 'var(--st-noshow-fg)',
 } as const;
-
-export const DP_MONS = [
-  'Январь', 'Февраль', 'Март', 'Апрель', 'Май', 'Июнь',
-  'Июль', 'Август', 'Сентябрь', 'Октябрь', 'Ноябрь', 'Декабрь',
-];

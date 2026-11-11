@@ -6,8 +6,9 @@ import { StatusDistributionIslandProps } from './types';
 export function StatusDistributionIsland({ stats }: StatusDistributionIslandProps) {
   // Donut conic gradient string
   const donutGradient = useMemo(() => {
+    if (!stats.total) return 'var(--muted)';
     let acc = 0;
-    const total = stats.total || 1;
+    const total = stats.total;
     const segs = stats.byStatus.map((item) => {
       const from = acc;
       acc += (item.count / total) * 100;

@@ -4,6 +4,7 @@ import React, { useMemo } from 'react';
 import { CalendarDays, RefreshCw, Pencil, Trash2, Plus } from 'lucide-react';
 import type { WorkSchedule } from '@/modules/admin/types';
 import type { Veterinarian } from '@/modules/clinic/types';
+import { SearchCombobox, type SearchComboboxOption } from '@/shared/components';
 import {
   DOW_SHORT,
   DOW_FULL,
@@ -15,6 +16,7 @@ import { getDoctorDisplay } from '@/utils/doctorHelpers';
 
 export interface WeeklyScheduleMatrixProps {
   vets: Veterinarian[];
+  specsMap?: Record<string, string>;
   selectedVetId: string;
   selectedVetName: string;
   schedules: WorkSchedule[];
@@ -44,6 +46,7 @@ function pctW(a: string, b: string): string {
 
 export const WeeklyScheduleMatrix: React.FC<WeeklyScheduleMatrixProps> = ({
   vets,
+  specsMap,
   selectedVetId,
   selectedVetName,
   schedules,
@@ -55,6 +58,19 @@ export const WeeklyScheduleMatrix: React.FC<WeeklyScheduleMatrixProps> = ({
   onEditDay,
   onDeleteDay,
 }) => {
+  const vetOptions = useMemo<SearchComboboxOption[]>(
+    () =>
+      vets.map((v) => {
+        const doc = getDoctorDisplay(v, specsMap);
+        return {
+          value: v.id,
+          label: doc.fullName,
+          hint: doc.specName,
+        };
+      }),
+    [vets, specsMap]
+  );
+
   const scheduleRows = useMemo(() => {
     return DOW_SHORT.map((shortName, i) => {
       const ws = schedules.find((s) => s.dayOfWeek === DOW_ORDER[i]);
@@ -120,20 +136,19 @@ export const WeeklyScheduleMatrix: React.FC<WeeklyScheduleMatrixProps> = ({
   return (
     <>
       <section className="island filters" aria-label="Врач">
-        <div className="field" style={{ width: '320px' }}>
-          <span className="field-label">Врач</span>
-          <select
-            className="select"
+        <div className="field" style={{ width: 280 }}>
+          <label className="field-label" htmlFor="sch-vet">
+            Врач
+          </label>
+          <SearchCombobox
+            id="sch-vet"
             value={selectedVetId}
-            onChange={(e) => onSelectVet(e.target.value)}
+            options={vetOptions}
+            onChange={onSelectVet}
             disabled={loadingVets}
-          >
-            {vets.map((v) => (
-              <option key={v.id} value={v.id}>
-                {getDoctorDisplay(v).fullName}
-              </option>
-            ))}
-          </select>
+            placeholder="Найдите врача…"
+            ariaLabel="Найдите врача"
+          />
         </div>
 
         <div className="spacer" />
@@ -228,7 +243,8 @@ export const WeeklyScheduleMatrix: React.FC<WeeklyScheduleMatrixProps> = ({
                         </button>
                         <button
                           type="button"
-                          className="btn btn-ghost btn-sm btn-icon text-[var(--destructive)]"
+                          className="btn btn-ghost btn-sm btn-icon"
+                          style={{ color: 'var(--destructive)' }}
                           aria-label={`Удалить ${r.dowFull}`}
                           title={`Сделать выходным (${r.dowFull})`}
                           onClick={() => onDeleteDay(r.ws!.id, r.dowFull)}

@@ -3,7 +3,7 @@
 import React, { Suspense } from 'react';
 import { AlertCircle } from 'lucide-react';
 import { useShellHeader } from '@/components/layout/AppShell';
-import { ConfirmModal } from '@/shared/components/ConfirmModal';
+import { ConfirmModal } from '@/shared/components';
 import { SERVICE_NAV_TABS, useAdminServices } from './_hooks/useAdminServices';
 import { ServicesFilters } from './_components/ServicesFilters';
 import { ServicesTable } from './_components/ServicesTable';
@@ -16,25 +16,37 @@ import { SpecializationsTab } from './_components/SpecializationsTab';
 function AdminServicesContent() {
   const s = useAdminServices();
 
-  useShellHeader({ crumbGroup: 'Справочники', crumb: s.activeTabItem.crumb });
+  useShellHeader({
+    crumbGroup: 'Справочники',
+    crumb: s.activeTabItem.crumb,
+    crumb2: s.mainTab === 'SERVICES' && s.selectedService ? s.selectedService.name : undefined,
+  });
 
   return (
     <>
-      <div className="tabs-line" style={{ marginBottom: 'var(--gap)' }}>
-        {SERVICE_NAV_TABS.map((t) => (
-          <button
-            key={t.key}
-            type="button"
-            className={`tab-line ${s.mainTab === t.key ? 'on' : ''}`}
-            onClick={() => s.switchTab(t)}
-          >
-            {t.label}
-          </button>
-        ))}
-      </div>
+      <section className="island filters" style={{ padding: '8px 12px', marginBottom: 'var(--gap)' }}>
+        <div className="seg" role="tablist" aria-label="Справочники">
+          {SERVICE_NAV_TABS.map((t) => (
+            <button
+              key={t.key}
+              type="button"
+              role="tab"
+              aria-selected={s.mainTab === t.key}
+              className={`seg-item ${s.mainTab === t.key ? 'on' : ''}`}
+              onClick={() => s.switchTab(t)}
+            >
+              {t.label}
+            </button>
+          ))}
+        </div>
+      </section>
 
       {s.error && (
-        <div className="alert alert-destructive row between" role="alert" style={{ alignItems: 'center', marginBottom: 'var(--gap)' }}>
+        <div
+          className="alert alert-destructive row between"
+          role="alert"
+          style={{ alignItems: 'center', marginBottom: 'var(--gap)' }}
+        >
           <div className="row" style={{ gap: 8, alignItems: 'center' }}>
             <AlertCircle size={16} className="ic" />
             <span>{s.error}</span>
@@ -53,6 +65,8 @@ function AdminServicesContent() {
               onFilterSpecChange={s.setFilterSpec}
               filterSpecies={s.filterSpecies}
               onFilterSpeciesChange={s.setFilterSpecies}
+              filterActive={s.filterActive}
+              onFilterActiveChange={s.setFilterActive}
               search={s.search}
               onSearchChange={s.setSearch}
               specializations={s.specializations}
@@ -94,13 +108,19 @@ function AdminServicesContent() {
       {s.mainTab === 'SPECIES' && (
         <SpeciesTab
           speciesList={s.speciesList}
+          services={s.allServices}
+          serviceSpeciesMap={s.serviceSpeciesMap}
           onCreateSpecies={s.createSpecies}
+          onUpdateSpecies={s.updateSpecies}
           onDeleteSpecies={s.deleteSpecies}
         />
       )}
+
       {s.mainTab === 'SPECIALIZATIONS' && (
         <SpecializationsTab
           specializations={s.specializations}
+          services={s.allServices}
+          veterinarians={s.veterinarians}
           onSaveSpecialization={s.saveSpecialization}
           onDeleteSpecialization={s.deleteSpecialization}
         />
@@ -119,10 +139,12 @@ function AdminServicesContent() {
         title="Удалить услугу?"
         description={
           s.deleteTarget
-            ? `Услуга «${s.deleteTarget.name}» будет удалена. Записи с этой услугой могут быть затронуты.`
+            ? `Услуга «${s.deleteTarget.name}» будет удалена. Если по ней уже есть записи, сделайте услугу неактивной.`
             : ''
         }
         confirmLabel="Удалить"
+        cancelLabel="Отмена"
+        tone="destructive"
         loading={s.deleting}
         error={s.deleteError}
         onClose={s.closeDeleteModal}

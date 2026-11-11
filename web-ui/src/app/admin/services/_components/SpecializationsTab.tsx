@@ -1,19 +1,23 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Tags, Plus, Edit2, Trash2, AlertCircle, X } from 'lucide-react';
-import type { Specialization } from '@/modules/clinic/types';
+import type { Service, Specialization, Veterinarian } from '@/modules/clinic/types';
+import { ConfirmModal } from '@/shared/components';
 import { formatApiError } from '@/shared/lib';
-import { ConfirmModal } from '@/shared/components/ConfirmModal';
 
 export interface SpecializationsTabProps {
   specializations: Specialization[];
+  services: Service[];
+  veterinarians: Veterinarian[];
   onSaveSpecialization: (data: { name: string; description: string }, id?: string) => Promise<void>;
   onDeleteSpecialization: (id: string) => Promise<void>;
 }
 
 export const SpecializationsTab: React.FC<SpecializationsTabProps> = ({
   specializations,
+  services,
+  veterinarians,
   onSaveSpecialization,
   onDeleteSpecialization,
 }) => {
@@ -25,6 +29,22 @@ export const SpecializationsTab: React.FC<SpecializationsTabProps> = ({
   const [deleteTarget, setDeleteTarget] = useState<Specialization | null>(null);
   const [deletingSpec, setDeletingSpec] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
+
+  const vetCounts = useMemo(() => {
+    const map: Record<string, number> = {};
+    for (const v of veterinarians) {
+      if (v.specializationId) map[v.specializationId] = (map[v.specializationId] || 0) + 1;
+    }
+    return map;
+  }, [veterinarians]);
+
+  const serviceCounts = useMemo(() => {
+    const map: Record<string, number> = {};
+    for (const s of services) {
+      if (s.specializationId) map[s.specializationId] = (map[s.specializationId] || 0) + 1;
+    }
+    return map;
+  }, [services]);
 
   useEffect(() => {
     if (!isSpecModalOpen) return;
@@ -40,6 +60,14 @@ export const SpecializationsTab: React.FC<SpecializationsTabProps> = ({
     const trimmedName = specForm.name.trim();
     if (!trimmedName) {
       setSaveError('Введите название специализации');
+      return;
+    }
+    if (
+      specializations.some(
+        (z) => z.id !== specForm.id && z.name.toLowerCase() === trimmedName.toLowerCase()
+      )
+    ) {
+      setSaveError('Специализация с таким названием уже есть');
       return;
     }
     setSavingSpec(true);
@@ -77,11 +105,11 @@ export const SpecializationsTab: React.FC<SpecializationsTabProps> = ({
 
   return (
     <>
-      <section className="island grow">
+      <section className="island grow" style={{ maxWidth: 980 }}>
         <div className="island-head">
           <span className="island-title">
             <Tags size={18} />
-            Специализации врачей <span className="count">{specializations.length}</span>
+            Специализации <span className="count">{specializations.length}</span>
           </span>
           <button
             type="button"
@@ -93,31 +121,35 @@ export const SpecializationsTab: React.FC<SpecializationsTabProps> = ({
             }}
           >
             <Plus size={14} />
-            Добавить специализацию
+            Новая специализация
           </button>
         </div>
 
         <div className="table-wrap">
           <div
             className="dtable"
-            style={{ '--cols': '1.2fr 2fr 100px', minWidth: '700px' } as React.CSSProperties}
+            style={{ '--cols': '1fr 2.4fr 0.6fr 0.6fr 88px', minWidth: '700px' } as React.CSSProperties}
           >
             <div className="thead">
-              <span>Специализация</span>
+              <span>Название</span>
               <span>Описание</span>
-              <span className="right">Действия</span>
+              <span className="right">Врачей</span>
+              <span className="right">Услуг</span>
+              <span />
             </div>
 
             {specializations.map((sp) => (
               <div key={sp.id} className="trow static">
                 <span className="cell-main">{sp.name}</span>
-                <span className="muted">{sp.description || '—'}</span>
+                <span className="muted small">{sp.description || '—'}</span>
+                <span className="right tnum">{vetCounts[sp.id] || 0}</span>
+                <span className="right tnum">{serviceCounts[sp.id] || 0}</span>
                 <span className="row-actions right">
                   <button
                     type="button"
                     className="btn btn-ghost btn-icon btn-sm"
-                    aria-label={`Редактировать специализацию «${sp.name}»`}
-                    title="Редактировать"
+                    aria-label={`Изменить специализацию «${sp.name}»`}
+                    title="Изменить"
                     onClick={() => {
                       setSpecForm({ id: sp.id, name: sp.name, description: sp.description || '' });
                       setSaveError(null);
@@ -154,9 +186,12 @@ export const SpecializationsTab: React.FC<SpecializationsTabProps> = ({
           onClick={() => !savingSpec && setIsSpecModalOpen(false)}
         >
           <div className="dialog dialog-sm" onClick={(e) => e.stopPropagation()}>
-            <div className="dialog-head" style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div
+              className="dialog-head"
+              style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}
+            >
               <span id="spec-modal-title" className="dialog-title">
-                {specForm.id ? 'Редактировать специализацию' : 'Новая специализация'}
+                {specForm.id ? 'Изменить специализацию' : 'Новая специализация'}
               </span>
               <button
                 type="button"
@@ -168,7 +203,10 @@ export const SpecializationsTab: React.FC<SpecializationsTabProps> = ({
               </button>
             </div>
 
-            <form onSubmit={handleSaveSpec} style={{ display: 'flex', flexDirection: 'column', minHeight: 0, flex: 1 }}>
+            <form
+              onSubmit={handleSaveSpec}
+              style={{ display: 'flex', flexDirection: 'column', minHeight: 0, flex: 1 }}
+            >
               <div className="dialog-body">
                 <div className="field">
                   <label className="field-label" htmlFor="spec-name">
@@ -177,6 +215,7 @@ export const SpecializationsTab: React.FC<SpecializationsTabProps> = ({
                   <input
                     id="spec-name"
                     className="input"
+                    maxLength={150}
                     placeholder="Терапия, Хирургия…"
                     value={specForm.name}
                     onChange={(e) => setSpecForm({ ...specForm, name: e.target.value })}
@@ -191,10 +230,14 @@ export const SpecializationsTab: React.FC<SpecializationsTabProps> = ({
                   <textarea
                     id="spec-desc"
                     className="textarea"
-                    rows={2}
+                    maxLength={2000}
+                    rows={3}
                     value={specForm.description}
-                    onChange={(e) => setSpecForm({ ...specForm, description: e.target.value })}
+                    onChange={(e) =>
+                      setSpecForm({ ...specForm, description: e.target.value.slice(0, 2000) })
+                    }
                   />
+                  <span className="field-hint">{specForm.description.length} / 2000</span>
                 </div>
 
                 {saveError && (
@@ -215,7 +258,7 @@ export const SpecializationsTab: React.FC<SpecializationsTabProps> = ({
                   Отмена
                 </button>
                 <button type="submit" className="btn btn-primary" disabled={savingSpec}>
-                  {savingSpec ? 'Сохранение…' : 'Сохранить'}
+                  {savingSpec ? 'Сохранение…' : specForm.id ? 'Сохранить' : 'Создать'}
                 </button>
               </div>
             </form>
@@ -225,11 +268,15 @@ export const SpecializationsTab: React.FC<SpecializationsTabProps> = ({
 
       <ConfirmModal
         isOpen={Boolean(deleteTarget)}
-        title="Удалить специализацию?"
-        description={
-          deleteTarget ? `Специализация «${deleteTarget.name}» будет удалена.` : ''
+        title={
+          deleteTarget
+            ? `Удалить специализацию «${deleteTarget.name}»?`
+            : 'Удалить специализацию?'
         }
+        description="Нельзя удалить специализацию, если она указана у врачей или услуг."
         confirmLabel="Удалить"
+        cancelLabel="Отмена"
+        tone="destructive"
         loading={deletingSpec}
         error={deleteError}
         onClose={() => !deletingSpec && setDeleteTarget(null)}

@@ -1,11 +1,12 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Check, AlertCircle, X } from 'lucide-react';
 import type { AdminUpdateAppointmentRequest } from '@/modules/admin/types';
 import type { Appointment, Pet } from '@/modules/client/types';
 import type { Veterinarian, Service } from '@/modules/clinic/types';
 import type { AppointmentStatus } from '@/shared/types';
+import { DatePicker, SearchCombobox, type SearchComboboxOption } from '@/shared/components';
 import {
   APPOINTMENT_STATUS_LIST,
   APPOINTMENT_STATUS_META,
@@ -15,6 +16,7 @@ import {
   getMoscowDateKey,
 } from '@/shared/lib';
 import { getDoctorDisplay } from '@/utils/doctorHelpers';
+import { buildUpdateAppointmentPayload, computeAppointmentEditRange } from './utils';
 
 export interface AdminEditAppointmentModalProps {
   isOpen: boolean;
@@ -48,6 +50,7 @@ export const AdminEditAppointmentModal: React.FC<AdminEditAppointmentModalProps>
     start: '',
     status: 'CONFIRMED' as AppointmentStatus,
     cancelReason: '',
+    clientComment: '',
     vetNotes: '',
   });
 
@@ -65,6 +68,7 @@ export const AdminEditAppointmentModal: React.FC<AdminEditAppointmentModalProps>
       start: formatSlotTime(appointment.startAt),
       status: appointment.status,
       cancelReason: appointment.cancelReason || appointment.cancellationReason || '',
+      clientComment: appointment.clientComment || '',
       vetNotes: appointment.vetNotes || appointment.notes || '',
     });
     setAvailStatus('idle');
@@ -81,22 +85,18 @@ export const AdminEditAppointmentModal: React.FC<AdminEditAppointmentModalProps>
     return () => window.removeEventListener('keydown', onKey);
   }, [isOpen, saving, onClose]);
 
-  const computeRange = () => {
-    if (!appointment) return null;
-    const selectedSvc = services.find((s) => s.id === appointment.serviceId);
-    const origDurMin = Math.round(
-      (new Date(appointment.endAt).getTime() - new Date(appointment.startAt).getTime()) / 60000
-    );
-    const dur = origDurMin > 0 ? origDurMin : (selectedSvc?.baseDurationMin ?? 30);
-    const startAt = new Date(`${form.date}T${form.start}:00+03:00`).toISOString();
-    const endAt = new Date(new Date(startAt).getTime() + dur * 60000).toISOString();
-    return { startAt, endAt };
-  };
+  const vetOptions = useMemo<SearchComboboxOption[]>(
+    () =>
+      veterinarians.map((v) => {
+        const d = getDoctorDisplay(v);
+        return { value: v.id, label: d.fullName, hint: d.specName, disabled: !v.isActive };
+      }),
+    [veterinarians]
+  );
 
   const handleCheckSlot = async () => {
     if (!form.veterinarianId || !form.date || !form.start || !appointment) return;
-    const range = computeRange();
-    if (!range) return;
+    const range = computeAppointmentEditRange(appointment, services, form.date, form.start);
     setCheckingSlot(true);
     setAvailStatus('idle');
     try {
@@ -123,27 +123,7 @@ export const AdminEditAppointmentModal: React.FC<AdminEditAppointmentModalProps>
     setSaving(true);
     setSaveError(null);
     try {
-      let startAt = appointment.startAt;
-      let endAt = appointment.endAt;
-
-      if (form.date && form.start) {
-        const range = computeRange();
-        if (range) {
-          startAt = range.startAt;
-          endAt = range.endAt;
-        }
-      }
-
-      const payload: AdminUpdateAppointmentRequest = {
-        veterinarianId: form.veterinarianId,
-        startAt,
-        endAt,
-        status: form.status,
-        vetNotes: form.vetNotes.trim() || null,
-        cancelReason:
-          form.status === 'CANCELLED' ? form.cancelReason.trim() || 'Отменено администратором' : null,
-      };
-
+      const payload = buildUpdateAppointmentPayload(appointment, services, form);
       await onUpdate(appointment.id, payload);
       onClose();
     } catch (err: unknown) {
@@ -189,41 +169,33 @@ export const AdminEditAppointmentModal: React.FC<AdminEditAppointmentModalProps>
           </div>
         </div>
 
-        <form onSubmit={handleSubmit}>
+        <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', minHeight: 0, flex: 1 }}>
           <div className="dialog-body">
             <div className="field">
               <label className="field-label" htmlFor="me-vet">Врач</label>
-              <select
+              <SearchCombobox
                 id="me-vet"
-                className="select"
                 value={form.veterinarianId}
-                onChange={(e) => {
+                options={vetOptions}
+                onChange={(veterinarianId) => {
                   setAvailStatus('idle');
-                  setForm({ ...form, veterinarianId: e.target.value });
+                  setForm({ ...form, veterinarianId });
                 }}
-                required
-              >
-                {veterinarians.map((v) => (
-                  <option key={v.id} value={v.id}>
-                    {getDoctorDisplay(v).fullName}
-                  </option>
-                ))}
-              </select>
+                placeholder="Выберите врача…"
+              />
             </div>
 
             <div className="form-grid">
               <div className="field">
                 <label className="field-label" htmlFor="me-date">Дата</label>
-                <input
+                <DatePicker
                   id="me-date"
-                  type="date"
-                  className="input"
                   value={form.date}
-                  onChange={(e) => {
+                  clearable={false}
+                  onChange={(date) => {
                     setAvailStatus('idle');
-                    setForm({ ...form, date: e.target.value });
+                    setForm({ ...form, date });
                   }}
-                  required
                 />
               </div>
               <div className="field">
@@ -301,6 +273,18 @@ export const AdminEditAppointmentModal: React.FC<AdminEditAppointmentModalProps>
                 />
               </div>
             )}
+
+            <div className="field">
+              <label className="field-label" htmlFor="me-comm">Комментарий клиента</label>
+              <textarea
+                id="me-comm"
+                className="textarea"
+                maxLength={1000}
+                rows={2}
+                value={form.clientComment}
+                onChange={(e) => setForm({ ...form, clientComment: e.target.value })}
+              />
+            </div>
 
             <div className="field">
               <label className="field-label" htmlFor="me-notes">Заметки врача</label>

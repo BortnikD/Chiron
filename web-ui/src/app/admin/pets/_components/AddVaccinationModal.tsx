@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { AlertCircle, X } from 'lucide-react';
+import { DatePicker } from '@/shared/components';
 import { formatApiError, getMoscowTodayIso } from '@/shared/lib';
 import type { AddVaccinationModalProps, AddVaccinationFormData } from './types';
 
@@ -131,24 +132,21 @@ export const AddVaccinationModal: React.FC<AddVaccinationModalProps> = ({
                 <label className="field-label" htmlFor="vac-adm">
                   Дата введения <span className="req">*</span>
                 </label>
-                <input
+                <DatePicker
                   id="vac-adm"
-                  type="date"
-                  className="input"
                   value={form.administeredOn}
-                  onChange={(e) => setForm({ ...form, administeredOn: e.target.value })}
-                  required
+                  clearable={false}
+                  onChange={(administeredOn) => setForm({ ...form, administeredOn })}
                 />
               </div>
 
               <div className="field">
                 <label className="field-label" htmlFor="vac-due">Следующая дата</label>
-                <input
+                <DatePicker
                   id="vac-due"
-                  type="date"
-                  className="input"
                   value={form.nextDueOn}
-                  onChange={(e) => setForm({ ...form, nextDueOn: e.target.value })}
+                  min={form.administeredOn || undefined}
+                  onChange={(nextDueOn) => setForm({ ...form, nextDueOn })}
                 />
               </div>
             </div>

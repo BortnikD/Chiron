@@ -1,16 +1,23 @@
 'use client';
 
-import React from 'react';
+import React, { Suspense } from 'react';
 import { AlertCircle } from 'lucide-react';
-import { ConfirmModal } from '@/shared/components/ConfirmModal';
+import { useShellHeader } from '@/components/layout/AppShell';
+import { ConfirmModal } from '@/shared/components';
 import { useAdminVeterinarians } from './_hooks/useAdminVeterinarians';
 import { AdminVetsFilters } from './_components/AdminVetsFilters';
 import { AdminVetsTable } from './_components/AdminVetsTable';
 import { AdminVetDetailIsland } from './_components/AdminVetDetailIsland';
 import { AdminCreateVetModal } from './_components/AdminCreateVetModal';
 
-export default function AdminVeterinariansPage() {
+function AdminVeterinariansContent() {
   const s = useAdminVeterinarians();
+
+  useShellHeader({
+    crumbGroup: 'Персонал',
+    crumb: 'Врачи',
+    crumb2: s.selectedVet ? s.selectedVetName : undefined,
+  });
 
   return (
     <>
@@ -37,6 +44,8 @@ export default function AdminVeterinariansPage() {
             onFilterSpecChange={s.setFilterSpec}
             filterSpecies={s.filterSpecies}
             onFilterSpeciesChange={s.setFilterSpecies}
+            filterActive={s.filterActive}
+            onFilterActiveChange={s.setFilterActive}
             specializations={s.specializations}
             speciesList={s.speciesList}
             onCreateClick={s.openCreateModal}
@@ -57,6 +66,7 @@ export default function AdminVeterinariansPage() {
         {s.selectedVet && (
           <AdminVetDetailIsland
             selectedVet={s.selectedVet}
+            defaultTab={s.preferredDetailTab}
             users={s.users}
             specializations={s.specializations}
             speciesList={s.speciesList}
@@ -75,6 +85,7 @@ export default function AdminVeterinariansPage() {
 
       <AdminCreateVetModal
         isOpen={s.isCreateOpen}
+        defaultUserId={s.prefillUserId}
         onClose={s.closeCreateModal}
         usersWithoutProfile={s.usersWithoutProfile}
         specializations={s.specializations}
@@ -83,14 +94,33 @@ export default function AdminVeterinariansPage() {
 
       <ConfirmModal
         isOpen={s.isDeleteConfirmOpen && Boolean(s.selectedVet)}
-        title="Удалить профиль врача?"
-        description={`Профиль врача «${s.selectedVetName}» будет удалён. Записи и расписание могут быть затронуты. Сама учётная запись пользователя сохранится.`}
+        title={`Удалить профиль врача «${s.selectedVetName}»?`}
+        description="Пользователь останется в системе, но перестанет быть врачом в каталоге. Записи и расписание могут быть затронуты."
         confirmLabel="Удалить"
+        cancelLabel="Отмена"
+        tone="destructive"
         loading={s.deleting}
         error={s.deleteError}
         onClose={s.closeDeleteModal}
         onConfirm={s.confirmDeleteVet}
       />
     </>
+  );
+}
+
+export default function AdminVeterinariansPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="island grow">
+          <div className="empty">
+            <span className="spinner" aria-hidden="true" />
+            <span className="muted">Загрузка врачей…</span>
+          </div>
+        </div>
+      }
+    >
+      <AdminVeterinariansContent />
+    </Suspense>
   );
 }

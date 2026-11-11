@@ -11,6 +11,7 @@ import {
   Edit2,
 } from 'lucide-react';
 import type { Pet, Appointment } from '@/modules/client/types';
+import type { Service, Species, Veterinarian } from '@/modules/clinic/types';
 import type { User } from '@/shared/types';
 import { USER_ROLE_META, formatApiError, formatDateShort, getUserInitials } from '@/shared/lib';
 import { UserRelationsTabs } from './UserRelationsTabs';
@@ -19,6 +20,9 @@ export interface AdminUserDetailIslandProps {
   user: User;
   pets: Pet[];
   appointments: Appointment[];
+  veterinarians: Veterinarian[];
+  speciesList: Species[];
+  services: Service[];
   loadingDetails: boolean;
   detailsError: string | null;
   onClose: () => void;
@@ -34,6 +38,9 @@ export const AdminUserDetailIsland: React.FC<AdminUserDetailIslandProps> = ({
   user,
   pets,
   appointments,
+  veterinarians,
+  speciesList,
+  services,
   loadingDetails,
   detailsError,
   onClose,
@@ -101,6 +108,9 @@ export const AdminUserDetailIsland: React.FC<AdminUserDetailIslandProps> = ({
   };
 
   const rInfo = USER_ROLE_META[user.role] || { label: user.role, cls: 'badge-outline' };
+  const vetProfile = veterinarians.find((v) => v.userId === user.id);
+  const fullPreview =
+    [editForm.lastName, editForm.firstName, editForm.middleName].filter(Boolean).join(' ') || '—';
 
   return (
     <section className="island detail-island" aria-label="Пользователь">
@@ -227,7 +237,7 @@ export const AdminUserDetailIsland: React.FC<AdminUserDetailIslandProps> = ({
             </div>
 
             <span className="small muted">
-              fullName собирает сервер · зарегистрирован{' '}
+              fullName собирает сервер: «{fullPreview}» · зарегистрирован{' '}
               {user.createdAt ? formatDateShort(user.createdAt) : '—'}
             </span>
 
@@ -236,15 +246,20 @@ export const AdminUserDetailIsland: React.FC<AdminUserDetailIslandProps> = ({
                 <Stethoscope size={16} className="ic" />
                 <div className="col" style={{ gap: 6 }}>
                   <span>
-                    Пользователь имеет роль ВЕТЕРИНАР. График работы, специализация и допуски к видам
-                    настраиваются в разделе «Врачи».
+                    {vetProfile
+                      ? 'Профиль врача привязан к этой учётной записи. График, специализация и допуски настраиваются в разделе «Врачи».'
+                      : 'Пользователь имеет роль ветеринара, но профиль врача ещё не создан.'}
                   </span>
                   <Link
-                    href="/admin/veterinarians"
+                    href={
+                      vetProfile
+                        ? `/admin/veterinarians?sel=${vetProfile.id}`
+                        : `/admin/veterinarians?userId=${user.id}`
+                    }
                     className="btn btn-outline btn-sm"
                     style={{ alignSelf: 'flex-start' }}
                   >
-                    Перейти к профилю врача
+                    {vetProfile ? 'Открыть профиль врача' : 'Создать профиль врача'}
                   </Link>
                 </div>
               </div>
@@ -271,6 +286,9 @@ export const AdminUserDetailIsland: React.FC<AdminUserDetailIslandProps> = ({
             activeTab={activeTab}
             pets={pets}
             appointments={appointments}
+            speciesList={speciesList}
+            services={services}
+            veterinarians={veterinarians}
             loading={loadingDetails}
             error={detailsError}
           />

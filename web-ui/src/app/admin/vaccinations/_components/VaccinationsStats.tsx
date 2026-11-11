@@ -29,7 +29,7 @@ export const VaccinationsStats: React.FC<VaccinationsStatsProps> = ({
       <div className="card" style={{ padding: '16px' }}>
         <span className="small muted">Всего записей в реестре</span>
         <div className="row between" style={{ alignItems: 'baseline', marginTop: '4px' }}>
-          <span className="title-md font-mono">{totalCount}</span>
+          <span className="title-md tnum">{totalCount}</span>
           <Syringe className="ic muted" style={{ width: '20px', height: '20px' }} />
         </div>
       </div>
@@ -38,8 +38,8 @@ export const VaccinationsStats: React.FC<VaccinationsStatsProps> = ({
         <span className="small muted">Просрочено</span>
         <div className="row between" style={{ alignItems: 'baseline', marginTop: '4px' }}>
           <span
-            className="title-md font-mono"
-            style={{ color: overdueCount > 0 ? '#ef4444' : undefined }}
+            className="title-md tnum"
+            style={{ color: overdueCount > 0 ? 'var(--st-noshow-fg)' : undefined }}
           >
             {overdueCount}
           </span>
@@ -48,7 +48,7 @@ export const VaccinationsStats: React.FC<VaccinationsStatsProps> = ({
             style={{
               width: '20px',
               height: '20px',
-              color: overdueCount > 0 ? '#ef4444' : 'var(--muted-foreground)',
+              color: overdueCount > 0 ? 'var(--st-noshow-fg)' : 'var(--muted-foreground)',
             }}
           />
         </div>
@@ -58,8 +58,8 @@ export const VaccinationsStats: React.FC<VaccinationsStatsProps> = ({
         <span className="small muted">Срок в ближайшие 30 дней</span>
         <div className="row between" style={{ alignItems: 'baseline', marginTop: '4px' }}>
           <span
-            className="title-md font-mono"
-            style={{ color: soonCount > 0 ? '#f59e0b' : undefined }}
+            className="title-md tnum"
+            style={{ color: soonCount > 0 ? 'var(--st-pending-fg)' : undefined }}
           >
             {soonCount}
           </span>
@@ -68,7 +68,7 @@ export const VaccinationsStats: React.FC<VaccinationsStatsProps> = ({
             style={{
               width: '20px',
               height: '20px',
-              color: soonCount > 0 ? '#f59e0b' : 'var(--muted-foreground)',
+              color: soonCount > 0 ? 'var(--st-pending-fg)' : 'var(--muted-foreground)',
             }}
           />
         </div>

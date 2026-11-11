@@ -1,21 +1,28 @@
 'use client';
 
+import React, { Suspense } from 'react';
 import { AlertCircle, RefreshCw } from 'lucide-react';
-import { ConfirmModal } from '@/shared/components/ConfirmModal';
+import { useShellHeader } from '@/components/layout/AppShell';
+import { ConfirmModal } from '@/shared/components';
 import { formatDateTimeCompact } from '@/shared/lib';
 import { getDoctorDisplay } from '@/utils/doctorHelpers';
-import { CANCEL_REASONS, useAdminAppointments } from './_hooks/useAdminAppointments';
+import { useAdminAppointments } from './_hooks/useAdminAppointments';
+import { CANCEL_REASONS, formatAppointmentCrumb } from './_components/utils';
 import { AdminAppointmentsFilters } from './_components/AdminAppointmentsFilters';
 import { AdminAppointmentsTable } from './_components/AdminAppointmentsTable';
 import { AdminAppointmentDetailIsland } from './_components/AdminAppointmentDetailIsland';
 import { AdminCreateAppointmentModal } from './_components/AdminCreateAppointmentModal';
 import { AdminEditAppointmentModal } from './_components/AdminEditAppointmentModal';
 
-/**
- * Страница администрирования записей на приём клиники Chiron.
- */
-export default function AdminAppointmentsPage() {
+function AdminAppointmentsContent() {
   const vm = useAdminAppointments();
+
+  const crumb2 = formatAppointmentCrumb(vm.selectedAppt, vm.pets, vm.services);
+  useShellHeader({
+    crumbGroup: 'Работа клиники',
+    crumb: 'Записи',
+    crumb2,
+  });
 
   const cancelPetName = vm.cancelAppt ? vm.pets.find((p) => p.id === vm.cancelAppt?.petId)?.name || 'Питомец' : '';
   const cancelServiceName = vm.cancelAppt ? vm.services.find((s) => s.id === vm.cancelAppt?.serviceId)?.name || 'Услуга клиники' : '';
@@ -43,47 +50,88 @@ export default function AdminAppointmentsPage() {
           )}
 
           <AdminAppointmentsFilters
-            statusFilter={vm.statusFilter} onStatusFilterChange={vm.setStatusFilter}
-            vetFilter={vm.vetFilter} onVetFilterChange={vm.setVetFilter}
-            speciesFilter={vm.speciesFilter} onSpeciesFilterChange={vm.setSpeciesFilter}
-            dateFrom={vm.dateFrom} onDateFromChange={vm.setDateFrom}
-            dateTo={vm.dateTo} onDateToChange={vm.setDateTo}
-            search={vm.search} onSearchChange={vm.setSearch}
-            veterinarians={vm.veterinarians} speciesList={vm.speciesList}
+            vetFilter={vm.vetFilter}
+            onVetFilterChange={vm.setVetFilter}
+            petFilter={vm.petFilter}
+            onPetFilterChange={vm.setPetFilter}
+            ownerFilter={vm.ownerFilter}
+            onOwnerFilterChange={vm.setOwnerFilter}
+            serviceFilter={vm.serviceFilter}
+            onServiceFilterChange={vm.setServiceFilter}
+            statusFilters={vm.statusFilters}
+            onToggleStatusFilter={vm.toggleStatusFilter}
+            dateFrom={vm.dateFrom}
+            onDateFromChange={vm.setDateFrom}
+            dateTo={vm.dateTo}
+            onDateToChange={vm.setDateTo}
+            veterinarians={vm.veterinarians}
+            pets={vm.pets}
+            users={vm.users}
+            services={vm.services}
             onCreateClick={() => vm.setIsCreateOpen(true)}
           />
 
           <AdminAppointmentsTable
-            appointments={vm.appointments} veterinarians={vm.veterinarians}
-            services={vm.services} pets={vm.pets} users={vm.users}
-            selectedAppt={vm.selectedAppt} loading={vm.loading}
-            page={vm.page} totalPages={vm.totalPages} totalElements={vm.totalElements}
+            appointments={vm.appointments}
+            veterinarians={vm.veterinarians}
+            services={vm.services}
+            pets={vm.pets}
+            users={vm.users}
+            speciesList={vm.speciesList}
+            selectedAppt={vm.selectedAppt}
+            loading={vm.loading}
+            page={vm.page}
+            pageSize={vm.pageSize}
+            totalPages={vm.totalPages}
+            totalElements={vm.totalElements}
+            activeFilters={vm.activeFilters}
+            onResetFilters={vm.resetFilters}
             onPageChange={vm.setPage}
-            onSelect={vm.setSelectedAppt} onEdit={vm.setEditAppt}
-            onCancel={vm.openCancelModal} onDelete={vm.openDeleteModal}
+            onPageSizeChange={vm.setPageSize}
+            onSelect={vm.setSelectedAppt}
+            onEdit={vm.setEditAppt}
+            onCancel={vm.openCancelModal}
+            onDelete={vm.openDeleteModal}
           />
         </div>
 
         {vm.selectedAppt && (
           <AdminAppointmentDetailIsland
-            appointment={vm.selectedAppt} veterinarians={vm.veterinarians}
-            services={vm.services} pets={vm.pets} users={vm.users}
-            onClose={() => vm.setSelectedAppt(null)} onEdit={vm.setEditAppt}
-            onCancel={vm.openCancelModal} onDelete={vm.openDeleteModal}
+            appointment={vm.selectedAppt}
+            veterinarians={vm.veterinarians}
+            services={vm.services}
+            pets={vm.pets}
+            users={vm.users}
+            speciesList={vm.speciesList}
+            onClose={() => vm.setSelectedAppt(null)}
+            onEdit={vm.setEditAppt}
+            onCancel={vm.openCancelModal}
+            onDelete={vm.openDeleteModal}
           />
         )}
       </div>
 
       <AdminCreateAppointmentModal
-        isOpen={vm.isCreateOpen} onClose={() => vm.setIsCreateOpen(false)}
-        onCreate={vm.createAppointment} onCheckSlot={vm.checkSlotAvailability}
-        veterinarians={vm.veterinarians} services={vm.services} pets={vm.pets} users={vm.users}
+        isOpen={vm.isCreateOpen}
+        onClose={() => vm.setIsCreateOpen(false)}
+        onCreate={vm.createAppointment}
+        onCheckSlot={vm.checkSlotAvailability}
+        veterinarians={vm.veterinarians}
+        services={vm.services}
+        pets={vm.pets}
+        users={vm.users}
+        appointments={vm.appointments}
       />
 
       <AdminEditAppointmentModal
-        isOpen={Boolean(vm.editAppt)} appointment={vm.editAppt} onClose={() => vm.setEditAppt(null)}
-        onUpdate={vm.updateAppointment} onCheckSlot={vm.checkSlotAvailability}
-        veterinarians={vm.veterinarians} services={vm.services} pets={vm.pets}
+        isOpen={Boolean(vm.editAppt)}
+        appointment={vm.editAppt}
+        onClose={() => vm.setEditAppt(null)}
+        onUpdate={vm.updateAppointment}
+        onCheckSlot={vm.checkSlotAvailability}
+        veterinarians={vm.veterinarians}
+        services={vm.services}
+        pets={vm.pets}
       />
 
       <ConfirmModal
@@ -143,5 +191,25 @@ export default function AdminAppointmentsPage() {
         onConfirm={vm.confirmDeleteAppt}
       />
     </>
+  );
+}
+
+/**
+ * Страница администрирования записей на приём клиники Chiron.
+ */
+export default function AdminAppointmentsPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="island grow">
+          <div className="empty">
+            <span className="spinner" aria-hidden="true" />
+            <span className="muted">Загрузка записей…</span>
+          </div>
+        </div>
+      }
+    >
+      <AdminAppointmentsContent />
+    </Suspense>
   );
 }

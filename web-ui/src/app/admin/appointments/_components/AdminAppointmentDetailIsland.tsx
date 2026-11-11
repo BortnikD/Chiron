@@ -1,9 +1,10 @@
 'use client';
 
 import React from 'react';
+import Link from 'next/link';
 import { X, Trash2, Edit2, AlertCircle } from 'lucide-react';
 import type { Appointment, Pet } from '@/modules/client/types';
-import type { Veterinarian, Service } from '@/modules/clinic/types';
+import type { Veterinarian, Service, Species } from '@/modules/clinic/types';
 import type { User } from '@/shared/types';
 import {
   APPOINTMENT_STATUS_META,
@@ -21,6 +22,7 @@ export interface AdminAppointmentDetailIslandProps {
   services: Service[];
   pets: Pet[];
   users: User[];
+  speciesList: Species[];
   onClose: () => void;
   onEdit: (appointment: Appointment) => void;
   onCancel: (appointment: Appointment) => void;
@@ -36,16 +38,23 @@ export const AdminAppointmentDetailIsland: React.FC<AdminAppointmentDetailIsland
   services,
   pets,
   users,
+  speciesList,
   onClose,
   onEdit,
   onCancel,
   onDelete,
 }) => {
   const pet = pets.find((p) => p.id === appointment.petId);
+  const speciesName =
+    pet?.species?.name ||
+    pet?.speciesName ||
+    speciesList.find((sp) => sp.id === pet?.speciesId)?.name ||
+    '';
   const serviceName = services.find((s) => s.id === appointment.serviceId)?.name || 'Услуга клиники';
   const rawVet = veterinarians.find((v) => v.id === appointment.veterinarianId);
   const vetName = getDoctorDisplay(rawVet).fullName;
-  const ownerName = (pet?.ownerId && users.find((u) => u.id === pet.ownerId)?.fullName) || '—';
+  const owner = pet?.ownerId ? users.find((u) => u.id === pet.ownerId) : undefined;
+  const ownerName = owner?.fullName || owner?.email || '—';
   const cancelledByName =
     (appointment.cancelledBy && users.find((u) => u.id === appointment.cancelledBy)?.fullName) ||
     appointment.cancelledBy ||
@@ -59,7 +68,7 @@ export const AdminAppointmentDetailIsland: React.FC<AdminAppointmentDetailIsland
   };
 
   return (
-    <section className="island detail-island" aria-label="Запись">
+    <section className="island detail-island" style={{ width: 440 }} aria-label="Запись">
       <div className="island-head">
         <div className="col" style={{ gap: 2 }}>
           <span className="h2" style={{ wordBreak: 'break-word' }}>
@@ -90,9 +99,26 @@ export const AdminAppointmentDetailIsland: React.FC<AdminAppointmentDetailIsland
 
           <dl className="kv" style={{ margin: 0 }}>
             <dt>Питомец</dt>
-            <dd>{pet?.name || 'Питомец'}</dd>
+            <dd>
+              {pet ? (
+                <Link href={`/admin/pets?sel=${pet.id}`} className="linkish">
+                  {pet.name}
+                </Link>
+              ) : (
+                'Питомец'
+              )}
+              {speciesName ? ` · ${speciesName}` : ''}
+            </dd>
             <dt>Владелец</dt>
-            <dd>{ownerName}</dd>
+            <dd>
+              {pet?.ownerId ? (
+                <Link href={`/admin/users?sel=${pet.ownerId}`} className="linkish">
+                  {ownerName}
+                </Link>
+              ) : (
+                ownerName
+              )}
+            </dd>
             <dt>Врач</dt>
             <dd>{vetName}</dd>
             <dt>Услуга</dt>
@@ -108,7 +134,7 @@ export const AdminAppointmentDetailIsland: React.FC<AdminAppointmentDetailIsland
             {appointment.followUpOf && (
               <>
                 <dt>Повторный к</dt>
-                <dd className="tnum">{appointment.followUpOf.slice(0, 8)}…</dd>
+                <dd className="tnum">#{appointment.followUpOf.slice(0, 8)}</dd>
               </>
             )}
           </dl>

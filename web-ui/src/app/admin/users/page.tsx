@@ -1,7 +1,10 @@
 'use client';
 
-import { AlertCircle } from 'lucide-react';
-import { ConfirmModal } from '@/shared/components/ConfirmModal';
+import React, { Suspense } from 'react';
+import Link from 'next/link';
+import { AlertCircle, Stethoscope } from 'lucide-react';
+import { useShellHeader } from '@/components/layout/AppShell';
+import { ConfirmModal } from '@/shared/components';
 import { useAdminUsers } from './_hooks/useAdminUsers';
 import { AdminUsersFilters } from './_components/AdminUsersFilters';
 import { AdminUsersTable } from './_components/AdminUsersTable';
@@ -9,11 +12,17 @@ import { AdminUserDetailIsland } from './_components/AdminUserDetailIsland';
 import { AdminCreateUserModal } from './_components/AdminCreateUserModal';
 import { AdminEditUserModal } from './_components/AdminEditUserModal';
 
-/**
- * Страница управления пользователями администратором клиники.
- */
-export default function AdminUsersPage() {
+function AdminUsersContent() {
   const vm = useAdminUsers();
+  const selectedName = vm.selectedUser
+    ? vm.selectedUser.fullName || `${vm.selectedUser.firstName} ${vm.selectedUser.lastName}`
+    : undefined;
+
+  useShellHeader({
+    crumbGroup: 'Клиенты и доступ',
+    crumb: 'Пользователи',
+    crumb2: selectedName,
+  });
 
   return (
     <>
@@ -40,6 +49,10 @@ export default function AdminUsersPage() {
             onRoleFilterChange={vm.setRoleFilter}
             search={vm.search}
             onSearchChange={vm.setSearch}
+            createdFrom={vm.createdFrom}
+            onCreatedFromChange={vm.setCreatedFrom}
+            createdTo={vm.createdTo}
+            onCreatedToChange={vm.setCreatedTo}
             onCreateClick={() => vm.setIsCreateOpen(true)}
           />
 
@@ -56,6 +69,9 @@ export default function AdminUsersPage() {
             user={vm.selectedUser}
             pets={vm.userPets}
             appointments={vm.userAppointments}
+            veterinarians={vm.veterinarians}
+            speciesList={vm.speciesList}
+            services={vm.services}
             loadingDetails={vm.loadingDetails}
             detailsError={vm.detailsError}
             onClose={() => vm.setSelectedUser(null)}
@@ -79,6 +95,42 @@ export default function AdminUsersPage() {
         onUpdateUser={vm.updateUser}
       />
 
+      {vm.vetOfferUser && (
+        <div className="overlay" onClick={vm.closeVetOffer}>
+          <div
+            className="dialog dialog-sm"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="vet-offer-title"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="dialog-head">
+              <span id="vet-offer-title" className="dialog-title">
+                Создать профиль врача?
+              </span>
+              <span className="dialog-desc">
+                {vm.vetOfferUser.fullName || vm.vetOfferUser.email} получил роль ветеринара. Чтобы
+                он появился в каталоге и мог вести приём, нужен профиль: специализация, стаж и
+                допуски к видам.
+              </span>
+            </div>
+            <div className="dialog-foot">
+              <button type="button" className="btn btn-outline" onClick={vm.closeVetOffer}>
+                Позже
+              </button>
+              <Link
+                href={`/admin/veterinarians?userId=${vm.vetOfferUser.id}`}
+                className="btn btn-primary"
+                onClick={vm.closeVetOffer}
+              >
+                <Stethoscope size={16} />
+                Создать профиль
+              </Link>
+            </div>
+          </div>
+        </div>
+      )}
+
       <ConfirmModal
         isOpen={vm.isDeleteConfirmOpen && Boolean(vm.selectedUser)}
         title="Удалить пользователя?"
@@ -96,5 +148,25 @@ export default function AdminUsersPage() {
         onConfirm={vm.handleDeleteUser}
       />
     </>
+  );
+}
+
+/**
+ * Страница управления пользователями администратором клиники.
+ */
+export default function AdminUsersPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="island grow">
+          <div className="empty">
+            <span className="spinner" aria-hidden="true" />
+            <span className="muted">Загрузка пользователей…</span>
+          </div>
+        </div>
+      }
+    >
+      <AdminUsersContent />
+    </Suspense>
   );
 }
