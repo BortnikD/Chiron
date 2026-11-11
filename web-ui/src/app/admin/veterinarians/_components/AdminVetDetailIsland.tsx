@@ -7,6 +7,8 @@ import type { WorkSchedule, ScheduleException } from '@/modules/admin/types';
 import type { Veterinarian, Specialization, Species } from '@/modules/clinic/types';
 import type { User } from '@/shared/types';
 import { SearchCombobox, type SearchComboboxOption } from '@/shared/components';
+import { VetAvatar } from '@/components/ui/EntityAvatar';
+import { EntityPhotoControl } from '@/components/ui/EntityPhotoControl';
 import { formatApiError, toIdNameMap } from '@/shared/lib';
 import { getDoctorDisplay } from '@/utils/doctorHelpers';
 import { VetDetailTabsSection } from './VetDetailTabsSection';
@@ -24,7 +26,12 @@ export interface AdminVetDetailIslandProps {
   detailsError: string | null;
   onClose: () => void;
   onDeleteClick: () => void;
-  onSaveProfile: (id: string, data: Partial<Veterinarian>) => Promise<Veterinarian>;
+  onSaveProfile: (
+    id: string,
+    data: Partial<Pick<Veterinarian, 'specializationId' | 'bio' | 'experienceYears' | 'isActive'>>
+  ) => Promise<Veterinarian>;
+  onUploadPhoto: (vetId: string, file: File) => Promise<void>;
+  onDeletePhoto: (vetId: string) => Promise<void>;
   onToggleSpeciesPermission: (
     vetId: string,
     speciesId: string,
@@ -46,6 +53,8 @@ export const AdminVetDetailIsland: React.FC<AdminVetDetailIslandProps> = ({
   onClose,
   onDeleteClick,
   onSaveProfile,
+  onUploadPhoto,
+  onDeletePhoto,
   onToggleSpeciesPermission,
 }) => {
   const [activeTab, setActiveTab] = useState<'profile' | 'species' | 'schedule' | 'exceptions'>(
@@ -55,7 +64,6 @@ export const AdminVetDetailIsland: React.FC<AdminVetDetailIslandProps> = ({
     specializationId: selectedVet.specializationId || '',
     experienceYears: selectedVet.experienceYears || 0,
     isActive: selectedVet.isActive,
-    photoUrl: selectedVet.photoUrl || '',
     bio: selectedVet.bio || '',
   });
 
@@ -83,7 +91,6 @@ export const AdminVetDetailIsland: React.FC<AdminVetDetailIslandProps> = ({
       specializationId: selectedVet.specializationId || '',
       experienceYears: selectedVet.experienceYears || 0,
       isActive: selectedVet.isActive,
-      photoUrl: selectedVet.photoUrl || '',
       bio: selectedVet.bio || '',
     });
     setActiveTab(defaultTab);
@@ -105,7 +112,6 @@ export const AdminVetDetailIsland: React.FC<AdminVetDetailIslandProps> = ({
     try {
       await onSaveProfile(selectedVet.id, {
         bio: editForm.bio,
-        photoUrl: editForm.photoUrl,
         experienceYears: exp,
         isActive: editForm.isActive,
         specializationId: editForm.specializationId || undefined,
@@ -124,7 +130,12 @@ export const AdminVetDetailIsland: React.FC<AdminVetDetailIslandProps> = ({
     <section className="island detail-island" style={{ width: 460 }} aria-label="Врач">
       <div className="island-head">
         <div className="row">
-          <span className="avatar avatar-lg">{doc.initials}</span>
+          <VetAvatar
+            vet={selectedVet}
+            initials={doc.initials}
+            className="avatar avatar-lg detail-head-ava"
+            alt={doc.fullName}
+          />
           <div className="col" style={{ gap: 2 }}>
             <span className="h2">{doc.fullName}</span>
             <span className="cell-sub">
@@ -221,17 +232,17 @@ export const AdminVetDetailIsland: React.FC<AdminVetDetailIslandProps> = ({
               </div>
 
               <div className="field span-2">
-                <label className="field-label" htmlFor="vd-photo">
-                  Фото (URL)
-                </label>
-                <input
-                  className="input"
-                  id="vd-photo"
-                  type="url"
-                  maxLength={2048}
-                  placeholder="https://…"
-                  value={editForm.photoUrl}
-                  onChange={(e) => setEditForm({ ...editForm, photoUrl: e.target.value })}
+                <EntityPhotoControl
+                  photo={selectedVet}
+                  previewFallback={doc.initials}
+                  previewClassName="t-ava lg round"
+                  previewAlt={doc.fullName}
+                  title="Фотография врача"
+                  hint="JPEG или PNG до 5 МБ · обрежется в квадрат 512×512"
+                  disabled={savingVet}
+                  hidePreview
+                  onUpload={(file) => onUploadPhoto(selectedVet.id, file)}
+                  onDelete={() => onDeletePhoto(selectedVet.id)}
                 />
               </div>
 

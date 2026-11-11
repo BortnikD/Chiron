@@ -1,6 +1,6 @@
 import { api, tokenStorage } from '@/shared/api/client';
-import { fetchAllPages, mapWithConcurrency } from '@/shared/lib/pagination';
-import type { AppointmentStatus, PageResponse } from '@/shared/types';
+import { fetchAllPages, isPhotoUrlFresh, mapWithConcurrency } from '@/shared/lib';
+import type { AppointmentStatus, PageResponse, PhotoLinks } from '@/shared/types';
 import type { Veterinarian } from '@/modules/clinic/types';
 import type {
   Appointment,
@@ -54,6 +54,14 @@ export const vetApi = {
 
   updateProfile: (data: UpdateVetProfileRequest) =>
     api.patch<Veterinarian>('/api/v1/veterinarian/profile', data),
+
+  uploadOwnPhoto: (file: File) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    return api.putForm<PhotoLinks>('/api/v1/veterinarian/profile/photo', formData);
+  },
+
+  deleteOwnPhoto: () => api.delete<void>('/api/v1/veterinarian/profile/photo'),
 
   getAppointments: (
     pageOrOptions: number | VetAppointmentsQuery = 0,
@@ -136,10 +144,12 @@ export const vetApi = {
 
     for (const id of new Set(petIds)) {
       if (!id) continue;
-      if (existingMap?.[id]) {
-        out[id] = existingMap[id];
-      } else if (cachedPetsById.has(id)) {
-        out[id] = cachedPetsById.get(id)!;
+      const existing = existingMap?.[id];
+      const cached = cachedPetsById.get(id);
+      if (existing && isPhotoUrlFresh(existing)) {
+        out[id] = existing;
+      } else if (cached && isPhotoUrlFresh(cached)) {
+        out[id] = cached;
       } else {
         missing.push(id);
       }
@@ -161,7 +171,12 @@ export const vetApi = {
 
   getPatients: async (forceRefresh = false): Promise<Pet[]> => {
     const token = syncCacheToken();
-    if (!forceRefresh && cachedPatients && Date.now() - cachedPatients.ts < PATIENTS_CACHE_TTL_MS) {
+    if (
+      !forceRefresh &&
+      cachedPatients &&
+      Date.now() - cachedPatients.ts < PATIENTS_CACHE_TTL_MS &&
+      cachedPatients.data.every((p) => isPhotoUrlFresh(p))
+    ) {
       return cachedPatients.data;
     }
     if (!forceRefresh && inFlightPatients && inFlightPatients.token === token) {
@@ -179,7 +194,7 @@ export const vetApi = {
         petIds,
         async (id) => {
           const cached = cachedPetsById.get(id);
-          if (cached) return cached;
+          if (cached && isPhotoUrlFresh(cached)) return cached;
           return vetApi.getPatientPet(id).catch(() => null);
         },
         6

@@ -4,7 +4,7 @@ import React from 'react';
 import Link from 'next/link';
 import { Calendar, Edit3, PawPrint, Syringe, X } from 'lucide-react';
 import type { Pet, Vaccination } from '@/modules/client/types';
-import { SpeciesIcon } from '@/components/ui/SpeciesIcon';
+import { PetAvatar } from '@/components/ui/EntityAvatar';
 import { formatIsoDateDisplay, getSpeciesTone } from '@/shared/lib';
 import { getVetVaccinationDueInfo } from '../../dashboard/_components/vetHelpers';
 
@@ -39,9 +39,14 @@ export const VetVaccinationDetailIsland: React.FC<VetVaccinationDetailIslandProp
     <section className="island detail-island xl:w-[420px]" aria-label="Детали прививки">
       <div className="island-head">
         <div className="row" style={{ minWidth: 0 }}>
-          <span className={`t-ava tone-${tone}`}>
-            <SpeciesIcon species={tone} size={20} />
-          </span>
+          <PetAvatar
+            pet={pet}
+            tone={tone}
+            species={tone}
+            iconSize={20}
+            variant="full"
+            className={`t-ava tone-${tone} detail-head-ava`}
+          />
           <div className="col" style={{ gap: '2px', minWidth: 0 }}>
             <span className="h2" style={{ wordBreak: 'break-word' }}>
               {vaccination.name}

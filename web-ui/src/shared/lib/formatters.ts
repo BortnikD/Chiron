@@ -236,7 +236,7 @@ const ERROR_FIELD_LABELS: Record<string, string> = {
   bufferAfterMin: 'Буфер',
   experienceYears: 'Стаж',
   bio: 'Описание',
-  photoUrl: 'Фото (URL)',
+  file: 'Фотография',
   administeredOn: 'Дата введения',
   nextDueOn: 'Следующая дата',
   birthDate: 'Дата рождения',
@@ -335,6 +335,38 @@ export function formatApiError(err: unknown, fallback = 'Произошла ош
 
   if (rawName.includes('UserRoleMismatch')) {
     return 'Роль пользователя не соответствует требуемой для этого действия';
+  }
+
+  if (
+    candidate.status === 413 ||
+    lowerMsg.includes('photo must be at most 5 mb') ||
+    lowerMsg.includes('maxuploadsizeexceeded') ||
+    lowerMsg.includes('at most 5 mb')
+  ) {
+    return 'Размер фотографии не должен превышать 5 МБ';
+  }
+
+  if (
+    candidate.status === 503 &&
+    (rawName.includes('PhotoStorage') || lowerMsg.includes('photo storage'))
+  ) {
+    return 'Хранилище фотографий временно недоступно';
+  }
+
+  if (lowerMsg.includes('must be a jpeg or png')) {
+    return 'Поддерживаются только изображения JPEG и PNG';
+  }
+
+  if (lowerMsg.includes('20 million pixels')) {
+    return 'Разрешение изображения не должно превышать 20 млн пикселей';
+  }
+
+  if (lowerMsg.includes('decodable image')) {
+    return 'Не удалось прочитать изображение. Выберите корректный файл JPEG или PNG';
+  }
+
+  if (lowerMsg.includes('file part is required')) {
+    return 'Не передан файл фотографии';
   }
 
   if (

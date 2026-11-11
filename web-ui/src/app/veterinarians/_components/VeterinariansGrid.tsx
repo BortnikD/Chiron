@@ -5,6 +5,7 @@ import { Stethoscope } from 'lucide-react';
 import { getDoctorDisplay } from '@/utils/doctorHelpers';
 import { getSpecTone, getSpeciesTone, pluralRu } from '@/shared/lib';
 import { SpeciesIcon } from '@/components/ui/SpeciesIcon';
+import { VetAvatar } from '@/components/ui/EntityAvatar';
 import type { VeterinariansGridProps } from './types';
 
 export const VeterinariansGrid: React.FC<VeterinariansGridProps> = ({
@@ -62,7 +63,13 @@ export const VeterinariansGrid: React.FC<VeterinariansGridProps> = ({
                   onClick={() => onSelectVet(v)}
                 >
                   <div className="tcard-head">
-                    <span className="t-ava lg round">{initials}</span>
+                    <VetAvatar
+                      vet={v}
+                      initials={initials}
+                      tone={tone}
+                      className="t-ava lg round"
+                      alt={fullName}
+                    />
                     <span className="col" style={{ gap: '4px', minWidth: 0 }}>
                       <span className="tcard-title" title={fullName}>
                         {name}

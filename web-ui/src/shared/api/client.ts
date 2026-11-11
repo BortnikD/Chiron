@@ -89,5 +89,10 @@ export const api = {
       method: 'PATCH',
       body: body !== undefined ? JSON.stringify(body) : undefined,
     }),
+  putForm: <T>(url: string, body: FormData) =>
+    request<T>(url, {
+      method: 'PUT',
+      body,
+    }),
   delete: <T>(url: string) => request<T>(url, { method: 'DELETE' }),
 };

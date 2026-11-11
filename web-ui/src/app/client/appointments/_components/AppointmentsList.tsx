@@ -12,7 +12,7 @@ import {
 } from 'lucide-react';
 import type { Appointment, Pet } from '@/modules/client/types';
 import type { Service, Veterinarian } from '@/modules/clinic/types';
-import { SpeciesIcon } from '@/components/ui/SpeciesIcon';
+import { PetAvatar } from '@/components/ui/EntityAvatar';
 import {
   APPOINTMENT_STATUS_META,
   formatCurrency,
@@ -192,9 +192,14 @@ export function AppointmentsList({
                     )}
                   </span>
                   <span className="pet-cell">
-                    <span className={`t-ava xs tone-${tone}`}>
-                      <SpeciesIcon species={tone} size={14} />
-                    </span>
+                    <PetAvatar
+                      pet={pet}
+                      tone={tone}
+                      species={tone}
+                      iconSize={14}
+                      variant="thumb"
+                      className={`t-ava xs tone-${tone}`}
+                    />
                     <span>{pet?.name || a.petName || 'Питомец'}</span>
                   </span>
                   <span>{svc?.name || a.serviceName || 'Услуга'}</span>

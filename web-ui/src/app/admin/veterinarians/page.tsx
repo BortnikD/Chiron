@@ -78,6 +78,8 @@ function AdminVeterinariansContent() {
             onClose={s.closeDetail}
             onDeleteClick={s.openDeleteModal}
             onSaveProfile={s.updateVeterinarian}
+            onUploadPhoto={s.uploadVetPhoto}
+            onDeletePhoto={s.deleteVetPhoto}
             onToggleSpeciesPermission={s.toggleVetSpeciesPermission}
           />
         )}

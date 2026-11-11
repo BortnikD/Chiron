@@ -6,6 +6,7 @@ import type { Veterinarian, Specialization, Species } from '@/modules/clinic/typ
 import type { User } from '@/shared/types';
 import { getSpecTone, getSpeciesTone, pluralRu, toIdNameMap } from '@/shared/lib';
 import { SpeciesIcon } from '@/components/ui/SpeciesIcon';
+import { VetAvatar } from '@/components/ui/EntityAvatar';
 import { getDoctorDisplay } from '@/utils/doctorHelpers';
 
 export interface AdminVetsTableProps {
@@ -77,9 +78,13 @@ export const AdminVetsTable: React.FC<AdminVetsTableProps> = ({
                 onClick={() => onSelectVet(v)}
               >
                 <span className="row" style={{ gap: 8 }}>
-                  <span className={`t-ava sm round tone-${getSpecTone(v.specializationId)}`}>
-                    {doc.initials}
-                  </span>
+                  <VetAvatar
+                    vet={v}
+                    initials={doc.initials}
+                    tone={getSpecTone(v.specializationId)}
+                    className={`t-ava sm round tone-${getSpecTone(v.specializationId)}`}
+                    alt={doc.fullName}
+                  />
                   <span className="cell-main">{doc.fullName}</span>
                 </span>
                 <span>

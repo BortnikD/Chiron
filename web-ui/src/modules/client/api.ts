@@ -1,5 +1,5 @@
 import { api } from '@/shared/api/client';
-import type { AppointmentStatus, PageResponse } from '@/shared/types';
+import type { AppointmentStatus, PageResponse, PhotoLinks } from '@/shared/types';
 import type {
   Pet,
   CreatePetRequest,
@@ -55,6 +55,14 @@ export const clientApi = {
 
   updatePet: (id: string, data: UpdatePetRequest) =>
     api.patch<Pet>(`/api/v1/client/pets/${id}`, data),
+
+  uploadPetPhoto: (id: string, file: File) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    return api.putForm<PhotoLinks>(`/api/v1/client/pets/${id}/photo`, formData);
+  },
+
+  deletePetPhoto: (id: string) => api.delete<void>(`/api/v1/client/pets/${id}/photo`),
 
   deletePet: (id: string) => api.delete<void>(`/api/v1/client/pets/${id}`),
 

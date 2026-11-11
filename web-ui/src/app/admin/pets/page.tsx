@@ -94,6 +94,8 @@ function AdminPetsContent() {
             onToggleArchive={vm.handleToggleArchive}
             onDelete={vm.openDeleteConfirm}
             onAddVaccination={() => vm.setIsAddVacOpen(true)}
+            onUploadPhoto={vm.uploadPetPhoto}
+            onDeletePhoto={vm.deletePetPhoto}
           />
         )}
       </div>
@@ -111,6 +113,8 @@ function AdminPetsContent() {
         speciesList={vm.speciesList}
         onClose={() => vm.setIsEditOpen(false)}
         onUpdate={vm.updatePet}
+        onUploadPhoto={vm.uploadPetPhoto}
+        onDeletePhoto={vm.deletePetPhoto}
       />
       <ConfirmModal
         isOpen={vm.isDeleteConfirmOpen && Boolean(vm.selectedPet)}

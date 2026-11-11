@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { Clock, ChevronRight } from 'lucide-react';
 import type { Pet, Appointment } from '@/modules/client/types';
 import type { Service, Veterinarian } from '@/modules/clinic/types';
-import { SpeciesIcon } from '@/components/ui/SpeciesIcon';
+import { PetAvatar } from '@/components/ui/EntityAvatar';
 import { getDoctorDisplay } from '@/utils/doctorHelpers';
 import {
   APPOINTMENT_STATUS_META,
@@ -85,9 +85,14 @@ export function NextAppointmentBanner({
       </div>
 
       <div className="hm-next-who">
-        <span className={`hm-ava tone-${tone}`}>
-          <SpeciesIcon species={tone} size={20} />
-        </span>
+        <PetAvatar
+          pet={pet || nextAppointment.pet}
+          tone={tone}
+          species={tone}
+          iconSize={20}
+          variant="full"
+          className={`hm-ava tone-${tone}`}
+        />
         <span className="col" style={{ gap: '1px', minWidth: 0 }}>
           <span className="hm-next-pet">
             {petName} · {serviceName}

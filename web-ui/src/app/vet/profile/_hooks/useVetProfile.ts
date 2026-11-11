@@ -8,17 +8,7 @@ import { formatApiError, toIdNameMap } from '@/shared/lib';
 
 export interface VetPracticeForm {
   bio: string;
-  photoUrl: string;
   experienceYears: number;
-}
-
-function isValidHttpUrl(value: string): boolean {
-  try {
-    const parsed = new URL(value);
-    return parsed.protocol === 'http:' || parsed.protocol === 'https:';
-  } catch {
-    return false;
-  }
 }
 
 export function useVetProfile() {
@@ -32,7 +22,6 @@ export function useVetProfile() {
   const [error, setError] = useState<string | null>(null);
   const [form, setForm] = useState<VetPracticeForm>({
     bio: '',
-    photoUrl: '',
     experienceYears: 0,
   });
 
@@ -60,7 +49,6 @@ export function useVetProfile() {
       setSpecsMap(toIdNameMap(Array.isArray(specs) ? specs : []));
       setForm({
         bio: data.bio || '',
-        photoUrl: data.photoUrl || '',
         experienceYears: data.experienceYears || 0,
       });
     } catch (err: unknown) {
@@ -83,18 +71,6 @@ export function useVetProfile() {
       setSuccess(false);
       setError(null);
 
-      const trimmedPhoto = form.photoUrl.trim();
-      if (trimmedPhoto) {
-        if (trimmedPhoto.length > 2048) {
-          setError('Ссылка на фото не должна превышать 2048 символов');
-          return;
-        }
-        if (!isValidHttpUrl(trimmedPhoto)) {
-          setError('Укажите корректную ссылку на фото (начинается с https:// или http://)');
-          return;
-        }
-      }
-
       const rawExp = Number(form.experienceYears);
       if (!Number.isFinite(rawExp) || rawExp < 0 || rawExp > 70) {
         setError('Стаж должен быть числом от 0 до 70 лет');
@@ -111,14 +87,12 @@ export function useVetProfile() {
       try {
         const updated = await vetApi.updateProfile({
           bio: trimmedBio || null,
-          photoUrl: trimmedPhoto || null,
           experienceYears: Math.trunc(rawExp),
         });
         if (!isMountedRef.current) return;
         setVetProfile(updated);
         setForm({
           bio: updated.bio || '',
-          photoUrl: updated.photoUrl || '',
           experienceYears: updated.experienceYears || 0,
         });
         setSuccess(true);
@@ -137,6 +111,35 @@ export function useVetProfile() {
     [form, toast]
   );
 
+  const uploadOwnPhoto = useCallback(
+    async (file: File) => {
+      const links = await vetApi.uploadOwnPhoto(file);
+      if (!isMountedRef.current) return;
+      setVetProfile((prev) =>
+        prev
+          ? {
+              ...prev,
+              photoUrl: links.photoUrl,
+              photoThumbnailUrl: links.photoThumbnailUrl,
+              photoUrlExpiresAt: links.photoUrlExpiresAt,
+            }
+          : prev
+      );
+      window.dispatchEvent(new CustomEvent('chiron:vet-profile-updated', { detail: links }));
+      toast('Фотография обновлена', 'Изображение сохранено в профиле врача');
+    },
+    [toast]
+  );
+
+  const deleteOwnPhoto = useCallback(async () => {
+    await vetApi.deleteOwnPhoto();
+    if (!isMountedRef.current) return;
+    const empty = { photoUrl: null, photoThumbnailUrl: null, photoUrlExpiresAt: null };
+    setVetProfile((prev) => (prev ? { ...prev, ...empty } : prev));
+    window.dispatchEvent(new CustomEvent('chiron:vet-profile-updated', { detail: empty }));
+    toast('Фотография удалена', 'В карточке снова отображаются инициалы');
+  }, [toast]);
+
   const memoSpecsMap = useMemo(() => specsMap, [specsMap]);
 
   return {
@@ -151,5 +154,7 @@ export function useVetProfile() {
     success,
     error,
     handleSubmit,
+    uploadOwnPhoto,
+    deleteOwnPhoto,
   };
 }

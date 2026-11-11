@@ -5,6 +5,7 @@ import { AlertCircle, X } from 'lucide-react';
 import type { Veterinarian, Specialization } from '@/modules/clinic/types';
 import type { User } from '@/shared/types';
 import { SearchCombobox, type SearchComboboxOption } from '@/shared/components';
+import { EntityPhotoControl } from '@/components/ui/EntityPhotoControl';
 import { formatApiError } from '@/shared/lib';
 import type { CreateVetInput } from '../_hooks/useAdminVeterinarians';
 
@@ -21,7 +22,6 @@ const INITIAL_FORM = {
   userId: '',
   specializationId: '',
   bio: '',
-  photoUrl: '',
   experienceYears: 0,
   isActive: true,
 };
@@ -35,6 +35,7 @@ export const AdminCreateVetModal: React.FC<AdminCreateVetModalProps> = ({
   onCreateVet,
 }) => {
   const [createForm, setCreateForm] = useState(INITIAL_FORM);
+  const [photoFile, setPhotoFile] = useState<File | null>(null);
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
 
@@ -68,6 +69,7 @@ export const AdminCreateVetModal: React.FC<AdminCreateVetModalProps> = ({
         ...INITIAL_FORM,
         userId: matchedUser,
       });
+      setPhotoFile(null);
       setCreateError(null);
       setCreating(false);
     }
@@ -97,11 +99,12 @@ export const AdminCreateVetModal: React.FC<AdminCreateVetModalProps> = ({
         userId: createForm.userId,
         specializationId: createForm.specializationId,
         bio: createForm.bio,
-        photoUrl: createForm.photoUrl,
         experienceYears: Number(createForm.experienceYears) || 0,
         isActive: createForm.isActive,
+        photoFile,
       });
       setCreateForm(INITIAL_FORM);
+      setPhotoFile(null);
       onClose();
     } catch (err: unknown) {
       setCreateError(formatApiError(err, 'Не удалось создать профиль врача'));
@@ -225,16 +228,15 @@ export const AdminCreateVetModal: React.FC<AdminCreateVetModalProps> = ({
               </div>
 
               <div className="field span-2">
-                <label className="field-label" htmlFor="cr-photo">
-                  Фото (URL)
-                </label>
-                <input
-                  className="input"
-                  id="cr-photo"
-                  type="url"
-                  placeholder="https://…"
-                  value={createForm.photoUrl}
-                  onChange={(e) => setCreateForm({ ...createForm, photoUrl: e.target.value })}
+                <EntityPhotoControl
+                  previewFallback="ВР"
+                  previewClassName="t-ava lg round"
+                  previewAlt="Фото нового врача"
+                  title="Фотография (необязательно)"
+                  hint="JPEG или PNG до 5 МБ · загрузится сразу после создания профиля"
+                  disabled={creating}
+                  pendingFile={photoFile}
+                  onSelectPendingFile={setPhotoFile}
                 />
               </div>
 

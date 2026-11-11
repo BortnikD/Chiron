@@ -12,6 +12,8 @@ import {
 } from 'lucide-react';
 import type { Pet, Appointment, Vaccination } from '@/modules/client/types';
 import type { Service, Veterinarian } from '@/modules/clinic/types';
+import { PetAvatar } from '@/components/ui/EntityAvatar';
+import { EntityPhotoControl } from '@/components/ui/EntityPhotoControl';
 import { SpeciesIcon } from '@/components/ui/SpeciesIcon';
 import { getDoctorDisplay } from '@/utils/doctorHelpers';
 import {
@@ -39,6 +41,8 @@ export interface PetDetailIslandProps {
   onEdit: (pet: Pet) => void;
   onToggleArchive: (pet: Pet) => void;
   onDelete: (pet: Pet) => void;
+  onUploadPhoto: (petId: string, file: File) => Promise<void>;
+  onDeletePhoto: (petId: string) => Promise<void>;
 }
 
 export function PetDetailIsland({
@@ -54,6 +58,8 @@ export function PetDetailIsland({
   onEdit,
   onToggleArchive,
   onDelete,
+  onUploadPhoto,
+  onDeletePhoto,
 }: PetDetailIslandProps) {
   const [detailTab, setDetailTab] = useState<DetailTab>(initialTab);
 
@@ -79,9 +85,14 @@ export function PetDetailIsland({
     >
       <div className="island-head">
         <div className="row">
-          <span className={`pet-ava tone-${tone}`} style={{ color: 'var(--tone)', background: 'color-mix(in srgb, var(--tone, var(--muted-foreground)) 16%, transparent)' }}>
-            <SpeciesIcon species={tone} size={20} />
-          </span>
+          <PetAvatar
+            pet={pet}
+            tone={tone}
+            iconSize={20}
+            className={`pet-ava tone-${tone} detail-head-ava`}
+            style={{ color: 'var(--tone)', background: 'color-mix(in srgb, var(--tone, var(--muted-foreground)) 16%, transparent)' }}
+            alt={pet.name}
+          />
           <div className="col" style={{ gap: 0, minWidth: 0 }}>
             <span className="h2">{pet.name}</span>
             <span className="cell-sub">
@@ -175,6 +186,18 @@ export function PetDetailIsland({
                 <div>Питомец в архиве: история сохранена, новые записи недоступны.</div>
               </div>
             )}
+
+            <EntityPhotoControl
+              photo={pet}
+              previewFallback={<SpeciesIcon species={tone} size={20} />}
+              previewClassName={`pet-ava tone-${tone}`}
+              previewAlt={pet.name}
+              title="Фотография питомца"
+              hint="JPEG или PNG до 5 МБ · квадрат 512×512"
+              hidePreview
+              onUpload={(file) => onUploadPhoto(pet.id, file)}
+              onDelete={() => onDeletePhoto(pet.id)}
+            />
 
             <dl className="kv" style={{ margin: 0 }}>
               <dt>Вид</dt>

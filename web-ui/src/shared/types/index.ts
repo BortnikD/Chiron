@@ -83,6 +83,12 @@ export interface AuthResult {
   user: User;
 }
 
+export interface PhotoLinks {
+  photoUrl: string;
+  photoThumbnailUrl: string;
+  photoUrlExpiresAt: string;
+}
+
 export interface AppNotification {
   id: string;
   type: NotificationType;

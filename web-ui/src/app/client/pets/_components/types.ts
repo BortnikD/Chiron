@@ -18,6 +18,7 @@ export interface PetFormData {
   weightKg?: number | null;
   notes?: string | null;
   isArchived?: boolean;
+  photoFile?: File | null;
 }
 
 export function getPetVacDueInfo(dateStr?: string | null): {

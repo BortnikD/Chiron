@@ -2,6 +2,7 @@ import React from 'react';
 import { CalendarOff, AlertCircle } from 'lucide-react';
 import type { Veterinarian, AvailableSlotResponse } from '@/modules/clinic/types';
 import { DatePicker } from '@/shared/components';
+import { VetAvatar } from '@/components/ui/EntityAvatar';
 import { formatSlotTime } from '@/shared/lib';
 import { getDoctorDisplay } from '@/utils/doctorHelpers';
 import type { GroupedDaySlots } from '../_hooks/useBookingSlots';
@@ -177,9 +178,13 @@ export const StepSlotSelection: React.FC<StepSlotSelectionProps> = ({
                             const v = vetsMap[id];
                             const ini = v ? getDoctorDisplay(v, specsMap).initials : 'ДВ';
                             return (
-                              <span key={id} className="avatar avatar-xs">
-                                {ini}
-                              </span>
+                              <VetAvatar
+                                key={id}
+                                vet={v}
+                                initials={ini}
+                                className="avatar avatar-xs"
+                                alt={v ? getDoctorDisplay(v, specsMap).name : 'Дежурный врач'}
+                              />
                             );
                           })}
                         </span>
@@ -210,9 +215,13 @@ export const StepSlotSelection: React.FC<StepSlotSelectionProps> = ({
                       className={`chip ${isPicked ? 'on' : ''}`}
                       onClick={() => onSelectSlotVetId(vid)}
                     >
-                      <span className="avatar avatar-xs" style={{ margin: 0 }}>
-                        {display.initials}
-                      </span>
+                      <VetAvatar
+                        vet={v}
+                        initials={display.initials}
+                        className="avatar avatar-xs"
+                        style={{ margin: 0 }}
+                        alt={display.name}
+                      />
                       {display.name}
                     </button>
                   );

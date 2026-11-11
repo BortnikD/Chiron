@@ -159,8 +159,20 @@ export function useAdminPets() {
   }, [selectedPet?.id, loadPetDetails]);
 
   const createPet = useCallback(
-    async (payload: CreatePetRequest) => {
-      const created = await adminApi.createPet(payload);
+    async (payload: CreatePetRequest, photoFile?: File | null) => {
+      let created = await adminApi.createPet(payload);
+      if (photoFile && created?.id) {
+        try {
+          const links = await adminApi.uploadPetPhoto(created.id, photoFile);
+          created = { ...created, ...links };
+        } catch (photoErr: unknown) {
+          toast(
+            'Питомец добавлен, но фото не загрузилось',
+            formatApiError(photoErr, 'Попробуйте загрузить фото в карточке питомца'),
+            'err'
+          );
+        }
+      }
       toast('Питомец добавлен', created.name);
       await loadData();
       if (created) setSelectedPet(created);
@@ -177,6 +189,27 @@ export function useAdminPets() {
       return updated;
     },
     [loadData, toast]
+  );
+
+  const uploadPetPhoto = useCallback(
+    async (petId: string, file: File) => {
+      const links = await adminApi.uploadPetPhoto(petId, file);
+      setPets((prev) => prev.map((p) => (p.id === petId ? { ...p, ...links } : p)));
+      setSelectedPet((prev) => (prev?.id === petId ? { ...prev, ...links } : prev));
+      toast('Фотография питомца обновлена');
+    },
+    [toast]
+  );
+
+  const deletePetPhoto = useCallback(
+    async (petId: string) => {
+      await adminApi.deletePetPhoto(petId);
+      const empty = { photoUrl: null, photoThumbnailUrl: null, photoUrlExpiresAt: null };
+      setPets((prev) => prev.map((p) => (p.id === petId ? { ...p, ...empty } : p)));
+      setSelectedPet((prev) => (prev?.id === petId ? { ...prev, ...empty } : prev));
+      toast('Фотография питомца удалена');
+    },
+    [toast]
   );
 
   const createVaccination = useCallback(
@@ -282,6 +315,8 @@ export function useAdminPets() {
     clearActionError: useCallback(() => setActionError(null), []),
     createPet,
     updatePet,
+    uploadPetPhoto,
+    deletePetPhoto,
     createVaccination,
     handleToggleArchive,
     handleDeletePet,

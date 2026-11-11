@@ -3,7 +3,7 @@
 import React from 'react';
 import { PawPrint } from 'lucide-react';
 import { calculateAgeRu, getSpeciesTone } from '@/shared/lib';
-import { SpeciesIcon } from '@/components/ui/SpeciesIcon';
+import { PetAvatar } from '@/components/ui/EntityAvatar';
 import type { PetsTableProps } from './types';
 
 /**
@@ -63,9 +63,13 @@ export const PetsTable: React.FC<PetsTableProps> = ({
                 onClick={() => onSelectPet(p)}
               >
                 <span className="pet-cell">
-                  <span className={`t-ava sm tone-${tone}`}>
-                    <SpeciesIcon species={tone} size={14} />
-                  </span>
+                  <PetAvatar
+                    pet={p}
+                    tone={tone}
+                    iconSize={14}
+                    className={`t-ava sm tone-${tone}`}
+                    alt={p.name}
+                  />
                   <span className="col" style={{ gap: 0, textAlign: 'left', minWidth: 0 }}>
                     <span className="cell-main">{p.name}</span>
                     {p.breed && <span className="cell-sub">{p.breed}</span>}

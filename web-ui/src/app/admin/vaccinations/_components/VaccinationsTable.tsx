@@ -4,7 +4,7 @@ import React, { useMemo } from 'react';
 import { Syringe, Edit2, Trash2 } from 'lucide-react';
 import type { Vaccination, Pet } from '@/modules/client/types';
 import type { Species } from '@/modules/clinic/types';
-import { SpeciesIcon } from '@/components/ui/SpeciesIcon';
+import { PetAvatar } from '@/components/ui/EntityAvatar';
 import { formatIsoDateDisplay, getSpeciesTone } from '@/shared/lib';
 import { calculateVaccinationStatus } from './utils';
 import { VACCINATIONS_TABLE_COLS } from './constants';
@@ -100,9 +100,14 @@ export const VaccinationsTable: React.FC<VaccinationsTableProps> = ({
                   }}
                 >
                   <span className="pet-cell">
-                    <span className={`t-ava xs tone-${tone}`}>
-                      <SpeciesIcon species={tone} size={14} />
-                    </span>
+                    <PetAvatar
+                      pet={pet}
+                      tone={tone}
+                      species={tone}
+                      iconSize={14}
+                      variant="thumb"
+                      className={`t-ava xs tone-${tone}`}
+                    />
                     <span className="cell-main">{petName}</span>
                   </span>
 

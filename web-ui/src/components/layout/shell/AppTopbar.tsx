@@ -15,7 +15,8 @@ import {
   User as UserIcon,
 } from 'lucide-react';
 import type { AppNotification, UserRole } from '@/shared/types';
-import { formatSlotTime } from '@/shared/lib';
+import { formatSlotTime, type PhotoEntity } from '@/shared/lib';
+import { PhotoAvatar } from '@/components/ui/EntityAvatar';
 import { getNotifMeta } from '@/components/notifications/notifMeta';
 
 interface AppTopbarProps {
@@ -23,6 +24,7 @@ interface AppTopbarProps {
   roleShortLabel: string;
   shortName: string;
   initials: string;
+  avatarPhoto?: PhotoEntity | null;
   crumbGroup: string;
   crumbLabel: string;
   crumb2?: string;
@@ -53,6 +55,7 @@ export function AppTopbar({
   roleShortLabel,
   shortName,
   initials,
+  avatarPhoto,
   crumbGroup,
   crumbLabel,
   crumb2,
@@ -263,7 +266,13 @@ export function AppTopbar({
           onClick={onToggleUserMenu}
           aria-label="Меню профиля"
         >
-          <span className="avatar">{initials}</span>
+          <PhotoAvatar
+            photo={avatarPhoto}
+            alt={shortName}
+            className="avatar"
+            variant="thumb"
+            fallback={initials}
+          />
         </button>
 
         {userDropdown && (

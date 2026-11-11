@@ -15,7 +15,7 @@ import {
 import type { Appointment, Pet } from '@/modules/client/types';
 import type { Veterinarian, Service, Species } from '@/modules/clinic/types';
 import type { User } from '@/shared/types';
-import { SpeciesIcon } from '@/components/ui/SpeciesIcon';
+import { PetAvatar } from '@/components/ui/EntityAvatar';
 import {
   APPOINTMENT_STATUS_META,
   formatCurrency,
@@ -171,9 +171,14 @@ export const AdminAppointmentsTable: React.FC<AdminAppointmentsTableProps> = ({
                 </span>
 
                 <span className="pet-cell">
-                  <span className={`t-ava xs tone-${tone}`}>
-                    <SpeciesIcon species={tone} size={14} />
-                  </span>
+                  <PetAvatar
+                    pet={p}
+                    tone={tone}
+                    species={tone}
+                    iconSize={14}
+                    variant="thumb"
+                    className={`t-ava xs tone-${tone}`}
+                  />
                   <span>{p?.name || 'Питомец'}</span>
                 </span>
 

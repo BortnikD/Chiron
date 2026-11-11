@@ -3,9 +3,11 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { AlertCircle } from 'lucide-react';
 import { DatePicker, FilterDropdown } from '@/shared/components';
+import { EntityPhotoControl } from '@/components/ui/EntityPhotoControl';
+import { SpeciesIcon } from '@/components/ui/SpeciesIcon';
 import type { Pet } from '@/modules/client/types';
 import type { Species } from '@/modules/clinic/types';
-import { getMoscowDateKey, getMoscowTodayIso } from '@/shared/lib';
+import { getMoscowDateKey, getMoscowTodayIso, getSpeciesTone } from '@/shared/lib';
 import type { Gender } from '@/shared/types';
 import type { PetFormData } from './types';
 
@@ -14,6 +16,8 @@ export interface PetModalProps {
   pet: Pet | null;
   speciesList: Species[];
   onSave: (data: PetFormData) => Promise<void> | void;
+  onUploadPhoto?: (petId: string, file: File) => Promise<void>;
+  onDeletePhoto?: (petId: string) => Promise<void>;
   onClose: () => void;
   saving?: boolean;
   error?: string | null;
@@ -32,6 +36,8 @@ export function PetModal({
   pet,
   speciesList,
   onSave,
+  onUploadPhoto,
+  onDeletePhoto,
   onClose,
   saving = false,
   error = null,
@@ -43,6 +49,7 @@ export function PetModal({
   const [weightKg, setWeightKg] = useState('');
   const [notes, setNotes] = useState('');
   const [isArchived, setIsArchived] = useState(false);
+  const [pendingPhotoFile, setPendingPhotoFile] = useState<File | null>(null);
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
 
   const wasOpenRef = useRef(false);
@@ -79,6 +86,7 @@ export function PetModal({
         setNotes('');
         setIsArchived(false);
       }
+      setPendingPhotoFile(null);
       setFieldErrors({});
     } else if (!pet && speciesList.length > 0) {
       setSpeciesId((prev) => prev || speciesList[0].id);
@@ -137,11 +145,12 @@ export function PetModal({
       birthDate: birthDate || null,
       weightKg: parsedWeight,
       notes: notes.trim() || null,
-      ...(pet ? { isArchived } : {}),
+      ...(pet ? { isArchived } : { photoFile: pendingPhotoFile }),
     });
   };
 
   const modalTitle = pet ? 'Изменить питомца' : 'Новый питомец';
+  const currentTone = getSpeciesTone(speciesId, speciesList);
 
   return (
     <div
@@ -167,6 +176,33 @@ export function PetModal({
             )}
 
             <div className="form-grid">
+              <div className="field span-2">
+                {pet && onUploadPhoto && onDeletePhoto ? (
+                  <EntityPhotoControl
+                    photo={pet}
+                    previewFallback={<SpeciesIcon species={currentTone} size={20} />}
+                    previewClassName={`pet-ava tone-${currentTone}`}
+                    previewAlt={pet.name}
+                    title="Фотография питомца"
+                    hint="JPEG или PNG до 5 МБ · квадрат 512×512"
+                    disabled={saving}
+                    onUpload={(file) => onUploadPhoto(pet.id, file)}
+                    onDelete={() => onDeletePhoto(pet.id)}
+                  />
+                ) : (
+                  <EntityPhotoControl
+                    previewFallback={<SpeciesIcon species={currentTone} size={20} />}
+                    previewClassName={`pet-ava tone-${currentTone}`}
+                    previewAlt={name || 'Новый питомец'}
+                    title="Фотография (необязательно)"
+                    hint="JPEG или PNG до 5 МБ · загрузится сразу после добавления"
+                    disabled={saving}
+                    pendingFile={pendingPhotoFile}
+                    onSelectPendingFile={setPendingPhotoFile}
+                  />
+                )}
+              </div>
+
               <div className="field span-2">
                 <label className="field-label" htmlFor="pt-name">
                   Кличка <span className="req">*</span>

@@ -46,6 +46,8 @@ function VetProfileInner() {
     success,
     error,
     handleSubmit,
+    uploadOwnPhoto,
+    deleteOwnPhoto,
   } = useVetProfile();
 
   return (
@@ -106,6 +108,8 @@ function VetProfileInner() {
                 error={error}
                 onChange={setForm}
                 onSubmit={handleSubmit}
+                onUploadPhoto={uploadOwnPhoto}
+                onDeletePhoto={deleteOwnPhoto}
               />
             )}
           </>

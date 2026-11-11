@@ -2,6 +2,8 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { AlertCircle, X } from 'lucide-react';
+import { SpeciesIcon } from '@/components/ui/SpeciesIcon';
+import { EntityPhotoControl } from '@/components/ui/EntityPhotoControl';
 import {
   DatePicker,
   FilterDropdown,
@@ -9,7 +11,7 @@ import {
   type FilterDropdownOption,
   type SearchComboboxOption,
 } from '@/shared/components';
-import { formatApiError, getMoscowTodayIso } from '@/shared/lib';
+import { formatApiError, getMoscowTodayIso, getSpeciesTone } from '@/shared/lib';
 import type { CreatePetModalProps, CreatePetFormData } from './types';
 import { DEFAULT_CREATE_FORM } from './constants';
 
@@ -24,6 +26,7 @@ export const CreatePetModal: React.FC<CreatePetModalProps> = ({
   users,
 }) => {
   const [form, setForm] = useState<CreatePetFormData>(DEFAULT_CREATE_FORM);
+  const [pendingPhotoFile, setPendingPhotoFile] = useState<File | null>(null);
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
   const todayIso = getMoscowTodayIso();
@@ -46,6 +49,7 @@ export const CreatePetModal: React.FC<CreatePetModalProps> = ({
   useEffect(() => {
     if (isOpen) {
       setCreateError(null);
+      setPendingPhotoFile(null);
       const clients = users.filter((u) => u.role === 'CLIENT');
       const firstOwner = (clients[0] || users[0])?.id || '';
       setForm({
@@ -67,6 +71,9 @@ export const CreatePetModal: React.FC<CreatePetModalProps> = ({
 
   if (!isOpen) return null;
 
+  const selectedSpeciesName = speciesList.find((s) => s.id === form.speciesId)?.name;
+  const tone = getSpeciesTone(selectedSpeciesName || form.speciesId, speciesList);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!form.name.trim() || !form.speciesId || !form.ownerId) {
@@ -78,16 +85,20 @@ export const CreatePetModal: React.FC<CreatePetModalProps> = ({
     setCreateError(null);
 
     try {
-      await onCreate({
-        name: form.name.trim(),
-        speciesId: form.speciesId,
-        ownerId: form.ownerId,
-        gender: form.gender,
-        birthDate: form.birthDate || null,
-        weightKg: form.weightKg ? parseFloat(form.weightKg) : null,
-        notes: form.notes.trim() || null,
-      });
+      await onCreate(
+        {
+          name: form.name.trim(),
+          speciesId: form.speciesId,
+          ownerId: form.ownerId,
+          gender: form.gender,
+          birthDate: form.birthDate || null,
+          weightKg: form.weightKg ? parseFloat(form.weightKg) : null,
+          notes: form.notes.trim() || null,
+        },
+        pendingPhotoFile
+      );
       setForm(DEFAULT_CREATE_FORM);
+      setPendingPhotoFile(null);
       onClose();
     } catch (err: unknown) {
       setCreateError(formatApiError(err, 'Ошибка создания питомца'));
@@ -125,6 +136,18 @@ export const CreatePetModal: React.FC<CreatePetModalProps> = ({
 
         <form onSubmit={handleSubmit}>
           <div className="dialog-body">
+            <div style={{ marginBottom: 14 }}>
+              <EntityPhotoControl
+                photo={null}
+                pendingFile={pendingPhotoFile}
+                onSelectPendingFile={setPendingPhotoFile}
+                previewClassName={`t-ava lg tone-${tone}`}
+                previewAlt={form.name.trim() || 'Новый питомец'}
+                previewFallback={<SpeciesIcon species={tone} size={24} />}
+                disabled={creating}
+              />
+            </div>
+
             <div className="field">
               <label className="field-label" htmlFor="cr-powner">
                 Владелец <span className="req">*</span>

@@ -2,7 +2,7 @@ import React from 'react';
 import Link from 'next/link';
 import { Check, Plus } from 'lucide-react';
 import type { Pet } from '@/modules/client/types';
-import { SpeciesIcon } from '@/components/ui/SpeciesIcon';
+import { PetAvatar } from '@/components/ui/EntityAvatar';
 import { calculateAgeRu, getSpeciesTone } from '@/shared/lib';
 
 export interface StepPetSelectionProps {
@@ -67,9 +67,7 @@ export const StepPetSelection: React.FC<StepPetSelectionProps> = ({
                 style={p.isArchived ? { opacity: 0.55, cursor: 'not-allowed' } : undefined}
               >
                 <div className="tcard-head">
-                  <span className="t-ava lg">
-                    <SpeciesIcon species={spTone} size={26} />
-                  </span>
+                  <PetAvatar pet={p} tone={spTone} species={spTone} iconSize={26} className="t-ava lg" />
                   <span className="col grow" style={{ gap: '1px', minWidth: 0 }}>
                     <span className="tcard-title">{p.name}</span>
                     <span className="cell-sub">

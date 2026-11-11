@@ -17,10 +17,14 @@ export interface CreateVetInput {
   userId: string;
   specializationId: string;
   bio?: string;
-  photoUrl?: string;
   experienceYears: number;
   isActive: boolean;
+  photoFile?: File | null;
 }
+
+export type UpdateVetInput = Partial<
+  Pick<Veterinarian, 'specializationId' | 'bio' | 'experienceYears' | 'isActive'>
+>;
 
 export function useAdminVeterinarians() {
   const searchParams = useSearchParams();
@@ -202,7 +206,20 @@ export function useAdminVeterinarians() {
 
   const createVeterinarian = useCallback(
     async (data: CreateVetInput): Promise<Veterinarian> => {
-      const created = await adminApi.createVeterinarian(data);
+      const { photoFile, ...payload } = data;
+      let created = await adminApi.createVeterinarian(payload);
+      if (photoFile) {
+        try {
+          const links = await adminApi.uploadVeterinarianPhoto(created.id, photoFile);
+          created = { ...created, ...links };
+        } catch (err: unknown) {
+          toast(
+            'Профиль создан, но фото не загрузилось',
+            formatApiError(err, 'Попробуйте загрузить фотографию в карточке врача'),
+            'err'
+          );
+        }
+      }
       setPreferredDetailTab('species');
       await loadData();
       setSelectedVet(created);
@@ -214,7 +231,7 @@ export function useAdminVeterinarians() {
   );
 
   const updateVeterinarian = useCallback(
-    async (id: string, data: Partial<Veterinarian>): Promise<Veterinarian> => {
+    async (id: string, data: UpdateVetInput): Promise<Veterinarian> => {
       const updated = await adminApi.updateVeterinarian(id, data);
       await loadData();
       setSelectedVet((prev) => (prev?.id === id ? updated : prev));
@@ -222,6 +239,31 @@ export function useAdminVeterinarians() {
       return updated;
     },
     [loadData, toast]
+  );
+
+  const uploadVetPhoto = useCallback(
+    async (vetId: string, file: File): Promise<void> => {
+      const links = await adminApi.uploadVeterinarianPhoto(vetId, file);
+      setVeterinarians((prev) =>
+        prev.map((v) => (v.id === vetId ? { ...v, ...links } : v))
+      );
+      setSelectedVet((prev) => (prev?.id === vetId ? { ...prev, ...links } : prev));
+      toast('Фотография врача обновлена');
+    },
+    [toast]
+  );
+
+  const deleteVetPhoto = useCallback(
+    async (vetId: string): Promise<void> => {
+      await adminApi.deleteVeterinarianPhoto(vetId);
+      const empty = { photoUrl: null, photoThumbnailUrl: null, photoUrlExpiresAt: null };
+      setVeterinarians((prev) =>
+        prev.map((v) => (v.id === vetId ? { ...v, ...empty } : v))
+      );
+      setSelectedVet((prev) => (prev?.id === vetId ? { ...prev, ...empty } : prev));
+      toast('Фотография врача удалена');
+    },
+    [toast]
   );
 
   const toggleVetSpeciesPermission = useCallback(
@@ -324,6 +366,8 @@ export function useAdminVeterinarians() {
     confirmDeleteVet,
     createVeterinarian,
     updateVeterinarian,
+    uploadVetPhoto,
+    deleteVetPhoto,
     toggleVetSpeciesPermission,
   };
 }

@@ -1,6 +1,7 @@
 import React, { useMemo } from 'react';
 import { Stethoscope, Check } from 'lucide-react';
 import type { Veterinarian } from '@/modules/clinic/types';
+import { VetAvatar } from '@/components/ui/EntityAvatar';
 import { getDoctorDisplay } from '@/utils/doctorHelpers';
 import { getSpecTone, pluralRu } from '@/shared/lib';
 
@@ -88,7 +89,13 @@ export const StepDoctorSelection: React.FC<StepDoctorSelectionProps> = ({
               onClick={() => onSelectVet(v)}
             >
               <div className="tcard-head">
-                <span className="t-ava lg round">{initials}</span>
+                <VetAvatar
+                  vet={v}
+                  initials={initials}
+                  tone={tone}
+                  className="t-ava lg round"
+                  alt={name}
+                />
                 <span className="col grow" style={{ gap: '3px', minWidth: 0 }}>
                   <span className="tcard-title">{name}</span>
                   <span className="row" style={{ gap: '6px' }}>

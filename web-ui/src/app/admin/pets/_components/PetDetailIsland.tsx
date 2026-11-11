@@ -4,6 +4,8 @@ import React, { useState } from 'react';
 import Link from 'next/link';
 import { Edit2, Archive, Trash2, Syringe, X, AlertCircle } from 'lucide-react';
 import { SpeciesIcon } from '@/components/ui/SpeciesIcon';
+import { PetAvatar } from '@/components/ui/EntityAvatar';
+import { EntityPhotoControl } from '@/components/ui/EntityPhotoControl';
 import {
   APPOINTMENT_STATUS_META,
   calculateAgeRu,
@@ -44,6 +46,8 @@ export const PetDetailIsland: React.FC<PetDetailIslandProps> = ({
   onToggleArchive,
   onDelete,
   onAddVaccination,
+  onUploadPhoto,
+  onDeletePhoto,
 }) => {
   const [activeTab, setActiveTab] = useState<PetDetailTab>('overview');
 
@@ -57,9 +61,14 @@ export const PetDetailIsland: React.FC<PetDetailIslandProps> = ({
     <section className="island detail-island" aria-label="Питомец">
       <div className="island-head">
         <div className="row">
-          <span className="pet-ava">
-            <SpeciesIcon species={tone} size={20} />
-          </span>
+          <PetAvatar
+            pet={pet}
+            tone={tone}
+            species={tone}
+            iconSize={20}
+            className={`pet-ava tone-${tone} detail-head-ava`}
+            variant="full"
+          />
           <div className="col" style={{ gap: 0 }}>
             <span className="h2">{pet.name}</span>
             <span className="cell-sub">
@@ -138,6 +147,15 @@ export const PetDetailIsland: React.FC<PetDetailIslandProps> = ({
 
         {activeTab === 'overview' && (
           <div className="col" style={{ gap: 14 }}>
+            <EntityPhotoControl
+              photo={pet}
+              previewClassName={`t-ava lg tone-${tone}`}
+              previewAlt={pet.name}
+              previewFallback={<SpeciesIcon species={tone} size={24} />}
+              hidePreview
+              onUpload={(file) => onUploadPhoto(pet.id, file)}
+              onDelete={() => onDeletePhoto(pet.id)}
+            />
             <dl className="kv" style={{ margin: 0 }}>
               <dt>Владелец</dt>
               <dd>

@@ -5,8 +5,9 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
 import { useTheme } from '@/context/ThemeContext';
+import { vetApi } from '@/modules/vet/api';
 import { isDevMode } from '@/utils/env';
-import { getHomeByRole, getUserInitials } from '@/shared/lib';
+import { getHomeByRole, getUserInitials, type PhotoEntity } from '@/shared/lib';
 import { CommandPaletteModal } from './CommandPaletteModal';
 import { AppSidebar } from './shell/AppSidebar';
 import { AppTopbar } from './shell/AppTopbar';
@@ -92,6 +93,7 @@ const RootAppShell: React.FC<AppShellProps> = ({
   const [bellTab, setBellTab] = useState<'all' | 'unread'>('all');
   const [isDev, setIsDev] = useState(false);
   const [cmdOpen, setCmdOpen] = useState(false);
+  const [vetAvatarPhoto, setVetAvatarPhoto] = useState<PhotoEntity | null>(null);
 
   const userMenuRef = useRef<HTMLDivElement>(null);
   const bellMenuRef = useRef<HTMLDivElement>(null);
@@ -99,6 +101,45 @@ const RootAppShell: React.FC<AppShellProps> = ({
   useEffect(() => {
     setIsDev(isDevMode());
   }, []);
+
+  useEffect(() => {
+    if (role !== 'VETERINARIAN') {
+      setVetAvatarPhoto(null);
+      return;
+    }
+    let cancelled = false;
+    vetApi
+      .getProfile()
+      .then((prof) => {
+        if (cancelled) return;
+        setVetAvatarPhoto(
+          prof
+            ? {
+                photoUrl: prof.photoUrl,
+                photoThumbnailUrl: prof.photoThumbnailUrl,
+                photoUrlExpiresAt: prof.photoUrlExpiresAt,
+              }
+            : null
+        );
+      })
+      .catch(() => {});
+
+    const onVetProfileUpdated = (event: Event) => {
+      const custom = event as CustomEvent<PhotoEntity | undefined>;
+      if (custom.detail) {
+        setVetAvatarPhoto({
+          photoUrl: custom.detail.photoUrl ?? null,
+          photoThumbnailUrl: custom.detail.photoThumbnailUrl ?? null,
+          photoUrlExpiresAt: custom.detail.photoUrlExpiresAt ?? null,
+        });
+      }
+    };
+    window.addEventListener('chiron:vet-profile-updated', onVetProfileUpdated);
+    return () => {
+      cancelled = true;
+      window.removeEventListener('chiron:vet-profile-updated', onVetProfileUpdated);
+    };
+  }, [role, user?.id]);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -208,6 +249,7 @@ const RootAppShell: React.FC<AppShellProps> = ({
             roleShortLabel={roleShortLabel}
             shortName={shortName}
             initials={initials}
+            avatarPhoto={vetAvatarPhoto}
             crumbGroup={headerData.crumbGroup || crumbGroup || resolvedGroup}
             crumbLabel={headerData.crumb || crumb || headerData.currentSection || currentSection || resolvedCrumb}
             crumb2={headerData.crumb2 ?? crumb2 ?? resolvedCrumb2}

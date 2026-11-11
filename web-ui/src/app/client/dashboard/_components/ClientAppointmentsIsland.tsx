@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { Calendar, ChevronRight } from 'lucide-react';
 import type { Appointment, Pet } from '@/modules/client/types';
 import type { Service, Veterinarian } from '@/modules/clinic/types';
-import { SpeciesIcon } from '@/components/ui/SpeciesIcon';
+import { PetAvatar } from '@/components/ui/EntityAvatar';
 import { getDoctorDisplay } from '@/utils/doctorHelpers';
 import {
   APPOINTMENT_STATUS_META,
@@ -117,9 +117,14 @@ export function ClientAppointmentsIsland({
                     } as React.CSSProperties}
                   >
                     <span className="hm-appt-time">{formatSlotTime(a.startAt)}</span>
-                    <span className={`hm-ava sm tone-${tone}`}>
-                      <SpeciesIcon species={tone} size={16} />
-                    </span>
+                    <PetAvatar
+                      pet={pet}
+                      tone={tone}
+                      species={tone}
+                      iconSize={16}
+                      variant="thumb"
+                      className={`hm-ava sm tone-${tone}`}
+                    />
                     <span className="col" style={{ gap: '1px', minWidth: 0 }}>
                       <span className="cell-main hm-ell">
                         {pet?.name || a.petName || 'Питомец'} — {svc?.name || a.serviceName || 'Приём'}

@@ -79,12 +79,14 @@ export interface PetDetailIslandProps {
   onToggleArchive: () => void;
   onDelete: () => void;
   onAddVaccination: () => void;
+  onUploadPhoto: (petId: string, file: File) => Promise<void>;
+  onDeletePhoto: (petId: string) => Promise<void>;
 }
 
 export interface CreatePetModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onCreate: (payload: CreatePetRequest) => Promise<Pet>;
+  onCreate: (payload: CreatePetRequest, photoFile?: File | null) => Promise<Pet>;
   speciesList: Species[];
   users: User[];
 }
@@ -95,6 +97,8 @@ export interface EditPetModalProps {
   speciesList: Species[];
   onClose: () => void;
   onUpdate: (id: string, payload: UpdatePetRequest) => Promise<Pet>;
+  onUploadPhoto?: (petId: string, file: File) => Promise<void>;
+  onDeletePhoto?: (petId: string) => Promise<void>;
 }
 
 export interface AddVaccinationModalProps {

@@ -4,7 +4,7 @@ import React from 'react';
 import Link from 'next/link';
 import { PawPrint, ChevronRight, Calendar, CalendarPlus, Plus } from 'lucide-react';
 import type { Pet, Appointment } from '@/modules/client/types';
-import { SpeciesIcon } from '@/components/ui/SpeciesIcon';
+import { PetAvatar } from '@/components/ui/EntityAvatar';
 import { calculateAgeRu, formatSlotTime, getSpeciesTone } from '@/shared/lib';
 import { formatMoscowShortDayLabel } from './utils';
 
@@ -47,9 +47,14 @@ export function ClientPetsCarousel({
             return (
               <div key={p.id} className={`hm-pet tone-${tone}`}>
                 <div className="hm-pet-top">
-                  <span className={`hm-ava tone-${tone}`}>
-                    <SpeciesIcon species={tone} size={20} />
-                  </span>
+                  <PetAvatar
+                    pet={p}
+                    tone={tone}
+                    species={tone}
+                    iconSize={20}
+                    variant="full"
+                    className={`hm-ava tone-${tone}`}
+                  />
                   <span className="col" style={{ gap: '1px', minWidth: 0 }}>
                     <Link
                       href={`/client/pets?sel=${encodeURIComponent(p.id)}`}

@@ -3,7 +3,7 @@
 import React, { useMemo } from 'react';
 import { ChevronLeft, ChevronRight, Syringe } from 'lucide-react';
 import type { Pet, Vaccination } from '@/modules/client/types';
-import { SpeciesIcon } from '@/components/ui/SpeciesIcon';
+import { PetAvatar } from '@/components/ui/EntityAvatar';
 import { formatIsoDateDisplay, getSpeciesTone } from '@/shared/lib';
 import { getVetVaccinationDueInfo } from '../../dashboard/_components/vetHelpers';
 
@@ -114,9 +114,14 @@ export const VetVaccinationsTable: React.FC<VetVaccinationsTableProps> = ({
                   onClick={() => onSelectVac(v)}
                 >
                   <span className="pet-cell">
-                    <span className={`t-ava xs tone-${tone}`}>
-                      <SpeciesIcon species={tone} size={14} />
-                    </span>
+                    <PetAvatar
+                      pet={pet}
+                      tone={tone}
+                      species={tone}
+                      iconSize={14}
+                      variant="thumb"
+                      className={`t-ava xs tone-${tone}`}
+                    />
                     <span className="cell-main">{petName}</span>
                   </span>
                   <span>{v.name}</span>

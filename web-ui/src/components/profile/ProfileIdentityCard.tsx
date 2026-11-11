@@ -2,6 +2,8 @@
 
 import React from 'react';
 import { Phone, Calendar } from 'lucide-react';
+import { PhotoAvatar } from '@/components/ui/EntityAvatar';
+import type { PhotoEntity } from '@/shared/lib';
 
 export interface ProfileStatItem {
   val: string | number;
@@ -22,6 +24,7 @@ export interface SecondaryBadge {
 interface ProfileIdentityCardProps {
   roleClass: string;
   initials: string;
+  photo?: PhotoEntity | null;
   fullName: string;
   email: string;
   phone: string;
@@ -34,6 +37,7 @@ interface ProfileIdentityCardProps {
 export const ProfileIdentityCard: React.FC<ProfileIdentityCardProps> = ({
   roleClass,
   initials,
+  photo,
   fullName,
   email,
   phone,
@@ -44,7 +48,13 @@ export const ProfileIdentityCard: React.FC<ProfileIdentityCardProps> = ({
 }) => {
   return (
     <section className={`island idcard ${roleClass}`}>
-      <span className="t-ava xl round">{initials}</span>
+      <PhotoAvatar
+        photo={photo}
+        alt={fullName}
+        className="t-ava xl round"
+        variant="full"
+        fallback={initials}
+      />
 
       <span className="col" style={{ gap: '2px' }}>
         <span className="idcard-name">{fullName}</span>

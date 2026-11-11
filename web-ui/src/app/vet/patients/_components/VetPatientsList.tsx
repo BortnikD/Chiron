@@ -3,7 +3,7 @@
 import React, { useMemo } from 'react';
 import type { Appointment, Pet } from '@/modules/client/types';
 import type { Species } from '@/modules/clinic/types';
-import { SpeciesIcon } from '@/components/ui/SpeciesIcon';
+import { PetAvatar } from '@/components/ui/EntityAvatar';
 import {
   calculateAgeRu,
   formatIsoDateDisplay,
@@ -98,9 +98,14 @@ export function VetPatientsList({
                 style={{ textAlign: 'left', cursor: 'pointer' }}
               >
                 <div className="tcard-head">
-                  <span className={`t-ava sm tone-${tone}`}>
-                    <SpeciesIcon species={tone} size={16} />
-                  </span>
+                  <PetAvatar
+                    pet={p}
+                    tone={tone}
+                    species={tone}
+                    iconSize={16}
+                    variant="thumb"
+                    className={`t-ava sm tone-${tone}`}
+                  />
                   <div className="col" style={{ gap: '2px', minWidth: 0 }}>
                     <span className="tcard-title">{p.name}</span>
                     <span className="cell-sub">
@@ -195,9 +200,14 @@ export function VetPatientsList({
               onClick={() => onSelectPatient(p)}
             >
               <span className="row" style={{ gap: 10 }}>
-                <span className={`t-ava sm tone-${tone}`}>
-                  <SpeciesIcon species={tone} size={16} />
-                </span>
+                <PetAvatar
+                  pet={p}
+                  tone={tone}
+                  species={tone}
+                  iconSize={16}
+                  variant="thumb"
+                  className={`t-ava sm tone-${tone}`}
+                />
                 <span className="cell-main">{p.name}</span>
                 {p.isArchived && <span className="badge">Архив</span>}
               </span>

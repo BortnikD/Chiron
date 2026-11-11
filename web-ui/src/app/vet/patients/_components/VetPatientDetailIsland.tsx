@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation';
 import { AlertCircle, Calendar, Syringe, X } from 'lucide-react';
 import type { Appointment, Pet, Vaccination } from '@/modules/client/types';
 import type { Species } from '@/modules/clinic/types';
-import { SpeciesIcon } from '@/components/ui/SpeciesIcon';
+import { PetAvatar } from '@/components/ui/EntityAvatar';
 import {
   APPOINTMENT_STATUS_META,
   calculateAgeRu,
@@ -75,9 +75,14 @@ export function VetPatientDetailIsland({
     <section className="island detail-island xl:w-[440px]" aria-label="Карточка пациента">
       <div className="island-head">
         <div className="row">
-          <span className={`t-ava tone-${tone}`}>
-            <SpeciesIcon species={tone} size={20} />
-          </span>
+          <PetAvatar
+            pet={patient}
+            tone={tone}
+            species={tone}
+            iconSize={20}
+            variant="full"
+            className={`t-ava tone-${tone} detail-head-ava`}
+          />
           <div className="col" style={{ gap: 0 }}>
             <span className="h2">{patient.name}</span>
             <span className="cell-sub">

@@ -34,6 +34,9 @@ export interface Pet {
   gender: Gender;
   notes?: string | null;
   isArchived: boolean;
+  photoUrl?: string | null;
+  photoThumbnailUrl?: string | null;
+  photoUrlExpiresAt?: string | null;
   summary?: PetSummary | null;
   createdAt: string;
   updatedAt: string;

@@ -190,18 +190,31 @@ export function useClientPets(
     async (payload: PetFormData) => {
       setModalSaving(true);
       setModalError(null);
+      const { photoFile, ...petPayload } = payload;
       try {
         if (editingPet) {
-          const updated = await clientApi.updatePet(editingPet.id, payload);
-          toast('Изменения сохранены', payload.name);
+          const updated = await clientApi.updatePet(editingPet.id, petPayload);
+          toast('Изменения сохранены', petPayload.name);
           setIsPetModalOpen(false);
           await loadAll();
           if (updated) {
             setSelectedPet((prev) => (prev?.id === updated.id ? { ...prev, ...updated } : prev));
           }
         } else {
-          const created = await clientApi.createPet(payload);
-          toast('Питомец добавлен', `${payload.name} — теперь можно записаться на приём`);
+          let created = await clientApi.createPet(petPayload);
+          if (photoFile && created?.id) {
+            try {
+              const links = await clientApi.uploadPetPhoto(created.id, photoFile);
+              created = { ...created, ...links };
+            } catch (photoErr: unknown) {
+              toast(
+                'Питомец добавлен, но фото не загрузилось',
+                formatApiError(photoErr, 'Вы можете загрузить фотографию в карточке питомца'),
+                'err'
+              );
+            }
+          }
+          toast('Питомец добавлен', `${petPayload.name} — теперь можно записаться на приём`);
           setIsPetModalOpen(false);
           setArchiveFilter('ACTIVE');
           await loadAll();
@@ -214,6 +227,31 @@ export function useClientPets(
       }
     },
     [editingPet, loadAll, toast]
+  );
+
+  const uploadPetPhoto = useCallback(
+    async (petId: string, file: File) => {
+      const links = await clientApi.uploadPetPhoto(petId, file);
+      if (!isMountedRef.current) return;
+      setPets((prev) => prev.map((p) => (p.id === petId ? { ...p, ...links } : p)));
+      setSelectedPet((prev) => (prev?.id === petId ? { ...prev, ...links } : prev));
+      setEditingPet((prev) => (prev?.id === petId ? { ...prev, ...links } : prev));
+      toast('Фотография питомца обновлена');
+    },
+    [toast]
+  );
+
+  const deletePetPhoto = useCallback(
+    async (petId: string) => {
+      await clientApi.deletePetPhoto(petId);
+      if (!isMountedRef.current) return;
+      const empty = { photoUrl: null, photoThumbnailUrl: null, photoUrlExpiresAt: null };
+      setPets((prev) => prev.map((p) => (p.id === petId ? { ...p, ...empty } : p)));
+      setSelectedPet((prev) => (prev?.id === petId ? { ...prev, ...empty } : prev));
+      setEditingPet((prev) => (prev?.id === petId ? { ...prev, ...empty } : prev));
+      toast('Фотография питомца удалена');
+    },
+    [toast]
   );
 
   const openArchiveModal = useCallback((pet: Pet) => {
@@ -330,6 +368,8 @@ export function useClientPets(
     openEdit,
     closePetModal,
     handleSavePet,
+    uploadPetPhoto,
+    deletePetPhoto,
     archivingPet,
     archiveLoading,
     archiveError,

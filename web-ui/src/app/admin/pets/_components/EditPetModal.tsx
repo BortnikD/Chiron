@@ -2,8 +2,10 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { AlertCircle, X } from 'lucide-react';
+import { SpeciesIcon } from '@/components/ui/SpeciesIcon';
+import { EntityPhotoControl } from '@/components/ui/EntityPhotoControl';
 import { DatePicker, FilterDropdown, type FilterDropdownOption } from '@/shared/components';
-import { formatApiError, getMoscowTodayIso } from '@/shared/lib';
+import { formatApiError, getMoscowTodayIso, getSpeciesTone } from '@/shared/lib';
 import type { EditPetModalProps, EditPetFormData } from './types';
 
 /**
@@ -15,6 +17,8 @@ export const EditPetModal: React.FC<EditPetModalProps> = ({
   speciesList,
   onClose,
   onUpdate,
+  onUploadPhoto,
+  onDeletePhoto,
 }) => {
   const [form, setForm] = useState<EditPetFormData>({
     name: '',
@@ -121,6 +125,30 @@ export const EditPetModal: React.FC<EditPetModalProps> = ({
               <div className="alert alert-destructive" role="alert">
                 <AlertCircle className="ic" size={16} />
                 <span>{error}</span>
+              </div>
+            )}
+            {(onUploadPhoto || onDeletePhoto) && (
+              <div style={{ marginBottom: 14 }}>
+                <EntityPhotoControl
+                  photo={pet}
+                  previewClassName={`t-ava lg tone-${getSpeciesTone(
+                    pet.species?.name || speciesList.find((s) => s.id === form.speciesId)?.name || form.speciesId,
+                    speciesList
+                  )}`}
+                  previewAlt={pet.name}
+                  previewFallback={
+                    <SpeciesIcon
+                      species={getSpeciesTone(
+                        pet.species?.name || speciesList.find((s) => s.id === form.speciesId)?.name || form.speciesId,
+                        speciesList
+                      )}
+                      size={24}
+                    />
+                  }
+                  disabled={savingEdit}
+                  onUpload={onUploadPhoto ? (file) => onUploadPhoto(pet.id, file) : undefined}
+                  onDelete={onDeletePhoto ? () => onDeletePhoto(pet.id) : undefined}
+                />
               </div>
             )}
             <div className="form-grid">

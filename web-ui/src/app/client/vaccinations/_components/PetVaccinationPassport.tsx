@@ -4,7 +4,7 @@ import React from 'react';
 import Link from 'next/link';
 import { Plus, Syringe } from 'lucide-react';
 import type { Pet, Vaccination } from '@/modules/client/types';
-import { SpeciesIcon } from '@/components/ui/SpeciesIcon';
+import { PetAvatar } from '@/components/ui/EntityAvatar';
 import { formatIsoDateDisplay, getMoscowDateKey, getSpeciesTone } from '@/shared/lib';
 import { getVaccinationStatus } from '../_hooks/useClientVaccinations';
 
@@ -34,9 +34,14 @@ export function PetVaccinationPassport({
     <section className="island" aria-label={`Прививки: ${pet.name}`}>
       <div className="island-head">
         <div className="row" style={{ gap: '12px' }}>
-          <span className={`t-ava tone-${tone}`}>
-            <SpeciesIcon species={tone} size={20} />
-          </span>
+          <PetAvatar
+            pet={pet}
+            tone={tone}
+            species={tone}
+            iconSize={20}
+            variant="full"
+            className={`t-ava tone-${tone}`}
+          />
           <div className="col" style={{ gap: '1px' }}>
             <span className="island-title">{pet.name}</span>
             <span className="small muted">

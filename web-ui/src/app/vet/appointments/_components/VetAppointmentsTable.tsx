@@ -4,7 +4,7 @@ import React, { useMemo } from 'react';
 import { Calendar, CalendarDays, ChevronLeft, ChevronRight, Repeat, X } from 'lucide-react';
 import type { Appointment, Pet } from '@/modules/client/types';
 import type { AppointmentStatus } from '@/shared/types';
-import { SpeciesIcon } from '@/components/ui/SpeciesIcon';
+import { PetAvatar } from '@/components/ui/EntityAvatar';
 import {
   APPOINTMENT_STATUS_META,
   formatCurrency,
@@ -202,9 +202,14 @@ export const VetAppointmentsTable: React.FC<VetAppointmentsTableProps> = ({
                     )}
                   </span>
                   <span className="pet-cell">
-                    <span className={`t-ava xs tone-${tone}`}>
-                      <SpeciesIcon species={tone} size={14} />
-                    </span>
+                    <PetAvatar
+                      pet={pet}
+                      tone={tone}
+                      species={tone}
+                      iconSize={14}
+                      variant="thumb"
+                      className={`t-ava xs tone-${tone}`}
+                    />
                     <span>
                       {petName} <span className="muted">· {speciesName}</span>
                     </span>

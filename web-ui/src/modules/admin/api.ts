@@ -1,5 +1,5 @@
 import { api } from '@/shared/api/client';
-import type { AppointmentStatus, User, PageResponse, StatisticsGranularity } from '@/shared/types';
+import type { AppointmentStatus, User, PageResponse, PhotoLinks, StatisticsGranularity } from '@/shared/types';
 import type {
   Veterinarian,
   Service,
@@ -128,6 +128,14 @@ export const adminApi = {
   updatePet: (id: string, data: UpdatePetRequest) =>
     api.patch<Pet>(`/api/v1/admin/pets/${id}`, data),
 
+  uploadPetPhoto: (id: string, file: File) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    return api.putForm<PhotoLinks>(`/api/v1/admin/pets/${id}/photo`, formData);
+  },
+
+  deletePetPhoto: (id: string) => api.delete<void>(`/api/v1/admin/pets/${id}/photo`),
+
   deletePet: (id: string) => api.delete<void>(`/api/v1/admin/pets/${id}`),
 
   // Графики врачей
@@ -215,14 +223,24 @@ export const adminApi = {
   createVeterinarian: (data: {
     userId: string;
     specializationId: string;
-    bio?: string;
-    photoUrl?: string;
+    bio?: string | null;
     experienceYears: number;
     isActive: boolean;
   }) => api.post<Veterinarian>('/api/v1/admin/veterinarians', data),
 
-  updateVeterinarian: (id: string, data: Partial<Veterinarian>) =>
-    api.patch<Veterinarian>(`/api/v1/admin/veterinarians/${id}`, data),
+  updateVeterinarian: (
+    id: string,
+    data: Partial<Pick<Veterinarian, 'specializationId' | 'bio' | 'experienceYears' | 'isActive'>>
+  ) => api.patch<Veterinarian>(`/api/v1/admin/veterinarians/${id}`, data),
+
+  uploadVeterinarianPhoto: (id: string, file: File) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    return api.putForm<PhotoLinks>(`/api/v1/admin/veterinarians/${id}/photo`, formData);
+  },
+
+  deleteVeterinarianPhoto: (id: string) =>
+    api.delete<void>(`/api/v1/admin/veterinarians/${id}/photo`),
 
   deleteVeterinarian: (id: string) =>
     api.delete<void>(`/api/v1/admin/veterinarians/${id}`),

@@ -4,7 +4,7 @@ import React from 'react';
 import { PawPrint, Plus, Archive, Calendar, Syringe } from 'lucide-react';
 import type { Pet, Appointment, Vaccination } from '@/modules/client/types';
 import type { Service } from '@/modules/clinic/types';
-import { SpeciesIcon } from '@/components/ui/SpeciesIcon';
+import { PetAvatar } from '@/components/ui/EntityAvatar';
 import {
   calculateAgeRu,
   formatDateRu,
@@ -145,9 +145,13 @@ export function PetsList({
                   onClick={() => onSelectPet(p)}
                 >
                   <div className="tcard-head">
-                    <span className="t-ava lg">
-                      <SpeciesIcon species={tone} size={26} />
-                    </span>
+                    <PetAvatar
+                      pet={p}
+                      tone={tone}
+                      iconSize={26}
+                      className="t-ava lg"
+                      alt={p.name}
+                    />
                     <span className="col grow" style={{ gap: '1px', minWidth: 0 }}>
                       <span className="tcard-title">{p.name}</span>
                       <span className="cell-sub">

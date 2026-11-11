@@ -78,6 +78,8 @@ function PetsContent() {
             onEdit={state.openEdit}
             onToggleArchive={state.openArchiveModal}
             onDelete={state.openDeleteModal}
+            onUploadPhoto={state.uploadPetPhoto}
+            onDeletePhoto={state.deletePetPhoto}
           />
         )}
       </div>
@@ -87,6 +89,8 @@ function PetsContent() {
         pet={state.editingPet}
         speciesList={state.speciesList}
         onSave={state.handleSavePet}
+        onUploadPhoto={state.uploadPetPhoto}
+        onDeletePhoto={state.deletePetPhoto}
         onClose={state.closePetModal}
         saving={state.modalSaving}
         error={state.modalError}

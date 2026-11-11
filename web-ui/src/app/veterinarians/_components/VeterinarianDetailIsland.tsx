@@ -4,6 +4,7 @@ import React from 'react';
 import Link from 'next/link';
 import { X, CalendarPlus } from 'lucide-react';
 import { getDoctorDisplay } from '@/utils/doctorHelpers';
+import { VetAvatar } from '@/components/ui/EntityAvatar';
 import { DOW_ORDER, DOW_LABELS, formatIsoDateDisplay, formatTime, pluralRu } from '@/shared/lib';
 import type { VeterinarianDetailIslandProps } from './types';
 
@@ -28,7 +29,12 @@ export const VeterinarianDetailIsland: React.FC<VeterinarianDetailIslandProps> =
     >
       <div className="island-head">
         <div className="row" style={{ minWidth: 0 }}>
-          <span className="avatar avatar-lg">{initials}</span>
+          <VetAvatar
+            vet={vet}
+            initials={initials}
+            className="avatar avatar-lg detail-head-ava"
+            alt={fullName}
+          />
           <div className="col" style={{ gap: '2px', minWidth: 0 }}>
             <span className="h2" title={fullName}>
               {fullName}

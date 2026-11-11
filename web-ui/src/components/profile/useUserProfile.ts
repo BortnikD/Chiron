@@ -17,6 +17,7 @@ import {
   getUserInitials,
   MOSCOW_TIMEZONE,
   toIdNameMap,
+  type PhotoEntity,
 } from '@/shared/lib';
 import { SPECIALIZATION_NAMES_RU } from '@/utils/doctorHelpers';
 import type { Appointment } from '@/modules/client/types';
@@ -43,6 +44,7 @@ export function useUserProfile(onProfileUpdated?: (user: User) => void) {
   const [saveError, setSaveError] = useState<string | null>(null);
   const [stats, setStats] = useState<ProfileStats>(INITIAL_STATS);
   const [vetSpecBadge, setVetSpecBadge] = useState<SecondaryBadge | null>(null);
+  const [vetPhoto, setVetPhoto] = useState<PhotoEntity | null>(null);
   const [formData, setFormData] = useState({
     firstName: '',
     middleName: '',
@@ -50,6 +52,21 @@ export function useUserProfile(onProfileUpdated?: (user: User) => void) {
     email: '',
     phone: '',
   });
+
+  useEffect(() => {
+    const onVetProfileUpdated = (event: Event) => {
+      const custom = event as CustomEvent<PhotoEntity | undefined>;
+      if (custom.detail) {
+        setVetPhoto({
+          photoUrl: custom.detail.photoUrl ?? null,
+          photoThumbnailUrl: custom.detail.photoThumbnailUrl ?? null,
+          photoUrlExpiresAt: custom.detail.photoUrlExpiresAt ?? null,
+        });
+      }
+    };
+    window.addEventListener('chiron:vet-profile-updated', onVetProfileUpdated);
+    return () => window.removeEventListener('chiron:vet-profile-updated', onVetProfileUpdated);
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -80,6 +97,7 @@ export function useUserProfile(onProfileUpdated?: (user: User) => void) {
 
         if (data.role === 'ADMIN') {
           setVetSpecBadge(null);
+          setVetPhoto(null);
           const [vetsRes, usersRes] = await Promise.all([
             adminApi.getVeterinarians().catch(() => null),
             adminApi.getUsers(0, 1).catch(() => null),
@@ -92,6 +110,7 @@ export function useUserProfile(onProfileUpdated?: (user: User) => void) {
           });
         } else if (data.role === 'CLIENT') {
           setVetSpecBadge(null);
+          setVetPhoto(null);
           const summary = await clientApi.getSummary().catch(() => null);
           if (cancelled) return;
           setStats({
@@ -110,6 +129,15 @@ export function useUserProfile(onProfileUpdated?: (user: User) => void) {
             clinicApi.getSpecializations().catch(() => []),
           ]);
           if (cancelled) return;
+          setVetPhoto(
+            prof
+              ? {
+                  photoUrl: prof.photoUrl,
+                  photoThumbnailUrl: prof.photoThumbnailUrl,
+                  photoUrlExpiresAt: prof.photoUrlExpiresAt,
+                }
+              : null
+          );
           const apptList: Appointment[] = appts?.items || [];
           const specsMap = toIdNameMap(Array.isArray(specs) ? specs : []);
           const rawSpecName =
@@ -238,6 +266,7 @@ export function useUserProfile(onProfileUpdated?: (user: User) => void) {
     regDateLabel,
     roleBadgeLabel,
     vetSpecBadge,
+    vetPhoto,
     initials,
     fullName,
     shortName,

@@ -10,7 +10,7 @@ import {
   getSpeciesTone,
   timeToMinutes,
 } from '@/shared/lib';
-import { SpeciesIcon } from '@/components/ui/SpeciesIcon';
+import { PetAvatar } from '@/components/ui/EntityAvatar';
 import { formatWeekdayDateRu } from './vetHelpers';
 import { getPetName } from './utils';
 import {
@@ -234,7 +234,12 @@ export const VetDayTimelineIsland: React.FC<VetDayTimelineIslandProps> = ({
                     style={{ '--st': stColor } as React.CSSProperties}
                     onClick={() => onSelectAppointment(a)}
                   >
-                    <span
+                    <PetAvatar
+                      pet={pet}
+                      tone={tone}
+                      species={tone}
+                      iconSize={20}
+                      variant="full"
                       className="pet-ava"
                       style={{
                         width: '36px',
@@ -243,9 +248,7 @@ export const VetDayTimelineIsland: React.FC<VetDayTimelineIslandProps> = ({
                         background: 'color-mix(in srgb, var(--st) 16%, transparent)',
                         color: 'var(--st)',
                       }}
-                    >
-                      <SpeciesIcon species={tone} size={20} />
-                    </span>
+                    />
                     <span className="col grow" style={{ gap: '1px' }}>
                       <span className="row" style={{ gap: '8px' }}>
                         <span className="cell-main">{petName}</span>

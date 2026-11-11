@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { AlertCircle } from 'lucide-react';
 import type { Pet, Appointment } from '@/modules/client/types';
 import type { Service, Species, Veterinarian } from '@/modules/clinic/types';
-import { SpeciesIcon } from '@/components/ui/SpeciesIcon';
+import { PetAvatar } from '@/components/ui/EntityAvatar';
 import {
   APPOINTMENT_STATUS_META,
   calculateAgeRu,
@@ -65,9 +65,15 @@ export const UserRelationsTabs: React.FC<UserRelationsTabsProps> = ({
           const tone = getSpeciesTone(speciesName || p.speciesId, speciesList);
           return (
             <Link key={p.id} href={`/admin/pets?sel=${p.id}`} className="lrow">
-              <span className="pet-ava" style={{ width: 36, height: 36, borderRadius: 10 }}>
-                <SpeciesIcon species={tone} size={16} />
-              </span>
+              <PetAvatar
+                pet={p}
+                tone={tone}
+                species={tone}
+                iconSize={16}
+                variant="full"
+                className="pet-ava"
+                style={{ width: 36, height: 36, borderRadius: 10 }}
+              />
               <span className="col" style={{ gap: 1 }}>
                 <span className="cell-main">{p.name}</span>
                 <span className="cell-sub">

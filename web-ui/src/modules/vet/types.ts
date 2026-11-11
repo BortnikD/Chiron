@@ -6,6 +6,5 @@ export interface CreateFollowUpRequest {
 
 export interface UpdateVetProfileRequest {
   bio?: string | null;
-  photoUrl?: string | null;
   experienceYears?: number;
 }

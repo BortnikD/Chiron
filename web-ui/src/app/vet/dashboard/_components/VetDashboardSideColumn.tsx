@@ -22,7 +22,7 @@ import {
   getSpeciesTone,
   timeToMinutes,
 } from '@/shared/lib';
-import { SpeciesIcon } from '@/components/ui/SpeciesIcon';
+import { PetAvatar } from '@/components/ui/EntityAvatar';
 import { VetCancelAppointmentModal } from './VetCancelAppointmentModal';
 import { getPetName } from './utils';
 
@@ -143,12 +143,15 @@ export const VetDashboardSideColumn: React.FC<VetDashboardSideColumnProps> = ({
           {nextAppointment ? (
             <div className="col" style={{ gap: '14px', padding: '0 16px 16px' }}>
               <div className="row">
-                <span
+                <PetAvatar
+                  pet={nextPet}
+                  tone={nextTone}
+                  species={nextTone}
+                  iconSize={26}
+                  variant="full"
                   className={`t-ava tone-${nextTone}`}
                   style={{ width: '56px', height: '56px', borderRadius: '16px' }}
-                >
-                  <SpeciesIcon species={nextTone} size={26} />
-                </span>
+                />
                 <div className="col" style={{ gap: '2px' }}>
                   <span style={{ fontSize: '20px', fontWeight: 650 }}>
                     {getPetName(nextAppointment, petsMap)}

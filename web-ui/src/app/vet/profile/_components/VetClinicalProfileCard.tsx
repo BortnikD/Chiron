@@ -6,12 +6,13 @@ import { clinicApi } from '@/modules/clinic/api';
 import type { Species, Veterinarian } from '@/modules/clinic/types';
 import { useAuth } from '@/context/AuthContext';
 import { SpeciesIcon } from '@/components/ui/SpeciesIcon';
+import { VetAvatar } from '@/components/ui/EntityAvatar';
+import { EntityPhotoControl } from '@/components/ui/EntityPhotoControl';
 import { getDoctorDisplay } from '@/utils/doctorHelpers';
 import { getSpecTone, getSpeciesTone, pluralRu, toIdNameMap } from '@/shared/lib';
 
 export interface VetPracticeFormData {
   bio: string;
-  photoUrl: string;
   experienceYears: number;
 }
 
@@ -25,11 +26,8 @@ export interface VetClinicalProfileCardProps {
   error: string | null;
   onChange: React.Dispatch<React.SetStateAction<VetPracticeFormData>>;
   onSubmit: (e?: React.FormEvent) => Promise<void> | void;
-}
-
-function isPreviewImageUrl(value: string): boolean {
-  const trimmed = value.trim();
-  return /^https?:\/\/.+/i.test(trimmed);
+  onUploadPhoto: (file: File) => Promise<void>;
+  onDeletePhoto: () => Promise<void>;
 }
 
 export function VetClinicalProfileCard({
@@ -42,15 +40,12 @@ export function VetClinicalProfileCard({
   error,
   onChange,
   onSubmit,
+  onUploadPhoto,
+  onDeletePhoto,
 }: VetClinicalProfileCardProps) {
   const { user } = useAuth();
   const [speciesList, setSpeciesList] = useState<Species[]>([]);
   const [permIds, setPermIds] = useState<string[]>([]);
-  const [imgFailed, setImgFailed] = useState(false);
-
-  useEffect(() => {
-    setImgFailed(false);
-  }, [form.photoUrl]);
 
   useEffect(() => {
     let cancelled = false;
@@ -109,8 +104,6 @@ export function VetClinicalProfileCard({
     );
   }
 
-  const trimmedPhoto = form.photoUrl.trim();
-  const hasPhoto = isPreviewImageUrl(trimmedPhoto) && !imgFailed;
   const safeExp = Math.max(0, Math.min(70, Number(form.experienceYears) || 0));
   const expLabel = `${safeExp} ${pluralRu(safeExp, 'год', 'года', 'лет')}`;
   const isActive = vetProfile?.isActive !== false;
@@ -143,25 +136,17 @@ export function VetClinicalProfileCard({
 
           <form id="vet-practice-form" onSubmit={onSubmit}>
             <div className="col" style={{ gap: '18px' }}>
-              <div className="row">
-                <span className={`t-ava xl round tone-${specTone}`} style={{ overflow: 'hidden' }}>
-                  {hasPhoto ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img
-                      src={trimmedPhoto}
-                      alt={doc.fullName}
-                      className="w-full h-full object-cover"
-                      onError={() => setImgFailed(true)}
-                    />
-                  ) : (
-                    doc.initials
-                  )}
-                </span>
-                <div className="col" style={{ gap: '2px' }}>
-                  <span className="h2">{doc.fullName}</span>
-                  <span className="cell-sub">Без фото показываются инициалы</span>
-                </div>
-              </div>
+              <EntityPhotoControl
+                photo={vetProfile}
+                previewFallback={doc.initials}
+                previewClassName={`t-ava xl round tone-${specTone}`}
+                previewAlt={doc.fullName}
+                title={doc.fullName}
+                hint="JPEG или PNG до 5 МБ · без фото показываются инициалы"
+                disabled={saving || !vetProfile}
+                onUpload={onUploadPhoto}
+                onDelete={onDeletePhoto}
+              />
 
               <div className="form-grid">
                 <div className="field">
@@ -183,24 +168,6 @@ export function VetClinicalProfileCard({
                     </span>
                   </div>
                   <span className="field-hint">Меняет администратор</span>
-                </div>
-
-                <div className="field span-2">
-                  <label className="field-label" htmlFor="vp-photo">
-                    Фото (URL)
-                  </label>
-                  <input
-                    id="vp-photo"
-                    type="url"
-                    maxLength={2048}
-                    className="input"
-                    value={form.photoUrl}
-                    onChange={(e) => onChange((prev) => ({ ...prev, photoUrl: e.target.value }))}
-                    placeholder="https://…"
-                  />
-                  <span className="field-hint">
-                    Загрузки файлов нет — только ссылка, до 2048 символов
-                  </span>
                 </div>
 
                 <div className="field">
@@ -268,19 +235,13 @@ export function VetClinicalProfileCard({
         <div className="island-body">
           <div className={`tcard tone-${specTone}`} style={{ cursor: 'default' }}>
             <div className="tcard-head">
-              <span className="t-ava lg round" style={{ overflow: 'hidden' }}>
-                {hasPhoto ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img
-                    src={trimmedPhoto}
-                    alt={doc.name}
-                    className="w-full h-full object-cover"
-                    onError={() => setImgFailed(true)}
-                  />
-                ) : (
-                  doc.initials
-                )}
-              </span>
+              <VetAvatar
+                vet={vetProfile}
+                initials={doc.initials}
+                tone={specTone}
+                className="t-ava lg round"
+                alt={doc.name}
+              />
               <span className="col" style={{ gap: '4px', minWidth: 0 }}>
                 <span className="tcard-title">{doc.name}</span>
                 <span className="cell-sub tnum">стаж {expLabel}</span>

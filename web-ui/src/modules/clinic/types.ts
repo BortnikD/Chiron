@@ -53,6 +53,8 @@ export interface Veterinarian {
   specialization?: Specialization;
   bio?: string | null;
   photoUrl?: string | null;
+  photoThumbnailUrl?: string | null;
+  photoUrlExpiresAt?: string | null;
   experienceYears: number;
   isActive: boolean;
   createdAt: string;

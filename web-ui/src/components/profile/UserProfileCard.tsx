@@ -17,6 +17,7 @@ export const UserProfileCard: React.FC<UserProfileCardProps> = ({ onProfileUpdat
     regDateLabel,
     roleBadgeLabel,
     vetSpecBadge,
+    vetPhoto,
     initials,
     fullName,
     shortName,
@@ -48,6 +49,7 @@ export const UserProfileCard: React.FC<UserProfileCardProps> = ({ onProfileUpdat
       <ProfileIdentityCard
         roleClass={`tone-${role}`}
         initials={initials}
+        photo={vetPhoto}
         fullName={fullName}
         email={formData.email || user?.email || '—'}
         phone={formData.phone || user?.phone || '—'}
