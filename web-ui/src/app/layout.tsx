@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import './globals.css';
 import { AuthProvider } from '@/context/AuthContext';
 import { ThemeProvider } from '@/context/ThemeContext';
+import { ToastProvider } from '@/shared/components/ToastProvider';
 
 export const metadata: Metadata = {
   title: 'Chiron — Ветеринарная клиника',
@@ -49,7 +50,9 @@ export default function RootLayout({
       <body className="min-h-screen antialiased bg-[var(--background)] text-[var(--foreground)] selection:bg-[var(--primary)] selection:text-[var(--primary-foreground)]">
         <AuthProvider>
           <ThemeProvider>
-            {children}
+            <ToastProvider>
+              {children}
+            </ToastProvider>
           </ThemeProvider>
         </AuthProvider>
       </body>

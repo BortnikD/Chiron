@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Client, type IMessage } from '@stomp/stompjs';
 import { useAuth } from '@/context/AuthContext';
 import type { AppNotification } from '@/shared/types';
@@ -42,6 +42,7 @@ export function useNotificationSocket({
   onConnect,
 }: UseNotificationSocketOptions = {}) {
   const { token, isAuthenticated, role } = useAuth();
+  const [connected, setConnected] = useState(false);
   const onNotificationRef = useRef(onNotification);
   const onConnectRef = useRef(onConnect);
 
@@ -50,6 +51,7 @@ export function useNotificationSocket({
 
   useEffect(() => {
     if (!isAuthenticated || !token || role === 'ADMIN') {
+      setConnected(false);
       return;
     }
 
@@ -63,6 +65,7 @@ export function useNotificationSocket({
       heartbeatIncoming: 10000,
       heartbeatOutgoing: 10000,
       onConnect: () => {
+        setConnected(true);
         onConnectRef.current?.();
         client.subscribe('/user/queue/notifications', (message: IMessage) => {
           if (!message.body) return;
@@ -80,10 +83,18 @@ export function useNotificationSocket({
           }
         });
       },
+      onDisconnect: () => {
+        setConnected(false);
+      },
+      onWebSocketClose: () => {
+        setConnected(false);
+      },
       onStompError: () => {
+        setConnected(false);
         // Ошибки авторизации или подписки STOMP обрабатываются переподключением/HTTP fallback
       },
       onWebSocketError: () => {
+        setConnected(false);
         // Ошибки сокета обрабатываются встроенным механизмом reconnectDelay
       },
     });
@@ -91,7 +102,10 @@ export function useNotificationSocket({
     client.activate();
 
     return () => {
+      setConnected(false);
       void client.deactivate();
     };
   }, [isAuthenticated, token, role]);
+
+  return { connected };
 }

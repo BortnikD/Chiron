@@ -173,12 +173,16 @@ export function calculateAgeRu(birthDate?: string | null, emptyLabel = '—'): s
 
     if (years < 0) return emptyLabel;
     if (years === 0 && months <= 0) return 'Меньше месяца';
-    if (years === 0) return `${months} ${pluralRu(months, 'месяц', 'месяца', 'месяцев')}`;
-    if (months === 0) return `${years} ${pluralRu(years, 'год', 'года', 'лет')}`;
-    return `${years} ${pluralRu(years, 'г.', 'г.', 'л.')} ${months} мес.`;
+    if (years === 0) return `${months} мес.`;
+    return `${years} ${pluralRu(years, 'год', 'года', 'лет')}`;
   } catch {
     return emptyLabel;
   }
+}
+
+export function formatWeightRu(weightKg?: number | null, emptyLabel = '—'): string {
+  if (weightKg == null || Number.isNaN(Number(weightKg))) return emptyLabel;
+  return `${String(weightKg).replace('.', ',')} кг`;
 }
 
 export function toIdNameMap<T extends { id: string; name: string }>(

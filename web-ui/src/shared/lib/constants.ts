@@ -4,7 +4,7 @@ export const APPOINTMENT_STATUS_META: Record<
   AppointmentStatus,
   { label: string; short: string; cls: string }
 > = {
-  PENDING: { label: 'В ожидании', short: 'Ожидает', cls: 'badge-PENDING' },
+  PENDING: { label: 'Ожидает подтверждения', short: 'Ожидает', cls: 'badge-PENDING' },
   CONFIRMED: { label: 'Подтверждена', short: 'Подтверждена', cls: 'badge-CONFIRMED' },
   COMPLETED: { label: 'Завершена', short: 'Завершена', cls: 'badge-COMPLETED' },
   CANCELLED: { label: 'Отменена', short: 'Отменена', cls: 'badge-CANCELLED' },
