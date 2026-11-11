@@ -4,19 +4,24 @@ import { useState, useEffect, useRef } from 'react';
 import { userApi } from '@/shared/api';
 import { adminApi } from '@/modules/admin/api';
 import { clientApi } from '@/modules/client/api';
+import { clinicApi } from '@/modules/clinic/api';
 import { vetApi } from '@/modules/vet/api';
 import { useAuth } from '@/context/AuthContext';
+import { useToast } from '@/shared/components';
 import {
   formatApiError,
   formatDateShort,
   getMoscowDateKey,
   getMoscowTodayIso,
+  getSpecTone,
   getUserInitials,
   MOSCOW_TIMEZONE,
+  toIdNameMap,
 } from '@/shared/lib';
+import { SPECIALIZATION_NAMES_RU } from '@/utils/doctorHelpers';
 import type { Appointment } from '@/modules/client/types';
 import type { User } from '@/shared/types';
-import type { ProfileStats } from './ProfileIdentityCard';
+import type { ProfileStats, SecondaryBadge } from './ProfileIdentityCard';
 
 const INITIAL_STATS: ProfileStats = {
   s1: { val: '—', label: '—' },
@@ -26,6 +31,7 @@ const INITIAL_STATS: ProfileStats = {
 
 export function useUserProfile(onProfileUpdated?: (user: User) => void) {
   const { user: authUser, refreshUser } = useAuth();
+  const { toast } = useToast();
   const authUserRef = useRef(authUser);
   authUserRef.current = authUser;
 
@@ -36,6 +42,7 @@ export function useUserProfile(onProfileUpdated?: (user: User) => void) {
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [stats, setStats] = useState<ProfileStats>(INITIAL_STATS);
+  const [vetSpecBadge, setVetSpecBadge] = useState<SecondaryBadge | null>(null);
   const [formData, setFormData] = useState({
     firstName: '',
     middleName: '',
@@ -72,6 +79,7 @@ export function useUserProfile(onProfileUpdated?: (user: User) => void) {
           : '—';
 
         if (data.role === 'ADMIN') {
+          setVetSpecBadge(null);
           const [vetsRes, usersRes] = await Promise.all([
             adminApi.getVeterinarians().catch(() => null),
             adminApi.getUsers(0, 1).catch(() => null),
@@ -83,6 +91,7 @@ export function useUserProfile(onProfileUpdated?: (user: User) => void) {
             s3: { val: regYear, label: 'с года' },
           });
         } else if (data.role === 'CLIENT') {
+          setVetSpecBadge(null);
           const summary = await clientApi.getSummary().catch(() => null);
           if (cancelled) return;
           setStats({
@@ -91,22 +100,62 @@ export function useUserProfile(onProfileUpdated?: (user: User) => void) {
             s3: { val: summary ? summary.completedAppointments : '—', label: 'приёмов' },
           });
         } else if (data.role === 'VETERINARIAN') {
-          const [appts, patients, prof] = await Promise.all([
-            vetApi.getAppointments(0, 100).catch(() => null),
-            vetApi.getPatients().catch(() => null),
+          const todayIso = getMoscowTodayIso();
+          const tomorrowIso = getMoscowTodayIso(1);
+          const todayFrom = new Date(`${todayIso}T00:00:00+03:00`).toISOString();
+          const todayTo = new Date(`${tomorrowIso}T00:00:00+03:00`).toISOString();
+          const [appts, prof, specs] = await Promise.all([
+            vetApi.getAppointments({ page: 0, size: 100, from: todayFrom, to: todayTo }).catch(() => null),
             vetApi.getProfile().catch(() => null),
+            clinicApi.getSpecializations().catch(() => []),
           ]);
           if (cancelled) return;
           const apptList: Appointment[] = appts?.items || [];
-          const todayIso = getMoscowTodayIso();
+          const specsMap = toIdNameMap(Array.isArray(specs) ? specs : []);
+          const rawSpecName =
+            prof?.specialization?.name ||
+            (prof?.specializationId ? specsMap[prof.specializationId] : undefined) ||
+            (prof?.specializationId ? SPECIALIZATION_NAMES_RU[prof.specializationId] : undefined);
+          if (rawSpecName) {
+            setVetSpecBadge({
+              label: SPECIALIZATION_NAMES_RU[rawSpecName] || rawSpecName,
+              tone: getSpecTone(prof?.specializationId),
+            });
+          } else {
+            setVetSpecBadge(null);
+          }
+
           setStats({
             s1: {
-              val: appts ? apptList.filter((a) => getMoscowDateKey(a.startAt) === todayIso).length : '—',
+              val: appts
+                ? apptList.filter(
+                    (a) => getMoscowDateKey(a.startAt) === todayIso && a.status !== 'CANCELLED'
+                  ).length
+                : '—',
               label: 'приёмов сегодня',
             },
-            s2: { val: Array.isArray(patients) ? patients.length : '—', label: 'пациентов' },
+            s2: { val: '…', label: 'пациентов' },
             s3: { val: prof?.experienceYears ?? '—', label: 'лет стажа' },
           });
+
+          void vetApi
+            .getPatients()
+            .then((pts) => {
+              if (!cancelled && Array.isArray(pts)) {
+                setStats((prev) => ({
+                  ...prev,
+                  s2: { val: pts.length, label: 'пациентов' },
+                }));
+              }
+            })
+            .catch(() => {
+              if (!cancelled) {
+                setStats((prev) => ({
+                  ...prev,
+                  s2: { val: '—', label: 'пациентов' },
+                }));
+              }
+            });
         }
       })
       .catch((err) => {
@@ -149,9 +198,12 @@ export function useUserProfile(onProfileUpdated?: (user: User) => void) {
       setUser(updated);
       await refreshUser();
       setSaveSuccess(true);
+      toast('Профиль сохранён');
       onProfileUpdated?.(updated);
     } catch (err) {
-      setSaveError(formatApiError(err, 'Не удалось сохранить изменения'));
+      const msg = formatApiError(err, 'Не удалось сохранить изменения');
+      setSaveError(msg);
+      toast('Ошибка сохранения профиля', msg, 'err');
     } finally {
       setSaving(false);
     }
@@ -185,6 +237,7 @@ export function useUserProfile(onProfileUpdated?: (user: User) => void) {
     role,
     regDateLabel,
     roleBadgeLabel,
+    vetSpecBadge,
     initials,
     fullName,
     shortName,

@@ -28,7 +28,7 @@ export const PublicHeader: React.FC = () => {
   return (
     <header className="island topbar" style={{ flex: 'none' }}>
       {/* Логотип Chiron */}
-      <Link href="/" className="brand" style={{ padding: 0 }}>
+      <Link href="/" className="brand" style={{ padding: 0, textDecoration: 'none', color: 'inherit' }}>
         <div className="brand-mark">
           <ChironLogo size={20} />
         </div>

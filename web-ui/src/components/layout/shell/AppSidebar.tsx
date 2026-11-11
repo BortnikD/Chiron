@@ -3,9 +3,9 @@
 import React, { Suspense } from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
-import { ChevronLeft, ChevronRight, X } from 'lucide-react';
+import { PanelLeft, X } from 'lucide-react';
 import { ChironLogo } from '@/components/ui/ChironLogo';
-import type { NavGroup } from './navConfig';
+import type { NavGroup, NavItem } from './navConfig';
 
 function SidebarNavLinks({
   navGroups,
@@ -20,7 +20,8 @@ function SidebarNavLinks({
 }) {
   const searchParams = useSearchParams();
 
-  const isItemActive = (href: string) => {
+  const isItemActive = (item: NavItem) => {
+    const href = item.href;
     if (href.includes('?')) {
       const [path, query] = href.split('?');
       if (pathname !== path) return false;
@@ -29,29 +30,38 @@ function SidebarNavLinks({
       }
       return true;
     }
-    return pathname === href && !searchParams.get('tab');
+    if (pathname === href && !searchParams.get('tab')) return true;
+    if (item.matchPrefixes?.some((prefix) => pathname.startsWith(prefix))) {
+      return true;
+    }
+    return false;
   };
 
   return (
     <>
       {navGroups.map((group, gIdx) => (
-        <div key={gIdx} className="flex flex-col gap-0.5">
-          {group.label && !collapsed && <span className="nav-group-label">{group.label}</span>}
-          {group.items.map((item) => (
-            <Link
-              key={item.href}
-              href={item.href}
-              className={`nav-item ${isItemActive(item.href) ? 'active' : ''}`}
-              title={collapsed ? item.label : undefined}
-              onClick={onItemClick}
-            >
-              {item.icon}
-              {!collapsed && <span className="label">{item.label}</span>}
-              {!collapsed && item.badge !== undefined && <span className="nav-count">{item.badge}</span>}
-            </Link>
-          ))}
-        </div>
+        <React.Fragment key={group.label ?? `group-${gIdx}`}>
+          {group.label && <span className="nav-group-label">{group.label}</span>}
+          {group.items.map((item) => {
+            const active = isItemActive(item);
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                className={`nav-item ${active ? 'active' : ''}`}
+                title={item.label}
+                aria-current={active ? 'page' : undefined}
+                onClick={onItemClick}
+              >
+                {item.icon}
+                <span className="label">{item.label}</span>
+                {item.badge !== undefined && <span className="nav-count">{item.badge}</span>}
+              </Link>
+            );
+          })}
+        </React.Fragment>
       ))}
+      {collapsed ? null : null}
     </>
   );
 }
@@ -81,62 +91,66 @@ export function AppSidebar({
 }: AppSidebarProps) {
   return (
     <aside
-      className={`island sidebar flex flex-col justify-between shrink-0 transition-all duration-200 ${
-        collapsed ? 'collapsed' : ''
-      } ${mobileOpen ? 'open' : ''}`}
+      className={`island sidebar ${collapsed ? 'collapsed' : ''} ${mobileOpen ? 'open' : ''}`}
+      aria-label="Навигация"
     >
-      <div className="flex flex-col gap-1 min-h-0">
-        <div className="brand p-2 flex items-center justify-between">
-          <Link href={homeHref} className="flex items-center gap-2.5 text-inherit no-underline">
-            <div className="brand-mark bg-[var(--primary)] text-[var(--primary-foreground)] rounded-lg w-8 h-8 flex items-center justify-center shrink-0">
-              <ChironLogo size={18} />
-            </div>
-            {!collapsed && (
-              <div className="flex flex-col min-w-0">
-                <span className="brand-name font-bold text-sm tracking-tight leading-tight">Chiron</span>
-                <span className="brand-role text-[11px] text-[var(--muted-foreground)] leading-tight">{roleLabel}</span>
-              </div>
-            )}
-          </Link>
+      <div className="brand" style={{ justifyContent: 'space-between' }}>
+        <Link
+          href={homeHref}
+          className="row"
+          style={{ gap: '10px', textDecoration: 'none', color: 'inherit', minWidth: 0, flex: 1 }}
+        >
+          <div className="brand-mark">
+            <ChironLogo size={20} />
+          </div>
+          <div className="col label" style={{ gap: 0 }}>
+            <span className="brand-name">Chiron</span>
+            <span className="brand-role">{roleLabel}</span>
+          </div>
+        </Link>
 
-          <button
-            type="button"
-            className="mobile-only btn btn-ghost btn-icon h-7 w-7"
-            onClick={onCloseMobile}
-            aria-label="Закрыть меню"
-          >
-            <X className="w-4 h-4" />
-          </button>
-        </div>
-
-        <div className="overflow-y-auto flex-1 py-2 flex flex-col gap-1">
-          <Suspense fallback={null}>
-            <SidebarNavLinks
-              navGroups={navGroups}
-              collapsed={collapsed}
-              pathname={pathname}
-              onItemClick={onCloseMobile}
-            />
-          </Suspense>
-        </div>
+        <button
+          type="button"
+          className="mobile-only btn btn-ghost btn-icon btn-sm"
+          onClick={onCloseMobile}
+          aria-label="Закрыть меню"
+        >
+          <X className="ic" />
+        </button>
       </div>
 
-      <div className="sidebar-foot shrink-0">
+      <nav
+        className="col"
+        style={{ gap: '2px', overflowY: 'auto', overflowX: 'hidden', flex: 1 }}
+        aria-label="Разделы"
+      >
+        <Suspense fallback={null}>
+          <SidebarNavLinks
+            navGroups={navGroups}
+            collapsed={collapsed}
+            pathname={pathname}
+            onItemClick={onCloseMobile}
+          />
+        </Suspense>
+      </nav>
+
+      <div className="sidebar-foot">
         {isDev && (
           <div className="health" title="GET /actuator/health → UP">
             <span className="dot" />
-            {!collapsed && <span className="label text-xs">Сервер доступен</span>}
+            <span className="label">Сервер доступен</span>
           </div>
         )}
 
         <button
           type="button"
-          className="nav-item hidden lg:flex items-center text-xs text-[var(--muted-foreground)]"
+          className="nav-item"
           onClick={onToggleCollapse}
-          title={collapsed ? 'Развернуть меню' : 'Свернуть меню'}
+          title={collapsed ? 'Развернуть панель' : 'Свернуть панель'}
+          aria-label={collapsed ? 'Развернуть панель' : 'Свернуть панель'}
         >
-          {collapsed ? <ChevronRight className="ic" /> : <ChevronLeft className="ic" />}
-          {!collapsed && <span className="label text-xs">Свернуть</span>}
+          <PanelLeft className="ic" />
+          <span className="label">Свернуть</span>
         </button>
       </div>
     </aside>

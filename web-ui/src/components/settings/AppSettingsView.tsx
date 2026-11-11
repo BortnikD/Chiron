@@ -194,7 +194,7 @@ export const AppSettingsView: React.FC = () => {
           </span>
         </div>
         <div className="island-body set-list" style={{ paddingTop: 0 }}>
-          <Link className="set-row set-link" href="/services">
+          <Link className="set-row set-link" href="/">
             <span className="col grow" style={{ gap: '2px' }}>
               <b>О клинике Chiron</b>
               <span className="small muted">Врачи, направления, популярные услуги</span>

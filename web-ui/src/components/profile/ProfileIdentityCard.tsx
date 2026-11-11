@@ -14,6 +14,11 @@ export interface ProfileStats {
   s3: ProfileStatItem;
 }
 
+export interface SecondaryBadge {
+  label: string;
+  tone?: string;
+}
+
 interface ProfileIdentityCardProps {
   roleClass: string;
   initials: string;
@@ -21,6 +26,7 @@ interface ProfileIdentityCardProps {
   email: string;
   phone: string;
   roleBadgeLabel: string;
+  secondaryBadge?: SecondaryBadge | null;
   regDateLabel: string;
   stats: ProfileStats;
 }
@@ -32,6 +38,7 @@ export const ProfileIdentityCard: React.FC<ProfileIdentityCardProps> = ({
   email,
   phone,
   roleBadgeLabel,
+  secondaryBadge,
   regDateLabel,
   stats,
 }) => {
@@ -44,7 +51,16 @@ export const ProfileIdentityCard: React.FC<ProfileIdentityCardProps> = ({
         <span className="cell-sub">{email}</span>
       </span>
 
-      <span className="t-badge">{roleBadgeLabel}</span>
+      {secondaryBadge ? (
+        <span className="row wrap" style={{ gap: '6px', justifyContent: 'center' }}>
+          <span className="t-badge">{roleBadgeLabel}</span>
+          <span className={`t-badge ${secondaryBadge.tone ? `tone-${secondaryBadge.tone}` : ''}`}>
+            {secondaryBadge.label}
+          </span>
+        </span>
+      ) : (
+        <span className="t-badge">{roleBadgeLabel}</span>
+      )}
 
       <div className="idcard-kv">
         <div>

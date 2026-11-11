@@ -7,7 +7,7 @@ interface ChironLogoProps {
   size?: number;
 }
 
-export const ChironLogo: React.FC<ChironLogoProps> = ({ className = 'w-5 h-5', size = 20 }) => {
+export const ChironLogo: React.FC<ChironLogoProps> = ({ className = '', size = 20 }) => {
   return (
     <svg
       width={size}
@@ -16,6 +16,7 @@ export const ChironLogo: React.FC<ChironLogoProps> = ({ className = 'w-5 h-5', s
       fill="currentColor"
       fillRule="evenodd"
       className={className}
+      style={{ fill: 'currentColor', stroke: 'none', flexShrink: 0 }}
       aria-hidden="true"
     >
       <g>

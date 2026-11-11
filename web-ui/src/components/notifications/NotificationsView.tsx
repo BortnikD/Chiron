@@ -1,55 +1,22 @@
 'use client';
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import { useRouter } from 'next/navigation';
+import { useAuth } from '@/context/AuthContext';
 import { notificationsApi } from '@/shared/api';
-import { formatApiError, formatSlotTime, getMoscowDateKey, getMoscowTodayIso } from '@/shared/lib';
-import type { AppNotification } from '@/shared/types';
+import { useToast } from '@/shared/components';
+import { useAppShell } from '@/components/layout/AppShell';
 import {
-  AlertCircle,
-  AlertTriangle,
-  Bell,
-  Calendar,
-  CalendarPlus,
-  CheckCircle,
-  Clock,
-  Syringe,
-  CheckCheck,
-  XCircle,
-} from 'lucide-react';
+  formatApiError,
+  formatSlotTime,
+  getMoscowDateKey,
+  getMoscowTodayIso,
+} from '@/shared/lib';
+import type { AppNotification } from '@/shared/types';
+import { getNotifMeta, getNotificationHref } from './notifMeta';
+import { AlertCircle, Bell, CheckCheck } from 'lucide-react';
 
-function getNotifMeta(n: AppNotification) {
-  const t = n.type || '';
-  if (t.includes('NO_SHOW')) {
-    return { cls: 't-noshow', icon: <AlertTriangle className="ic" /> };
-  }
-  if (t.includes('FOLLOW_UP')) {
-    return { cls: 't-followup', icon: <CalendarPlus className="ic" /> };
-  }
-  if (t.includes('REMINDER')) {
-    return { cls: 't-reminder', icon: <Clock className="ic" /> };
-  }
-  if (t.includes('CANCEL')) {
-    return { cls: 't-cancelled', icon: <XCircle className="ic" /> };
-  }
-  if (t.includes('CONFIRM')) {
-    return { cls: 't-confirmed', icon: <CheckCircle className="ic" /> };
-  }
-  if (t.includes('RESCHED')) {
-    return { cls: 't-rescheduled', icon: <Clock className="ic" /> };
-  }
-  if (t.includes('BOOK')) {
-    return { cls: 't-booked', icon: <Calendar className="ic" /> };
-  }
-  if (
-    t.includes('VACC') ||
-    n.vaccinationId ||
-    n.title?.toLowerCase().includes('привив') ||
-    n.title?.toLowerCase().includes('вакцин')
-  ) {
-    return { cls: 't-vaccine', icon: <Syringe className="ic" /> };
-  }
-  return { cls: '', icon: <Bell className="ic" /> };
-}
+const PAGE_SIZE = 20;
 
 function groupNotifications(list: AppNotification[]) {
   const today = getMoscowTodayIso(0);
@@ -76,13 +43,24 @@ function groupNotifications(list: AppNotification[]) {
 }
 
 export const NotificationsView: React.FC = () => {
+  const { role } = useAuth();
+  const { wsConnected } = useAppShell();
+  const { toast } = useToast();
+  const router = useRouter();
+
   const [onlyUnread, setOnlyUnread] = useState(false);
+  const [page, setPage] = useState(0);
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [markingAll, setMarkingAll] = useState(false);
 
   const loadNotifications = useCallback(async () => {
+    if (role === 'ADMIN') {
+      setLoading(false);
+      setNotifications([]);
+      return;
+    }
     setLoading(true);
     setError(null);
     try {
@@ -95,10 +73,10 @@ export const NotificationsView: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, [onlyUnread]);
+  }, [onlyUnread, role]);
 
   useEffect(() => {
-    loadNotifications();
+    void loadNotifications();
   }, [loadNotifications]);
 
   useEffect(() => {
@@ -124,22 +102,30 @@ export const NotificationsView: React.FC = () => {
     };
   }, [onlyUnread]);
 
-  const handleMarkAsRead = async (id: string) => {
-    try {
-      await notificationsApi.markAsRead(id);
-      const nowIso = new Date().toISOString();
-      setNotifications((prev) =>
-        onlyUnread
-          ? prev.filter((n) => n.id !== id)
-          : prev.map((n) => (n.id === id ? { ...n, readAt: n.readAt || nowIso } : n))
-      );
-      window.dispatchEvent(new CustomEvent('chiron:notifications-updated'));
-    } catch (err) {
-      setError(formatApiError(err, 'Не удалось отметить уведомление'));
+  const handleOpenNotification = async (notif: AppNotification) => {
+    if (!notif.readAt) {
+      try {
+        await notificationsApi.markAsRead(notif.id);
+        const nowIso = new Date().toISOString();
+        setNotifications((prev) =>
+          onlyUnread
+            ? prev.filter((n) => n.id !== notif.id)
+            : prev.map((n) => (n.id === notif.id ? { ...n, readAt: n.readAt || nowIso } : n))
+        );
+        window.dispatchEvent(new CustomEvent('chiron:notifications-updated'));
+      } catch (err) {
+        setError(formatApiError(err, 'Не удалось отметить уведомление'));
+      }
+    }
+
+    const href = getNotificationHref(notif, role);
+    if (href) {
+      router.push(href);
     }
   };
 
   const handleMarkAllAsRead = async () => {
+    const unreadBefore = notifications.filter((n) => !n.readAt).length;
     setMarkingAll(true);
     setError(null);
     try {
@@ -149,26 +135,70 @@ export const NotificationsView: React.FC = () => {
         onlyUnread ? [] : prev.map((n) => ({ ...n, readAt: n.readAt || now }))
       );
       window.dispatchEvent(new CustomEvent('chiron:notifications-updated'));
+      if (unreadBefore > 0) {
+        toast(`Отмечено прочитанными: ${unreadBefore}`);
+      }
     } catch (err) {
-      setError(formatApiError(err, 'Не удалось отметить уведомления прочитанными'));
+      const msg = formatApiError(err, 'Не удалось отметить уведомления прочитанными');
+      setError(msg);
+      toast('Ошибка отметки уведомлений', msg, 'err');
     } finally {
       setMarkingAll(false);
     }
   };
 
+  if (role === 'ADMIN') {
+    return (
+      <section className="island grow" style={{ maxWidth: '860px', width: '100%' }}>
+        <div className="island-head">
+          <span className="island-title">
+            <Bell className="ic" />
+            Уведомления
+          </span>
+        </div>
+        <div className="empty">
+          <div className="empty-art">
+            <Bell className="ic ic-40" />
+          </div>
+          <span className="empty-title">Администраторам уведомления не приходят</span>
+          <span>
+            Уведомления получают клиенты и врачи — о записях, отменах, переносах и ревакцинации
+          </span>
+        </div>
+      </section>
+    );
+  }
+
+  const filtered = useMemo(
+    () => (onlyUnread ? notifications.filter((n) => !n.readAt) : notifications),
+    [notifications, onlyUnread]
+  );
+
   const unreadCount = notifications.filter((n) => !n.readAt).length;
-  const filtered = onlyUnread ? notifications.filter((n) => !n.readAt) : notifications;
-  const groups = groupNotifications(filtered);
+  const pageCount = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const currentPage = Math.min(page, pageCount - 1);
+  const pageItems = filtered.slice(currentPage * PAGE_SIZE, (currentPage + 1) * PAGE_SIZE);
+  const groups = groupNotifications(pageItems);
 
   return (
-    <section className="island grow" style={{ maxWidth: '860px', width: '100%', margin: '0 auto' }}>
+    <section className="island grow" style={{ maxWidth: '860px', width: '100%' }}>
       <div className="island-head">
         <span className="island-title">
           <Bell className="ic" />
           Уведомления <span className="count">непрочитанных: {unreadCount}</span>
         </span>
+
         <div className="row wrap" style={{ gap: '12px' }}>
-          <div className="row small" style={{ gap: '8px' }}>
+          <span
+            className="row small muted"
+            style={{ gap: '6px' }}
+            title="WebSocket STOMP /user/queue/notifications"
+          >
+            <span className={`dot ${wsConnected ? '' : 'off'}`} />
+            {wsConnected ? 'Подключено' : 'Отключено'}
+          </span>
+
+          <label className="row small" style={{ gap: '8px', cursor: 'pointer', userSelect: 'none' }}>
             <button
               id="notif-only-unread"
               className={`switch ${onlyUnread ? 'on' : ''}`}
@@ -176,15 +206,14 @@ export const NotificationsView: React.FC = () => {
               type="button"
               aria-checked={onlyUnread}
               aria-label="Только непрочитанные"
-              onClick={() => setOnlyUnread((v) => !v)}
+              onClick={() => {
+                setOnlyUnread((v) => !v);
+                setPage(0);
+              }}
             />
-            <span
-              style={{ cursor: 'pointer', userSelect: 'none' }}
-              onClick={() => setOnlyUnread((v) => !v)}
-            >
-              Только непрочитанные
-            </span>
-          </div>
+            Только непрочитанные
+          </label>
+
           <button
             className="btn btn-outline btn-sm"
             type="button"
@@ -217,7 +246,7 @@ export const NotificationsView: React.FC = () => {
             <span className="empty-title">
               {onlyUnread ? 'Непрочитанных нет' : 'Уведомлений пока нет'}
             </span>
-            <span>Новые уведомления появятся здесь при изменениях по записям и прививкам</span>
+            <span>Новые уведомления появятся здесь и всплывут в углу экрана</span>
           </div>
         ) : (
           groups.map((g) => (
@@ -231,15 +260,15 @@ export const NotificationsView: React.FC = () => {
                     key={n.id}
                     type="button"
                     className={`notif ${isUnread ? 'unread' : ''}`}
-                    onClick={() => handleMarkAsRead(n.id)}
+                    onClick={() => void handleOpenNotification(n)}
                   >
                     <span className={`notif-ic ${meta.cls}`}>{meta.icon}</span>
                     <span className="col" style={{ gap: '2px', textAlign: 'left' }}>
-                      <span className="notif-title">{n.title}</span>
-                      <span className="notif-body">{n.body}</span>
+                      <span className="notif-title">{n.title || 'Уведомление'}</span>
+                      <span className="notif-body">{n.body || ''}</span>
                     </span>
                     <span className="notif-time">
-                      {formatSlotTime(n.createdAt)}
+                      {n.createdAt ? formatSlotTime(n.createdAt) : ''}
                       {isUnread && <span className="dot accent" />}
                     </span>
                   </button>
@@ -252,8 +281,39 @@ export const NotificationsView: React.FC = () => {
 
       <div className="island-foot">
         <span className="small muted">
-          Показано {filtered.length} из {notifications.length}
+          Показано {pageItems.length} из {filtered.length}
         </span>
+
+        {pageCount > 1 && (
+          <div className="pager">
+            <button
+              type="button"
+              className="btn btn-ghost btn-sm"
+              disabled={currentPage === 0}
+              onClick={() => setPage((p) => Math.max(0, p - 1))}
+            >
+              ‹
+            </button>
+            {Array.from({ length: pageCount }, (_, idx) => (
+              <button
+                key={idx}
+                type="button"
+                className={`btn btn-ghost btn-sm ${idx === currentPage ? 'on' : ''}`}
+                onClick={() => setPage(idx)}
+              >
+                {idx + 1}
+              </button>
+            ))}
+            <button
+              type="button"
+              className="btn btn-ghost btn-sm"
+              disabled={currentPage >= pageCount - 1}
+              onClick={() => setPage((p) => Math.min(pageCount - 1, p + 1))}
+            >
+              ›
+            </button>
+          </div>
+        )}
       </div>
     </section>
   );

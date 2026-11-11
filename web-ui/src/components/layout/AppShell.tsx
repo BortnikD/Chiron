@@ -1,19 +1,17 @@
 'use client';
 
-import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
 import { useTheme } from '@/context/ThemeContext';
-import { notificationsApi } from '@/shared/api';
-import type { AppNotification } from '@/shared/types';
-import { useNotificationSocket } from '@/shared/realtime/useNotificationSocket';
 import { isDevMode } from '@/utils/env';
 import { getHomeByRole, getUserInitials } from '@/shared/lib';
 import { CommandPaletteModal } from './CommandPaletteModal';
 import { AppSidebar } from './shell/AppSidebar';
 import { AppTopbar } from './shell/AppTopbar';
 import { getNavGroups, getMobileNavItems, resolveBreadcrumbs } from './shell/navConfig';
+import { useShellNotifications } from './shell/useShellNotifications';
 
 export interface ShellHeaderData {
   title?: string;
@@ -22,14 +20,26 @@ export interface ShellHeaderData {
   currentSection?: string;
   crumbGroup?: string;
   crumb?: string;
+  crumb2?: string;
 }
 
 interface AppShellContextType {
   insideShell: boolean;
+  wsConnected: boolean;
   setHeaderData: React.Dispatch<React.SetStateAction<ShellHeaderData>>;
 }
 
 export const AppShellContext = React.createContext<AppShellContextType | null>(null);
+
+export function useAppShell() {
+  return (
+    React.useContext(AppShellContext) ?? {
+      insideShell: false,
+      wsConnected: false,
+      setHeaderData: (() => {}) as React.Dispatch<React.SetStateAction<ShellHeaderData>>,
+    }
+  );
+}
 
 export function useShellHeader(header: ShellHeaderData) {
   const ctx = React.useContext(AppShellContext);
@@ -47,6 +57,7 @@ export function useShellHeader(header: ShellHeaderData) {
     header.currentSection,
     header.crumbGroup,
     header.crumb,
+    header.crumb2,
   ]);
 }
 
@@ -66,6 +77,7 @@ const RootAppShell: React.FC<AppShellProps> = ({
   currentSection,
   crumbGroup,
   crumb,
+  crumb2,
 }) => {
   const [headerData, setHeaderData] = useState<ShellHeaderData>({});
   const { user, role, logout } = useAuth();
@@ -77,9 +89,7 @@ const RootAppShell: React.FC<AppShellProps> = ({
   const [mobileOpen, setMobileOpen] = useState(false);
   const [userDropdown, setUserDropdown] = useState(false);
   const [bellDropdown, setBellDropdown] = useState(false);
-  const [notifications, setNotifications] = useState<AppNotification[]>([]);
-  const [unreadCount, setUnreadCount] = useState(0);
-  const [loadingNotifications, setLoadingNotifications] = useState(false);
+  const [bellTab, setBellTab] = useState<'all' | 'unread'>('all');
   const [isDev, setIsDev] = useState(false);
   const [cmdOpen, setCmdOpen] = useState(false);
 
@@ -94,60 +104,18 @@ const RootAppShell: React.FC<AppShellProps> = ({
     const handleKeyDown = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && ['k', 'K', 'л', 'Л'].includes(e.key)) {
         e.preventDefault();
+        setBellDropdown(false);
+        setUserDropdown(false);
         setCmdOpen((prev) => !prev);
+      } else if (e.key === 'Escape') {
+        setBellDropdown(false);
+        setUserDropdown(false);
+        setMobileOpen(false);
       }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
-
-  const fetchUnread = useCallback(() => {
-    if (!role || role === 'ADMIN') {
-      setUnreadCount(0);
-      return;
-    }
-
-    notificationsApi
-      .getUnreadCount()
-      .then((res) => {
-        const count = typeof res === 'number' ? res : (res as { count?: number })?.count ?? 0;
-        setUnreadCount(count);
-      })
-      .catch(() => {
-        // Сохраняем текущее значение счётчика при временном сбое сети
-      });
-  }, [role]);
-
-  useEffect(() => {
-    fetchUnread();
-    if (!role || role === 'ADMIN') return;
-    window.addEventListener('chiron:notifications-updated', fetchUnread);
-    return () => window.removeEventListener('chiron:notifications-updated', fetchUnread);
-  }, [role, fetchUnread]);
-
-  const handleIncomingNotification = useCallback((notif: AppNotification) => {
-    if (!notif?.id) return;
-    setNotifications((prev) => [notif, ...prev.filter((item) => item.id !== notif.id)].slice(0, 15));
-  }, []);
-
-  useNotificationSocket({
-    onNotification: handleIncomingNotification,
-    onConnect: fetchUnread,
-  });
-
-  useEffect(() => {
-    if (!bellDropdown) return;
-    if (role === 'ADMIN') {
-      setNotifications([]);
-      return;
-    }
-    setLoadingNotifications(true);
-    notificationsApi
-      .getNotifications(0, 15)
-      .then((res) => setNotifications(Array.isArray(res) ? res : res?.items || []))
-      .catch(() => setNotifications([]))
-      .finally(() => setLoadingNotifications(false));
-  }, [bellDropdown, role]);
 
   useEffect(() => {
     const handleClick = (e: MouseEvent) => {
@@ -160,45 +128,66 @@ const RootAppShell: React.FC<AppShellProps> = ({
 
   useEffect(() => {
     setMobileOpen(false);
+    setBellDropdown(false);
+    setUserDropdown(false);
   }, [pathname]);
 
-  const handleMarkAllRead = async () => {
-    try {
-      await notificationsApi.markAllAsRead();
-      setUnreadCount(0);
-      setNotifications((prev) => prev.map((n) => ({ ...n, readAt: n.readAt || new Date().toISOString() })));
-      window.dispatchEvent(new CustomEvent('chiron:notifications-marked-all-read'));
-      window.dispatchEvent(new CustomEvent('chiron:notifications-updated'));
-    } catch {
-      // ignore transient mark-all failure inside topbar popover
-    }
-  };
+  const {
+    notifications,
+    unreadCount,
+    vetTodayCount,
+    loadingNotifications,
+    wsConnected,
+    handleMarkAllRead,
+    handleClickNotification,
+  } = useShellNotifications({
+    role,
+    pathname,
+    bellDropdown,
+    bellTab,
+    onCloseBell: () => setBellDropdown(false),
+  });
 
-  const navGroups = useMemo(() => getNavGroups(role, unreadCount), [role, unreadCount]);
+  const navGroups = useMemo(
+    () => getNavGroups(role, unreadCount, vetTodayCount),
+    [role, unreadCount, vetTodayCount]
+  );
   const mobileItems = useMemo(() => getMobileNavItems(role), [role]);
-
   const initials = getUserInitials(user);
 
   const roleLabel =
     role === 'ADMIN' ? 'Администратор' : role === 'VETERINARIAN' ? 'Кабинет врача' : 'Кабинет клиента';
+  const roleShortLabel =
+    role === 'ADMIN' ? 'Администратор' : role === 'VETERINARIAN' ? 'Ветеринар' : 'Клиент';
 
-  const [resolvedGroup, resolvedCrumb] = resolveBreadcrumbs(pathname, role, {
+  const shortName = useMemo(() => {
+    if (!user) return 'Пользователь';
+    if (user.firstName && user.lastName) {
+      const f = `${user.firstName.charAt(0)}.`;
+      const m = user.middleName ? ` ${user.middleName.charAt(0)}.` : '';
+      return `${f}${m} ${user.lastName}`;
+    }
+    return user.fullName || 'Пользователь';
+  }, [user]);
+
+  const [resolvedGroup, resolvedCrumb, resolvedCrumb2] = resolveBreadcrumbs(pathname, role, {
     group: headerData.crumbGroup || crumbGroup,
     crumb: headerData.crumb || crumb,
+    crumb2: headerData.crumb2 || crumb2,
     section: headerData.currentSection || currentSection,
     title: headerData.title || title,
   });
 
-  const ctxValue = useMemo(() => ({ insideShell: true, setHeaderData }), []);
+  const ctxValue = useMemo(
+    () => ({ insideShell: true, wsConnected, setHeaderData }),
+    [wsConnected]
+  );
 
   return (
     <AppShellContext.Provider value={ctxValue}>
       <div className="app" data-theme={resolvedTheme}>
         {mobileOpen && (
-          <div
-            className="nav-backdrop mobile-only"
-            onClick={() => setMobileOpen(false)}
-          />
+          <div className="nav-backdrop mobile-only" onClick={() => setMobileOpen(false)} />
         )}
 
         <AppSidebar
@@ -213,27 +202,46 @@ const RootAppShell: React.FC<AppShellProps> = ({
           onCloseMobile={() => setMobileOpen(false)}
         />
 
-        <div className="main-col flex-1 flex flex-col min-w-0 min-h-0 gap-2">
+        <div className="main-col">
           <AppTopbar
             role={role}
-            roleLabel={roleLabel}
-            user={user}
+            roleShortLabel={roleShortLabel}
+            shortName={shortName}
             initials={initials}
             crumbGroup={headerData.crumbGroup || crumbGroup || resolvedGroup}
             crumbLabel={headerData.crumb || crumb || headerData.currentSection || currentSection || resolvedCrumb}
+            crumb2={headerData.crumb2 ?? crumb2 ?? resolvedCrumb2}
             actions={headerData.actions || actions}
             unreadCount={unreadCount}
+            wsConnected={wsConnected}
+            bellTab={bellTab}
             notifications={notifications}
             loadingNotifications={loadingNotifications}
             bellDropdown={bellDropdown}
             userDropdown={userDropdown}
             bellMenuRef={bellMenuRef}
             userMenuRef={userMenuRef}
-            onOpenMobile={() => setMobileOpen(true)}
-            onOpenCmd={() => setCmdOpen(true)}
-            onToggleBell={() => setBellDropdown((v) => !v)}
+            onOpenMobile={() => {
+              setBellDropdown(false);
+              setUserDropdown(false);
+              setMobileOpen(true);
+            }}
+            onOpenCmd={() => {
+              setBellDropdown(false);
+              setUserDropdown(false);
+              setCmdOpen(true);
+            }}
+            onToggleBell={() => {
+              setUserDropdown(false);
+              setBellDropdown((v) => !v);
+            }}
             onCloseBell={() => setBellDropdown(false)}
-            onToggleUserMenu={() => setUserDropdown((v) => !v)}
+            onChangeBellTab={setBellTab}
+            onClickNotification={handleClickNotification}
+            onToggleUserMenu={() => {
+              setBellDropdown(false);
+              setUserDropdown((v) => !v);
+            }}
             onCloseUserMenu={() => setUserDropdown(false)}
             onMarkAllRead={handleMarkAllRead}
             onLogout={() => {
@@ -242,38 +250,29 @@ const RootAppShell: React.FC<AppShellProps> = ({
             }}
           />
 
-          <main className="flex-1 flex flex-col min-h-0 min-w-0 w-full" style={{ minHeight: 0 }}>
-            {children}
-          </main>
+          <main className="content-col grow">{children}</main>
         </div>
 
-        <nav className="mobile-nav" aria-label="Нижняя навигация">
-          {mobileItems.map((item) =>
-            item.isBell ? (
-              <button
-                key={item.title}
-                type="button"
-                className={`btn btn-icon ${bellDropdown ? 'btn-secondary' : 'btn-ghost'} relative`}
-                onClick={() => setBellDropdown((v) => !v)}
-                title={item.title}
-              >
-                {item.icon}
-                {unreadCount > 0 && (
-                  <span className="dot dot-danger" style={{ position: 'absolute', top: '8px', right: '8px' }} />
-                )}
-              </button>
-            ) : (
-              <Link
-                key={item.href}
-                href={item.href!}
-                className={`btn btn-icon ${pathname === item.href ? 'btn-secondary' : 'btn-ghost'}`}
-                title={item.title}
-              >
-                {item.icon}
-              </Link>
-            )
-          )}
-        </nav>
+        {mobileItems.length > 0 && (
+          <nav className="mobile-nav" aria-label="Нижняя навигация">
+            {mobileItems.map((item) => {
+              const active =
+                pathname === item.href ||
+                Boolean(item.matchPrefixes?.some((prefix) => pathname.startsWith(prefix)));
+              return (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  className={`btn btn-icon ${active ? 'btn-secondary' : 'btn-ghost'}`}
+                  title={item.title}
+                  aria-label={item.title}
+                >
+                  {item.icon}
+                </Link>
+              );
+            })}
+          </nav>
+        )}
 
         <CommandPaletteModal isOpen={cmdOpen} onClose={() => setCmdOpen(false)} role={role} />
       </div>

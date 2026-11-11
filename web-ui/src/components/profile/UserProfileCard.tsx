@@ -1,6 +1,7 @@
 'use client';
 
 import React from 'react';
+import Link from 'next/link';
 import type { User } from '@/shared/types';
 import { User as UserIcon, Check, AlertCircle } from 'lucide-react';
 import { ProfileIdentityCard } from './ProfileIdentityCard';
@@ -15,6 +16,7 @@ export const UserProfileCard: React.FC<UserProfileCardProps> = ({ onProfileUpdat
     role,
     regDateLabel,
     roleBadgeLabel,
+    vetSpecBadge,
     initials,
     fullName,
     shortName,
@@ -38,6 +40,9 @@ export const UserProfileCard: React.FC<UserProfileCardProps> = ({ onProfileUpdat
     );
   }
 
+  const settingsHref =
+    role === 'ADMIN' ? '/admin/settings' : role === 'VETERINARIAN' ? '/vet/settings' : '/client/settings';
+
   return (
     <div className="prof-grid">
       <ProfileIdentityCard
@@ -47,6 +52,7 @@ export const UserProfileCard: React.FC<UserProfileCardProps> = ({ onProfileUpdat
         email={formData.email || user?.email || '—'}
         phone={formData.phone || user?.phone || '—'}
         roleBadgeLabel={roleBadgeLabel}
+        secondaryBadge={vetSpecBadge}
         regDateLabel={regDateLabel}
         stats={stats}
       />
@@ -58,9 +64,9 @@ export const UserProfileCard: React.FC<UserProfileCardProps> = ({ onProfileUpdat
             Профиль
           </span>
           <span className="small muted">
-            {role === 'ADMIN'
-              ? `Отображается как «${shortName}»`
-              : `Будет отображаться как «${shortName}»`}
+            {role === 'CLIENT'
+              ? `Будет отображаться как «${shortName}»`
+              : `Отображается как «${shortName}»`}
           </span>
         </div>
 
@@ -86,7 +92,7 @@ export const UserProfileCard: React.FC<UserProfileCardProps> = ({ onProfileUpdat
             </div>
           )}
 
-          <form onSubmit={handleProfileSubmit}>
+          <form id="user-profile-form" onSubmit={handleProfileSubmit}>
             <div className="form-grid">
               <div className="field">
                 <label className="field-label" htmlFor="pf-first">
@@ -157,24 +163,38 @@ export const UserProfileCard: React.FC<UserProfileCardProps> = ({ onProfileUpdat
                 <label className="field-label" htmlFor="pf-role">
                   Роль
                 </label>
-                <input className="input" id="pf-role" value={roleBadgeLabel} readOnly disabled />
+                <input
+                  className="input"
+                  id="pf-role"
+                  value={
+                    role === 'ADMIN'
+                      ? 'Администратор'
+                      : role === 'VETERINARIAN'
+                      ? 'Ветеринар'
+                      : 'Клиент'
+                  }
+                  readOnly
+                />
               </div>
 
               <div className="field">
                 <label className="field-label" htmlFor="pf-created">
                   Дата регистрации
                 </label>
-                <input className="input" id="pf-created" value={regDateLabel} readOnly disabled />
+                <input className="input" id="pf-created" value={regDateLabel} readOnly />
               </div>
             </div>
           </form>
         </div>
 
-        <div className="island-foot" style={{ justifyContent: 'flex-end' }}>
+        <div className="island-foot">
+          <Link href={settingsHref} className="small muted" style={{ textDecoration: 'none' }}>
+            Смена пароля в настройках
+          </Link>
           <button
-            type="button"
+            type="submit"
+            form="user-profile-form"
             className="btn btn-primary"
-            onClick={() => handleProfileSubmit()}
             disabled={saving}
           >
             {saving ? 'Сохранение...' : 'Сохранить'}
