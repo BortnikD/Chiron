@@ -10,4 +10,5 @@ data class PetFilter(
     val gender: Gender? = null,
     val isArchived: Boolean? = null,
     val name: String? = null,
+    val patientOfVeterinarianId: UUID? = null,
 )
