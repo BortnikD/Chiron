@@ -13,11 +13,6 @@ data class VeterinarianUpdateProfileRequest(
         message = "must be at most ${VeterinarianRules.BIO_MAX_LENGTH} characters",
     )
     val bio: JsonNullable<String?> = JsonNullable.undefined(),
-    @field:Size(
-        max = VeterinarianRules.PHOTO_URL_MAX_LENGTH,
-        message = "must be at most ${VeterinarianRules.PHOTO_URL_MAX_LENGTH} characters",
-    )
-    val photoUrl: JsonNullable<String?> = JsonNullable.undefined(),
     @field:Min(
         value = VeterinarianRules.EXPERIENCE_YEARS_MIN.toLong(),
         message = "must be between ${VeterinarianRules.EXPERIENCE_YEARS_MIN} and ${VeterinarianRules.EXPERIENCE_YEARS_MAX}",

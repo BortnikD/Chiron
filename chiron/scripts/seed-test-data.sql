@@ -210,7 +210,7 @@ FROM generate_series(1, 600) AS i,
 
 -- Veterinarians ------------------------------------------------------------------------------------------------------
 
-INSERT INTO veterinarian (id, user_id, specialization_id, bio, photo_url, experience_years, is_active,
+INSERT INTO veterinarian (id, user_id, specialization_id, bio, photo_key, experience_years, is_active,
                           created_at, updated_at)
 VALUES ('5eed0006-0000-0000-0000-000000000001', '5eed0004-0000-0000-0000-000000000001',
         '5eed0002-0000-0000-0000-000000000001', 'Therapist, also treats rabbits', NULL, 12, TRUE,
@@ -384,7 +384,7 @@ WITH params AS (SELECT (now() AT TIME ZONE 'Europe/Moscow')::date AS today),
                         FROM slots s
                                  JOIN (VALUES (5, 2), (6, 3), (7, 4), (8, 2)) AS copies(vet_n, template_n)
                                       ON s.vet_n = copies.template_n),
-     candidates AS (SELECT ('5eed0006-0000-0000-0000-00000000000' || s.vet_n)::uuid                              AS veterinarian_id,
+     candidates AS (SELECT ('5eed0006-0000-0000-0000-00000000000' || s.vet_n)::uuid AS veterinarian_id,
                            ('5eed0003-0000-0000-0000-' || lpad((CASE
                                                                     WHEN s.service_n = 1
                                                                         THEN (ARRAY [1, 6, 7, 11])[1 + extract(hour FROM s.slot_time)::int % 4]
@@ -395,12 +395,12 @@ WITH params AS (SELECT (now() AT TIME ZONE 'Europe/Moscow')::date AS today),
                                                                     WHEN s.service_n = 10 AND extract(hour FROM s.slot_time)::int % 2 = 0
                                                                         THEN 7
                                                                     ELSE s.service_n END)::text, 12,
-                                                               '0'))::uuid                                       AS service_id,
+                                                               '0'))::uuid          AS service_id,
                            s.vet_n,
                            d.day,
-                           (d.day + s.slot_time) AT TIME ZONE 'Europe/Moscow'                                    AS start_at,
-                           d.day || ' ' || s.slot_time || ' ' || s.vet_n                                         AS seed,
-                           d.day < p.today                                                                       AS is_past
+                           (d.day + s.slot_time) AT TIME ZONE 'Europe/Moscow'       AS start_at,
+                           d.day || ' ' || s.slot_time || ' ' || s.vet_n            AS seed,
+                           d.day < p.today                                          AS is_past
                     FROM params p
                              CROSS JOIN LATERAL generate_series(p.today - 730, p.today + 60, INTERVAL '1 day') AS g(day_ts)
                              CROSS JOIN LATERAL (SELECT g.day_ts::date AS day) AS d

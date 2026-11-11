@@ -13,6 +13,7 @@ fun ResultRow.toPet(): Pet = Pet(
     weightKg = this[ExposedPetTable.weightKg]?.toDouble(),
     gender = this[ExposedPetTable.gender],
     notes = this[ExposedPetTable.notes],
+    photoKey = this[ExposedPetTable.photoKey],
     isArchived = this[ExposedPetTable.isArchived],
     createdAt = this[ExposedPetTable.createdAt].toInstant(),
     updatedAt = this[ExposedPetTable.updatedAt].toInstant(),

@@ -23,7 +23,7 @@ class VeterinarianUpdateProfileUseCase(
         val profile = getVeterinarianUseCase.findByUserId(actor.userId)
         val veterinarian = updateVeterinarianUseCase.update(
             profile.veterinarian.id,
-            UpdateVeterinarianDto(bio = dto.bio, photoUrl = dto.photoUrl, experienceYears = dto.experienceYears),
+            UpdateVeterinarianDto(bio = dto.bio, experienceYears = dto.experienceYears),
         )
         log.info(
             "Veterinarian {} ({}) updated own veterinarian profile {}",

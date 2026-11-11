@@ -7,6 +7,5 @@ import com.bortnik.chiron.domain.dto.Patch
 // Partial update: null / Patch.Unchanged keep the stored value.
 data class UpdateOwnVeterinarianDto(
     val bio: Patch<String?> = Patch.Unchanged,
-    val photoUrl: Patch<String?> = Patch.Unchanged,
     val experienceYears: Int? = null,
 )

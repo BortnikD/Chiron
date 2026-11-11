@@ -7,7 +7,6 @@ import java.util.UUID
 data class UpdateVeterinarianDto(
     val specializationId: UUID? = null,
     val bio: Patch<String?> = Patch.Unchanged,
-    val photoUrl: Patch<String?> = Patch.Unchanged,
     val experienceYears: Int? = null,
     val isActive: Boolean? = null,
 )

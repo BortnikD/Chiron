@@ -5,13 +5,14 @@ import com.bortnik.chiron.domain.dto.veterinarian.UpdateOwnVeterinarianDto
 import com.bortnik.chiron.domain.dto.veterinarian.UpdateVeterinarianDto
 import com.bortnik.chiron.domain.dto.veterinarian.VeterinarianDetailsDto
 import com.bortnik.chiron.domain.dto.veterinarian.VeterinarianFilter
+import com.bortnik.chiron.domain.photo.PhotoLinks
 import com.bortnik.chiron.presentation.api.http.dto.request.veterinarian.CreateVeterinarianRequest
 import com.bortnik.chiron.presentation.api.http.dto.request.veterinarian.UpdateVeterinarianRequest
 import com.bortnik.chiron.presentation.api.http.dto.request.veterinarian.VeterinarianFilterRequest
 import com.bortnik.chiron.presentation.api.http.dto.request.veterinarian.VeterinarianUpdateProfileRequest
 import com.bortnik.chiron.presentation.api.http.dto.response.VeterinarianResponse
 
-fun VeterinarianDetailsDto.toResponse(): VeterinarianResponse = VeterinarianResponse(
+fun VeterinarianDetailsDto.toResponse(photo: PhotoLinks? = null): VeterinarianResponse = VeterinarianResponse(
     id = veterinarian.id,
     userId = veterinarian.userId,
     firstName = firstName,
@@ -20,7 +21,9 @@ fun VeterinarianDetailsDto.toResponse(): VeterinarianResponse = VeterinarianResp
     fullName = fullName,
     specializationId = veterinarian.specializationId,
     bio = veterinarian.bio,
-    photoUrl = veterinarian.photoUrl,
+    photoUrl = photo?.photoUrl,
+    photoThumbnailUrl = photo?.photoThumbnailUrl,
+    photoUrlExpiresAt = photo?.photoUrlExpiresAt,
     experienceYears = veterinarian.experienceYears,
     isActive = veterinarian.isActive,
     createdAt = veterinarian.createdAt,
@@ -32,7 +35,6 @@ fun CreateVeterinarianRequest.toDto(): CreateVeterinarianDto = CreateVeterinaria
     userId = userId,
     specializationId = specializationId,
     bio = bio,
-    photoUrl = photoUrl,
     experienceYears = experienceYears,
     isActive = isActive,
 )
@@ -40,14 +42,12 @@ fun CreateVeterinarianRequest.toDto(): CreateVeterinarianDto = CreateVeterinaria
 fun UpdateVeterinarianRequest.toDto(): UpdateVeterinarianDto = UpdateVeterinarianDto(
     specializationId = specializationId,
     bio = bio.toPatch(),
-    photoUrl = photoUrl.toPatch(),
     experienceYears = experienceYears,
     isActive = isActive,
 )
 
 fun VeterinarianUpdateProfileRequest.toDto(): UpdateOwnVeterinarianDto = UpdateOwnVeterinarianDto(
     bio = bio.toPatch(),
-    photoUrl = photoUrl.toPatch(),
     experienceYears = experienceYears,
 )
 

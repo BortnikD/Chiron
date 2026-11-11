@@ -6,6 +6,7 @@ import com.bortnik.chiron.domain.dto.pet.PetDetailsDto
 import com.bortnik.chiron.domain.dto.pet.PetFilter
 import com.bortnik.chiron.domain.dto.pet.UpdatePetDto
 import com.bortnik.chiron.domain.entities.Pet
+import com.bortnik.chiron.domain.photo.PhotoLinks
 import com.bortnik.chiron.presentation.api.http.dto.request.pet.ClientCreatePetRequest
 import com.bortnik.chiron.presentation.api.http.dto.request.pet.CreatePetRequest
 import com.bortnik.chiron.presentation.api.http.dto.request.pet.PetFilterRequest
@@ -15,7 +16,7 @@ import com.bortnik.chiron.presentation.api.http.dto.response.PetNextAppointmentR
 import com.bortnik.chiron.presentation.api.http.dto.response.PetResponse
 import com.bortnik.chiron.presentation.api.http.dto.response.PetSummaryResponse
 
-fun Pet.toResponse(): PetResponse = PetResponse(
+fun Pet.toResponse(photo: PhotoLinks? = null): PetResponse = PetResponse(
     id = id,
     name = name,
     ownerId = ownerId,
@@ -25,12 +26,15 @@ fun Pet.toResponse(): PetResponse = PetResponse(
     gender = gender,
     notes = notes,
     isArchived = isArchived,
+    photoUrl = photo?.photoUrl,
+    photoThumbnailUrl = photo?.photoThumbnailUrl,
+    photoUrlExpiresAt = photo?.photoUrlExpiresAt,
     createdAt = createdAt,
     updatedAt = updatedAt,
 )
 
-fun PetDetailsDto.toResponse(): ClientPetResponse = ClientPetResponse(
-    pet = pet.toResponse(),
+fun PetDetailsDto.toResponse(photo: PhotoLinks? = null): ClientPetResponse = ClientPetResponse(
+    pet = pet.toResponse(photo),
     summary = summary?.let {
         PetSummaryResponse(
             completedVisits = it.completedVisits,

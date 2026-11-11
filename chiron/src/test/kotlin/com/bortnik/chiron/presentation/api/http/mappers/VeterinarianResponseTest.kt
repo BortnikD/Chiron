@@ -33,7 +33,7 @@ class VeterinarianResponseTest {
                         ExposedSpecializationTable,
                     ),
                     ExposedVeterinarianTable.bio to null,
-                    ExposedVeterinarianTable.photoUrl to null,
+                    ExposedVeterinarianTable.photoKey to null,
                     ExposedVeterinarianTable.experienceYears to 5,
                     ExposedVeterinarianTable.isActive to true,
                     ExposedVeterinarianTable.createdAt to timestamp,

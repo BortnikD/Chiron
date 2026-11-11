@@ -37,7 +37,6 @@ class ExposedVeterinarianRepository : VeterinarianRepository {
             it[userId] = dto.userId
             it[specializationId] = dto.specializationId
             it[bio] = dto.bio
-            it[photoUrl] = dto.photoUrl
             it[experienceYears] = dto.experienceYears
             it[isActive] = dto.isActive
         }.single().toVeterinarian()
@@ -91,7 +90,6 @@ class ExposedVeterinarianRepository : VeterinarianRepository {
         ExposedVeterinarianTable.updateReturning(where = { ExposedVeterinarianTable.id eq id }) {
             dto.specializationId?.let { value -> it[specializationId] = value }
             dto.bio.ifPresent { value -> it[bio] = value }
-            dto.photoUrl.ifPresent { value -> it[photoUrl] = value }
             dto.experienceYears?.let { value -> it[experienceYears] = value }
             dto.isActive?.let { value -> it[isActive] = value }
             it[updatedAt] = CurrentTimestampWithTimeZone

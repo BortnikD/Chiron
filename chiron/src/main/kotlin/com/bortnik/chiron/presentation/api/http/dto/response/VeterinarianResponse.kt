@@ -13,6 +13,8 @@ data class VeterinarianResponse(
     val specializationId: UUID,
     val bio: String?,
     val photoUrl: String?,
+    val photoThumbnailUrl: String? = null,
+    val photoUrlExpiresAt: Instant? = null,
     val experienceYears: Int,
     val isActive: Boolean,
     val createdAt: Instant,
