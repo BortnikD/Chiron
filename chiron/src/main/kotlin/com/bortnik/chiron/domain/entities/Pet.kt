@@ -14,6 +14,7 @@ data class Pet(
     val weightKg: Double? = null,
     val gender: Gender,
     val notes: String? = null,
+    val photoKey: String? = null,
     val isArchived: Boolean = false,
     val createdAt: Instant,
     val updatedAt: Instant,

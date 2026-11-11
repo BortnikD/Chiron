@@ -12,6 +12,7 @@ import com.bortnik.chiron.presentation.api.http.dto.request.pet.PetFilterRequest
 import com.bortnik.chiron.presentation.api.http.dto.request.pet.UpdatePetRequest
 import com.bortnik.chiron.presentation.api.http.dto.response.PageResponse
 import com.bortnik.chiron.presentation.api.http.dto.response.PetResponse
+import com.bortnik.chiron.presentation.api.http.mappers.PhotoResponseMapper
 import com.bortnik.chiron.presentation.api.http.mappers.toDto
 import com.bortnik.chiron.presentation.api.http.mappers.toResponse
 import io.swagger.v3.oas.annotations.Operation
@@ -38,6 +39,7 @@ class AdminPetController(
     private val getPetUseCase: AdminGetPetUseCase,
     private val updatePetUseCase: AdminUpdatePetUseCase,
     private val deletePetUseCase: AdminDeletePetUseCase,
+    private val photoResponses: PhotoResponseMapper,
 ) {
     @Operation(
         summary = "List pets",
@@ -49,13 +51,13 @@ class AdminPetController(
         @Valid @ParameterObject pagination: PaginationRequest,
     ): ApiResponse<PageResponse<PetResponse>> =
         ApiResponse.success(
-            getPetUseCase.findAll(filter.toDto(), pagination.toDto()).toResponse { it.toResponse() },
+            getPetUseCase.findAll(filter.toDto(), pagination.toDto()).toResponse { it.let(photoResponses::pet) },
         )
 
     @Operation(summary = "Get pet by id")
     @GetMapping("/{id}")
     fun findById(@PathVariable id: UUID): ApiResponse<PetResponse> =
-        ApiResponse.success(getPetUseCase.findById(id).toResponse())
+        ApiResponse.success(getPetUseCase.findById(id).let(photoResponses::pet))
 
     @Operation(summary = "Create pet for any owner")
     @PostMapping
@@ -63,7 +65,7 @@ class AdminPetController(
         @AuthenticationPrincipal actor: Actor,
         @Valid @RequestBody request: CreatePetRequest,
     ): ResponseEntity<ApiResponse<PetResponse>> =
-        ApiResponse.created(createPetUseCase.create(actor, request.toDto()).toResponse())
+        ApiResponse.created(createPetUseCase.create(actor, request.toDto()).let(photoResponses::pet))
 
     @Operation(
         summary = "Update pet",
@@ -75,7 +77,7 @@ class AdminPetController(
         @PathVariable id: UUID,
         @Valid @RequestBody request: UpdatePetRequest,
     ): ApiResponse<PetResponse> =
-        ApiResponse.success(updatePetUseCase.update(actor, id, request.toDto()).toResponse())
+        ApiResponse.success(updatePetUseCase.update(actor, id, request.toDto()).let(photoResponses::pet))
 
     @Operation(summary = "Delete pet")
     @DeleteMapping("/{id}")

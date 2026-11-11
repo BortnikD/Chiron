@@ -4,7 +4,7 @@ import com.bortnik.chiron.application.usecase.common.veterinarian.GetVeterinaria
 import com.bortnik.chiron.domain.dto.veterinarian.VeterinarianFilter
 import com.bortnik.chiron.presentation.api.http.ApiResponse
 import com.bortnik.chiron.presentation.api.http.dto.response.VeterinarianResponse
-import com.bortnik.chiron.presentation.api.http.mappers.toResponse
+import com.bortnik.chiron.presentation.api.http.mappers.PhotoResponseMapper
 import io.swagger.v3.oas.annotations.Operation
 import io.swagger.v3.oas.annotations.Parameter
 import io.swagger.v3.oas.annotations.tags.Tag
@@ -18,7 +18,10 @@ import java.util.UUID
 @RestController
 @RequestMapping("/api/v1/veterinarians")
 @Tag(name = "Veterinarians")
-class VeterinarianController(private val getVeterinarianUseCase: GetVeterinarianUseCase) {
+class VeterinarianController(
+    private val getVeterinarianUseCase: GetVeterinarianUseCase,
+    private val photoResponses: PhotoResponseMapper,
+) {
 
     @Operation(summary = "List active veterinarians")
     @GetMapping
@@ -29,11 +32,12 @@ class VeterinarianController(private val getVeterinarianUseCase: GetVeterinarian
         @RequestParam(required = false) speciesId: UUID?,
     ): ApiResponse<List<VeterinarianResponse>> {
         val filter = VeterinarianFilter(specializationId = specializationId, speciesId = speciesId)
-        return ApiResponse.success(getVeterinarianUseCase.findAllActive(filter).map { it.toResponse() })
+        return ApiResponse.success(
+            getVeterinarianUseCase.findAllActive(filter).map { it.let(photoResponses::veterinarian) })
     }
 
     @Operation(summary = "Get veterinarian by id")
     @GetMapping("/{id}")
     fun findById(@PathVariable id: UUID): ApiResponse<VeterinarianResponse> =
-        ApiResponse.success(getVeterinarianUseCase.findById(id).toResponse())
+        ApiResponse.success(getVeterinarianUseCase.findById(id).let(photoResponses::veterinarian))
 }

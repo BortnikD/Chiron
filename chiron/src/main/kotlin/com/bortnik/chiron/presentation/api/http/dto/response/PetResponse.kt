@@ -15,6 +15,9 @@ data class PetResponse(
     val gender: Gender,
     val notes: String?,
     val isArchived: Boolean,
+    val photoUrl: String? = null,
+    val photoThumbnailUrl: String? = null,
+    val photoUrlExpiresAt: Instant? = null,
     val createdAt: Instant,
     val updatedAt: Instant,
 )

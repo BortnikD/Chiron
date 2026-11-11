@@ -10,8 +10,8 @@ import com.bortnik.chiron.presentation.api.http.dto.request.pet.ClientCreatePetR
 import com.bortnik.chiron.presentation.api.http.dto.request.pet.UpdatePetRequest
 import com.bortnik.chiron.presentation.api.http.dto.response.ClientPetResponse
 import com.bortnik.chiron.presentation.api.http.dto.response.PetResponse
+import com.bortnik.chiron.presentation.api.http.mappers.PhotoResponseMapper
 import com.bortnik.chiron.presentation.api.http.mappers.toDto
-import com.bortnik.chiron.presentation.api.http.mappers.toResponse
 import io.swagger.v3.oas.annotations.Operation
 import io.swagger.v3.oas.annotations.Parameter
 import io.swagger.v3.oas.annotations.tags.Tag
@@ -37,11 +37,12 @@ class ClientPetController(
     private val getPetUseCase: ClientGetPetUseCase,
     private val updatePetUseCase: ClientUpdatePetUseCase,
     private val deletePetUseCase: ClientDeletePetUseCase,
+    private val photoResponses: PhotoResponseMapper,
 ) {
     @Operation(
         summary = "List own pets",
         description = "withSummary=true adds visit counts, the next appointment and vaccination due status. " +
-            "By default summary is omitted and no summary queries are performed.",
+                "By default summary is omitted and no summary queries are performed.",
     )
     @GetMapping
     fun findAll(
@@ -50,7 +51,7 @@ class ClientPetController(
         @RequestParam(required = false) isArchived: Boolean?,
         @RequestParam(defaultValue = "false") withSummary: Boolean,
     ): ApiResponse<List<ClientPetResponse>> =
-        ApiResponse.success(getPetUseCase.findAll(actor, isArchived, withSummary).map { it.toResponse() })
+        ApiResponse.success(getPetUseCase.findAll(actor, isArchived, withSummary).map { it.let(photoResponses::pet) })
 
     @Operation(summary = "Get own pet by id", description = "withSummary=true includes the pet's summary.")
     @GetMapping("/{id}")
@@ -59,7 +60,7 @@ class ClientPetController(
         @PathVariable id: UUID,
         @RequestParam(defaultValue = "false") withSummary: Boolean,
     ): ApiResponse<ClientPetResponse> =
-        ApiResponse.success(getPetUseCase.findById(actor, id, withSummary).toResponse())
+        ApiResponse.success(getPetUseCase.findById(actor, id, withSummary).let(photoResponses::pet))
 
     @Operation(summary = "Create pet owned by the current user")
     @PostMapping
@@ -67,7 +68,7 @@ class ClientPetController(
         @AuthenticationPrincipal actor: Actor,
         @Valid @RequestBody request: ClientCreatePetRequest,
     ): ResponseEntity<ApiResponse<PetResponse>> =
-        ApiResponse.created(createPetUseCase.create(actor, request.toDto()).toResponse())
+        ApiResponse.created(createPetUseCase.create(actor, request.toDto()).let(photoResponses::pet))
 
     @Operation(
         summary = "Update own pet",
@@ -79,7 +80,7 @@ class ClientPetController(
         @PathVariable id: UUID,
         @Valid @RequestBody request: UpdatePetRequest,
     ): ApiResponse<PetResponse> =
-        ApiResponse.success(updatePetUseCase.update(actor, id, request.toDto()).toResponse())
+        ApiResponse.success(updatePetUseCase.update(actor, id, request.toDto()).let(photoResponses::pet))
 
     @Operation(summary = "Delete own pet")
     @DeleteMapping("/{id}")

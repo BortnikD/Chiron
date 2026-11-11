@@ -14,3 +14,6 @@ springdoc:
 cors:
   allowed-origins:
     - ${FRONTEND_ORIGIN:https://frontend.example.invalid}
+
+storage:
+  public-endpoint: ${STORAGE_PUBLIC_ENDPOINT}

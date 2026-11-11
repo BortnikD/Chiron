@@ -10,8 +10,8 @@ import com.bortnik.chiron.presentation.api.http.dto.request.veterinarian.CreateV
 import com.bortnik.chiron.presentation.api.http.dto.request.veterinarian.UpdateVeterinarianRequest
 import com.bortnik.chiron.presentation.api.http.dto.request.veterinarian.VeterinarianFilterRequest
 import com.bortnik.chiron.presentation.api.http.dto.response.VeterinarianResponse
+import com.bortnik.chiron.presentation.api.http.mappers.PhotoResponseMapper
 import com.bortnik.chiron.presentation.api.http.mappers.toDto
-import com.bortnik.chiron.presentation.api.http.mappers.toResponse
 import io.swagger.v3.oas.annotations.Operation
 import io.swagger.v3.oas.annotations.tags.Tag
 import jakarta.validation.Valid
@@ -36,6 +36,7 @@ class AdminVeterinarianController(
     private val getVeterinarianUseCase: AdminGetVeterinarianUseCase,
     private val updateVeterinarianUseCase: AdminUpdateVeterinarianUseCase,
     private val deleteVeterinarianUseCase: AdminDeleteVeterinarianUseCase,
+    private val photoResponses: PhotoResponseMapper,
 ) {
     @Operation(
         summary = "List veterinarians, including inactive ones",
@@ -45,14 +46,14 @@ class AdminVeterinarianController(
     fun findAll(
         @ParameterObject filter: VeterinarianFilterRequest,
     ): ApiResponse<List<VeterinarianResponse>> =
-        ApiResponse.success(getVeterinarianUseCase.findAll(filter.toDto()).map { it.toResponse() })
+        ApiResponse.success(getVeterinarianUseCase.findAll(filter.toDto()).map { it.let(photoResponses::veterinarian) })
 
     @Operation(summary = "Get veterinarian profile by user id")
     @GetMapping("/by-user/{userId}")
     fun findByUserId(
         @PathVariable userId: UUID,
     ): ApiResponse<VeterinarianResponse> =
-        ApiResponse.success(getVeterinarianUseCase.findByUserId(userId).toResponse())
+        ApiResponse.success(getVeterinarianUseCase.findByUserId(userId).let(photoResponses::veterinarian))
 
     @Operation(
         summary = "Create veterinarian profile",
@@ -63,7 +64,7 @@ class AdminVeterinarianController(
         @AuthenticationPrincipal actor: Actor,
         @Valid @RequestBody request: CreateVeterinarianRequest,
     ): ResponseEntity<ApiResponse<VeterinarianResponse>> =
-        ApiResponse.created(createVeterinarianUseCase.create(actor, request.toDto()).toResponse())
+        ApiResponse.created(createVeterinarianUseCase.create(actor, request.toDto()).let(photoResponses::veterinarian))
 
     @Operation(summary = "Update veterinarian profile")
     @PatchMapping("/{id}")
@@ -72,7 +73,9 @@ class AdminVeterinarianController(
         @PathVariable id: UUID,
         @Valid @RequestBody request: UpdateVeterinarianRequest,
     ): ApiResponse<VeterinarianResponse> =
-        ApiResponse.success(updateVeterinarianUseCase.update(actor, id, request.toDto()).toResponse())
+        ApiResponse.success(
+            updateVeterinarianUseCase.update(actor, id, request.toDto()).let(photoResponses::veterinarian)
+        )
 
     @Operation(summary = "Delete veterinarian profile")
     @DeleteMapping("/{id}")

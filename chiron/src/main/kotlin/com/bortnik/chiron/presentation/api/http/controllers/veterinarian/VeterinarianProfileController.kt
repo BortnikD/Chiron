@@ -6,8 +6,8 @@ import com.bortnik.chiron.application.usecase.veterinarian.profile.VeterinarianU
 import com.bortnik.chiron.presentation.api.http.ApiResponse
 import com.bortnik.chiron.presentation.api.http.dto.request.veterinarian.VeterinarianUpdateProfileRequest
 import com.bortnik.chiron.presentation.api.http.dto.response.VeterinarianResponse
+import com.bortnik.chiron.presentation.api.http.mappers.PhotoResponseMapper
 import com.bortnik.chiron.presentation.api.http.mappers.toDto
-import com.bortnik.chiron.presentation.api.http.mappers.toResponse
 import io.swagger.v3.oas.annotations.Operation
 import io.swagger.v3.oas.annotations.tags.Tag
 import jakarta.validation.Valid
@@ -24,21 +24,22 @@ import org.springframework.web.bind.annotation.RestController
 class VeterinarianProfileController(
     private val getProfileUseCase: VeterinarianGetProfileUseCase,
     private val updateProfileUseCase: VeterinarianUpdateProfileUseCase,
+    private val photoResponses: PhotoResponseMapper,
 ) {
 
     @Operation(summary = "Get own veterinarian profile")
     @GetMapping
     fun get(@AuthenticationPrincipal actor: Actor): ApiResponse<VeterinarianResponse> =
-        ApiResponse.success(getProfileUseCase.get(actor).toResponse())
+        ApiResponse.success(getProfileUseCase.get(actor).let(photoResponses::veterinarian))
 
     @Operation(
         summary = "Update own veterinarian profile",
-        description = "Only bio, photo and experience; specialization and activity are changed by an admin.",
+        description = "Only bio and experience; photo has separate endpoints; specialization and activity are changed by an admin.",
     )
     @PatchMapping
     fun update(
         @AuthenticationPrincipal actor: Actor,
         @Valid @RequestBody request: VeterinarianUpdateProfileRequest,
     ): ApiResponse<VeterinarianResponse> =
-        ApiResponse.success(updateProfileUseCase.update(actor, request.toDto()).toResponse())
+        ApiResponse.success(updateProfileUseCase.update(actor, request.toDto()).let(photoResponses::veterinarian))
 }

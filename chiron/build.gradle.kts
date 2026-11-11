@@ -29,6 +29,8 @@ repositories {
 }
 
 dependencies {
+    implementation("software.amazon.awssdk:s3:2.57.13")
+    implementation("software.amazon.awssdk:url-connection-client:2.57.13")
     implementation("org.springframework.boot:spring-boot-starter-actuator")
     implementation("org.springframework.boot:spring-boot-starter-flyway")
     implementation("org.springframework.boot:spring-boot-starter-jdbc")

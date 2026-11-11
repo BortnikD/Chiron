@@ -6,7 +6,6 @@ data class CreateVeterinarianDto(
     val userId: UUID,
     val specializationId: UUID,
     val bio: String? = null,
-    val photoUrl: String? = null,
     val experienceYears: Int,
     val isActive: Boolean = true,
 )

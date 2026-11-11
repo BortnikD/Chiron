@@ -1,0 +1,256 @@
+[
+  {
+    "file": "photos/veterinarians/anna-ivanova.jpg",
+    "source": "https://images.pexels.com/photos/32788234/pexels-photo-32788234.jpeg",
+    "download": "https://images.pexels.com/photos/32788234/pexels-photo-32788234.jpeg?auto=compress&cs=tinysrgb&w=1600",
+    "crop": [
+      350,
+      80,
+      1250
+    ],
+    "veterinarianId": "5eed0006-0000-0000-0000-000000000001",
+    "creditPage": "https://www.pexels.com/photo/32788234/",
+    "license": "Pexels License",
+    "licenseUrl": "https://www.pexels.com/license/"
+  },
+  {
+    "file": "photos/veterinarians/elena-smirnova.jpg",
+    "source": "https://images.pexels.com/photos/6234975/pexels-photo-6234975.jpeg",
+    "download": "https://images.pexels.com/photos/6234975/pexels-photo-6234975.jpeg?auto=compress&cs=tinysrgb&w=1600",
+    "crop": [
+      640,
+      650,
+      600
+    ],
+    "veterinarianId": "5eed0006-0000-0000-0000-000000000003",
+    "creditPage": "https://www.pexels.com/photo/6234975/",
+    "license": "Pexels License",
+    "licenseUrl": "https://www.pexels.com/license/"
+  },
+  {
+    "file": "photos/veterinarians/sofia-orlova.jpg",
+    "source": "https://cdn.pixabay.com/photo/2021/02/01/00/53/dog-5969008_1280.jpg",
+    "download": "https://cdn.pixabay.com/photo/2021/02/01/00/53/dog-5969008_1280.jpg",
+    "crop": [
+      130,
+      0,
+      700
+    ],
+    "veterinarianId": "5eed0006-0000-0000-0000-000000000005",
+    "creditPage": "https://pixabay.com/photos/dog-5969008/",
+    "license": "Pixabay Content License",
+    "licenseUrl": "https://pixabay.com/service/license-summary/"
+  },
+  {
+    "file": "photos/veterinarians/alina-zaitseva.jpg",
+    "source": "https://upload.wikimedia.org/wikipedia/commons/4/43/Yulia_Bublikova_portrait_2021.jpg",
+    "download": "https://upload.wikimedia.org/wikipedia/commons/4/43/Yulia_Bublikova_portrait_2021.jpg",
+    "crop": [
+      500,
+      280,
+      1200
+    ],
+    "veterinarianId": "5eed0006-0000-0000-0000-000000000007",
+    "author": "BublikovaYulia",
+    "creditPage": "https://commons.wikimedia.org/wiki/File:Yulia_Bublikova_portrait_2021.jpg",
+    "license": "CC BY-SA 4.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0/"
+  },
+  {
+    "file": "photos/veterinarians/pavel-petrov.jpg",
+    "source": "https://images.pexels.com/photos/6235652/pexels-photo-6235652.jpeg",
+    "download": "https://images.pexels.com/photos/6235652/pexels-photo-6235652.jpeg?auto=compress&cs=tinysrgb&w=1600",
+    "crop": [
+      360,
+      160,
+      1150
+    ],
+    "veterinarianId": "5eed0006-0000-0000-0000-000000000002",
+    "creditPage": "https://www.pexels.com/photo/6235652/",
+    "license": "Pexels License",
+    "licenseUrl": "https://www.pexels.com/license/"
+  },
+  {
+    "file": "photos/veterinarians/oleg-kuznetsov.jpg",
+    "source": "https://images.pexels.com/photos/7465698/pexels-photo-7465698.jpeg",
+    "download": "https://images.pexels.com/photos/7465698/pexels-photo-7465698.jpeg?auto=compress&cs=tinysrgb&w=1600",
+    "crop": [
+      600,
+      0,
+      520
+    ],
+    "veterinarianId": "5eed0006-0000-0000-0000-000000000004",
+    "creditPage": "https://www.pexels.com/photo/7465698/",
+    "license": "Pexels License",
+    "licenseUrl": "https://www.pexels.com/license/"
+  },
+  {
+    "file": "photos/veterinarians/roman-belov.jpg",
+    "source": "https://images.pexels.com/photos/22504402/pexels-photo-22504402.jpeg",
+    "download": "https://images.pexels.com/photos/22504402/pexels-photo-22504402.jpeg?auto=compress&cs=tinysrgb&w=1600",
+    "crop": [
+      300,
+      180,
+      520
+    ],
+    "veterinarianId": "5eed0006-0000-0000-0000-000000000006",
+    "creditPage": "https://www.pexels.com/photo/22504402/",
+    "license": "Pexels License",
+    "licenseUrl": "https://www.pexels.com/license/"
+  },
+  {
+    "file": "photos/veterinarians/denis-savin.jpg",
+    "source": "https://upload.wikimedia.org/wikipedia/commons/d/d7/Dr._Azmat_Ullah_Khan_.jpg",
+    "download": "https://upload.wikimedia.org/wikipedia/commons/d/d7/Dr._Azmat_Ullah_Khan_.jpg",
+    "crop": [
+      500,
+      80,
+      1700
+    ],
+    "veterinarianId": "5eed0006-0000-0000-0000-000000000008",
+    "author": "Waqasbinniaz",
+    "creditPage": "https://commons.wikimedia.org/wiki/File:Dr._Azmat_Ullah_Khan_.jpg",
+    "license": "CC BY-SA 4.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0/"
+  },
+  {
+    "file": "photos/pets/dogs/golden-retriever.jpg",
+    "source": "https://images.pexels.com/photos/35511912/pexels-photo-35511912.jpeg",
+    "download": "https://images.pexels.com/photos/35511912/pexels-photo-35511912.jpeg?auto=compress&cs=tinysrgb&w=1600",
+    "crop": [
+      0,
+      160,
+      1600
+    ],
+    "speciesId": "5eed0001-0000-0000-0000-000000000001",
+    "creditPage": "https://www.pexels.com/photo/35511912/",
+    "license": "Pexels License",
+    "licenseUrl": "https://www.pexels.com/license/"
+  },
+  {
+    "file": "photos/pets/dogs/husky.jpg",
+    "source": "https://images.pexels.com/photos/20648319/pexels-photo-20648319.jpeg",
+    "download": "https://images.pexels.com/photos/20648319/pexels-photo-20648319.jpeg?auto=compress&cs=tinysrgb&w=1600",
+    "crop": null,
+    "speciesId": "5eed0001-0000-0000-0000-000000000001",
+    "creditPage": "https://www.pexels.com/photo/20648319/",
+    "license": "Pexels License",
+    "licenseUrl": "https://www.pexels.com/license/"
+  },
+  {
+    "file": "photos/pets/dogs/dachshund.jpg",
+    "source": "https://images.pexels.com/photos/16459643/pexels-photo-16459643.jpeg",
+    "download": "https://images.pexels.com/photos/16459643/pexels-photo-16459643.jpeg?auto=compress&cs=tinysrgb&w=1600",
+    "crop": [
+      0,
+      120,
+      1600
+    ],
+    "speciesId": "5eed0001-0000-0000-0000-000000000001",
+    "creditPage": "https://www.pexels.com/photo/16459643/",
+    "license": "Pexels License",
+    "licenseUrl": "https://www.pexels.com/license/"
+  },
+  {
+    "file": "photos/pets/dogs/black-labrador.jpg",
+    "source": "https://images.pexels.com/photos/16738458/pexels-photo-16738458.jpeg",
+    "download": "https://images.pexels.com/photos/16738458/pexels-photo-16738458.jpeg?auto=compress&cs=tinysrgb&w=1600",
+    "crop": null,
+    "speciesId": "5eed0001-0000-0000-0000-000000000001",
+    "creditPage": "https://www.pexels.com/photo/16738458/",
+    "license": "Pexels License",
+    "licenseUrl": "https://www.pexels.com/license/"
+  },
+  {
+    "file": "photos/pets/cats/ginger-white.jpg",
+    "source": "https://images.pexels.com/photos/36969864/pexels-photo-36969864.jpeg",
+    "download": "https://images.pexels.com/photos/36969864/pexels-photo-36969864.jpeg?auto=compress&cs=tinysrgb&w=1600",
+    "crop": null,
+    "speciesId": "5eed0001-0000-0000-0000-000000000002",
+    "creditPage": "https://www.pexels.com/photo/36969864/",
+    "license": "Pexels License",
+    "licenseUrl": "https://www.pexels.com/license/"
+  },
+  {
+    "file": "photos/pets/cats/calico.jpg",
+    "source": "https://images.pexels.com/photos/34001258/pexels-photo-34001258.jpeg",
+    "download": "https://images.pexels.com/photos/34001258/pexels-photo-34001258.jpeg?auto=compress&cs=tinysrgb&w=1600",
+    "crop": null,
+    "speciesId": "5eed0001-0000-0000-0000-000000000002",
+    "creditPage": "https://www.pexels.com/photo/34001258/",
+    "license": "Pexels License",
+    "licenseUrl": "https://www.pexels.com/license/"
+  },
+  {
+    "file": "photos/pets/cats/white.jpg",
+    "source": "https://images.pexels.com/photos/33083323/pexels-photo-33083323.jpeg",
+    "download": "https://images.pexels.com/photos/33083323/pexels-photo-33083323.jpeg?auto=compress&cs=tinysrgb&w=1600",
+    "crop": null,
+    "speciesId": "5eed0001-0000-0000-0000-000000000002",
+    "creditPage": "https://www.pexels.com/photo/33083323/",
+    "license": "Pexels License",
+    "licenseUrl": "https://www.pexels.com/license/"
+  },
+  {
+    "file": "photos/pets/cats/black.jpg",
+    "source": "https://images.pexels.com/photos/31101860/pexels-photo-31101860.jpeg",
+    "download": "https://images.pexels.com/photos/31101860/pexels-photo-31101860.jpeg?auto=compress&cs=tinysrgb&w=1600",
+    "crop": [
+      0,
+      0,
+      1600
+    ],
+    "speciesId": "5eed0001-0000-0000-0000-000000000002",
+    "creditPage": "https://www.pexels.com/photo/31101860/",
+    "license": "Pexels License",
+    "licenseUrl": "https://www.pexels.com/license/"
+  },
+  {
+    "file": "photos/pets/rabbits/rabbit.jpg",
+    "source": "https://images.pexels.com/photos/20049448/pexels-photo-20049448.jpeg",
+    "download": "https://images.pexels.com/photos/20049448/pexels-photo-20049448.jpeg?auto=compress&cs=tinysrgb&w=1600",
+    "crop": [
+      0,
+      0,
+      1600
+    ],
+    "speciesId": "5eed0001-0000-0000-0000-000000000003",
+    "creditPage": "https://www.pexels.com/photo/20049448/",
+    "license": "Pexels License",
+    "licenseUrl": "https://www.pexels.com/license/"
+  },
+  {
+    "file": "photos/pets/guinea-pigs/guinea-pig.jpg",
+    "source": "https://images.pexels.com/photos/20634964/pexels-photo-20634964.jpeg",
+    "download": "https://images.pexels.com/photos/20634964/pexels-photo-20634964.jpeg?auto=compress&cs=tinysrgb&w=1600",
+    "crop": null,
+    "speciesId": "5eed0001-0000-0000-0000-000000000004",
+    "creditPage": "https://www.pexels.com/photo/20634964/",
+    "license": "Pexels License",
+    "licenseUrl": "https://www.pexels.com/license/"
+  },
+  {
+    "file": "photos/pets/ferrets/ferret.jpg",
+    "source": "https://images.pexels.com/photos/37850792/pexels-photo-37850792.jpeg",
+    "download": "https://images.pexels.com/photos/37850792/pexels-photo-37850792.jpeg?auto=compress&cs=tinysrgb&w=1600",
+    "crop": [
+      350,
+      630,
+      1150
+    ],
+    "speciesId": "5eed0001-0000-0000-0000-000000000005",
+    "creditPage": "https://www.pexels.com/photo/37850792/",
+    "license": "Pexels License",
+    "licenseUrl": "https://www.pexels.com/license/"
+  },
+  {
+    "file": "photos/pets/parrots/macaw.jpg",
+    "source": "https://images.pexels.com/photos/23644574/pexels-photo-23644574.jpeg",
+    "download": "https://images.pexels.com/photos/23644574/pexels-photo-23644574.jpeg?auto=compress&cs=tinysrgb&w=1600",
+    "crop": null,
+    "speciesId": "5eed0001-0000-0000-0000-000000000006",
+    "creditPage": "https://www.pexels.com/photo/23644574/",
+    "license": "Pexels License",
+    "licenseUrl": "https://www.pexels.com/license/"
+  }
+]

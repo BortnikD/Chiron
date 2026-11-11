@@ -1,4 +1,8 @@
 spring:
+  servlet:
+    multipart:
+      max-file-size: 5MB
+      max-request-size: 6MB
   application:
     name: chiron
 
@@ -46,6 +50,7 @@ management:
           include:
             - readinessState
             - db
+            - photoStorage
 
 springdoc:
   show-actuator: true
@@ -67,3 +72,12 @@ logging:
 
 cors:
   allowed-origins: [ ]
+
+storage:
+  endpoint: ${STORAGE_ENDPOINT:http://localhost:3900}
+  public-endpoint: ${STORAGE_PUBLIC_ENDPOINT:http://localhost:3900}
+  region: ${STORAGE_REGION:garage}
+  bucket: ${STORAGE_BUCKET:chiron-media}
+  access-key: ${STORAGE_ACCESS_KEY}
+  secret-key: ${STORAGE_SECRET_KEY}
+  read-url-ttl: 15m

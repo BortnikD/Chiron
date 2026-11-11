@@ -4,7 +4,7 @@ import com.bortnik.chiron.application.security.Actor
 import com.bortnik.chiron.application.usecase.veterinarian.pet.VeterinarianGetPatientUseCase
 import com.bortnik.chiron.presentation.api.http.ApiResponse
 import com.bortnik.chiron.presentation.api.http.dto.response.PetResponse
-import com.bortnik.chiron.presentation.api.http.mappers.toResponse
+import com.bortnik.chiron.presentation.api.http.mappers.PhotoResponseMapper
 import io.swagger.v3.oas.annotations.Operation
 import io.swagger.v3.oas.annotations.tags.Tag
 import org.springframework.security.core.annotation.AuthenticationPrincipal
@@ -17,7 +17,10 @@ import java.util.UUID
 @RestController
 @RequestMapping("/api/v1/veterinarian/pets")
 @Tag(name = "Veterinarian: Pets")
-class VeterinarianPetController(private val getPatientUseCase: VeterinarianGetPatientUseCase) {
+class VeterinarianPetController(
+    private val getPatientUseCase: VeterinarianGetPatientUseCase,
+    private val photoResponses: PhotoResponseMapper,
+) {
 
     @Operation(
         summary = "Get patient by id",
@@ -25,5 +28,5 @@ class VeterinarianPetController(private val getPatientUseCase: VeterinarianGetPa
     )
     @GetMapping("/{id}")
     fun findById(@AuthenticationPrincipal actor: Actor, @PathVariable id: UUID): ApiResponse<PetResponse> =
-        ApiResponse.success(getPatientUseCase.findById(actor, id).toResponse())
+        ApiResponse.success(getPatientUseCase.findById(actor, id).let(photoResponses::pet))
 }
