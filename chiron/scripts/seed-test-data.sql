@@ -74,35 +74,35 @@ WHERE id::text LIKE '5eed%';
 -- Reference data -----------------------------------------------------------------------------------------------------
 
 INSERT INTO species (id, name)
-VALUES ('5eed0001-0000-0000-0000-000000000001', 'Dog'),
-       ('5eed0001-0000-0000-0000-000000000002', 'Cat'),
-       ('5eed0001-0000-0000-0000-000000000003', 'Rabbit'),
-       ('5eed0001-0000-0000-0000-000000000004', 'Guinea pig'),
-       ('5eed0001-0000-0000-0000-000000000005', 'Ferret'),
-       ('5eed0001-0000-0000-0000-000000000006', 'Parrot');
+VALUES ('5eed0001-0000-0000-0000-000000000001', 'Собака'),
+       ('5eed0001-0000-0000-0000-000000000002', 'Кошка'),
+       ('5eed0001-0000-0000-0000-000000000003', 'Кролик'),
+       ('5eed0001-0000-0000-0000-000000000004', 'Морская свинка'),
+       ('5eed0001-0000-0000-0000-000000000005', 'Хорёк'),
+       ('5eed0001-0000-0000-0000-000000000006', 'Попугай');
 
 INSERT INTO specialization (id, name, description)
-VALUES ('5eed0002-0000-0000-0000-000000000001', 'Therapy', 'General examinations, diagnostics and vaccination'),
-       ('5eed0002-0000-0000-0000-000000000002', 'Surgery', 'Planned and emergency operations'),
-       ('5eed0002-0000-0000-0000-000000000003', 'Dentistry', 'Oral cavity and teeth treatment');
+VALUES ('5eed0002-0000-0000-0000-000000000001', 'Терапия', 'Общие осмотры, диагностика и вакцинация'),
+       ('5eed0002-0000-0000-0000-000000000002', 'Хирургия', 'Плановые и экстренные операции'),
+       ('5eed0002-0000-0000-0000-000000000003', 'Стоматология', 'Лечение зубов и полости рта');
 
 INSERT INTO service (id, specialization_id, name, description, base_price, base_duration_min, buffer_after_min,
                      is_active, created_at, updated_at)
-VALUES ('5eed0003-0000-0000-0000-000000000001', '5eed0002-0000-0000-0000-000000000001', 'General check-up',
-        'Examination, weighing and owner consultation', 1500.00, 30, 0, TRUE,
+VALUES ('5eed0003-0000-0000-0000-000000000001', '5eed0002-0000-0000-0000-000000000001', 'Первичный осмотр',
+        'Осмотр, взвешивание и консультация владельца', 1500.00, 30, 0, TRUE,
         now() - INTERVAL '900 days', now() - INTERVAL '900 days'),
-       ('5eed0003-0000-0000-0000-000000000002', '5eed0002-0000-0000-0000-000000000001', 'Vaccination',
-        'Examination before vaccination and the injection', 1200.00, 20, 10, TRUE,
+       ('5eed0003-0000-0000-0000-000000000002', '5eed0002-0000-0000-0000-000000000001', 'Вакцинация',
+        'Осмотр перед вакцинацией и введение вакцины', 1200.00, 20, 10, TRUE,
         now() - INTERVAL '900 days', now() - INTERVAL '900 days'),
-       ('5eed0003-0000-0000-0000-000000000003', '5eed0002-0000-0000-0000-000000000002', 'Soft tissue surgery',
-        'Planned and emergency soft tissue operations', 8000.00, 90, 30, TRUE,
+       ('5eed0003-0000-0000-0000-000000000003', '5eed0002-0000-0000-0000-000000000002', 'Операция на мягких тканях',
+        'Плановые и экстренные операции на мягких тканях', 8000.00, 90, 30, TRUE,
         now() - INTERVAL '900 days', now() - INTERVAL '900 days'),
-       ('5eed0003-0000-0000-0000-000000000004', '5eed0002-0000-0000-0000-000000000003', 'Teeth cleaning',
-        'Ultrasonic scaling and polishing', 4000.00, 60, 0, TRUE,
+       ('5eed0003-0000-0000-0000-000000000004', '5eed0002-0000-0000-0000-000000000003', 'Чистка зубов',
+        'Ультразвуковое удаление зубного камня и полировка', 4000.00, 60, 0, TRUE,
         now() - INTERVAL '900 days', now() - INTERVAL '900 days'),
        -- Inactive and without appointments: must not appear in the statistics by service.
-       ('5eed0003-0000-0000-0000-000000000005', '5eed0002-0000-0000-0000-000000000001', 'Laser therapy',
-        'Low-level laser therapy session', 2000.00, 30, 0, FALSE,
+       ('5eed0003-0000-0000-0000-000000000005', '5eed0002-0000-0000-0000-000000000001', 'Лазерная терапия',
+        'Сеанс низкоинтенсивной лазерной терапии', 2000.00, 30, 0, FALSE,
         now() - INTERVAL '900 days', now() - INTERVAL '900 days');
 
 INSERT INTO service (id, specialization_id, name, description, base_price, base_duration_min, buffer_after_min,
@@ -116,13 +116,13 @@ SELECT ('5eed0003-0000-0000-0000-' || lpad(n::text, 12, '0'))::uuid,
        buffer,
        now() - INTERVAL '900 days',
        now() - INTERVAL '900 days'
-FROM (VALUES (6, 1, 'Ultrasound', 'Abdominal ultrasound examination', 2800, 30, 0),
-             (7, 1, 'Blood test', 'Blood sampling and laboratory panel', 1800, 20, 10),
-             (8, 2, 'Wound treatment', 'Wound cleaning and suturing', 4500, 60, 30),
-             (9, 3, 'Tooth extraction', 'Dental examination and extraction', 6500, 45, 15),
-             (10, 1, 'Exotic pet consultation', 'Small mammal and bird examination', 2200, 30, 0),
-             (11, 1, 'Follow-up examination', 'Assessment of treatment progress', 900, 20, 10),
-             (12, 2, 'Dressing change', 'Postoperative wound care', 1300, 30, 0))
+FROM (VALUES (6, 1, 'УЗИ', 'Ультразвуковое исследование органов брюшной полости', 2800, 30, 0),
+             (7, 1, 'Анализ крови', 'Забор крови и лабораторное исследование', 1800, 20, 10),
+             (8, 2, 'Обработка раны', 'Обработка раны и наложение швов', 4500, 60, 30),
+             (9, 3, 'Удаление зуба', 'Стоматологический осмотр и удаление зуба', 6500, 45, 15),
+             (10, 1, 'Приём экзотического питомца', 'Осмотр мелких млекопитающих и птиц', 2200, 30, 0),
+             (11, 1, 'Повторный осмотр', 'Оценка результатов лечения', 900, 20, 10),
+             (12, 2, 'Перевязка', 'Уход за послеоперационной раной', 1300, 30, 0))
          AS s(n, specialization_n, name, description, price, minutes, buffer);
 
 -- NULL duration / price = the base values of the service
@@ -143,15 +143,15 @@ INSERT INTO service_species (service_id, species_id, duration_min, price)
 SELECT s.id,
        p.id,
        NULL,
-       CASE WHEN p.name IN ('Rabbit', 'Guinea pig', 'Parrot') THEN round(s.base_price * 0.8, 2) END
+       CASE WHEN p.name IN ('Кролик', 'Морская свинка', 'Попугай') THEN round(s.base_price * 0.8, 2) END
 FROM service s
          CROSS JOIN species p
 WHERE s.id::text LIKE '5eed%'
   AND p.id::text LIKE '5eed%'
   AND ((s.id::text >= '5eed0003-0000-0000-0000-000000000006'
-    AND (s.specialization_id = '5eed0002-0000-0000-0000-000000000001' OR p.name IN ('Dog', 'Cat')))
+    AND (s.specialization_id = '5eed0002-0000-0000-0000-000000000001' OR p.name IN ('Собака', 'Кошка')))
     OR (s.id IN ('5eed0003-0000-0000-0000-000000000001', '5eed0003-0000-0000-0000-000000000002')
-        AND p.name IN ('Guinea pig', 'Ferret')));
+        AND p.name IN ('Морская свинка', 'Хорёк')));
 
 -- Users --------------------------------------------------------------------------------------------------------------
 
@@ -169,21 +169,21 @@ SELECT u.id::uuid,
        u.role,
        now() - make_interval(days => u.age_days),
        now() - make_interval(days => u.age_days)
-FROM (VALUES ('5eed0004-0000-0000-0000-000000000001', 'vet1@seed.chiron.local', 'Anna', 'Sergeevna', 'Ivanova',
+FROM (VALUES ('5eed0004-0000-0000-0000-000000000001', 'vet1@seed.chiron.local', 'Анна', 'Сергеевна', 'Иванова',
               '+79000000001', 'VETERINARIAN', 900),
-             ('5eed0004-0000-0000-0000-000000000002', 'vet2@seed.chiron.local', 'Pavel', NULL, 'Petrov',
+             ('5eed0004-0000-0000-0000-000000000002', 'vet2@seed.chiron.local', 'Павел', NULL, 'Петров',
               '+79000000002', 'VETERINARIAN', 900),
-             ('5eed0004-0000-0000-0000-000000000003', 'vet3@seed.chiron.local', 'Elena', 'Viktorovna', 'Smirnova',
+             ('5eed0004-0000-0000-0000-000000000003', 'vet3@seed.chiron.local', 'Елена', 'Викторовна', 'Смирнова',
               '+79000000003', 'VETERINARIAN', 900),
-             ('5eed0004-0000-0000-0000-000000000004', 'vet4@seed.chiron.local', 'Oleg', NULL, 'Kuznetsov',
+             ('5eed0004-0000-0000-0000-000000000004', 'vet4@seed.chiron.local', 'Олег', NULL, 'Кузнецов',
               '+79000000004', 'VETERINARIAN', 900),
-             ('5eed0004-0000-0000-0000-000000000005', 'vet5@seed.chiron.local', 'Sofia', NULL, 'Orlova',
+             ('5eed0004-0000-0000-0000-000000000005', 'vet5@seed.chiron.local', 'София', NULL, 'Орлова',
               '+79000000005', 'VETERINARIAN', 600),
-             ('5eed0004-0000-0000-0000-000000000006', 'vet6@seed.chiron.local', 'Roman', 'Olegovich', 'Belov',
+             ('5eed0004-0000-0000-0000-000000000006', 'vet6@seed.chiron.local', 'Роман', 'Олегович', 'Белов',
               '+79000000006', 'VETERINARIAN', 500),
-             ('5eed0004-0000-0000-0000-000000000007', 'vet7@seed.chiron.local', 'Alina', NULL, 'Zaitseva',
+             ('5eed0004-0000-0000-0000-000000000007', 'vet7@seed.chiron.local', 'Алина', NULL, 'Зайцева',
               '+79000000007', 'VETERINARIAN', 400),
-             ('5eed0004-0000-0000-0000-000000000008', 'vet8@seed.chiron.local', 'Denis', NULL, 'Savin',
+             ('5eed0004-0000-0000-0000-000000000008', 'vet8@seed.chiron.local', 'Денис', NULL, 'Савин',
               '+79000000008', 'VETERINARIAN', 300))
          AS u(id, email, first_name, middle_name, last_name, phone, role, age_days);
 
@@ -202,10 +202,10 @@ SELECT ('5eed0005-0000-0000-0000-' || lpad(i::text, 12, '0'))::uuid,
        now() - make_interval(days => 1 + i * 137 % 810),
        now() - make_interval(days => 1 + i * 137 % 810)
 FROM generate_series(1, 600) AS i,
-     (SELECT ARRAY ['Ivan', 'Maria', 'Dmitry', 'Olga', 'Sergey', 'Natalia', 'Alexey', 'Irina', 'Mikhail',
-                 'Tatiana', 'Andrey', 'Ekaterina', 'Nikolay', 'Svetlana', 'Artem'] AS first_names,
-             ARRAY ['Sokolov', 'Popova', 'Lebedev', 'Kozlova', 'Novikov', 'Morozova', 'Volkov', 'Pavlova',
-                 'Semenov', 'Golubeva', 'Vinogradov', 'Bogdanova', 'Vorobyov', 'Fedorova', 'Mikhailov']
+     (SELECT ARRAY ['Иван', 'Мария', 'Дмитрий', 'Ольга', 'Сергей', 'Наталья', 'Алексей', 'Ирина', 'Михаил',
+                 'Татьяна', 'Андрей', 'Екатерина', 'Николай', 'Светлана', 'Артём'] AS first_names,
+             ARRAY ['Соколов', 'Попова', 'Лебедев', 'Козлова', 'Новиков', 'Морозова', 'Волков', 'Павлова',
+                 'Семёнов', 'Голубева', 'Виноградов', 'Богданова', 'Воробьёв', 'Фёдорова', 'Михайлов']
                                                                                    AS last_names) AS names;
 
 -- Veterinarians ------------------------------------------------------------------------------------------------------
@@ -213,16 +213,16 @@ FROM generate_series(1, 600) AS i,
 INSERT INTO veterinarian (id, user_id, specialization_id, bio, photo_key, experience_years, is_active,
                           created_at, updated_at)
 VALUES ('5eed0006-0000-0000-0000-000000000001', '5eed0004-0000-0000-0000-000000000001',
-        '5eed0002-0000-0000-0000-000000000001', 'Therapist, also treats rabbits', NULL, 12, TRUE,
+        '5eed0002-0000-0000-0000-000000000001', 'Ветеринарный терапевт, также принимает кроликов', NULL, 12, TRUE,
         now() - INTERVAL '900 days', now() - INTERVAL '900 days'),
        ('5eed0006-0000-0000-0000-000000000002', '5eed0004-0000-0000-0000-000000000002',
-        '5eed0002-0000-0000-0000-000000000001', 'Therapist', NULL, 4, TRUE,
+        '5eed0002-0000-0000-0000-000000000001', 'Ветеринарный терапевт', NULL, 4, TRUE,
         now() - INTERVAL '900 days', now() - INTERVAL '900 days'),
        ('5eed0006-0000-0000-0000-000000000003', '5eed0004-0000-0000-0000-000000000003',
-        '5eed0002-0000-0000-0000-000000000002', 'Surgeon', NULL, 15, TRUE,
+        '5eed0002-0000-0000-0000-000000000002', 'Ветеринарный хирург', NULL, 15, TRUE,
         now() - INTERVAL '900 days', now() - INTERVAL '900 days'),
        ('5eed0006-0000-0000-0000-000000000004', '5eed0004-0000-0000-0000-000000000004',
-        '5eed0002-0000-0000-0000-000000000003', 'Dentist', NULL, 7, TRUE,
+        '5eed0002-0000-0000-0000-000000000003', 'Ветеринарный стоматолог', NULL, 7, TRUE,
         now() - INTERVAL '900 days', now() - INTERVAL '900 days');
 
 INSERT INTO veterinarian (id, user_id, specialization_id, bio, experience_years, created_at, updated_at)
@@ -233,10 +233,10 @@ SELECT ('5eed0006-0000-0000-0000-00000000000' || n)::uuid,
        experience,
        u.created_at,
        u.created_at
-FROM (VALUES (5, 1, 'General practitioner and ultrasound specialist', 6),
-             (6, 2, 'Soft tissue surgeon', 10),
-             (7, 3, 'Veterinary dentist', 5),
-             (8, 1, 'Exotic mammals and birds specialist', 8)) AS v(n, specialization_n, bio, experience)
+FROM (VALUES (5, 1, 'Ветеринарный терапевт и специалист по УЗИ', 6),
+             (6, 2, 'Хирург по мягким тканям', 10),
+             (7, 3, 'Ветеринарный стоматолог', 5),
+             (8, 1, 'Специалист по экзотическим млекопитающим и птицам', 8)) AS v(n, specialization_n, bio, experience)
          JOIN users u ON u.id = ('5eed0004-0000-0000-0000-00000000000' || n)::uuid;
 
 INSERT INTO veterinarian_species_permission (veterinarian_id, species_id)
@@ -258,8 +258,8 @@ WHERE v.id::text BETWEEN '5eed0006-0000-0000-0000-000000000005' AND '5eed0006-00
   AND s.id::text LIKE '5eed%'
   AND CASE
           WHEN v.id = '5eed0006-0000-0000-0000-000000000008'
-              THEN s.name NOT IN ('Dog', 'Cat')
-          ELSE s.name IN ('Dog', 'Cat') END;
+              THEN s.name NOT IN ('Собака', 'Кошка')
+          ELSE s.name IN ('Собака', 'Кошка') END;
 
 -- Monday to Friday 09:00-18:00 with a break 13:00-14:00; the first therapist also works on Saturday 10:00-15:00.
 INSERT INTO work_schedule (veterinarian_id, day_of_week, start_time, end_time, break_start, break_end)
@@ -272,11 +272,11 @@ SELECT '5eed0006-0000-0000-0000-000000000001', 6, '10:00', '15:00', NULL, NULL;
 
 -- The second therapist was on vacation 20-16 days ago: no appointments are generated for these days.
 INSERT INTO schedule_exception (veterinarian_id, type, start_date, end_date, start_time, end_time, reason)
-SELECT '5eed0006-0000-0000-0000-000000000002', 'ABSENCE', today - 20, today - 16, NULL, NULL, 'Vacation'
+SELECT '5eed0006-0000-0000-0000-000000000002', 'ABSENCE', today - 20, today - 16, NULL, NULL, 'Отпуск'
 FROM (SELECT (now() AT TIME ZONE 'Europe/Moscow')::date AS today) AS t;
 
 INSERT INTO schedule_exception (veterinarian_id, type, start_date, end_date, start_time, end_time, reason)
-SELECT v.id, 'ABSENCE', today - 180 + n, today - 174 + n, NULL, NULL, 'Annual leave'
+SELECT v.id, 'ABSENCE', today - 180 + n, today - 174 + n, NULL, NULL, 'Ежегодный отпуск'
 FROM veterinarian v
          CROSS JOIN (VALUES (0), (-365)) AS periods(n)
          CROSS JOIN (SELECT (now() AT TIME ZONE 'Europe/Moscow')::date AS today) AS t
@@ -288,7 +288,7 @@ SELECT '5eed0006-0000-0000-0000-000000000005',
        today + 3,
        TIME '10:00',
        TIME '15:00',
-       'Training in the afternoon'
+       'Обучение во второй половине дня'
 FROM (SELECT (now() AT TIME ZONE 'Europe/Moscow')::date AS today) AS t;
 
 -- Pets ---------------------------------------------------------------------------------------------------------------
@@ -304,8 +304,8 @@ SELECT ('5eed0007-0000-0000-0000-' || lpad(i::text, 12, '0'))::uuid,
        species.base_weight + (i % 7) * 0.1,
        CASE WHEN i % 2 = 0 THEN 'MALE' ELSE 'FEMALE' END,
        CASE
-           WHEN i % 5 = 0 THEN 'Sensitive to handling; allow time to settle'
-           WHEN i % 7 = 0 THEN 'Food allergy; owner follows a special diet' END,
+           WHEN i % 5 = 0 THEN 'Чувствителен к прикосновениям; нужно время для адаптации'
+           WHEN i % 7 = 0 THEN 'Пищевая аллергия; владелец соблюдает специальную диету' END,
        i % 37 = 0,
        least(owner.created_at + make_interval(days => i % 5), now()),
        least(owner.created_at + make_interval(days => i % 5), now())
@@ -328,9 +328,9 @@ FROM generate_series(1, 900) AS i
                                         WHEN i % 20 = 19 THEN 0.3
                                         ELSE 1 END         AS base_weight)
     AS species,
-     (SELECT ARRAY ['Rex', 'Bella', 'Murka', 'Barsik', 'Krosh', 'Charlie', 'Luna', 'Max', 'Simba', 'Nyusha',
-                 'Bunny', 'Rocky', 'Daisy', 'Tom', 'Snowball', 'Buddy', 'Molly', 'Felix', 'Coco', 'Oliver',
-                 'Toby', 'Lucy', 'Leo', 'Fluffy'] AS names) AS n;
+     (SELECT ARRAY ['Рекс', 'Белла', 'Мурка', 'Барсик', 'Крош', 'Чарли', 'Луна', 'Макс', 'Симба', 'Нюша',
+                 'Боня', 'Рокки', 'Дейзи', 'Том', 'Снежок', 'Бадди', 'Молли', 'Феликс', 'Коко', 'Оливер',
+                 'Тоби', 'Люси', 'Лео', 'Пушок'] AS names) AS n;
 
 -- Appointments -------------------------------------------------------------------------------------------------------
 
@@ -487,16 +487,16 @@ SELECT veterinarian_id,
        status,
        price,
        CASE
-           WHEN r % 4 = 0 THEN (ARRAY ['Please call before the visit', 'Reduced appetite for two days',
-               'Routine preventive visit', 'Recheck after treatment'])[1 + r % 7 % 4] END,
+           WHEN r % 4 = 0 THEN (ARRAY ['Пожалуйста, позвоните перед приёмом', 'Снижен аппетит в течение двух дней',
+               'Плановый профилактический осмотр', 'Повторный осмотр после лечения'])[1 + r % 7 % 4] END,
        CASE
-           WHEN status = 'COMPLETED' THEN (ARRAY ['Examination completed; preventive care discussed',
-               'Condition improved; continue treatment for seven days', 'Procedure tolerated well; recheck recommended',
-               'Results reviewed with owner; monitor appetite and activity'])[1 + r % 4] END,
+           WHEN status = 'COMPLETED' THEN (ARRAY ['Осмотр проведён; даны рекомендации по профилактике',
+               'Состояние улучшилось; продолжить лечение в течение семи дней', 'Процедура перенесена хорошо; рекомендован повторный осмотр',
+               'Результаты обсуждены с владельцем; наблюдать за аппетитом и активностью'])[1 + r % 4] END,
        CASE WHEN status = 'CANCELLED' THEN CASE WHEN r % 2 = 0 THEN owner_id ELSE vet_user_id END END,
        CASE WHEN status = 'CANCELLED' THEN created_at + (least(start_at, now()) - created_at) / 2 END,
        CASE
-           WHEN status = 'CANCELLED' THEN CASE WHEN r % 2 = 0 THEN 'Owner cannot come' ELSE 'Veterinarian is ill' END
+           WHEN status = 'CANCELLED' THEN CASE WHEN r % 2 = 0 THEN 'Владелец не может прийти' ELSE 'Врач заболел' END
            END,
        created_at,
        CASE WHEN status = 'PENDING' THEN created_at ELSE greatest(created_at, least(end_at, now())) END
@@ -524,8 +524,8 @@ INSERT INTO vaccination (pet_id, appointment_id, name, administered_on, next_due
 SELECT DISTINCT ON (a.pet_id) a.pet_id,
                               a.id,
                               CASE
-                                  WHEN mod(abs(hashtext(a.pet_id::text)::bigint), 2) = 0 THEN 'Rabies'
-                                  ELSE 'Complex vaccine' END,
+                                  WHEN mod(abs(hashtext(a.pet_id::text)::bigint), 2) = 0 THEN 'Бешенство'
+                                  ELSE 'Комплексная вакцина' END,
                               (a.start_at AT TIME ZONE 'Europe/Moscow')::date,
                               (a.start_at AT TIME ZONE 'Europe/Moscow')::date + 365
 FROM appointment a
@@ -537,7 +537,7 @@ ORDER BY a.pet_id, a.start_at DESC;
 -- Imported vaccination passports also give new patients overdue, upcoming and later booster dates.
 INSERT INTO vaccination (pet_id, name, administered_on, next_due_on)
 SELECT p.id,
-       'Complex vaccine',
+       'Комплексная вакцина',
        coalesce(v.administered_on - 365, today - 365 + (right(p.id::text, 4)::int % 120 - 60)),
        coalesce(v.administered_on, today + (right(p.id::text, 4)::int % 120 - 60))
 FROM pet p
