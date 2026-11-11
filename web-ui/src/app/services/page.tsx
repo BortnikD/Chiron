@@ -17,10 +17,13 @@ function ServicesContent() {
   const searchParams = useSearchParams();
   const { isAuthenticated, role } = useAuth();
 
+  const openParam = searchParams.get('open') || searchParams.get('sel');
+  const specParam = searchParams.get('spec');
+  const speciesParam = searchParams.get('species');
+
   const {
     specializations,
     speciesList,
-    veterinarians,
     selectedSpec,
     setSelectedSpec,
     selectedSpecies,
@@ -35,6 +38,7 @@ function ServicesContent() {
     activeSpeciesTab,
     setActiveSpeciesTab,
     nearestSlots,
+    loadingSlots,
     loading,
     error,
     reload,
@@ -43,63 +47,66 @@ function ServicesContent() {
     hasFilters,
     resetFilters,
     filteredServices,
-  } = useServicesCatalog(searchParams.get('open'), searchParams.get('spec'));
+  } = useServicesCatalog(openParam, specParam, speciesParam);
 
   const content = (
-    <div className="content-col grow">
-      <ServicesFilters
-        specializations={specializations}
-        speciesList={speciesList}
-        selectedSpec={selectedSpec}
-        onSelectSpec={setSelectedSpec}
-        selectedSpecies={selectedSpecies}
-        onSelectSpecies={setSelectedSpecies}
-        searchQuery={searchQuery}
-        onSearchChange={setSearchQuery}
-        sortBy={sortBy}
-        onSortChange={setSortBy}
-        hasFilters={hasFilters}
-        onReset={resetFilters}
-      />
+    <div className="content-row">
+      <div className="content-col grow">
+        <ServicesFilters
+          specializations={specializations}
+          speciesList={speciesList}
+          selectedSpec={selectedSpec}
+          onSelectSpec={setSelectedSpec}
+          selectedSpecies={selectedSpecies}
+          onSelectSpecies={setSelectedSpecies}
+          searchQuery={searchQuery}
+          onSearchChange={setSearchQuery}
+          sortBy={sortBy}
+          onSortChange={setSortBy}
+          hasFilters={hasFilters}
+          onReset={resetFilters}
+        />
 
-      {error && (
-        <div className="alert alert-destructive" role="alert">
-          <AlertCircle className="ic" />
-          <div className="row between wrap grow" style={{ gap: '8px', alignItems: 'center' }}>
-            <span>{error}</span>
-            <button type="button" className="btn btn-outline btn-sm" onClick={reload}>
-              Повторить
-            </button>
+        {error && (
+          <div className="alert" role="alert">
+            <AlertCircle className="ic" />
+            <div className="row between wrap grow" style={{ gap: '8px' }}>
+              <span>{error}</span>
+              <button type="button" className="btn btn-outline btn-sm" onClick={reload}>
+                Повторить
+              </button>
+            </div>
           </div>
-        </div>
-      )}
+        )}
 
-      <div className="content-row">
         <ServicesGrid
           services={filteredServices}
           selectedService={selectedService}
           onSelectService={setSelectedService}
           specsMap={specsMap}
           loading={loading}
+          hasFilters={hasFilters}
+          onReset={resetFilters}
+          isAuthenticated={isAuthenticated}
         />
-
-        {selectedService && (
-          <ServiceDetailIsland
-            service={selectedService}
-            onClose={() => setSelectedService(null)}
-            specsMap={specsMap}
-            speciesMap={speciesMap}
-            speciesList={speciesList}
-            serviceSpeciesList={serviceSpeciesList}
-            activeSpeciesTab={activeSpeciesTab}
-            onSpeciesTabChange={setActiveSpeciesTab}
-            nearestSlots={nearestSlots}
-            veterinarians={veterinarians}
-            isAuthenticated={isAuthenticated}
-            role={role}
-          />
-        )}
       </div>
+
+      {selectedService && (
+        <ServiceDetailIsland
+          service={selectedService}
+          onClose={() => setSelectedService(null)}
+          specsMap={specsMap}
+          speciesMap={speciesMap}
+          speciesList={speciesList}
+          serviceSpeciesList={serviceSpeciesList}
+          activeSpeciesTab={activeSpeciesTab}
+          onSpeciesTabChange={setActiveSpeciesTab}
+          nearestSlots={nearestSlots}
+          loadingSlots={loadingSlots}
+          isAuthenticated={isAuthenticated}
+          role={role}
+        />
+      )}
     </div>
   );
 
@@ -126,8 +133,12 @@ export default function ServicesPage() {
   return (
     <Suspense
       fallback={
-        <div className="p-8 text-center text-xs text-[var(--muted-foreground)]">
-          Загрузка каталога услуг...
+        <div className="app" style={{ flexDirection: 'column' }}>
+          <div className="island grow">
+            <div className="empty">
+              <span className="small muted">Загрузка каталога услуг...</span>
+            </div>
+          </div>
         </div>
       }
     >

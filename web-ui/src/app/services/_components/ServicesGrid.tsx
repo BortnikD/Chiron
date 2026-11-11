@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { ClipboardList, Clock, Inbox } from 'lucide-react';
+import { ClipboardList, Clock } from 'lucide-react';
 import { formatCurrency, getSpecTone } from '@/shared/lib';
 import type { ServicesGridProps } from './types';
 
@@ -11,29 +11,39 @@ export function ServicesGrid({
   onSelectService,
   specsMap,
   loading = false,
+  hasFilters = false,
+  onReset,
+  isAuthenticated = false,
 }: ServicesGridProps) {
   return (
     <section className="island grow">
       <div className="island-head">
         <span className="island-title">
           <ClipboardList className="ic" />
-          Услуги <span className="count">{services.length}</span>
+          {isAuthenticated ? 'Услуги' : 'Услуги клиники'}{' '}
+          <span className="count">{services.length}</span>
         </span>
+        {!isAuthenticated && <span className="small muted">Только активные услуги</span>}
       </div>
       <div className="island-body">
         {services.length === 0 ? (
           <div className="empty">
             <div className="empty-art">
-              <Inbox className="ic ic-40" />
+              <ClipboardList className="ic ic-40" />
             </div>
             <span className="empty-title">
-              {loading ? 'Загрузка услуг...' : 'Услуги не найдены'}
+              {loading ? 'Загрузка услуг...' : 'Нет услуг по фильтру'}
             </span>
-            <span>
-              {loading
-                ? 'Получение списка услуг клиники...'
-                : 'Попробуйте изменить параметры фильтрации или поисковый запрос'}
-            </span>
+            {loading ? (
+              <span>Получение списка услуг клиники...</span>
+            ) : (
+              hasFilters &&
+              onReset && (
+                <button type="button" className="btn btn-outline" onClick={onReset}>
+                  Сбросить фильтры
+                </button>
+              )
+            )}
           </div>
         ) : (
           <div className="cards">
@@ -41,7 +51,8 @@ export function ServicesGrid({
               const isSel = selectedService?.id === svc.id;
               const tone = getSpecTone(svc.specializationId);
               const specName = specsMap[svc.specializationId] || 'Терапия';
-              const duration = svc.effectiveDurationMin ?? svc.baseDurationMin ?? svc.durationMin ?? 30;
+              const duration =
+                svc.effectiveDurationMin ?? svc.baseDurationMin ?? svc.durationMin ?? 30;
               const price = svc.effectivePrice ?? svc.basePrice;
 
               return (
@@ -50,7 +61,6 @@ export function ServicesGrid({
                   type="button"
                   className={`tcard tone-${tone} ${isSel ? 'sel' : ''}`}
                   onClick={() => onSelectService(svc)}
-                  style={{ textAlign: 'left', cursor: 'pointer' }}
                 >
                   <span className="t-badge" style={{ alignSelf: 'flex-start' }}>
                     {specName}
@@ -65,7 +75,9 @@ export function ServicesGrid({
                       {duration} мин
                     </span>
                     <span className="tcard-price">
-                      {svc.effectivePrice != null ? formatCurrency(price) : `от ${formatCurrency(price)}`}
+                      {svc.effectivePrice != null
+                        ? formatCurrency(price)
+                        : `от ${formatCurrency(price)}`}
                     </span>
                   </div>
                 </button>

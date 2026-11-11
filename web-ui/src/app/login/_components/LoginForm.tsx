@@ -1,9 +1,9 @@
 'use client';
 
-import React, { useState } from 'react';
+import { useState } from 'react';
 import Link from 'next/link';
-import { LogIn, Eye, EyeOff } from 'lucide-react';
-import { LoginFormProps } from './types';
+import { Eye, EyeOff, LogIn } from 'lucide-react';
+import type { LoginFormProps } from './types';
 
 const IS_DEMO_BACKEND = Boolean(process.env.NEXT_PUBLIC_API_PROXY_TARGET?.includes(':8081'));
 const DEV_ADMIN_EMAIL = IS_DEMO_BACKEND ? 'admin@demo.chiron.local' : 'admin@chiron.local';
@@ -23,7 +23,7 @@ export function LoginForm({
 
   return (
     <>
-      <form onSubmit={onSubmit} className="flex flex-col gap-4">
+      <form onSubmit={onSubmit} className="col" style={{ gap: '18px' }}>
         <div className="field">
           <label className="field-label" htmlFor="l-email">
             Email
@@ -36,7 +36,7 @@ export function LoginForm({
             autoComplete="email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            placeholder="name@example.com"
+            placeholder="name@example.ru"
           />
         </div>
 
@@ -44,11 +44,11 @@ export function LoginForm({
           <label className="field-label" htmlFor="l-pass">
             Пароль
           </label>
-          <div className="relative">
+          <div className="pass-wrap">
             <input
               id="l-pass"
               type={showPassword ? 'text' : 'password'}
-              className="input pr-10"
+              className="input"
               required
               autoComplete="current-password"
               aria-describedby={isDev ? 'l-pass-hint' : undefined}
@@ -58,12 +58,12 @@ export function LoginForm({
             />
             <button
               type="button"
-              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[var(--muted-foreground)] hover:text-[var(--foreground)] transition-colors p-1"
+              className="pass-toggle"
               onClick={() => setShowPassword((prev) => !prev)}
               title={showPassword ? 'Скрыть пароль' : 'Показать пароль'}
               aria-label={showPassword ? 'Скрыть пароль' : 'Показать пароль'}
             >
-              {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+              {showPassword ? <EyeOff className="ic" /> : <Eye className="ic" />}
             </button>
           </div>
           {isDev && (
@@ -76,7 +76,7 @@ export function LoginForm({
         <button
           type="submit"
           disabled={loading}
-          className="btn btn-primary btn-lg mt-2 w-full justify-center"
+          className="btn btn-primary btn-lg btn-block"
         >
           {loading ? (
             <span>Выполняется вход...</span>
@@ -91,7 +91,7 @@ export function LoginForm({
 
       {isDev && (
         <p className="small muted">
-          Демо-аккаунты: client1@seed.chiron.local (клиент), vet2@seed.chiron.local (врач), {DEV_ADMIN_EMAIL} (админ).
+          Демо-аккаунты: client1@seed.chiron.local, vet2@seed.chiron.local, {DEV_ADMIN_EMAIL}.
         </p>
       )}
 

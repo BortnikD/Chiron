@@ -3,11 +3,31 @@
 import React from 'react';
 import Link from 'next/link';
 import { Phone, Clock, MapPin } from 'lucide-react';
+import { ChironLogo } from '@/components/ui/ChironLogo';
+import { getHomeByRole } from '@/shared/lib';
+import type { UserRole } from '@/shared/types';
 
-export const LandingFooter: React.FC = () => {
+interface LandingFooterProps {
+  isAuthenticated?: boolean;
+  role?: UserRole | null;
+}
+
+export const LandingFooter: React.FC<LandingFooterProps> = ({
+  isAuthenticated = false,
+  role = null,
+}) => {
+  const bookHref =
+    isAuthenticated && role
+      ? role === 'CLIENT'
+        ? '/client/book'
+        : getHomeByRole(role)
+      : `/login?next=${encodeURIComponent('/client/book')}`;
+
+  const cabinetHref = isAuthenticated && role ? getHomeByRole(role) : '/login';
+
   return (
     <footer
-      className="island shrink-0"
+      className="island"
       style={{
         flex: 'none',
         padding: '18px 24px',
@@ -19,16 +39,13 @@ export const LandingFooter: React.FC = () => {
       aria-label="Подвал сайта"
     >
       <div
-        className="row wrap"
+        className="row between wrap"
         style={{
-          justifyContent: 'space-between',
-          alignItems: 'center',
           gap: '12px',
           borderBottom: '1px solid var(--border)',
           paddingBottom: '12px',
         }}
       >
-        {/* Навигационные ссылки */}
         <nav
           className="row wrap"
           style={{ gap: '16px', fontSize: '13.5px', fontWeight: 500 }}
@@ -43,44 +60,48 @@ export const LandingFooter: React.FC = () => {
           <Link href="/veterinarians" className="muted" style={{ textDecoration: 'none' }}>
             Специалисты
           </Link>
-          <Link href="/client/book" className="muted" style={{ textDecoration: 'none' }}>
+          <Link href={bookHref} className="muted" style={{ textDecoration: 'none' }}>
             Запись на приём
           </Link>
-          <Link href="/login" className="muted" style={{ textDecoration: 'none' }}>
+          <Link href={cabinetHref} className="muted" style={{ textDecoration: 'none' }}>
             Личный кабинет
           </Link>
         </nav>
 
-        {/* Контакты и режим работы */}
         <div className="row wrap" style={{ gap: '16px', fontSize: '13px' }}>
           <div className="row" style={{ gap: '6px' }}>
-            <Phone className="ic" style={{ width: '15px', height: '15px', color: 'var(--primary-text)' }} />
-            <span>+7 863 200-10-00 (08:00–21:00)</span>
+            <Phone
+              className="ic"
+              style={{ width: '15px', height: '15px', color: 'var(--primary-text)' }}
+              aria-hidden="true"
+            />
+            <span>+7 863 200-10-00</span>
           </div>
           <div className="row" style={{ gap: '6px' }}>
-            <Clock className="ic" style={{ width: '15px', height: '15px', color: 'var(--primary-text)' }} />
-            <span>Пн–Пт 9:00–21:00, Сб–Вс 10:00–18:00</span>
+            <Clock
+              className="ic"
+              style={{ width: '15px', height: '15px', color: 'var(--primary-text)' }}
+              aria-hidden="true"
+            />
+            <span>Пн–Пт 9:00–18:00, Сб 10:00–15:00</span>
           </div>
         </div>
       </div>
 
-      {/* Копирайт и локация */}
       <div
-        className="row wrap"
+        className="row between wrap muted"
         style={{
-          justifyContent: 'space-between',
-          alignItems: 'center',
           gap: '8px',
-          color: 'var(--muted-foreground)',
           fontSize: '12.5px',
         }}
       >
         <div className="row" style={{ gap: '6px' }}>
-          <MapPin className="ic" style={{ width: '14px', height: '14px' }} />
+          <MapPin className="ic" style={{ width: '14px', height: '14px' }} aria-hidden="true" />
           <span>г. Ростов-на-Дону, ул. Пушкинская, 100</span>
         </div>
-        <div>
-          © {new Date().getFullYear()} Chiron Veterinary Clinic · Все права защищены
+        <div className="row" style={{ gap: '6px' }}>
+          <ChironLogo size={15} />
+          <span>© 2026 Chiron Veterinary Clinic · Все права защищены</span>
         </div>
       </div>
     </footer>

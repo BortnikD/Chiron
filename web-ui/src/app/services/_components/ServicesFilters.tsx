@@ -1,8 +1,18 @@
 'use client';
 
-import React from 'react';
-import { ChevronDown, Search, X } from 'lucide-react';
-import { ServicesFiltersProps, ServiceSortOption } from './types';
+import React, { useMemo } from 'react';
+import { Search, X } from 'lucide-react';
+import { FilterDropdown, type FilterDropdownOption } from '@/shared/components';
+import { SPECIALIZATION_NAMES_RU } from '@/utils/doctorHelpers';
+import type { ServicesFiltersProps, ServiceSortOption } from './types';
+
+const SORT_OPTIONS: FilterDropdownOption[] = [
+  { value: 'default', label: 'По умолчанию' },
+  { value: 'price-asc', label: 'Сначала дешевле' },
+  { value: 'price-desc', label: 'Сначала дороже' },
+  { value: 'duration-asc', label: 'Короче по времени' },
+  { value: 'duration-desc', label: 'Дольше по времени' },
+];
 
 export function ServicesFilters({
   specializations,
@@ -18,124 +28,76 @@ export function ServicesFilters({
   hasFilters,
   onReset,
 }: ServicesFiltersProps) {
+  const specOptions = useMemo<FilterDropdownOption[]>(
+    () => [
+      { value: 'ALL', label: 'Все специализации' },
+      ...specializations.map((sp) => ({
+        value: sp.id,
+        label: SPECIALIZATION_NAMES_RU[sp.name] || SPECIALIZATION_NAMES_RU[sp.id] || sp.name,
+      })),
+    ],
+    [specializations]
+  );
+
+  const speciesOptions = useMemo<FilterDropdownOption[]>(
+    () => [
+      { value: 'ALL', label: 'Все виды' },
+      ...speciesList.map((sp) => ({ value: sp.id, label: sp.name })),
+    ],
+    [speciesList]
+  );
+
   return (
     <section className="island filters" aria-label="Фильтры">
-      {/* Сегментные фильтры категорий / специализаций */}
-      <div className="field" style={{ width: '100%' }}>
-        <span className="field-label">Специализация</span>
-        <div className="seg" role="tablist" style={{ overflowX: 'auto', maxWidth: '100%' }}>
-          <button
-            type="button"
-            role="tab"
-            aria-selected={selectedSpec === 'ALL'}
-            className={`seg-item seg-btn ${selectedSpec === 'ALL' ? 'on' : ''}`}
-            onClick={() => onSelectSpec('ALL')}
-          >
-            Все специализации
-          </button>
-          {specializations.map((sp) => (
-            <button
-              key={sp.id}
-              type="button"
-              role="tab"
-              aria-selected={selectedSpec === sp.id}
-              className={`seg-item seg-btn ${selectedSpec === sp.id ? 'on' : ''}`}
-              onClick={() => onSelectSpec(sp.id)}
-            >
-              {sp.name}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* Селектор вида животного */}
       <div className="field">
-        <label className="field-label" htmlFor="sf-species">
-          Вид животного
-        </label>
-        <div className="dd" style={{ position: 'relative' }}>
-          <select
-            id="sf-species"
-            className="select dd-btn"
-            value={selectedSpecies}
-            onChange={(e) => onSelectSpecies(e.target.value)}
-            style={{ appearance: 'none', paddingRight: '28px', cursor: 'pointer' }}
-          >
-            <option value="ALL">Все виды</option>
-            {speciesList.map((sp) => (
-              <option key={sp.id} value={sp.id}>
-                {sp.name}
-              </option>
-            ))}
-          </select>
-          <ChevronDown
-            className="ic"
-            style={{
-              position: 'absolute',
-              right: '8px',
-              top: '50%',
-              transform: 'translateY(-50%)',
-              pointerEvents: 'none',
-              width: '14px',
-              height: '14px',
-            }}
-          />
-        </div>
+        <span className="field-label">Специализация</span>
+        <FilterDropdown
+          id="sf-spec"
+          ariaLabel="Специализация"
+          value={selectedSpec}
+          options={specOptions}
+          onChange={onSelectSpec}
+          placeholder="Все специализации"
+        />
       </div>
 
-      {/* Сортировка по цене / длительности */}
+      <div className="field">
+        <span className="field-label">Вид животного</span>
+        <FilterDropdown
+          id="sf-species"
+          ariaLabel="Вид животного"
+          value={selectedSpecies}
+          options={speciesOptions}
+          onChange={onSelectSpecies}
+          placeholder="Все виды"
+        />
+      </div>
+
       <div className="field">
         <span className="field-label">Сортировка</span>
-        <div className="dd" style={{ position: 'relative' }}>
-          <select
-            className="select dd-btn"
-            value={sortBy}
-            onChange={(e) => onSortChange(e.target.value as ServiceSortOption)}
-            style={{ appearance: 'none', paddingRight: '28px', cursor: 'pointer' }}
-          >
-            <option value="default">По умолчанию</option>
-            <option value="price-asc">Сначала дешевле</option>
-            <option value="price-desc">Сначала дороже</option>
-            <option value="duration-asc">По длительности (короткие)</option>
-            <option value="duration-desc">По длительности (длинные)</option>
-          </select>
-          <ChevronDown
-            className="ic"
-            style={{
-              position: 'absolute',
-              right: '8px',
-              top: '50%',
-              transform: 'translateY(-50%)',
-              pointerEvents: 'none',
-              width: '14px',
-              height: '14px',
-            }}
-          />
-        </div>
+        <FilterDropdown
+          id="sf-sort"
+          ariaLabel="Сортировка"
+          value={sortBy}
+          options={SORT_OPTIONS}
+          onChange={(val) => onSortChange(val as ServiceSortOption)}
+        />
       </div>
 
-      {/* Поиск по названию / описанию */}
-      <div className="field" style={{ flex: 1, minWidth: '220px' }}>
-        <span className="field-label">Поиск</span>
-        <div className="input-icon" style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
-          <Search
-            className="ic"
-            style={{
-              position: 'absolute',
-              left: '10px',
-              width: '15px',
-              height: '15px',
-              color: 'var(--muted-foreground)',
-              pointerEvents: 'none',
-            }}
-          />
+      <div className="field" style={{ flex: '1 1 200px', minWidth: 0 }}>
+        <label className="field-label" htmlFor="sf-search">
+          Поиск
+        </label>
+        <div className="input-icon">
+          <Search className="ic" />
           <input
+            id="sf-search"
             type="text"
-            placeholder="Поиск по названию или описанию..."
+            placeholder="Название или описание..."
             value={searchQuery}
             onChange={(e) => onSearchChange(e.target.value)}
             className="input"
-            style={{ paddingLeft: '34px', width: '100%' }}
+            style={{ paddingRight: searchQuery ? '32px' : undefined }}
           />
           {searchQuery && (
             <button
@@ -144,25 +106,25 @@ export function ServicesFilters({
               className="btn btn-ghost btn-icon btn-sm"
               style={{
                 position: 'absolute',
-                right: '6px',
-                width: '24px',
-                height: '24px',
+                right: '4px',
+                width: '26px',
+                height: '26px',
               }}
               title="Очистить поиск"
+              aria-label="Очистить поиск"
             >
-              <X className="ic" style={{ width: '12px', height: '12px' }} />
+              <X style={{ width: '13px', height: '13px' }} />
             </button>
           )}
         </div>
       </div>
 
-      {/* Кнопка сброса при активных фильтрах */}
       {hasFilters && (
         <button
           type="button"
           className="btn btn-ghost btn-sm"
           onClick={onReset}
-          style={{ alignSelf: 'flex-end', height: '34px' }}
+          style={{ marginBottom: '3px' }}
         >
           Сбросить
         </button>

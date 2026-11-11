@@ -1,18 +1,28 @@
-import React from 'react';
+import type { FormEvent, ReactNode } from 'react';
 
 export type AuthMode = 'login' | 'register';
 
 export interface RegisterFormData {
   firstName: string;
   lastName: string;
-  middleName?: string | undefined;
+  middleName: string;
   email: string;
   phone: string;
   password: string;
   confirmPassword: string;
 }
 
-export type RegisterPayload = Omit<RegisterFormData, 'confirmPassword'>;
+export type RegisterField = keyof RegisterFormData;
+export type RegisterFieldErrors = Partial<Record<RegisterField, string>>;
+
+export interface RegisterPayload {
+  firstName: string;
+  lastName: string;
+  middleName?: string;
+  email: string;
+  phone: string;
+  password: string;
+}
 
 export interface LoginFormProps {
   email: string;
@@ -20,7 +30,7 @@ export interface LoginFormProps {
   password: string;
   setPassword: (password: string) => void;
   loading: boolean;
-  onSubmit: (e: React.FormEvent) => void;
+  onSubmit: (e: FormEvent) => void;
   onSwitchToRegister: () => void;
   isDev?: boolean;
 }
@@ -30,6 +40,8 @@ export interface RegisterFormProps {
   onSubmit: (payload: RegisterPayload) => void | Promise<void>;
   onSwitchToLogin: () => void;
   setError: (error: string | null) => void;
+  serverFieldErrors?: RegisterFieldErrors;
+  clearServerFieldError?: (field: RegisterField) => void;
 }
 
 export interface DevAccount {
@@ -47,5 +59,5 @@ export interface QuickDevLoginPanelProps {
 }
 
 export interface AuthBrandSideProps {
-  children?: React.ReactNode;
+  children?: ReactNode;
 }

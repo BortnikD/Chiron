@@ -1,12 +1,12 @@
 'use client';
 
-import React from 'react';
+import type { CSSProperties } from 'react';
 import { PawPrint } from 'lucide-react';
 import { ChironLogo } from '@/components/ui/ChironLogo';
 import { EcgPulseSvg, HeroPetsSvg } from '@/components/ui/HeroPetsSvg';
-import { AuthBrandSideProps } from './types';
+import type { AuthBrandSideProps } from './types';
 
-type PawStyle = React.CSSProperties & { '--r': string };
+type PawStyle = CSSProperties & { '--r': string };
 
 const PAW_PRINTS: ReadonlyArray<PawStyle> = [
   { left: '54%', top: '16%', '--r': 'rotate(48deg)', animationDelay: '0s' },
@@ -19,20 +19,17 @@ const PAW_PRINTS: ReadonlyArray<PawStyle> = [
 export function AuthBrandSide({ children }: AuthBrandSideProps) {
   return (
     <section className="island auth-side" aria-label="О клинике и демо-режим">
-      {/* Фоновые графические эффекты */}
       <div className="hero-fx" aria-hidden="true">
         <div className="hero-grid" />
         <div className="hero-glow" />
 
-        {/* Декоративные следы лапок с CSS переменной --r для вращения */}
         {PAW_PRINTS.map((pawStyle, index) => (
           <div key={index} className="paw" style={pawStyle}>
-            <PawPrint className="w-6 h-6" />
+            <PawPrint aria-hidden="true" />
           </div>
         ))}
       </div>
 
-      {/* Логотип Chiron согласно прототипу Main.html */}
       <div className="brand">
         <div className="brand-mark">
           <ChironLogo size={20} />
@@ -43,7 +40,6 @@ export function AuthBrandSide({ children }: AuthBrandSideProps) {
         </div>
       </div>
 
-      {/* Заголовок, описание и анимированная иллюстрация питомцев */}
       <div className="auth-side-hero">
         <EcgPulseSvg className="pulse-line auth-side-pulse" />
 
@@ -60,7 +56,7 @@ export function AuthBrandSide({ children }: AuthBrandSideProps) {
           <HeroPetsSvg
             idPrefix="as"
             className="auth-side-svg"
-            viewBox="55 35 465 400"
+            viewBox="40 35 520 400"
             role="img"
             ariaLabel="Кошка и собака — пациенты клиники"
             animated

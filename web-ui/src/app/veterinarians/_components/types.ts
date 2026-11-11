@@ -1,6 +1,11 @@
 import type { UserRole } from '@/shared/types';
-import type { Veterinarian, Specialization, Species } from '@/modules/clinic/types';
-import type { WorkSchedule, ScheduleException } from '@/modules/admin/types';
+import type {
+  Veterinarian,
+  Specialization,
+  Species,
+  WorkSchedule,
+  ScheduleException,
+} from '@/modules/clinic/types';
 
 export interface VeterinariansFiltersProps {
   specializations: Specialization[];
@@ -22,6 +27,9 @@ export interface VeterinariansGridProps {
   specsMap: Record<string, string>;
   speciesMap: Record<string, string>;
   vetPermissions: Record<string, string[]>;
+  loading?: boolean;
+  hasFilters?: boolean;
+  onReset?: () => void;
 }
 
 export interface VeterinarianDetailIslandProps {

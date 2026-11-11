@@ -6,64 +6,40 @@ import {
   ClipboardList,
   ChevronRight,
   Stethoscope,
-  Sparkles,
   CalendarPlus,
   Clock,
-  AlertCircle,
 } from 'lucide-react';
 import { formatCurrency, getSpecTone, toIdNameMap } from '@/shared/lib';
-import { SPECIALIZATION_NAMES_RU } from '@/utils/doctorHelpers';
+import { SPECIALIZATION_NAMES_RU, getDoctorDisplay } from '@/utils/doctorHelpers';
 import type { Service } from '@/modules/clinic/types';
-import type { LandingServicesSectionProps, ClinicDirection, PopularOffer } from './types';
-
-const DEFAULT_DIRECTIONS: ClinicDirection[] = [
-  { id: 'ther', name: 'Терапия', who: 'Первичный осмотр и диагностика' },
-  { id: 'surg', name: 'Хирургия', who: 'Плановые и срочные операции' },
-  { id: 'dent', name: 'Стоматология', who: 'УЗ-чистка и санация полости' },
-  { id: 'derm', name: 'Дерматология', who: 'Диагностика кожи и шерсти' },
-  { id: 'opht', name: 'Офтальмология', who: 'Осмотр глаз и тонометрия' },
-  { id: 'prev', name: 'Профилактика', who: 'Вакцинация и паспорт прививок' },
-];
-
-const FEATURED_SERVICES: PopularOffer[] = [
-  {
-    spec: 'ther',
-    specName: 'Терапия',
-    name: 'Первичный осмотр',
-    desc: 'Осмотр, сбор анамнеза, план обследования и лечения.',
-    dur: 30,
-    price: formatCurrency(1500),
-  },
-  {
-    spec: 'surg',
-    specName: 'Хирургия',
-    name: 'Стерилизация и кастрация',
-    desc: 'Плановые операции под ингаляционным наркозом с мониторингом.',
-    dur: 60,
-    price: formatCurrency(4500),
-  },
-  {
-    spec: 'dent',
-    specName: 'Стоматология',
-    name: 'Ультразвуковая чистка зубов',
-    desc: 'Снятие зубного камня, полировка, санация ротовой полости.',
-    dur: 40,
-    price: formatCurrency(3000),
-  },
-];
+import type { LandingServicesSectionProps, PopularOffer } from './types';
 
 export const LandingServicesSection: React.FC<LandingServicesSectionProps> = ({
   services = [],
+  vets = [],
   specializations = [],
-  error = null,
+  isAuthenticated = false,
 }) => {
   const specsMap = useMemo(() => toIdNameMap(specializations), [specializations]);
 
-  const popularOffers: PopularOffer[] = useMemo(() => {
-    if (services.length === 0) {
-      return FEATURED_SERVICES;
-    }
+  const specDoctors = useMemo(() => {
+    const activeVets = vets.filter((v) => v.isActive !== false);
+    return specializations.map((sp) => {
+      const matching = activeVets.filter((v) => v.specializationId === sp.id);
+      const who =
+        matching.length > 0
+          ? matching.map((v) => getDoctorDisplay(v, specsMap).name).join(', ')
+          : 'скоро';
+      return {
+        id: sp.id,
+        tone: getSpecTone(sp.id),
+        name: SPECIALIZATION_NAMES_RU[sp.name] || SPECIALIZATION_NAMES_RU[sp.id] || sp.name,
+        who,
+      };
+    });
+  }, [specializations, vets, specsMap]);
 
+  const popularOffers: PopularOffer[] = useMemo(() => {
     const active = services.filter((s) => s.isActive !== false);
     const pool = active.length > 0 ? active : services;
     const picked: Service[] = [];
@@ -86,6 +62,7 @@ export const LandingServicesSection: React.FC<LandingServicesSectionProps> = ({
     return picked.map((s) => ({
       spec: getSpecTone(s.specializationId),
       specName:
+        SPECIALIZATION_NAMES_RU[specsMap[s.specializationId] || ''] ||
         specsMap[s.specializationId] ||
         SPECIALIZATION_NAMES_RU[s.specializationId] ||
         'Услуга',
@@ -99,89 +76,85 @@ export const LandingServicesSection: React.FC<LandingServicesSectionProps> = ({
 
   return (
     <>
-      {/* Блок «Ключевые направления» */}
-      <section className="island" style={{ flex: 'none' }} aria-label="Ключевые направления клиники">
+      {/* Блок «Приём ведут» */}
+      <section className="island" style={{ flex: 'none' }} aria-label="Приём ведут">
         <div className="island-head">
           <span className="island-title">
-            <ClipboardList className="ic" />
-            Ключевые направления
+            <Stethoscope className="ic" />
+            Приём ведут
           </span>
-          <Link href="/services" className="btn btn-ghost btn-sm" style={{ textDecoration: 'none' }}>
-            <span>Каталог услуг</span>
+          <Link href="/veterinarians" className="btn btn-ghost btn-sm">
+            <span>Все врачи</span>
             <ChevronRight className="ic" />
           </Link>
         </div>
         <div className="island-body" style={{ paddingTop: 0 }}>
-          <div className="ab-specs">
-            {DEFAULT_DIRECTIONS.map((sp) => (
-              <Link
-                key={sp.id}
-                href={`/services?spec=${sp.id}`}
-                className={`ab-spec tone-${sp.id}`}
-                style={{ textDecoration: 'none' }}
-              >
-                <span className="t-ava">
-                  <Stethoscope className="ic ic-20" />
-                </span>
-                <span className="col" style={{ gap: '1px', minWidth: 0 }}>
-                  <b>{sp.name}</b>
-                  <span>{sp.who}</span>
-                </span>
-              </Link>
-            ))}
-          </div>
+          {specDoctors.length > 0 ? (
+            <div className="ab-specs">
+              {specDoctors.map((sp) => (
+                <Link
+                  key={sp.id}
+                  href={`/veterinarians?spec=${encodeURIComponent(sp.id)}`}
+                  className={`ab-spec tone-${sp.tone}`}
+                >
+                  <span className="t-ava">
+                    <Stethoscope className="ic ic-20" />
+                  </span>
+                  <span className="col" style={{ gap: '1px', minWidth: 0 }}>
+                    <b>{sp.name}</b>
+                    <span>{sp.who}</span>
+                  </span>
+                </Link>
+              ))}
+            </div>
+          ) : (
+            <span className="small muted">Загрузка направлений клиники...</span>
+          )}
         </div>
       </section>
 
       {/* Двухколоночная сетка: Популярные услуги + Как записаться */}
       <div className="ab-grid">
-        {/* Левая колонка: Популярные услуги */}
         <section className="island" aria-label="Популярные услуги">
           <div className="island-head">
             <span className="island-title">
-              <Sparkles className="ic" />
+              <ClipboardList className="ic" />
               Популярные услуги
             </span>
-            <Link href="/services" className="btn btn-ghost btn-sm" style={{ textDecoration: 'none' }}>
+            <Link href="/services" className="btn btn-ghost btn-sm">
               <span>Все услуги</span>
               <ChevronRight className="ic" />
             </Link>
           </div>
           <div className="island-body" style={{ paddingTop: 0 }}>
-            {error && (
-              <div className="alert alert-info mb-3" role="status">
-                <AlertCircle className="ic" />
-                <div className="small">
-                  Не удалось обновить каталог с сервера — показаны базовые услуги клиники.
-                </div>
-              </div>
-            )}
-            <div className="ab-offers">
-              {popularOffers.map((offer) => (
-                <Link
-                  key={offer.serviceId || offer.name}
-                  href={offer.serviceId ? `/services?open=${offer.serviceId}` : '/services'}
-                  className={`ab-offer tone-${offer.spec}`}
-                  style={{ textDecoration: 'none' }}
-                >
-                  <span className="t-badge">{offer.specName}</span>
-                  <b className="ab-offer-name">{offer.name}</b>
-                  <span className="tcard-desc">{offer.desc}</span>
-                  <span className="ab-offer-foot">
-                    <span className="tcard-meta">
-                      <Clock className="ic" style={{ width: '14px', height: '14px' }} />
-                      {offer.dur} мин
+            {popularOffers.length > 0 ? (
+              <div className="ab-offers">
+                {popularOffers.map((offer) => (
+                  <Link
+                    key={offer.serviceId || offer.name}
+                    href={offer.serviceId ? `/services?open=${offer.serviceId}` : '/services'}
+                    className={`ab-offer tone-${offer.spec}`}
+                  >
+                    <span className="t-badge">{offer.specName}</span>
+                    <b className="ab-offer-name">{offer.name}</b>
+                    <span className="tcard-desc">{offer.desc}</span>
+                    <span className="ab-offer-foot">
+                      <span className="tcard-meta">
+                        <Clock className="ic" />
+                        {offer.dur} мин
+                      </span>
+                      <span className="tcard-price">от {offer.price}</span>
                     </span>
-                    <span className="tcard-price">от {offer.price}</span>
-                  </span>
-                </Link>
-              ))}
-            </div>
+                  </Link>
+                ))}
+              </div>
+            ) : (
+              <span className="small muted">Загрузка популярных услуг...</span>
+            )}
           </div>
         </section>
 
-        {/* Правая колонка: Как записаться */}
-        <section className="island" aria-label="Как записаться на приём">
+        <section className="island" aria-label="Как записаться">
           <div className="island-head">
             <span className="island-title">
               <CalendarPlus className="ic" />
@@ -212,13 +185,15 @@ export const LandingServicesSection: React.FC<LandingServicesSectionProps> = ({
                 </span>
               </li>
             </ol>
-            <Link
-              href="/register"
-              className="btn btn-primary"
-              style={{ width: '100%', justifyContent: 'center', marginTop: '14px', textDecoration: 'none' }}
-            >
-              Создать аккаунт
-            </Link>
+            {!isAuthenticated && (
+              <Link
+                href="/register"
+                className="btn btn-primary btn-block"
+                style={{ marginTop: '14px' }}
+              >
+                Создать аккаунт
+              </Link>
+            )}
           </div>
         </section>
       </div>

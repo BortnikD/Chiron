@@ -1,17 +1,5 @@
-'use client';
+import { AuthPageView } from '@/app/login/_components/AuthPageView';
 
-import { useEffect } from 'react';
-import { useRouter } from 'next/navigation';
-
-export default function RegisterRedirectPage() {
-  const router = useRouter();
-  useEffect(() => {
-    router.replace('/login?mode=register');
-  }, [router]);
-
-  return (
-    <div className="flex h-screen items-center justify-center p-4 text-xs text-[var(--muted-foreground)]">
-      Перенаправление на регистрацию...
-    </div>
-  );
+export default function RegisterPage() {
+  return <AuthPageView defaultMode="register" />;
 }

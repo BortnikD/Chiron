@@ -1,10 +1,5 @@
-import type { Service, Veterinarian, Specialization } from '@/modules/clinic/types';
-
-export interface ClinicDirection {
-  id: string;
-  name: string;
-  who: string;
-}
+import type { UserRole } from '@/shared/types';
+import type { Service, Specialization, Veterinarian } from '@/modules/clinic/types';
 
 export interface PopularOffer {
   spec: string;
@@ -16,35 +11,19 @@ export interface PopularOffer {
   serviceId?: string;
 }
 
-export interface AdvantageChip {
-  id: string;
-  label: string;
-  desc: string;
-}
-
 export interface LandingHeroSectionProps {
-  vetsCount?: number;
-  specsCount?: number;
-  servicesCount?: number;
-}
-
-export interface LandingDoctorsSectionProps {
-  vets?: Veterinarian[];
-  specializations?: Specialization[];
+  vetsCount: number;
+  specsCount: number;
+  servicesCount: number;
+  speciesCount: number;
+  loading?: boolean;
+  isAuthenticated?: boolean;
+  role?: UserRole | null;
 }
 
 export interface LandingServicesSectionProps {
   services?: Service[];
+  vets?: Veterinarian[];
   specializations?: Specialization[];
-  error?: string | null;
-}
-
-export interface DoctorCardData {
-  id: string;
-  name: string;
-  fullName: string;
-  initials: string;
-  specName: string;
-  experienceYears: number;
-  tone: string;
+  isAuthenticated?: boolean;
 }

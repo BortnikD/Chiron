@@ -2,13 +2,14 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { clinicApi } from '@/modules/clinic/api';
-import type { Service, Specialization, Veterinarian } from '@/modules/clinic/types';
+import type { Service, Specialization, Species, Veterinarian } from '@/modules/clinic/types';
 import { formatApiError } from '@/shared/lib';
 
 export function useLandingData() {
   const [services, setServices] = useState<Service[]>([]);
   const [vets, setVets] = useState<Veterinarian[]>([]);
   const [specs, setSpecs] = useState<Specialization[]>([]);
+  const [species, setSpecies] = useState<Species[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [reloadTick, setReloadTick] = useState(0);
@@ -26,12 +27,14 @@ export function useLandingData() {
       clinicApi.getServices(),
       clinicApi.getVeterinarians(),
       clinicApi.getSpecializations(),
+      clinicApi.getSpecies(),
     ])
-      .then(([svc, vt, sp]) => {
+      .then(([svc, vt, sp, spc]) => {
         if (cancelled) return;
         setServices(Array.isArray(svc) ? svc : []);
         setVets(Array.isArray(vt) ? vt : []);
         setSpecs(Array.isArray(sp) ? sp : []);
+        setSpecies(Array.isArray(spc) ? spc : []);
       })
       .catch((err: unknown) => {
         if (cancelled) return;
@@ -46,5 +49,5 @@ export function useLandingData() {
     };
   }, [reloadTick]);
 
-  return { services, vets, specs, loading, error, reload };
+  return { services, vets, specs, species, loading, error, reload };
 }

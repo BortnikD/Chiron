@@ -1,8 +1,10 @@
 'use client';
 
-import React from 'react';
-import { Search, X, ChevronDown } from 'lucide-react';
-import { VeterinariansFiltersProps } from './types';
+import React, { useMemo } from 'react';
+import { Search, X } from 'lucide-react';
+import { FilterDropdown, type FilterDropdownOption } from '@/shared/components';
+import { SPECIALIZATION_NAMES_RU } from '@/utils/doctorHelpers';
+import type { VeterinariansFiltersProps } from './types';
 
 export const VeterinariansFilters: React.FC<VeterinariansFiltersProps> = ({
   specializations,
@@ -16,91 +18,65 @@ export const VeterinariansFilters: React.FC<VeterinariansFiltersProps> = ({
   onResetFilters,
   hasFilters,
 }) => {
+  const specOptions = useMemo<FilterDropdownOption[]>(
+    () => [
+      { value: 'ALL', label: 'Все специализации' },
+      ...specializations.map((sp) => ({
+        value: sp.id,
+        label: SPECIALIZATION_NAMES_RU[sp.name] || SPECIALIZATION_NAMES_RU[sp.id] || sp.name,
+      })),
+    ],
+    [specializations]
+  );
+
+  const speciesOptions = useMemo<FilterDropdownOption[]>(
+    () => [
+      { value: 'ALL', label: 'Все виды' },
+      ...speciesList.map((sp) => ({ value: sp.id, label: sp.name })),
+    ],
+    [speciesList]
+  );
+
   return (
     <section className="island filters" aria-label="Фильтры">
       <div className="field">
         <span className="field-label">Специализация</span>
-        <div className="dd" style={{ position: 'relative' }}>
-          <select
-            className="select dd-btn"
-            value={selectedSpec}
-            onChange={(e) => onSelectSpec(e.target.value)}
-            style={{ appearance: 'none', paddingRight: '28px', cursor: 'pointer' }}
-          >
-            <option value="ALL">Все специализации</option>
-            {specializations.map((sp) => (
-              <option key={sp.id} value={sp.id}>
-                {sp.name}
-              </option>
-            ))}
-          </select>
-          <ChevronDown
-            className="ic"
-            style={{
-              position: 'absolute',
-              right: '8px',
-              top: '50%',
-              transform: 'translateY(-50%)',
-              pointerEvents: 'none',
-              width: '14px',
-              height: '14px',
-            }}
-          />
-        </div>
+        <FilterDropdown
+          id="vf-spec"
+          ariaLabel="Специализация"
+          value={selectedSpec}
+          options={specOptions}
+          onChange={onSelectSpec}
+          placeholder="Все специализации"
+        />
       </div>
 
       <div className="field">
         <span className="field-label">Вид животного</span>
-        <div className="dd" style={{ position: 'relative' }}>
-          <select
-            className="select dd-btn"
-            value={selectedSpecies}
-            onChange={(e) => onSelectSpecies(e.target.value)}
-            style={{ appearance: 'none', paddingRight: '28px', cursor: 'pointer' }}
-          >
-            <option value="ALL">Все виды</option>
-            {speciesList.map((sp) => (
-              <option key={sp.id} value={sp.id}>
-                {sp.name}
-              </option>
-            ))}
-          </select>
-          <ChevronDown
-            className="ic"
-            style={{
-              position: 'absolute',
-              right: '8px',
-              top: '50%',
-              transform: 'translateY(-50%)',
-              pointerEvents: 'none',
-              width: '14px',
-              height: '14px',
-            }}
-          />
-        </div>
+        <FilterDropdown
+          id="vf-species"
+          ariaLabel="Вид животного"
+          value={selectedSpecies}
+          options={speciesOptions}
+          onChange={onSelectSpecies}
+          placeholder="Все виды"
+        />
       </div>
 
-      <div className="field" style={{ flex: 1, minWidth: '220px' }}>
-        <span className="field-label">Поиск</span>
-        <div className="input-icon" style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
-          <Search
-            className="ic"
-            style={{
-              position: 'absolute',
-              left: '10px',
-              width: '15px',
-              height: '15px',
-              color: 'var(--muted-foreground)',
-              pointerEvents: 'none',
-            }}
-          />
+      <div className="field" style={{ flex: '1 1 200px', minWidth: 0 }}>
+        <label className="field-label" htmlFor="vf-search">
+          Поиск
+        </label>
+        <div className="input-icon">
+          <Search className="ic" />
           <input
+            id="vf-search"
             type="text"
             placeholder="Поиск по имени врача..."
             value={searchQuery}
             onChange={(e) => onSearchChange(e.target.value)}
             className="input"
-            style={{ paddingLeft: '34px', width: '100%' }}
+            style={{ paddingRight: searchQuery ? '32px' : undefined }}
           />
           {searchQuery && (
             <button
@@ -109,13 +85,13 @@ export const VeterinariansFilters: React.FC<VeterinariansFiltersProps> = ({
               className="btn btn-ghost btn-icon btn-sm"
               style={{
                 position: 'absolute',
-                right: '6px',
-                width: '24px',
-                height: '24px',
+                right: '4px',
+                width: '26px',
+                height: '26px',
               }}
               aria-label="Очистить поиск"
             >
-              <X className="ic" style={{ width: '12px', height: '12px' }} />
+              <X style={{ width: '13px', height: '13px' }} />
             </button>
           )}
         </div>
@@ -126,7 +102,7 @@ export const VeterinariansFilters: React.FC<VeterinariansFiltersProps> = ({
           type="button"
           className="btn btn-ghost btn-sm"
           onClick={onResetFilters}
-          style={{ alignSelf: 'flex-end', height: '34px' }}
+          style={{ marginBottom: '3px' }}
         >
           Сбросить
         </button>

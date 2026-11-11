@@ -8,16 +8,25 @@ import type {
   ServiceSpecies,
   Specialization,
   Species,
-  Veterinarian,
 } from '@/modules/clinic/types';
-import { SPEC_TONES, formatApiError, getMoscowTodayIso, toIdNameMap } from '@/shared/lib';
+import {
+  SPEC_TONES,
+  formatApiError,
+  getMoscowTodayIso,
+  getSpeciesTone,
+  toIdNameMap,
+} from '@/shared/lib';
+import { SPECIALIZATION_NAMES_RU } from '@/utils/doctorHelpers';
 import type { ServiceSortOption } from '../_components/types';
 
-export function useServicesCatalog(openParam: string | null, specParam: string | null = null) {
+export function useServicesCatalog(
+  openParam: string | null,
+  specParam: string | null = null,
+  speciesParam: string | null = null
+) {
   const [services, setServices] = useState<Service[]>([]);
   const [specializations, setSpecializations] = useState<Specialization[]>([]);
   const [speciesList, setSpeciesList] = useState<Species[]>([]);
-  const [veterinarians, setVeterinarians] = useState<Veterinarian[]>([]);
   const [selectedSpec, setSelectedSpec] = useState('ALL');
   const [selectedSpecies, setSelectedSpecies] = useState('ALL');
   const [searchQuery, setSearchQuery] = useState('');
@@ -26,12 +35,14 @@ export function useServicesCatalog(openParam: string | null, specParam: string |
   const [serviceSpeciesList, setServiceSpeciesList] = useState<ServiceSpecies[]>([]);
   const [activeSpeciesTab, setActiveSpeciesTab] = useState('');
   const [nearestSlots, setNearestSlots] = useState<AvailableSlotResponse[]>([]);
+  const [loadingSlots, setLoadingSlots] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [reloadTick, setReloadTick] = useState(0);
 
   const appliedOpenRef = useRef<string | null>(null);
   const appliedSpecRef = useRef<string | null>(null);
+  const appliedSpeciesRef = useRef<string | null>(null);
 
   const reload = useCallback(() => {
     setReloadTick((tick) => tick + 1);
@@ -40,16 +51,11 @@ export function useServicesCatalog(openParam: string | null, specParam: string |
   useEffect(() => {
     let cancelled = false;
 
-    Promise.all([
-      clinicApi.getSpecializations(),
-      clinicApi.getSpecies(),
-      clinicApi.getVeterinarians(),
-    ])
-      .then(([spec, sp, vets]) => {
+    Promise.all([clinicApi.getSpecializations(), clinicApi.getSpecies()])
+      .then(([spec, sp]) => {
         if (cancelled) return;
         setSpecializations(Array.isArray(spec) ? spec : []);
         setSpeciesList(Array.isArray(sp) ? sp : []);
-        setVeterinarians(Array.isArray(vets) ? vets : []);
       })
       .catch((err: unknown) => {
         if (cancelled) return;
@@ -71,7 +77,7 @@ export function useServicesCatalog(openParam: string | null, specParam: string |
       .getServices(undefined, speciesFilter)
       .then((svc) => {
         if (cancelled) return;
-        const safeServices = Array.isArray(svc) ? svc : [];
+        const safeServices = (Array.isArray(svc) ? svc : []).filter((s) => s.isActive !== false);
         setServices(safeServices);
         setSelectedService((prev) =>
           prev ? safeServices.find((item) => item.id === prev.id) ?? null : null
@@ -106,7 +112,26 @@ export function useServicesCatalog(openParam: string | null, specParam: string |
   }, [specParam, specializations]);
 
   useEffect(() => {
-    if (!openParam || services.length === 0 || appliedOpenRef.current === openParam) return;
+    if (!speciesParam) {
+      appliedSpeciesRef.current = null;
+      return;
+    }
+    if (speciesList.length === 0 || appliedSpeciesRef.current === speciesParam) return;
+    const match = speciesList.find(
+      (sp) => sp.id === speciesParam || getSpeciesTone(sp.name) === speciesParam
+    );
+    if (match) {
+      appliedSpeciesRef.current = speciesParam;
+      setSelectedSpecies(match.id);
+    }
+  }, [speciesParam, speciesList]);
+
+  useEffect(() => {
+    if (!openParam) {
+      appliedOpenRef.current = null;
+      return;
+    }
+    if (services.length === 0 || appliedOpenRef.current === openParam) return;
     const found = services.find((s) => s.id === openParam);
     if (found) {
       appliedOpenRef.current = openParam;
@@ -120,6 +145,7 @@ export function useServicesCatalog(openParam: string | null, specParam: string |
     if (!selectedServiceId) {
       setServiceSpeciesList([]);
       setNearestSlots([]);
+      setLoadingSlots(false);
       return;
     }
 
@@ -168,21 +194,29 @@ export function useServicesCatalog(openParam: string | null, specParam: string |
   useEffect(() => {
     if (!selectedServiceId || !activeSpeciesTab) return;
     let cancelled = false;
+    setLoadingSlots(true);
     const today = getMoscowTodayIso(0);
-    const in3Days = getMoscowTodayIso(3);
+    const in7Days = getMoscowTodayIso(6);
 
     clinicApi
       .findAvailableSlots({
         serviceId: selectedServiceId,
         speciesId: activeSpeciesTab,
         from: today,
-        to: in3Days,
+        to: in7Days,
       })
       .then((res) => {
-        if (!cancelled) setNearestSlots(Array.isArray(res) ? res.slice(0, 8) : []);
+        if (cancelled) return;
+        const sorted = (Array.isArray(res) ? [...res] : []).sort((a, b) =>
+          a.startAt.localeCompare(b.startAt)
+        );
+        setNearestSlots(sorted);
       })
       .catch(() => {
         if (!cancelled) setNearestSlots([]);
+      })
+      .finally(() => {
+        if (!cancelled) setLoadingSlots(false);
       });
 
     return () => {
@@ -190,7 +224,13 @@ export function useServicesCatalog(openParam: string | null, specParam: string |
     };
   }, [selectedServiceId, activeSpeciesTab]);
 
-  const specsMap = useMemo(() => toIdNameMap(specializations), [specializations]);
+  const specsMap = useMemo(() => {
+    const map: Record<string, string> = {};
+    for (const sp of specializations) {
+      map[sp.id] = SPECIALIZATION_NAMES_RU[sp.name] || SPECIALIZATION_NAMES_RU[sp.id] || sp.name;
+    }
+    return map;
+  }, [specializations]);
   const speciesMap = useMemo(() => toIdNameMap(speciesList), [speciesList]);
 
   const hasFilters =
@@ -207,11 +247,13 @@ export function useServicesCatalog(openParam: string | null, specParam: string |
   };
 
   const filteredServices = useMemo(() => {
-    const q = searchQuery.toLowerCase();
+    const q = searchQuery.trim().toLowerCase();
     const result = services.filter(
       (s) =>
         (selectedSpec === 'ALL' || s.specializationId === selectedSpec) &&
-        (s.name.toLowerCase().includes(q) || (s.description && s.description.toLowerCase().includes(q)))
+        (!q ||
+          s.name.toLowerCase().includes(q) ||
+          (s.description && s.description.toLowerCase().includes(q)))
     );
     if (sortBy === 'price-asc') {
       return [...result].sort(
@@ -243,7 +285,6 @@ export function useServicesCatalog(openParam: string | null, specParam: string |
   return {
     specializations,
     speciesList,
-    veterinarians,
     selectedSpec,
     setSelectedSpec,
     selectedSpecies,
@@ -258,6 +299,7 @@ export function useServicesCatalog(openParam: string | null, specParam: string |
     activeSpeciesTab,
     setActiveSpeciesTab,
     nearestSlots,
+    loadingSlots,
     loading,
     error,
     reload,

@@ -2,11 +2,25 @@
 
 import React, { useMemo } from 'react';
 import Link from 'next/link';
-import { X, CalendarPlus, AlertCircle } from 'lucide-react';
-import { formatCurrency, formatSlotTime, pluralRu } from '@/shared/lib';
-import { getDoctorDisplay } from '@/utils/doctorHelpers';
+import { X, CalendarPlus, CalendarOff } from 'lucide-react';
+import {
+  DOW_SHORT,
+  formatCurrency,
+  formatIsoDateDisplay,
+  formatSlotTime,
+  getMoscowDateKey,
+  pluralRu,
+} from '@/shared/lib';
+import type { AvailableSlotResponse } from '@/modules/clinic/types';
 import type { ServiceDetailIslandProps } from './types';
-import { SPECIALIZATION_CONTRAINDICATIONS, DEFAULT_CONTRAINDICATION } from './constants';
+
+function formatDayDow(isoDate: string): string {
+  const [y, m, d] = isoDate.split('-').map(Number);
+  if (!y || !m || !d) return '';
+  const dt = new Date(Date.UTC(y, m - 1, d, 12, 0, 0));
+  const idx = (dt.getUTCDay() + 6) % 7;
+  return DOW_SHORT[idx] || '';
+}
 
 export function ServiceDetailIsland({
   service,
@@ -18,23 +32,10 @@ export function ServiceDetailIsland({
   activeSpeciesTab,
   onSpeciesTabChange,
   nearestSlots,
-  veterinarians = [],
+  loadingSlots = false,
   isAuthenticated,
   role,
 }: ServiceDetailIslandProps) {
-  const assignedVets = useMemo(() => {
-    if (!veterinarians || !service) return [];
-    const specVets = veterinarians.filter(
-      (v) => v.specializationId === service.specializationId && v.isActive
-    );
-    if (!activeSpeciesTab) return specVets;
-    const hasSpeciesInfo = specVets.some((v) => Array.isArray(v.speciesIds));
-    if (!hasSpeciesInfo) return specVets;
-    return specVets.filter((v) =>
-      Array.isArray(v.speciesIds) ? v.speciesIds.includes(activeSpeciesTab) : true
-    );
-  }, [veterinarians, service, activeSpeciesTab]);
-
   const detailSpeciesList = useMemo(
     () =>
       serviceSpeciesList.length > 0
@@ -43,20 +44,32 @@ export function ServiceDetailIsland({
     [serviceSpeciesList, speciesList]
   );
 
-  const hasSpeciesDiff =
-    (service.effectivePrice != null && service.effectivePrice !== service.basePrice) ||
-    (service.effectiveDurationMin != null &&
-      service.effectiveDurationMin !== service.baseDurationMin);
+  const groupedSlotDays = useMemo(() => {
+    const byDate = new Map<string, AvailableSlotResponse[]>();
+    for (const slot of nearestSlots) {
+      const dateKey = getMoscowDateKey(slot.startAt);
+      if (!dateKey) continue;
+      const arr = byDate.get(dateKey);
+      if (arr) arr.push(slot);
+      else byDate.set(dateKey, [slot]);
+    }
+    return Array.from(byDate.entries())
+      .sort(([a], [b]) => a.localeCompare(b))
+      .slice(0, 3)
+      .map(([isoDate, slots]) => ({
+        isoDate,
+        dow: formatDayDow(isoDate),
+        label: formatIsoDateDisplay(isoDate),
+        totalCount: slots.length,
+        slots: slots.slice(0, 8),
+      }));
+  }, [nearestSlots]);
 
-  const contraindicationsText =
-    SPECIALIZATION_CONTRAINDICATIONS[service.specializationId] || DEFAULT_CONTRAINDICATION;
+  const baseDuration = service.baseDurationMin ?? service.durationMin ?? 30;
+  const baseBuffer = service.bufferAfterMin ?? 10;
 
   return (
-    <section
-      className="island detail-island"
-      style={{ flex: 'none' }}
-      aria-label="Карточка услуги"
-    >
+    <section className="island detail-island" style={{ width: '460px' }} aria-label="Услуга">
       <div className="island-head">
         <div className="col" style={{ gap: '2px', minWidth: 0 }}>
           <span className="h2" style={{ wordBreak: 'break-word' }}>
@@ -80,110 +93,15 @@ export function ServiceDetailIsland({
         <div className="col" style={{ gap: '18px' }}>
           {service.description && <p>{service.description}</p>}
 
-          {/* Характеристики услуги */}
           <dl className="kv" style={{ margin: 0 }}>
             <dt>Базовая цена</dt>
-            <dd className="tnum">
-              {formatCurrency(service.basePrice)}
-            </dd>
+            <dd className="tnum">{formatCurrency(service.basePrice)}</dd>
             <dt>Длительность</dt>
-            <dd className="tnum">
-              {service.baseDurationMin ?? 30} мин
-            </dd>
-            {hasSpeciesDiff && (
-              <>
-                <dt>Для выбранного вида</dt>
-                <dd className="tnum">
-                  {formatCurrency(service.effectivePrice ?? service.basePrice)} ·{' '}
-                  {service.effectiveDurationMin ?? service.baseDurationMin ?? 30} мин
-                </dd>
-              </>
-            )}
+            <dd className="tnum">{baseDuration} мин</dd>
             <dt>Буфер после</dt>
-            <dd className="tnum">
-              {service.bufferAfterMin ?? 10} мин
-            </dd>
+            <dd className="tnum">{baseBuffer} мин</dd>
           </dl>
 
-          {/* Противопоказания и подготовка */}
-          <div className="note" style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-            <span style={{ fontWeight: 600, display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px' }}>
-              <AlertCircle className="ic" style={{ width: '15px', height: '15px', flex: 'none', color: 'var(--amber, #f59e0b)' }} />
-              Противопоказания и подготовка
-            </span>
-            <span className="cell-sub" style={{ fontSize: '12.5px', lineHeight: '1.45', color: 'var(--foreground)' }}>
-              {contraindicationsText}
-            </span>
-          </div>
-
-          {/* Врачи, оказывающие данную услугу */}
-          <div className="col" style={{ gap: '8px' }}>
-            <div className="row between">
-              <span className="section-title">Специалисты направления</span>
-              <span className="small muted">
-                {assignedVets.length > 0 ? `${assignedVets.length} врач.` : ''}
-              </span>
-            </div>
-            {assignedVets.length > 0 ? (
-              <div className="col" style={{ gap: '6px' }}>
-                {assignedVets.map((v) => {
-                  const { name, initials, title } = getDoctorDisplay(v, specsMap);
-                  return (
-                    <div
-                      key={v.id}
-                      className="row between"
-                      style={{
-                        alignItems: 'center',
-                        padding: '6px 10px',
-                        borderRadius: '8px',
-                        background: 'var(--muted)',
-                      }}
-                    >
-                      <div className="row" style={{ alignItems: 'center', gap: '8px', minWidth: 0 }}>
-                        <span
-                          className="t-ava sm round"
-                          style={{ width: '28px', height: '28px', fontSize: '11px', flex: 'none' }}
-                        >
-                          {initials}
-                        </span>
-                        <div className="col" style={{ gap: '1px', minWidth: 0 }}>
-                          <span
-                            style={{
-                              fontSize: '13px',
-                              fontWeight: 600,
-                              whiteSpace: 'nowrap',
-                              overflow: 'hidden',
-                              textOverflow: 'ellipsis',
-                            }}
-                          >
-                            {name}
-                          </span>
-                          <span className="cell-sub" style={{ fontSize: '11px' }}>
-                            {title ||
-                              `Стаж ${v.experienceYears} ${pluralRu(v.experienceYears, 'год', 'года', 'лет')}`}
-                          </span>
-                        </div>
-                      </div>
-                      {isAuthenticated && role === 'CLIENT' && (
-                        <Link
-                          href={`/client/book?serviceId=${service.id}&vetId=${v.id}`}
-                          className="btn btn-ghost btn-sm"
-                          style={{ height: '26px', padding: '0 8px', fontSize: '12px', flex: 'none' }}
-                          title="Записаться к врачу"
-                        >
-                          Выбрать
-                        </Link>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            ) : (
-              <span className="small muted">Прием ведут дежурные ветеринарные врачи</span>
-            )}
-          </div>
-
-          {/* Таблица цен по видам животных */}
           <div className="col" style={{ gap: '8px' }}>
             <span className="section-title">Цена и длительность по видам</span>
             <div className="dtable" style={{ '--cols': '1fr 1.2fr 1.2fr' } as React.CSSProperties}>
@@ -192,35 +110,39 @@ export function ServiceDetailIsland({
                 <span>Длительность</span>
                 <span className="right">Цена</span>
               </div>
-              {serviceSpeciesList.length > 0 ? (
-                serviceSpeciesList.map((ss) => (
-                  <div key={ss.speciesId} className="trow static compact">
-                    <span>{speciesMap[ss.speciesId] || 'Животное'}</span>
-                    <span className="tnum">
-                      {ss.durationMin || service.baseDurationMin || 30} мин
-                    </span>
-                    <span className="right tnum">
-                      {formatCurrency(ss.price ?? service.basePrice)}
-                    </span>
-                  </div>
-                ))
-              ) : (
-                speciesList.map((sp) => (
-                  <div key={sp.id} className="trow static compact">
-                    <span>{sp.name}</span>
-                    <span className="tnum">
-                      {service.baseDurationMin || 30} мин
-                    </span>
-                    <span className="right tnum">
-                      {formatCurrency(service.basePrice)}
-                    </span>
-                  </div>
-                ))
-              )}
+              {serviceSpeciesList.length > 0
+                ? serviceSpeciesList.map((ss) => {
+                    const dur = ss.durationMin ?? baseDuration;
+                    const price = ss.price ?? service.basePrice;
+                    return (
+                      <div key={ss.speciesId} className="trow static compact">
+                        <span>{speciesMap[ss.speciesId] || 'Животное'}</span>
+                        <span className="tnum">
+                          {dur} мин{' '}
+                          {ss.durationMin == null && <span className="small muted">базовая</span>}
+                        </span>
+                        <span className="right tnum">
+                          {formatCurrency(price)}{' '}
+                          {ss.price == null && <span className="small muted">базовая</span>}
+                        </span>
+                      </div>
+                    );
+                  })
+                : speciesList.map((sp) => (
+                    <div key={sp.id} className="trow static compact">
+                      <span>{sp.name}</span>
+                      <span className="tnum">
+                        {baseDuration} мин <span className="small muted">базовая</span>
+                      </span>
+                      <span className="right tnum">
+                        {formatCurrency(service.basePrice)}{' '}
+                        <span className="small muted">базовая</span>
+                      </span>
+                    </div>
+                  ))}
             </div>
           </div>
 
-          {/* Ближайшие свободные окна */}
           <div className="col" style={{ gap: '10px' }}>
             <div className="row between wrap">
               <span className="section-title">Ближайшие свободные окна</span>
@@ -238,51 +160,69 @@ export function ServiceDetailIsland({
               </div>
             </div>
 
-            <div className="col" style={{ gap: '6px' }}>
-              <span className="small">
-                <b style={{ fontWeight: 600 }}>На ближайшие 3 дня</b>
-              </span>
-              {nearestSlots.length > 0 ? (
-                <div className="chips">
-                  {nearestSlots.map((slot) => {
-                    const timeStr = formatSlotTime(slot.startAt);
-                    if (!isAuthenticated) {
+            {loadingSlots ? (
+              <span className="small muted">Загрузка свободных окон...</span>
+            ) : groupedSlotDays.length > 0 ? (
+              groupedSlotDays.map((day) => (
+                <div key={day.isoDate} className="col" style={{ gap: '6px' }}>
+                  <span className="small">
+                    <b style={{ fontWeight: 600 }}>
+                      {day.dow}, {day.label}
+                    </b>{' '}
+                    <span className="muted">
+                      · {day.totalCount} {pluralRu(day.totalCount, 'окно', 'окна', 'окон')}
+                    </span>
+                  </span>
+                  <div className="chips">
+                    {day.slots.map((slot) => {
+                      const timeStr = formatSlotTime(slot.startAt);
+                      if (!isAuthenticated) {
+                        const bookUrl = `/client/book?serviceId=${service.id}&slot=${encodeURIComponent(slot.startAt)}`;
+                        return (
+                          <Link
+                            key={slot.startAt}
+                            href={`/login?next=${encodeURIComponent(bookUrl)}`}
+                            className="slot"
+                            title="Войдите, чтобы записаться"
+                          >
+                            {timeStr}
+                          </Link>
+                        );
+                      }
+                      if (role === 'CLIENT') {
+                        return (
+                          <Link
+                            key={slot.startAt}
+                            href={`/client/book?serviceId=${service.id}&slot=${encodeURIComponent(slot.startAt)}`}
+                            className="slot"
+                            title="Записаться на это время"
+                          >
+                            {timeStr}
+                          </Link>
+                        );
+                      }
                       return (
-                        <Link
+                        <span
                           key={slot.startAt}
-                          href="/login"
                           className="slot"
-                          title="Войдите для записи"
+                          style={{ cursor: 'default' }}
+                          title="Свободное окно"
                         >
                           {timeStr}
-                        </Link>
+                        </span>
                       );
-                    }
-                    if (role === 'CLIENT') {
-                      return (
-                        <Link
-                          key={slot.startAt}
-                          href={`/client/book?serviceId=${service.id}&slot=${encodeURIComponent(slot.startAt)}`}
-                          className="slot"
-                          title="Записаться на это время"
-                        >
-                          {timeStr}
-                        </Link>
-                      );
-                    }
-                    return (
-                      <span key={slot.startAt} className="slot" title="Свободное окно">
-                        {timeStr}
-                      </span>
-                    );
-                  })}
+                    })}
+                  </div>
                 </div>
-              ) : (
-                <span className="small muted">
-                  Свободные окна не найдены на ближайшие дни
-                </span>
-              )}
-            </div>
+              ))
+            ) : (
+              <div className="empty" style={{ padding: '16px' }}>
+                <CalendarOff className="ic ic-20" />
+                <span>Нет свободных окон, попробуйте другой период</span>
+              </div>
+            )}
+
+            <span className="small muted">Показаны 3 ближайших дня, первые 8 окон</span>
           </div>
         </div>
       </div>
@@ -292,35 +232,26 @@ export function ServiceDetailIsland({
           {!isAuthenticated
             ? 'Для записи нужен вход'
             : role === 'CLIENT'
-            ? 'Выберите врача и время'
+            ? 'Запись — через мастер'
             : role === 'VETERINARIAN'
             ? 'Справочник услуг клиники'
             : 'Справочник услуг'}
         </span>
         {!isAuthenticated ? (
           <Link
-            href="/login"
+            href={`/login?next=${encodeURIComponent(`/client/book?serviceId=${service.id}`)}`}
             className="btn btn-primary"
-            style={{ textDecoration: 'none' }}
           >
             <CalendarPlus className="ic" />
             <span>Записаться</span>
           </Link>
         ) : role === 'CLIENT' ? (
-          <Link
-            href={`/client/book?serviceId=${service.id}`}
-            className="btn btn-primary"
-            style={{ textDecoration: 'none' }}
-          >
+          <Link href={`/client/book?serviceId=${service.id}`} className="btn btn-primary">
             <CalendarPlus className="ic" />
             <span>Записаться</span>
           </Link>
         ) : role === 'ADMIN' ? (
-          <Link
-            href="/admin/services"
-            className="btn btn-outline btn-sm"
-            style={{ textDecoration: 'none' }}
-          >
+          <Link href="/admin/services" className="btn btn-outline btn-sm">
             <span>Управление в админке</span>
           </Link>
         ) : (

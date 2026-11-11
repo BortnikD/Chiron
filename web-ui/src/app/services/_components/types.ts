@@ -5,7 +5,6 @@ import type {
   Species,
   ServiceSpecies,
   AvailableSlotResponse,
-  Veterinarian,
 } from '@/modules/clinic/types';
 
 export type ServiceSortOption = 'default' | 'price-asc' | 'price-desc' | 'duration-asc' | 'duration-desc';
@@ -31,6 +30,9 @@ export interface ServicesGridProps {
   onSelectService: (service: Service) => void;
   specsMap: Record<string, string>;
   loading?: boolean;
+  hasFilters?: boolean;
+  onReset?: () => void;
+  isAuthenticated?: boolean;
 }
 
 export interface ServiceDetailIslandProps {
@@ -43,7 +45,7 @@ export interface ServiceDetailIslandProps {
   activeSpeciesTab: string;
   onSpeciesTabChange: (speciesId: string) => void;
   nearestSlots: AvailableSlotResponse[];
-  veterinarians?: Veterinarian[];
+  loadingSlots?: boolean;
   isAuthenticated: boolean;
   role?: UserRole | null;
 }

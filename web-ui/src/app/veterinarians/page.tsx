@@ -17,6 +17,10 @@ function VeterinariansContent() {
   const searchParams = useSearchParams();
   const { isAuthenticated, role } = useAuth();
 
+  const specParam = searchParams.get('spec');
+  const openParam = searchParams.get('open') || searchParams.get('sel');
+  const speciesParam = searchParams.get('species');
+
   const {
     specializations,
     speciesList,
@@ -31,6 +35,7 @@ function VeterinariansContent() {
     setSelectedVet,
     vetSchedules,
     vetExceptions,
+    loading,
     error,
     reload,
     specsMap,
@@ -38,36 +43,36 @@ function VeterinariansContent() {
     hasFilters,
     resetFilters,
     filteredVets,
-  } = useVeterinariansCatalog(searchParams.get('spec'));
+  } = useVeterinariansCatalog(specParam, openParam, speciesParam);
 
   const content = (
-    <div className="content-col grow">
-      <VeterinariansFilters
-        specializations={specializations}
-        speciesList={speciesList}
-        selectedSpec={selectedSpec}
-        onSelectSpec={setSelectedSpec}
-        selectedSpecies={selectedSpecies}
-        onSelectSpecies={setSelectedSpecies}
-        searchQuery={searchQuery}
-        onSearchChange={setSearchQuery}
-        onResetFilters={resetFilters}
-        hasFilters={hasFilters}
-      />
+    <div className="content-row">
+      <div className="content-col grow">
+        <VeterinariansFilters
+          specializations={specializations}
+          speciesList={speciesList}
+          selectedSpec={selectedSpec}
+          onSelectSpec={setSelectedSpec}
+          selectedSpecies={selectedSpecies}
+          onSelectSpecies={setSelectedSpecies}
+          searchQuery={searchQuery}
+          onSearchChange={setSearchQuery}
+          onResetFilters={resetFilters}
+          hasFilters={hasFilters}
+        />
 
-      {error && (
-        <div className="alert alert-destructive" role="alert">
-          <AlertCircle className="ic" />
-          <div className="row between wrap grow" style={{ gap: '8px', alignItems: 'center' }}>
-            <span>{error}</span>
-            <button type="button" className="btn btn-outline btn-sm" onClick={reload}>
-              Повторить
-            </button>
+        {error && (
+          <div className="alert" role="alert">
+            <AlertCircle className="ic" />
+            <div className="row between wrap grow" style={{ gap: '8px' }}>
+              <span>{error}</span>
+              <button type="button" className="btn btn-outline btn-sm" onClick={reload}>
+                Повторить
+              </button>
+            </div>
           </div>
-        </div>
-      )}
+        )}
 
-      <div className="content-row">
         <VeterinariansGrid
           vets={filteredVets}
           selectedVet={selectedVet}
@@ -75,21 +80,25 @@ function VeterinariansContent() {
           specsMap={specsMap}
           speciesMap={speciesMap}
           vetPermissions={vetPermissions}
+          loading={loading}
+          hasFilters={hasFilters}
+          onReset={resetFilters}
         />
-        {selectedVet && (
-          <VeterinarianDetailIsland
-            vet={selectedVet}
-            specsMap={specsMap}
-            speciesMap={speciesMap}
-            permissions={vetPermissions[selectedVet.id] || []}
-            schedules={vetSchedules}
-            exceptions={vetExceptions}
-            onClose={() => setSelectedVet(null)}
-            isAuthenticated={isAuthenticated}
-            role={role}
-          />
-        )}
       </div>
+
+      {selectedVet && (
+        <VeterinarianDetailIsland
+          vet={selectedVet}
+          specsMap={specsMap}
+          speciesMap={speciesMap}
+          permissions={vetPermissions[selectedVet.id] || []}
+          schedules={vetSchedules}
+          exceptions={vetExceptions}
+          onClose={() => setSelectedVet(null)}
+          isAuthenticated={isAuthenticated}
+          role={role}
+        />
+      )}
     </div>
   );
 
@@ -116,8 +125,12 @@ export default function VeterinariansPage() {
   return (
     <Suspense
       fallback={
-        <div className="p-8 text-center text-xs text-[var(--muted-foreground)]">
-          Загрузка каталога врачей...
+        <div className="app" style={{ flexDirection: 'column' }}>
+          <div className="island grow">
+            <div className="empty">
+              <span className="small muted">Загрузка каталога врачей...</span>
+            </div>
+          </div>
         </div>
       }
     >

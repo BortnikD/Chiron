@@ -2,12 +2,27 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { clinicApi } from '@/modules/clinic/api';
-import type { Specialization, Species, Veterinarian } from '@/modules/clinic/types';
-import type { ScheduleException, WorkSchedule } from '@/modules/admin/types';
-import { SPEC_TONES, formatApiError, toIdNameMap } from '@/shared/lib';
-import { getDoctorDisplay } from '@/utils/doctorHelpers';
+import type {
+  ScheduleException,
+  Specialization,
+  Species,
+  Veterinarian,
+  WorkSchedule,
+} from '@/modules/clinic/types';
+import {
+  SPEC_TONES,
+  formatApiError,
+  getMoscowTodayIso,
+  getSpeciesTone,
+  toIdNameMap,
+} from '@/shared/lib';
+import { SPECIALIZATION_NAMES_RU, getDoctorDisplay } from '@/utils/doctorHelpers';
 
-export function useVeterinariansCatalog(specParam: string | null) {
+export function useVeterinariansCatalog(
+  specParam: string | null = null,
+  openParam: string | null = null,
+  speciesParam: string | null = null
+) {
   const [vets, setVets] = useState<Veterinarian[]>([]);
   const [specializations, setSpecializations] = useState<Specialization[]>([]);
   const [speciesList, setSpeciesList] = useState<Species[]>([]);
@@ -23,6 +38,8 @@ export function useVeterinariansCatalog(specParam: string | null) {
   const [reloadTick, setReloadTick] = useState(0);
 
   const appliedSpecRef = useRef<string | null>(null);
+  const appliedOpenRef = useRef<string | null>(null);
+  const appliedSpeciesRef = useRef<string | null>(null);
 
   const reload = useCallback(() => {
     setReloadTick((tick) => tick + 1);
@@ -40,7 +57,9 @@ export function useVeterinariansCatalog(specParam: string | null) {
     ])
       .then(async ([vetsData, specData, spList]) => {
         if (cancelled) return;
-        const safeVets = Array.isArray(vetsData) ? vetsData : [];
+        const safeVets = (Array.isArray(vetsData) ? vetsData : []).filter(
+          (v) => v.isActive !== false
+        );
         const safeSpec = Array.isArray(specData) ? specData : [];
 
         setVets(safeVets);
@@ -90,12 +109,42 @@ export function useVeterinariansCatalog(specParam: string | null) {
       return;
     }
     if (specializations.length === 0 || appliedSpecRef.current === specParam) return;
-    const match = specializations.find((s) => s.id === specParam || SPEC_TONES[s.id] === specParam);
+    const match = specializations.find(
+      (s) => s.id === specParam || SPEC_TONES[s.id] === specParam
+    );
     if (match) {
       appliedSpecRef.current = specParam;
       setSelectedSpec(match.id);
     }
   }, [specParam, specializations]);
+
+  useEffect(() => {
+    if (!speciesParam) {
+      appliedSpeciesRef.current = null;
+      return;
+    }
+    if (speciesList.length === 0 || appliedSpeciesRef.current === speciesParam) return;
+    const match = speciesList.find(
+      (sp) => sp.id === speciesParam || getSpeciesTone(sp.name) === speciesParam
+    );
+    if (match) {
+      appliedSpeciesRef.current = speciesParam;
+      setSelectedSpecies(match.id);
+    }
+  }, [speciesParam, speciesList]);
+
+  useEffect(() => {
+    if (!openParam) {
+      appliedOpenRef.current = null;
+      return;
+    }
+    if (vets.length === 0 || appliedOpenRef.current === openParam) return;
+    const found = vets.find((v) => v.id === openParam);
+    if (found) {
+      appliedOpenRef.current = openParam;
+      setSelectedVet(found);
+    }
+  }, [openParam, vets]);
 
   const selectedVetId = selectedVet?.id ?? null;
 
@@ -107,14 +156,23 @@ export function useVeterinariansCatalog(specParam: string | null) {
     }
 
     let cancelled = false;
+    const today = getMoscowTodayIso(0);
+    const in60Days = getMoscowTodayIso(60);
+
     Promise.all([
       clinicApi.getWorkSchedules(selectedVetId),
-      clinicApi.getScheduleExceptions(selectedVetId),
+      clinicApi.getScheduleExceptions(selectedVetId, today, in60Days),
     ])
       .then(([schedRes, excRes]) => {
         if (cancelled) return;
         setVetSchedules(Array.isArray(schedRes) ? schedRes : []);
-        setVetExceptions(Array.isArray(excRes) ? excRes : []);
+        const upcoming = (Array.isArray(excRes) ? excRes : [])
+          .filter((exc) => {
+            const end = exc.endDate || exc.startDate;
+            return end >= today && exc.startDate <= in60Days;
+          })
+          .sort((a, b) => a.startDate.localeCompare(b.startDate));
+        setVetExceptions(upcoming);
       })
       .catch(() => {
         if (cancelled) return;
@@ -127,7 +185,13 @@ export function useVeterinariansCatalog(specParam: string | null) {
     };
   }, [selectedVetId]);
 
-  const specsMap = useMemo(() => toIdNameMap(specializations), [specializations]);
+  const specsMap = useMemo(() => {
+    const map: Record<string, string> = {};
+    for (const sp of specializations) {
+      map[sp.id] = SPECIALIZATION_NAMES_RU[sp.name] || SPECIALIZATION_NAMES_RU[sp.id] || sp.name;
+    }
+    return map;
+  }, [specializations]);
   const speciesMap = useMemo(() => toIdNameMap(speciesList), [speciesList]);
   const hasFilters = selectedSpec !== 'ALL' || selectedSpecies !== 'ALL' || searchQuery.trim() !== '';
 

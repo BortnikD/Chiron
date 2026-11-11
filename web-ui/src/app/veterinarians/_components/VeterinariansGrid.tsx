@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { Stethoscope, Inbox } from 'lucide-react';
+import { Stethoscope } from 'lucide-react';
 import { getDoctorDisplay } from '@/utils/doctorHelpers';
 import { getSpecTone, getSpeciesTone, pluralRu } from '@/shared/lib';
 import { SpeciesIcon } from '@/components/ui/SpeciesIcon';
@@ -14,6 +14,9 @@ export const VeterinariansGrid: React.FC<VeterinariansGridProps> = ({
   specsMap,
   speciesMap,
   vetPermissions,
+  loading = false,
+  hasFilters = false,
+  onReset,
 }) => {
   return (
     <section className="island grow" aria-label="Список врачей">
@@ -27,13 +30,24 @@ export const VeterinariansGrid: React.FC<VeterinariansGridProps> = ({
         {vets.length === 0 ? (
           <div className="empty">
             <div className="empty-art">
-              <Inbox className="ic ic-40" />
+              <Stethoscope className="ic ic-40" />
             </div>
-            <span className="empty-title">Врачи не найдены</span>
-            <span>Попробуйте изменить фильтры</span>
+            <span className="empty-title">
+              {loading ? 'Загрузка врачей...' : 'Нет врачей по фильтру'}
+            </span>
+            {loading ? (
+              <span>Получение списка врачей клиники...</span>
+            ) : (
+              hasFilters &&
+              onReset && (
+                <button type="button" className="btn btn-outline" onClick={onReset}>
+                  Сбросить фильтры
+                </button>
+              )
+            )}
           </div>
         ) : (
-          <div className="cards" style={{ alignItems: 'stretch' }}>
+          <div className="cards">
             {vets.map((v) => {
               const isSel = selectedVet?.id === v.id;
               const tone = getSpecTone(v.specializationId);
@@ -46,54 +60,14 @@ export const VeterinariansGrid: React.FC<VeterinariansGridProps> = ({
                   type="button"
                   className={`tcard tone-${tone} ${isSel ? 'sel' : ''}`}
                   onClick={() => onSelectVet(v)}
-                  style={{
-                    textAlign: 'left',
-                    cursor: 'pointer',
-                    height: '100%',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    alignSelf: 'stretch',
-                    boxSizing: 'border-box',
-                    transition: 'border-color 0.15s ease, box-shadow 0.15s ease',
-                  }}
                 >
-                  <div
-                    className="tcard-head"
-                    style={{
-                      minHeight: '48px',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '12px',
-                      minWidth: 0,
-                      width: '100%',
-                    }}
-                  >
-                    <span className="t-ava lg round" style={{ flexShrink: 0 }}>
-                      {initials}
-                    </span>
-                    <span className="col" style={{ gap: '4px', minWidth: 0, flex: 1, overflow: 'hidden' }}>
-                      <span
-                        className="tcard-title"
-                        style={{
-                          whiteSpace: 'nowrap',
-                          overflow: 'hidden',
-                          textOverflow: 'ellipsis',
-                          minWidth: 0,
-                          display: 'block',
-                        }}
-                        title={fullName}
-                      >
+                  <div className="tcard-head">
+                    <span className="t-ava lg round">{initials}</span>
+                    <span className="col" style={{ gap: '4px', minWidth: 0 }}>
+                      <span className="tcard-title" title={fullName}>
                         {name}
                       </span>
-                      <span
-                        className="cell-sub"
-                        style={{
-                          whiteSpace: 'nowrap',
-                          overflow: 'hidden',
-                          textOverflow: 'ellipsis',
-                          minWidth: 0,
-                        }}
-                      >
+                      <span className="cell-sub">
                         стаж {v.experienceYears} {pluralRu(v.experienceYears, 'год', 'года', 'лет')}
                       </span>
                     </span>
@@ -103,29 +77,14 @@ export const VeterinariansGrid: React.FC<VeterinariansGridProps> = ({
                     <span className="t-badge">{specName}</span>
                   </div>
 
-                  {v.bio && (
-                    <span
-                      className="tcard-desc"
-                      style={{
-                        display: '-webkit-box',
-                        WebkitLineClamp: 2,
-                        WebkitBoxOrient: 'vertical',
-                        overflow: 'hidden',
-                        textOverflow: 'ellipsis',
-                        lineHeight: '1.45',
-                      }}
-                    >
-                      {v.bio}
-                    </span>
-                  )}
+                  {v.bio && <span className="tcard-desc">{v.bio}</span>}
 
-                  <div className="tcard-foot" style={{ justifyContent: 'flex-start', marginTop: 'auto' }}>
+                  <div className="tcard-foot" style={{ justifyContent: 'flex-start' }}>
                     <div className="chips">
                       {perms.length > 0 ? (
                         perms.map((spId) => {
                           const spName = speciesMap[spId] || 'Животное';
                           const spTone = getSpeciesTone(spName);
-
                           return (
                             <span key={spId} className={`sp-chip tone-${spTone}`}>
                               <SpeciesIcon species={spTone} size={14} />
