@@ -172,6 +172,28 @@ API использует JWT-токен. Токен один и живёт 30 д
 
 Пример: `GET /api/v1/client/appointments?status=COMPLETED&direction=DESC&page=0&size=20`.
 
+## Пациенты врача
+
+`GET /api/v1/veterinarian/pets` возвращает постраничный список пациентов текущего врача.
+Пациент — питомец, у которого есть хотя бы одна запись к этому врачу, независимо от даты и статуса записи.
+Повторные приёмы не создают дубли; питомцы других врачей без записи к текущему врачу не попадают в ответ.
+Профиль врача определяется по токену, передавать `veterinarianId` не требуется.
+
+Необязательные фильтры: `ownerId`, `speciesId`, `gender`, `isArchived`, `name` (подстрока без учёта регистра).
+Без `isArchived` возвращаются и архивные, и неархивные пациенты. Все фильтры объединяются через AND.
+Параметры `page` (с 0) и `size` (1–100, по умолчанию 20) и формат страницы описаны ниже.
+Элементы `items` имеют формат `PetResponse`, как у `GET /api/v1/veterinarian/pets/{id}`, включая поля фото.
+Сортировка: `createdAt`, затем `id`, оба по возрастанию.
+
+Пример: `GET /api/v1/veterinarian/pets?name=Барс&isArchived=false&page=0&size=20`.
+Для числа пациентов в профиле достаточно `?page=0&size=1` и поля `result.totalElements`.
+
+Отбор пациентов, фильтрация, подсчёт и пагинация выполняются в БД через подзапрос к приёмам.
+На запрос списка выполняется поиск профиля врача, подсчёт пациентов и выборка нужной страницы —
+без выгрузки истории приёмов и отдельных запросов для каждого питомца. Миграция `V05` добавляет индекс
+`appointment(veterinarian_id, pet_id)` для этой выборки.
+Фронтенду следует использовать этот эндпоинт вместо сбора ID из приёмов и последующей загрузки питомцев по одному.
+
 ## Сводка питомца по запросу
 
 `GET /api/v1/client/pets` и `GET /api/v1/client/pets/{id}` принимают `withSummary`, по умолчанию `false`.
@@ -352,7 +374,7 @@ Health check, OpenAPI и STOMP-сообщения используют собс�
 и, для ошибок валидации, список нарушений по полям (`violations`).
 
 Постраничные списки — `GET /api/v1/admin/{appointments,users,pets,vaccinations,schedule-exceptions}`,
-`GET /api/v1/client/appointments`, `GET /api/v1/veterinarian/{appointments,vaccinations}`
+`GET /api/v1/client/appointments`, `GET /api/v1/veterinarian/{appointments,pets,vaccinations}`
 и `GET /api/v1/notifications` — принимают `page`
 (с 0, по умолчанию 0) и `size` (1–100, по умолчанию 20), а в `result` возвращают страницу:
 

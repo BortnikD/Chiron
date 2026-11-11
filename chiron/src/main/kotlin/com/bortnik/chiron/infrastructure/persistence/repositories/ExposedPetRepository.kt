@@ -12,15 +12,18 @@ import com.bortnik.chiron.infrastructure.persistence.containsIgnoreCase
 import com.bortnik.chiron.infrastructure.persistence.exposedSql
 import com.bortnik.chiron.infrastructure.persistence.mappers.toDbDecimal
 import com.bortnik.chiron.infrastructure.persistence.mappers.toPet
+import com.bortnik.chiron.infrastructure.persistence.models.ExposedAppointmentTable
 import com.bortnik.chiron.infrastructure.persistence.models.ExposedPetTable
 import com.bortnik.chiron.infrastructure.persistence.toPage
 import org.jetbrains.exposed.v1.core.Op
 import org.jetbrains.exposed.v1.core.SortOrder
 import org.jetbrains.exposed.v1.core.andIfNotNull
 import org.jetbrains.exposed.v1.core.eq
+import org.jetbrains.exposed.v1.core.inSubQuery
 import org.jetbrains.exposed.v1.javatime.CurrentTimestampWithTimeZone
 import org.jetbrains.exposed.v1.jdbc.deleteWhere
 import org.jetbrains.exposed.v1.jdbc.insertReturning
+import org.jetbrains.exposed.v1.jdbc.select
 import org.jetbrains.exposed.v1.jdbc.selectAll
 import org.jetbrains.exposed.v1.jdbc.updateReturning
 import org.springframework.stereotype.Repository
@@ -87,6 +90,13 @@ class ExposedPetRepository : PetRepository {
     }
 
     private fun PetFilter.toCondition(): Op<Boolean> = Op.TRUE
+        .andIfNotNull(
+            patientOfVeterinarianId?.let {
+                ExposedPetTable.id inSubQuery
+                        ExposedAppointmentTable.select(ExposedAppointmentTable.petId)
+                            .where { ExposedAppointmentTable.veterinarianId eq it }
+            },
+        )
         .andIfNotNull(ownerId?.let { ExposedPetTable.ownerId eq it })
         .andIfNotNull(speciesId?.let { ExposedPetTable.speciesId eq it })
         .andIfNotNull(gender?.let { ExposedPetTable.gender eq it })

@@ -1,6 +1,40 @@
 -- Run automatically before seed commit, or independently with psql -v ON_ERROR_STOP=1 -f this-file.sql.
 DO
 $$
+BEGIN
+    IF EXISTS (
+        SELECT 1 FROM (
+            SELECT concat_ws(' ', first_name, middle_name, last_name, full_name) AS value
+            FROM users WHERE id::text LIKE '5eed%' OR email = 'admin@demo.chiron.local'
+            UNION ALL
+            SELECT name FROM species WHERE id::text LIKE '5eed%'
+            UNION ALL
+            SELECT concat_ws(' ', name, description) FROM specialization WHERE id::text LIKE '5eed%'
+            UNION ALL
+            SELECT concat_ws(' ', name, description) FROM service WHERE id::text LIKE '5eed%'
+            UNION ALL
+            SELECT bio FROM veterinarian WHERE id::text LIKE '5eed%'
+            UNION ALL
+            SELECT concat_ws(' ', name, notes) FROM pet WHERE id::text LIKE '5eed%'
+            UNION ALL
+            SELECT reason FROM schedule_exception WHERE veterinarian_id::text LIKE '5eed%'
+            UNION ALL
+            SELECT concat_ws(' ', client_comment, vet_notes, cancel_reason)
+            FROM appointment WHERE veterinarian_id::text LIKE '5eed%'
+            UNION ALL
+            SELECT v.name FROM vaccination v JOIN pet p ON p.id = v.pet_id WHERE p.id::text LIKE '5eed%'
+            UNION ALL
+            SELECT concat_ws(' ', title, body) FROM notification WHERE recipient_id::text LIKE '5eed%'
+        ) AS texts
+        WHERE value ~ '[A-Za-z]'
+    ) THEN
+        RAISE EXCEPTION 'Demo display texts must be in Russian';
+    END IF;
+END;
+$$;
+
+DO
+$$
     DECLARE
         today date := (now() AT TIME ZONE 'Europe/Moscow')::date;
     BEGIN
