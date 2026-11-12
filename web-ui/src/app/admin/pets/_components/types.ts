@@ -61,7 +61,13 @@ export interface PetsTableProps {
   speciesList: Species[];
   users: User[];
   loading: boolean;
+  totalElements: number;
+  page: number;
+  pageSize: number;
+  totalPages: number;
   onSelectPet: (pet: Pet) => void;
+  onPageChange: (page: number) => void;
+  onPageSizeChange: (size: number) => void;
 }
 
 export interface PetDetailIslandProps {

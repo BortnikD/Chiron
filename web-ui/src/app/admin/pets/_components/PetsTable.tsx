@@ -3,6 +3,7 @@
 import React from 'react';
 import { PawPrint } from 'lucide-react';
 import { calculateAgeRu, getSpeciesTone } from '@/shared/lib';
+import { PaginationFooter } from '@/shared/components';
 import { PetAvatar } from '@/components/ui/EntityAvatar';
 import type { PetsTableProps } from './types';
 
@@ -16,14 +17,20 @@ export const PetsTable: React.FC<PetsTableProps> = ({
   speciesList,
   users,
   loading,
+  totalElements,
+  page,
+  pageSize,
+  totalPages,
   onSelectPet,
+  onPageChange,
+  onPageSizeChange,
 }) => {
   return (
     <section className="island grow">
       <div className="island-head">
         <span className="island-title">
           <PawPrint size={18} />
-          Питомцы <span className="count">Найдено: {pets.length}</span>
+          Питомцы <span className="count">Найдено: {totalElements}</span>
         </span>
       </div>
 
@@ -103,6 +110,16 @@ export const PetsTable: React.FC<PetsTableProps> = ({
           </div>
         )}
       </div>
+
+      <PaginationFooter
+        page={page}
+        pageSize={pageSize}
+        totalElements={totalElements}
+        totalPages={totalPages}
+        loading={loading}
+        onPageChange={onPageChange}
+        onPageSizeChange={onPageSizeChange}
+      />
     </section>
   );
 };

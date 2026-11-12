@@ -7,7 +7,7 @@ import { clinicApi } from '@/modules/clinic/api';
 import type { Pet, Appointment } from '@/modules/client/types';
 import type { Service, Species, Veterinarian } from '@/modules/clinic/types';
 import { useToast } from '@/shared/components';
-import { fetchAllPages, formatApiError, getMoscowDateKey } from '@/shared/lib';
+import { formatApiError, nextMoscowDayIso } from '@/shared/lib';
 import type { User, UserRole } from '@/shared/types';
 
 export interface CreateUserInput {
@@ -26,6 +26,8 @@ export function useAdminUsers() {
   const initialSel = searchParams.get('sel');
 
   const [users, setUsers] = useState<User[]>([]);
+  const [totalElements, setTotalElements] = useState(0);
+  const [totalPages, setTotalPages] = useState(1);
   const [veterinarians, setVeterinarians] = useState<Veterinarian[]>([]);
   const [speciesList, setSpeciesList] = useState<Species[]>([]);
   const [services, setServices] = useState<Service[]>([]);
@@ -34,8 +36,11 @@ export function useAdminUsers() {
 
   const [roleFilter, setRoleFilter] = useState<string>('ALL');
   const [search, setSearch] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
   const [createdFrom, setCreatedFrom] = useState('');
   const [createdTo, setCreatedTo] = useState('');
+  const [page, setPage] = useState(0);
+  const [pageSize, setPageSize] = useState(20);
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
 
   const [userPets, setUserPets] = useState<Pet[]>([]);
@@ -51,32 +56,70 @@ export function useAdminUsers() {
   const [deleteError, setDeleteError] = useState<string | null>(null);
 
   const loadReqIdRef = useRef(0);
+  const loadAbortRef = useRef<AbortController | null>(null);
   const detailsReqIdRef = useRef(0);
   const appliedSelRef = useRef<string | null>(null);
 
-  const loadUsers = useCallback(async () => {
-    const reqId = ++loadReqIdRef.current;
-    setLoading(true);
-    setError(null);
+  useEffect(() => {
+    const trimmed = search.trim();
+    if (trimmed === debouncedSearch) return;
+    const timer = window.setTimeout(() => {
+      setDebouncedSearch(trimmed);
+      setPage(0);
+    }, 250);
+    return () => window.clearTimeout(timer);
+  }, [search, debouncedSearch]);
+
+  const loadRefs = useCallback(async () => {
     try {
-      const [items, vetsRes, speciesRes, servicesRes] = await Promise.all([
-        fetchAllPages(
-          (p, s) => adminApi.getUsers(p, s, roleFilter !== 'ALL' ? (roleFilter as UserRole) : undefined),
-          { pageSize: 100, maxPages: 50, concurrency: 4 }
-        ),
+      const [vetsRes, speciesRes, servicesRes] = await Promise.all([
         adminApi.getVeterinarians(),
         clinicApi.getSpecies(),
         adminApi.getServices(),
       ]);
-      if (loadReqIdRef.current !== reqId) return;
-      setUsers(items);
-      setVeterinarians(
-        (Array.isArray(vetsRes) ? vetsRes : []).map((v) =>
-          v.user ? v : { ...v, user: items.find((u) => u.id === v.userId) }
-        )
-      );
+      setVeterinarians(Array.isArray(vetsRes) ? vetsRes : []);
       setSpeciesList(Array.isArray(speciesRes) ? speciesRes : []);
       setServices(Array.isArray(servicesRes) ? servicesRes : []);
+    } catch {
+      // ignore
+    }
+  }, []);
+
+  const loadUsers = useCallback(async () => {
+    loadAbortRef.current?.abort();
+    const controller = new AbortController();
+    loadAbortRef.current = controller;
+    const reqId = ++loadReqIdRef.current;
+    setLoading(true);
+    setError(null);
+    try {
+      const createdFromIso = createdFrom
+        ? new Date(`${createdFrom}T00:00:00+03:00`).toISOString()
+        : undefined;
+      const createdToIso = createdTo
+        ? new Date(`${nextMoscowDayIso(createdTo)}T00:00:00+03:00`).toISOString()
+        : undefined;
+
+      const res = await adminApi.getUsers(
+        page,
+        pageSize,
+        {
+          role: roleFilter !== 'ALL' ? (roleFilter as UserRole) : undefined,
+          search: debouncedSearch || undefined,
+          createdFrom: createdFromIso,
+          createdTo: createdToIso,
+        },
+        { signal: controller.signal }
+      );
+
+      if (loadReqIdRef.current !== reqId || controller.signal.aborted) return;
+      const items = res?.items || [];
+      const total = res?.totalElements ?? items.length;
+      const pages = Math.max(1, res?.totalPages ?? 1);
+
+      setUsers(items);
+      setTotalElements(total);
+      setTotalPages(pages);
 
       if (initialSel && appliedSelRef.current !== initialSel) {
         appliedSelRef.current = initialSel;
@@ -95,17 +138,22 @@ export function useAdminUsers() {
         setSelectedUser((prev) => (prev ? items.find((u) => u.id === prev.id) ?? prev : null));
       }
     } catch (err: unknown) {
-      if (loadReqIdRef.current !== reqId) return;
+      if (loadReqIdRef.current !== reqId || controller.signal.aborted) return;
       setError(formatApiError(err, 'Не удалось загрузить пользователей'));
     } finally {
-      if (loadReqIdRef.current === reqId) setLoading(false);
+      if (loadReqIdRef.current === reqId && !controller.signal.aborted) setLoading(false);
     }
-  }, [roleFilter, initialSel]);
+  }, [page, pageSize, roleFilter, debouncedSearch, createdFrom, createdTo, initialSel]);
+
+  useEffect(() => {
+    void loadRefs();
+  }, [loadRefs]);
 
   useEffect(() => {
     void loadUsers();
     return () => {
       loadReqIdRef.current += 1;
+      loadAbortRef.current?.abort();
     };
   }, [loadUsers]);
 
@@ -202,24 +250,39 @@ export function useAdminUsers() {
     [loadUsers, toast]
   );
 
-  const filteredUsers = useMemo(() => {
-    const q = search.trim().toLowerCase();
-    return users.filter((u) => {
-      if (q) {
-        const name = (u.fullName || `${u.firstName} ${u.lastName}`).toLowerCase();
-        const email = (u.email || '').toLowerCase();
-        const phone = (u.phone || '').toLowerCase();
-        if (!name.includes(q) && !email.includes(q) && !phone.includes(q)) return false;
-      }
-      const createdIso = getMoscowDateKey(u.createdAt);
-      if (createdFrom && (!createdIso || createdIso < createdFrom)) return false;
-      if (createdTo && (!createdIso || createdIso > createdTo)) return false;
-      return true;
-    });
-  }, [users, search, createdFrom, createdTo]);
+  const handleRoleFilterChange = useCallback((newRole: string) => {
+    setRoleFilter(newRole);
+    setPage(0);
+  }, []);
+
+  const handleSearchChange = useCallback((newSearch: string) => {
+    setSearch(newSearch);
+    setPage(0);
+  }, []);
+
+  const handleCreatedFromChange = useCallback((newFrom: string) => {
+    setCreatedFrom(newFrom);
+    setPage(0);
+  }, []);
+
+  const handleCreatedToChange = useCallback((newTo: string) => {
+    setCreatedTo(newTo);
+    setPage(0);
+  }, []);
+
+  const handlePageSizeChange = useCallback((newSize: number) => {
+    setPageSize(newSize);
+    setPage(0);
+  }, []);
 
   return {
-    users: filteredUsers,
+    users,
+    totalElements,
+    totalPages,
+    page,
+    setPage,
+    pageSize,
+    setPageSize: handlePageSizeChange,
     veterinarians,
     speciesList,
     services,
@@ -227,13 +290,13 @@ export function useAdminUsers() {
     error,
     reload: loadUsers,
     roleFilter,
-    setRoleFilter,
+    setRoleFilter: handleRoleFilterChange,
     search,
-    setSearch,
+    setSearch: handleSearchChange,
     createdFrom,
-    setCreatedFrom,
+    setCreatedFrom: handleCreatedFromChange,
     createdTo,
-    setCreatedTo,
+    setCreatedTo: handleCreatedToChange,
     selectedUser,
     setSelectedUser,
     userPets,

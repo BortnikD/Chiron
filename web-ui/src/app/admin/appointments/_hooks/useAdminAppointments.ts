@@ -12,7 +12,7 @@ import type { Appointment, Pet } from '@/modules/client/types';
 import type { Veterinarian, Service, Species } from '@/modules/clinic/types';
 import type { AppointmentStatus, User } from '@/shared/types';
 import { useToast } from '@/shared/components';
-import { fetchAllPages, formatApiError } from '@/shared/lib';
+import { formatCurrency, formatApiError, mapWithConcurrency } from '@/shared/lib';
 import { buildActiveFilterChips, nextMoscowDayIso } from '../_components/utils';
 
 export function useAdminAppointments() {
@@ -62,30 +62,59 @@ export function useAdminAppointments() {
 
   const requestIdRef = useRef(0);
   const refsReqIdRef = useRef(0);
+  const loadAbortRef = useRef<AbortController | null>(null);
   const appliedInitialSelRef = useRef<string | null>(null);
+  const petsRef = useRef<Pet[]>(pets);
+  petsRef.current = pets;
+  const usersRef = useRef<User[]>(users);
+  usersRef.current = users;
 
   const loadRefs = useCallback(async () => {
     const reqId = ++refsReqIdRef.current;
     try {
-      const [vetsRes, svcsRes, speciesRes, allPets, allUsers] = await Promise.all([
+      const [vetsRes, svcsRes, speciesRes, initialPetsRes, initialUsersRes] = await Promise.all([
         adminApi.getVeterinarians(),
         adminApi.getServices(),
         clinicApi.getSpecies(),
-        fetchAllPages((p, s) => adminApi.getPets(p, s), { pageSize: 100, maxPages: 50, concurrency: 4 }),
-        fetchAllPages((p, s) => adminApi.getUsers(p, s), { pageSize: 100, maxPages: 50, concurrency: 4 }),
+        adminApi.getPets(0, 50),
+        adminApi.getUsers(0, 50, 'CLIENT'),
       ]);
       if (reqId !== refsReqIdRef.current) return;
       setVeterinarians(Array.isArray(vetsRes) ? vetsRes : []);
       setServices(Array.isArray(svcsRes) ? svcsRes : []);
       setSpeciesList(Array.isArray(speciesRes) ? speciesRes : []);
-      setPets(allPets);
-      setUsers(allUsers);
+
+      const safePets = initialPetsRes?.items ? [...initialPetsRes.items] : [];
+      const safeUsers = initialUsersRes?.items ? [...initialUsersRes.items] : [];
+
+      if (initialPetId && !safePets.some((p) => p.id === initialPetId)) {
+        try {
+          const p = await adminApi.getPetById(initialPetId);
+          if (p) safePets.push(p);
+        } catch {
+          // ignore
+        }
+      }
+      if (initialOwnerId && !safeUsers.some((u) => u.id === initialOwnerId)) {
+        try {
+          const u = await adminApi.getUserById(initialOwnerId);
+          if (u) safeUsers.push(u);
+        } catch {
+          // ignore
+        }
+      }
+
+      setPets(safePets);
+      setUsers(safeUsers);
     } catch {
       // справочные ошибки обрабатываются при основном запросе, либо доступны при повторном reload
     }
-  }, []);
+  }, [initialPetId, initialOwnerId]);
 
   const loadData = useCallback(async () => {
+    loadAbortRef.current?.abort();
+    const controller = new AbortController();
+    loadAbortRef.current = controller;
     const reqId = ++requestIdRef.current;
     setLoading(true);
     setError(null);
@@ -95,22 +124,84 @@ export function useAdminAppointments() {
         ? new Date(`${nextMoscowDayIso(dateTo)}T00:00:00+03:00`).toISOString()
         : undefined;
 
-      const apptsRes = await adminApi.getAppointments(page, pageSize, {
-        status: statusFilters.length > 0 ? statusFilters : undefined,
-        veterinarianId: vetFilter !== 'ALL' ? vetFilter : undefined,
-        petId: petFilter !== 'ALL' ? petFilter : undefined,
-        ownerId: ownerFilter !== 'ALL' ? ownerFilter : undefined,
-        serviceId: serviceFilter !== 'ALL' ? serviceFilter : undefined,
-        from: fromIso,
-        to: toIso,
-      });
+      const apptsRes = await adminApi.getAppointments(
+        page,
+        pageSize,
+        {
+          status: statusFilters.length > 0 ? statusFilters : undefined,
+          veterinarianId: vetFilter !== 'ALL' ? vetFilter : undefined,
+          petId: petFilter !== 'ALL' ? petFilter : undefined,
+          ownerId: ownerFilter !== 'ALL' ? ownerFilter : undefined,
+          serviceId: serviceFilter !== 'ALL' ? serviceFilter : undefined,
+          from: fromIso,
+          to: toIso,
+        },
+        { signal: controller.signal }
+      );
 
-      if (reqId !== requestIdRef.current) return;
+      if (reqId !== requestIdRef.current || controller.signal.aborted) return;
 
       const appts = apptsRes?.items || [];
       setAppointments(appts);
       setTotalElements(apptsRes?.totalElements ?? appts.length);
       setTotalPages(Math.max(1, apptsRes?.totalPages ?? 1));
+
+      // Подгружаем недостающих питомцев и владельцев только для строк текущей страницы
+      const missingPetIds = Array.from(
+        new Set(appts.map((a) => a.petId).filter((id): id is string => Boolean(id)))
+      ).filter((id) => !petsRef.current.some((p) => p.id === id));
+
+      let mergedPets = petsRef.current;
+      if (missingPetIds.length > 0) {
+        try {
+          const fetchedPets = await mapWithConcurrency(
+            missingPetIds,
+            (id) => adminApi.getPetById(id).catch(() => null),
+            4
+          );
+          const validPets = fetchedPets.filter((p): p is Pet => p !== null);
+          if (validPets.length > 0) {
+            setPets((prev) => {
+              const prevIds = new Set(prev.map((p) => p.id));
+              const next = [...prev];
+              for (const p of validPets) {
+                if (!prevIds.has(p.id)) next.push(p);
+              }
+              return next;
+            });
+            mergedPets = [...mergedPets, ...validPets];
+          }
+        } catch {
+          // ignore
+        }
+      }
+
+      const missingOwnerIds = Array.from(
+        new Set(mergedPets.map((p) => p.ownerId).filter((id): id is string => Boolean(id)))
+      ).filter((id) => !usersRef.current.some((u) => u.id === id));
+
+      if (missingOwnerIds.length > 0) {
+        try {
+          const fetchedUsers = await mapWithConcurrency(
+            missingOwnerIds,
+            (id) => adminApi.getUserById(id).catch(() => null),
+            4
+          );
+          const validUsers = fetchedUsers.filter((u): u is User => u !== null);
+          if (validUsers.length > 0) {
+            setUsers((prev) => {
+              const prevIds = new Set(prev.map((u) => u.id));
+              const next = [...prev];
+              for (const u of validUsers) {
+                if (!prevIds.has(u.id)) next.push(u);
+              }
+              return next;
+            });
+          }
+        } catch {
+          // ignore
+        }
+      }
 
       if (initialSel && appliedInitialSelRef.current !== initialSel) {
         appliedInitialSelRef.current = initialSel;
@@ -129,10 +220,10 @@ export function useAdminAppointments() {
         setSelectedAppt((prev) => (prev ? appts.find((a) => a.id === prev.id) ?? prev : null));
       }
     } catch (err: unknown) {
-      if (reqId !== requestIdRef.current) return;
+      if (reqId !== requestIdRef.current || controller.signal.aborted) return;
       setError(formatApiError(err, 'Не удалось загрузить список записей на приём.'));
     } finally {
-      if (reqId === requestIdRef.current) setLoading(false);
+      if (reqId === requestIdRef.current && !controller.signal.aborted) setLoading(false);
     }
   }, [page, pageSize, statusFilters, vetFilter, petFilter, ownerFilter, serviceFilter, dateFrom, dateTo, initialSel]);
 
@@ -147,6 +238,7 @@ export function useAdminAppointments() {
     void loadData();
     return () => {
       requestIdRef.current += 1;
+      loadAbortRef.current?.abort();
     };
   }, [loadData]);
 

@@ -74,7 +74,13 @@ function AdminPetsContent() {
             speciesList={vm.speciesList}
             users={vm.users}
             loading={vm.loading}
+            totalElements={vm.totalElements}
+            page={vm.page}
+            pageSize={vm.pageSize}
+            totalPages={vm.totalPages}
             onSelectPet={vm.setSelectedPet}
+            onPageChange={vm.setPage}
+            onPageSizeChange={vm.setPageSize}
           />
         </div>
 

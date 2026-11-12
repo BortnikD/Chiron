@@ -101,7 +101,7 @@ export const SpeciesTab: React.FC<SpeciesTabProps> = ({
 
   return (
     <>
-      <section className="island grow" style={{ maxWidth: 820 }}>
+      <section className="island grow">
         <div className="island-head">
           <span className="island-title">
             <Shapes size={18} />

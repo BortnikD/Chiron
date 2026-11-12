@@ -16,6 +16,7 @@ import type { Appointment, Pet } from '@/modules/client/types';
 import type { Veterinarian, Service, Species } from '@/modules/clinic/types';
 import type { User } from '@/shared/types';
 import { PetAvatar } from '@/components/ui/EntityAvatar';
+import { PaginationFooter } from '@/shared/components';
 import {
   APPOINTMENT_STATUS_META,
   formatCurrency,
@@ -23,7 +24,7 @@ import {
   getSpeciesTone,
 } from '@/shared/lib';
 import { getDoctorDisplay } from '@/utils/doctorHelpers';
-import { PAGE_SIZES, type ActiveFilterChip } from './utils';
+import { type ActiveFilterChip } from './utils';
 
 export interface AdminAppointmentsTableProps {
   appointments: Appointment[];
@@ -252,57 +253,16 @@ export const AdminAppointmentsTable: React.FC<AdminAppointmentsTableProps> = ({
         )}
       </div>
 
-      <div className="island-foot">
-        <div className="row small muted">
-          <span>На странице</span>
-          <div className="seg">
-            {PAGE_SIZES.map((sz) => (
-              <button
-                key={sz}
-                type="button"
-                className={`seg-item ${pageSize === sz ? 'on' : ''}`}
-                onClick={() => onPageSizeChange(sz)}
-              >
-                {sz}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        <div className="pager">
-          <button
-            type="button"
-            className="btn btn-ghost btn-sm btn-icon"
-            disabled={page <= 0 || loading}
-            onClick={() => onPageChange(Math.max(0, page - 1))}
-            aria-label="Назад"
-          >
-            <ChevronLeft className="ic" />
-          </button>
-
-          {Array.from({ length: Math.max(1, totalPages) }, (_, idx) => idx).map((p) => (
-            <button
-              key={p}
-              type="button"
-              className={`btn btn-ghost btn-sm ${p === page ? 'on' : ''}`}
-              disabled={loading}
-              onClick={() => onPageChange(p)}
-            >
-              {p + 1}
-            </button>
-          ))}
-
-          <button
-            type="button"
-            className="btn btn-ghost btn-sm btn-icon"
-            disabled={page >= totalPages - 1 || loading}
-            onClick={() => onPageChange(Math.min(totalPages - 1, page + 1))}
-            aria-label="Вперёд"
-          >
-            <ChevronRight className="ic" />
-          </button>
-        </div>
-      </div>
+      <PaginationFooter
+        page={page}
+        pageSize={pageSize}
+        totalElements={totalElements}
+        totalPages={totalPages}
+        loading={loading}
+        pageSizes={[10, 25, 50]}
+        onPageChange={onPageChange}
+        onPageSizeChange={onPageSizeChange}
+      />
     </section>
   );
 };

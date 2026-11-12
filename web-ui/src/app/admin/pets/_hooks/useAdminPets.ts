@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { adminApi } from '@/modules/admin/api';
 import { clinicApi } from '@/modules/clinic/api';
@@ -14,7 +14,7 @@ import type {
 } from '@/modules/client/types';
 import type { Service, Species, Veterinarian } from '@/modules/clinic/types';
 import { useToast } from '@/shared/components';
-import { fetchAllPages, formatApiError } from '@/shared/lib';
+import { formatApiError, mapWithConcurrency } from '@/shared/lib';
 import type { User } from '@/shared/types';
 import type { GenderFilter, StatusFilter } from '../_components/types';
 
@@ -38,10 +38,15 @@ export function useAdminPets() {
   const [error, setError] = useState<string | null>(null);
 
   const [search, setSearch] = useState('');
-  const [ownerFilter, setOwnerFilter] = useState(initialOwner);
-  const [speciesFilter, setSpeciesFilter] = useState('ALL');
-  const [genderFilter, setGenderFilter] = useState<GenderFilter>('ALL');
-  const [statusFilter, setStatusFilter] = useState<StatusFilter>('ALL');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
+  const [ownerFilter, setOwnerFilterState] = useState(initialOwner);
+  const [speciesFilter, setSpeciesFilterState] = useState('ALL');
+  const [genderFilter, setGenderFilterState] = useState<GenderFilter>('ALL');
+  const [statusFilter, setStatusFilterState] = useState<StatusFilter>('ALL');
+  const [page, setPage] = useState(0);
+  const [pageSize, setPageSizeState] = useState(20);
+  const [totalElements, setTotalElements] = useState(0);
+  const [totalPages, setTotalPages] = useState(1);
   const [selectedPet, setSelectedPet] = useState<Pet | null>(null);
   const [petAppointments, setPetAppointments] = useState<Appointment[]>([]);
   const [petVaccinations, setPetVaccinations] = useState<Vaccination[]>([]);
@@ -57,35 +62,43 @@ export function useAdminPets() {
   const [actionError, setActionError] = useState<string | null>(null);
 
   const loadReqIdRef = useRef(0);
+  const loadAbortRef = useRef<AbortController | null>(null);
+  const refsReqIdRef = useRef(0);
+  const refsLoadedRef = useRef(false);
   const detailsReqIdRef = useRef(0);
   const appliedSelRef = useRef<string | null>(null);
+  const usersRef = useRef<User[]>(users);
+  usersRef.current = users;
 
-  const loadData = useCallback(async () => {
-    const reqId = ++loadReqIdRef.current;
-    setLoading(true);
-    setError(null);
+  useEffect(() => {
+    const trimmed = search.trim();
+    if (trimmed === debouncedSearch) return;
+    const timer = window.setTimeout(() => {
+      setDebouncedSearch(trimmed);
+      setPage(0);
+    }, 250);
+    return () => window.clearTimeout(timer);
+  }, [search, debouncedSearch]);
+
+  const loadRefs = useCallback(async () => {
+    const reqId = ++refsReqIdRef.current;
     try {
-      const isArchived =
-        statusFilter === 'ACTIVE' ? false : statusFilter === 'ARCHIVED' ? true : undefined;
-      const [safePets, speciesRes, safeUsers, servicesRes, vetsRes] = await Promise.all([
-        fetchAllPages(
-          (p, s) =>
-            adminApi.getPets(p, s, {
-              ownerId: ownerFilter !== 'ALL' ? ownerFilter : undefined,
-              speciesId: speciesFilter !== 'ALL' ? speciesFilter : undefined,
-              isArchived,
-            }),
-          { pageSize: 100, maxPages: 50, concurrency: 4 }
-        ),
+      const [speciesRes, initialUsersRes, servicesRes, vetsRes] = await Promise.all([
         clinicApi.getSpecies(),
-        fetchAllPages((p, s) => adminApi.getUsers(p, s), { pageSize: 100, maxPages: 50, concurrency: 4 }),
+        adminApi.getUsers(0, 50, 'CLIENT'),
         adminApi.getServices(),
         adminApi.getVeterinarians(),
       ]);
-
-      if (reqId !== loadReqIdRef.current) return;
-
-      setPets(safePets);
+      if (reqId !== refsReqIdRef.current) return;
+      const safeUsers = initialUsersRes?.items ? [...initialUsersRes.items] : [];
+      if (initialOwner && initialOwner !== 'ALL' && !safeUsers.some((u) => u.id === initialOwner)) {
+        try {
+          const u = await adminApi.getUserById(initialOwner);
+          if (u) safeUsers.push(u);
+        } catch {
+          // ignore
+        }
+      }
       setSpeciesList(Array.isArray(speciesRes) ? speciesRes : []);
       setUsers(safeUsers);
       setServices(Array.isArray(servicesRes) ? servicesRes : []);
@@ -94,6 +107,87 @@ export function useAdminPets() {
           v.user ? v : { ...v, user: safeUsers.find((u) => u.id === v.userId) }
         )
       );
+      refsLoadedRef.current = true;
+    } catch {
+      // Справочники загрузятся повторно при reload
+    }
+  }, [initialOwner]);
+
+  useEffect(() => {
+    void loadRefs();
+    return () => {
+      refsReqIdRef.current += 1;
+    };
+  }, [loadRefs]);
+
+  const loadData = useCallback(async () => {
+    loadAbortRef.current?.abort();
+    const controller = new AbortController();
+    loadAbortRef.current = controller;
+    const reqId = ++loadReqIdRef.current;
+    setLoading(true);
+    setError(null);
+    if (!refsLoadedRef.current) {
+      void loadRefs();
+    }
+    try {
+      const isArchived =
+        statusFilter === 'ACTIVE' ? false : statusFilter === 'ARCHIVED' ? true : undefined;
+      const petsRes = await adminApi.getPets(
+        page,
+        pageSize,
+        {
+          ownerId: ownerFilter !== 'ALL' ? ownerFilter : undefined,
+          speciesId: speciesFilter !== 'ALL' ? speciesFilter : undefined,
+          gender: genderFilter !== 'ALL' ? genderFilter : undefined,
+          isArchived,
+          search: debouncedSearch || undefined,
+        },
+        { signal: controller.signal }
+      );
+
+      if (reqId !== loadReqIdRef.current || controller.signal.aborted) return;
+
+      const safePets = Array.isArray(petsRes?.items) ? petsRes.items : [];
+      const nextTotalElements = petsRes?.totalElements ?? safePets.length;
+      const nextTotalPages = Math.max(1, petsRes?.totalPages ?? 1);
+
+      if (page > nextTotalPages - 1) {
+        setPage(Math.max(0, nextTotalPages - 1));
+        return;
+      }
+
+      setPets(safePets);
+      setTotalElements(nextTotalElements);
+      setTotalPages(nextTotalPages);
+
+      // Подгружаем недостающих владельцев для питомцев текущей страницы
+      const missingOwnerIds = Array.from(
+        new Set(safePets.map((p) => p.ownerId).filter((id): id is string => Boolean(id)))
+      ).filter((id) => !usersRef.current.some((u) => u.id === id));
+
+      if (missingOwnerIds.length > 0) {
+        try {
+          const loadedUsers = await mapWithConcurrency(
+            missingOwnerIds,
+            (id) => adminApi.getUserById(id).catch(() => null),
+            4
+          );
+          const validUsers = loadedUsers.filter((u): u is User => u !== null);
+          if (validUsers.length > 0) {
+            setUsers((prev) => {
+              const prevIds = new Set(prev.map((u) => u.id));
+              const next = [...prev];
+              for (const u of validUsers) {
+                if (!prevIds.has(u.id)) next.push(u);
+              }
+              return next;
+            });
+          }
+        } catch {
+          // ignore
+        }
+      }
 
       if (initialSel && appliedSelRef.current !== initialSel) {
         appliedSelRef.current = initialSel;
@@ -112,12 +206,12 @@ export function useAdminPets() {
         setSelectedPet((prev) => (prev ? safePets.find((p) => p.id === prev.id) ?? prev : null));
       }
     } catch (err: unknown) {
-      if (reqId !== loadReqIdRef.current) return;
+      if (reqId !== loadReqIdRef.current || controller.signal.aborted) return;
       setError(getErrMsg(err, 'Не удалось загрузить список питомцев.'));
     } finally {
-      if (reqId === loadReqIdRef.current) setLoading(false);
+      if (reqId === loadReqIdRef.current && !controller.signal.aborted) setLoading(false);
     }
-  }, [ownerFilter, speciesFilter, statusFilter, initialSel]);
+  }, [page, pageSize, ownerFilter, speciesFilter, genderFilter, statusFilter, debouncedSearch, initialSel, loadRefs]);
 
   const loadPetDetails = useCallback(async (petId: string) => {
     const reqId = ++detailsReqIdRef.current;
@@ -143,6 +237,7 @@ export function useAdminPets() {
     loadData();
     return () => {
       loadReqIdRef.current += 1;
+      loadAbortRef.current?.abort();
     };
   }, [loadData]);
 
@@ -262,21 +357,39 @@ export function useAdminPets() {
     }
   }, [selectedPet, loadData, toast]);
 
-  const filteredPets = useMemo(() => {
-    return pets.filter((p) => {
-      if (genderFilter !== 'ALL' && p.gender !== genderFilter) return false;
-      if (search) {
-        const q = search.toLowerCase();
-        const pName = p.name.toLowerCase();
-        const oName = (users.find((u) => u.id === p.ownerId)?.fullName || '').toLowerCase();
-        if (!pName.includes(q) && !oName.includes(q)) return false;
-      }
-      return true;
-    });
-  }, [pets, genderFilter, search, users]);
+  const setOwnerFilter = useCallback((next: string) => {
+    setOwnerFilterState(next);
+    setPage(0);
+  }, []);
+
+  const setSpeciesFilter = useCallback((next: string) => {
+    setSpeciesFilterState(next);
+    setPage(0);
+  }, []);
+
+  const setGenderFilter = useCallback((next: GenderFilter) => {
+    setGenderFilterState(next);
+    setPage(0);
+  }, []);
+
+  const setStatusFilter = useCallback((next: StatusFilter) => {
+    setStatusFilterState(next);
+    setPage(0);
+  }, []);
+
+  const setPageSize = useCallback((next: number) => {
+    setPageSizeState(next);
+    setPage(0);
+  }, []);
 
   return {
-    pets: filteredPets,
+    pets,
+    totalElements,
+    totalPages,
+    page,
+    setPage,
+    pageSize,
+    setPageSize,
     speciesList,
     users,
     services,

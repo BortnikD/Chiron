@@ -6,6 +6,7 @@ import { X, Trash2, Edit2, AlertCircle } from 'lucide-react';
 import type { Appointment, Pet } from '@/modules/client/types';
 import type { Veterinarian, Service, Species } from '@/modules/clinic/types';
 import type { User } from '@/shared/types';
+import { PetAvatar } from '@/components/ui/EntityAvatar';
 import {
   APPOINTMENT_STATUS_META,
   canTransitionAppointmentStatus,
@@ -13,6 +14,7 @@ import {
   formatDateShort,
   formatDateTimeCompact,
   formatSlotTime,
+  getSpeciesTone,
 } from '@/shared/lib';
 import { getDoctorDisplay } from '@/utils/doctorHelpers';
 
@@ -67,16 +69,28 @@ export const AdminAppointmentDetailIsland: React.FC<AdminAppointmentDetailIsland
     cls: 'badge-outline',
   };
 
+  const tone = getSpeciesTone(pet?.species?.name || speciesName || pet?.speciesId || 'cat', speciesList);
+
   return (
     <section className="island detail-island" style={{ width: 440 }} aria-label="Запись">
       <div className="island-head">
-        <div className="col" style={{ gap: 2 }}>
-          <span className="h2" style={{ wordBreak: 'break-word' }}>
-            {pet?.name || 'Питомец'} — {serviceName}
-          </span>
-          <span className="cell-sub tnum">
-            {dtStart.date}, {dtStart.time}–{dtEnd.time}
-          </span>
+        <div className="row" style={{ minWidth: 0, gap: 12, alignItems: 'center' }}>
+          <PetAvatar
+            pet={pet}
+            tone={tone}
+            species={tone}
+            iconSize={20}
+            variant="full"
+            className={`t-ava tone-${tone} detail-head-ava`}
+          />
+          <div className="col" style={{ gap: 2, minWidth: 0 }}>
+            <span className="h2" style={{ wordBreak: 'break-word' }}>
+              {pet?.name || 'Питомец'} — {serviceName}
+            </span>
+            <span className="cell-sub tnum">
+              {dtStart.date}, {dtStart.time}–{dtEnd.time}
+            </span>
+          </div>
         </div>
         <button
           type="button"

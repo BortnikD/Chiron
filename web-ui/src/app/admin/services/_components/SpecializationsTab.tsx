@@ -105,7 +105,7 @@ export const SpecializationsTab: React.FC<SpecializationsTabProps> = ({
 
   return (
     <>
-      <section className="island grow" style={{ maxWidth: 980 }}>
+      <section className="island grow">
         <div className="island-head">
           <span className="island-title">
             <Tags size={18} />

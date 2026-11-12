@@ -3,12 +3,19 @@
 import React from 'react';
 import { Users } from 'lucide-react';
 import type { User } from '@/shared/types';
+import { PaginationFooter } from '@/shared/components';
 import { USER_ROLE_META, formatDateShort, getUserInitials } from '@/shared/lib';
 
 export interface AdminUsersTableProps {
   users: User[];
   selectedUser: User | null;
   loading: boolean;
+  page: number;
+  pageSize: number;
+  totalPages: number;
+  totalElements: number;
+  onPageChange: (page: number) => void;
+  onPageSizeChange: (size: number) => void;
   onSelectUser: (user: User) => void;
 }
 
@@ -19,6 +26,12 @@ export const AdminUsersTable: React.FC<AdminUsersTableProps> = ({
   users,
   selectedUser,
   loading,
+  page,
+  pageSize,
+  totalPages,
+  totalElements,
+  onPageChange,
+  onPageSizeChange,
   onSelectUser,
 }) => {
   return (
@@ -26,7 +39,7 @@ export const AdminUsersTable: React.FC<AdminUsersTableProps> = ({
       <div className="island-head">
         <span className="island-title">
           <Users size={18} />
-          Пользователи <span className="count">Найдено: {users.length}</span>
+          Пользователи <span className="count">Найдено: {totalElements}</span>
         </span>
       </div>
 
@@ -90,6 +103,17 @@ export const AdminUsersTable: React.FC<AdminUsersTableProps> = ({
           </div>
         )}
       </div>
+
+      <PaginationFooter
+        page={page}
+        pageSize={pageSize}
+        totalElements={totalElements}
+        totalPages={totalPages}
+        loading={loading}
+        pageSizes={[10, 20, 50]}
+        onPageChange={onPageChange}
+        onPageSizeChange={onPageSizeChange}
+      />
     </section>
   );
 };

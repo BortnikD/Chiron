@@ -60,6 +60,12 @@ function AdminUsersContent() {
             users={vm.users}
             selectedUser={vm.selectedUser}
             loading={vm.loading}
+            page={vm.page}
+            pageSize={vm.pageSize}
+            totalPages={vm.totalPages}
+            totalElements={vm.totalElements}
+            onPageChange={vm.setPage}
+            onPageSizeChange={vm.setPageSize}
             onSelectUser={vm.setSelectedUser}
           />
         </div>
