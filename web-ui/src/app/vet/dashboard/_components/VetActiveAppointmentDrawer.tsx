@@ -15,6 +15,8 @@ import {
   formatSlotTime,
 } from '@/shared/lib';
 import { ConsultationPrintSheet } from '@/components/print/ConsultationPrintSheet';
+import { PetAvatar } from '@/components/ui/EntityAvatar';
+import { PatientQuickViewModal } from '@/components/patients/PatientQuickViewModal';
 import { useAuth } from '@/context/AuthContext';
 import { getDoctorDisplay } from '@/utils/doctorHelpers';
 import { VetAddVaccinationModal } from '../../patients/_components/VetAddVaccinationModal';
@@ -56,6 +58,7 @@ export const VetActiveAppointmentDrawer: React.FC<VetActiveAppointmentDrawerProp
   const [cancelErr, setCancelErr] = useState<string | null>(null);
   const [isFollowUpOpen, setIsFollowUpOpen] = useState(false);
   const [isVaccOpen, setIsVaccOpen] = useState(false);
+  const [isQuickViewOpen, setIsQuickViewOpen] = useState(false);
   const [origAppt, setOrigAppt] = useState<Appointment | null>(null);
 
   useEffect(() => {
@@ -86,6 +89,7 @@ export const VetActiveAppointmentDrawer: React.FC<VetActiveAppointmentDrawerProp
 
   const pet = appointment.pet || petsMap?.[appointment.petId] || null;
   const petName = getPetName(appointment, petsMap);
+  const tone = pet ? (pet.species?.name || pet.speciesName || pet.speciesId || 'cat').toLowerCase() : 'cat';
   const speciesName =
     pet?.species?.name ||
     pet?.speciesName ||
@@ -167,14 +171,24 @@ export const VetActiveAppointmentDrawer: React.FC<VetActiveAppointmentDrawerProp
     <>
       <section className="island detail-island xl:w-[460px]" aria-label="Детали приёма">
         <div className="island-head">
-          <div className="col" style={{ gap: '2px', minWidth: 0 }}>
-            <span className="h2" style={{ wordBreak: 'break-word' }}>
-              {petName} — {serviceName}
-            </span>
-            <span className="cell-sub tnum">
-              {formatDateShort(appointment.startAt)}, {formatSlotTime(appointment.startAt)}–
-              {formatSlotTime(appointment.endAt)}
-            </span>
+          <div className="row" style={{ minWidth: 0, gap: 12, alignItems: 'center' }}>
+            <PetAvatar
+              pet={pet}
+              tone={tone}
+              species={tone}
+              iconSize={20}
+              variant="full"
+              className={`t-ava tone-${tone} detail-head-ava`}
+            />
+            <div className="col" style={{ gap: '2px', minWidth: 0 }}>
+              <span className="h2" style={{ wordBreak: 'break-word' }}>
+                {petName} — {serviceName}
+              </span>
+              <span className="cell-sub tnum">
+                {formatDateShort(appointment.startAt)}, {formatSlotTime(appointment.startAt)}–
+                {formatSlotTime(appointment.endAt)}
+              </span>
+            </div>
           </div>
           <button
             type="button"
@@ -220,7 +234,7 @@ export const VetActiveAppointmentDrawer: React.FC<VetActiveAppointmentDrawerProp
             <dl className="kv" style={{ margin: 0 }}>
               <dt>Пациент</dt>
               <dd>
-                <button type="button" className="linkish" onClick={openPatientPage}>
+                <button type="button" className="linkish" onClick={() => setIsQuickViewOpen(true)}>
                   {petName}
                 </button>{' '}
                 <span className="muted">· {speciesName}</span>
@@ -286,7 +300,7 @@ export const VetActiveAppointmentDrawer: React.FC<VetActiveAppointmentDrawerProp
               <button
                 type="button"
                 className="btn btn-ghost btn-block"
-                onClick={openPatientPage}
+                onClick={() => setIsQuickViewOpen(true)}
               >
                 <PawPrint className="ic" />
                 <span>Карточка пациента</span>
@@ -340,6 +354,16 @@ export const VetActiveAppointmentDrawer: React.FC<VetActiveAppointmentDrawerProp
         pet={pet}
         vetName={vetName}
         notes={printNotes}
+      />
+
+      <PatientQuickViewModal
+        isOpen={isQuickViewOpen}
+        pet={pet}
+        speciesMap={speciesMap}
+        servicesMap={servicesMap}
+        appointments={appointments}
+        onClose={() => setIsQuickViewOpen(false)}
+        onOpenAppointment={onSelectAppointment}
       />
     </>
   );

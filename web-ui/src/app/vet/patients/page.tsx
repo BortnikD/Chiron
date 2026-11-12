@@ -14,7 +14,7 @@ function VetPatientsContent() {
   const initialSelId = searchParams.get('sel');
 
   const {
-    filteredPatients,
+    patients,
     appointments,
     speciesList,
     servicesMap,
@@ -25,6 +25,12 @@ function VetPatientsContent() {
     setSearch,
     speciesFilter,
     setSpeciesFilter,
+    page,
+    setPage,
+    pageSize,
+    setPageSize,
+    totalElements,
+    totalPages,
     viewMode,
     setViewMode,
     selectedPatient,
@@ -63,19 +69,25 @@ function VetPatientsContent() {
               speciesFilter={speciesFilter}
               onSpeciesFilterChange={setSpeciesFilter}
               speciesList={speciesList}
-              count={filteredPatients.length}
+              count={totalElements}
               viewMode={viewMode}
               onViewModeChange={setViewMode}
             />
 
             <VetPatientsList
-              patients={filteredPatients}
+              patients={patients}
               selectedPatient={selectedPatient}
               onSelectPatient={setSelectedPatient}
               speciesList={speciesList}
               appointments={appointments}
               loading={loading}
               viewMode={viewMode}
+              page={page}
+              pageSize={pageSize}
+              totalElements={totalElements}
+              totalPages={totalPages}
+              onPageChange={setPage}
+              onPageSizeChange={setPageSize}
             />
           </section>
 

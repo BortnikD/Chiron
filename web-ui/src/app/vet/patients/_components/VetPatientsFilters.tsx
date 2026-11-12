@@ -83,7 +83,7 @@ export function VetPatientsFilters({
             <input
               type="text"
               className="input input-sm"
-              placeholder="Кличка или вид…"
+              placeholder="Поиск по кличке…"
               aria-label="Поиск по кличке"
               value={search}
               onChange={(e) => onSearchChange(e.target.value)}

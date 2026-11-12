@@ -240,6 +240,9 @@ export function VetAddVaccinationModal({
                 </label>
                 <input
                   id="vx-name"
+                  name="vaccineName"
+                  type="text"
+                  autoFocus
                   className={`input ${fieldErrors.name ? 'invalid' : ''}`}
                   maxLength={150}
                   placeholder="Например, Нобивак DHPPi"
