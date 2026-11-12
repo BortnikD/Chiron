@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { clinicApi } from '@/modules/clinic/api';
 import type {
   ScheduleException,
+  Service,
   Specialization,
   Species,
   Veterinarian,
@@ -26,6 +27,7 @@ export function useVeterinariansCatalog(
   const [vets, setVets] = useState<Veterinarian[]>([]);
   const [specializations, setSpecializations] = useState<Specialization[]>([]);
   const [speciesList, setSpeciesList] = useState<Species[]>([]);
+  const [services, setServices] = useState<Service[]>([]);
   const [vetPermissions, setVetPermissions] = useState<Record<string, string[]>>({});
   const [selectedSpec, setSelectedSpec] = useState<string>('ALL');
   const [selectedSpecies, setSelectedSpecies] = useState<string>('ALL');
@@ -54,8 +56,9 @@ export function useVeterinariansCatalog(
       clinicApi.getVeterinarians(),
       clinicApi.getSpecializations(),
       clinicApi.getSpecies(),
+      clinicApi.getServices().catch(() => [] as Service[]),
     ])
-      .then(async ([vetsData, specData, spList]) => {
+      .then(async ([vetsData, specData, spList, svcData]) => {
         if (cancelled) return;
         const safeVets = (Array.isArray(vetsData) ? vetsData : []).filter(
           (v) => v.isActive !== false
@@ -65,6 +68,7 @@ export function useVeterinariansCatalog(
         setVets(safeVets);
         setSpecializations(safeSpec);
         setSpeciesList(Array.isArray(spList) ? spList : []);
+        setServices(Array.isArray(svcData) ? svcData : []);
         setSelectedVet((prev) =>
           prev ? safeVets.find((item) => item.id === prev.id) ?? null : null
         );
@@ -225,6 +229,7 @@ export function useVeterinariansCatalog(
   return {
     specializations,
     speciesList,
+    services,
     vetPermissions,
     selectedSpec,
     setSelectedSpec,

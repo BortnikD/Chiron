@@ -2,6 +2,7 @@ import type { UserRole } from '@/shared/types';
 import type {
   Veterinarian,
   Specialization,
+  Service,
   Species,
   WorkSchedule,
   ScheduleException,
@@ -36,6 +37,7 @@ export interface VeterinarianDetailIslandProps {
   vet: Veterinarian;
   specsMap: Record<string, string>;
   speciesMap: Record<string, string>;
+  services?: Service[];
   permissions: string[];
   schedules: WorkSchedule[];
   exceptions: ScheduleException[];

@@ -24,6 +24,7 @@ function VeterinariansContent() {
   const {
     specializations,
     speciesList,
+    services,
     vetPermissions,
     selectedSpec,
     setSelectedSpec,
@@ -91,6 +92,7 @@ function VeterinariansContent() {
           vet={selectedVet}
           specsMap={specsMap}
           speciesMap={speciesMap}
+          services={services}
           permissions={vetPermissions[selectedVet.id] || []}
           schedules={vetSchedules}
           exceptions={vetExceptions}

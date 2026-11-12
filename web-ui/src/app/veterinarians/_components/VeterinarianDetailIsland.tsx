@@ -5,13 +5,14 @@ import Link from 'next/link';
 import { X, CalendarPlus } from 'lucide-react';
 import { getDoctorDisplay } from '@/utils/doctorHelpers';
 import { VetAvatar } from '@/components/ui/EntityAvatar';
-import { DOW_ORDER, DOW_LABELS, formatIsoDateDisplay, formatTime, pluralRu } from '@/shared/lib';
+import { DOW_ORDER, DOW_LABELS, formatIsoDateDisplay, formatTime, getSpecTone, pluralRu } from '@/shared/lib';
 import type { VeterinarianDetailIslandProps } from './types';
 
 export const VeterinarianDetailIsland: React.FC<VeterinarianDetailIslandProps> = ({
   vet,
   specsMap,
   speciesMap,
+  services = [],
   permissions,
   schedules,
   exceptions,
@@ -20,6 +21,10 @@ export const VeterinarianDetailIsland: React.FC<VeterinarianDetailIslandProps> =
   role,
 }) => {
   const { fullName, initials, specName } = getDoctorDisplay(vet, specsMap);
+  const specTone = getSpecTone(vet.specializationId);
+  const vetServices = services.filter(
+    (s) => s.isActive !== false && s.specializationId === vet.specializationId
+  );
 
   return (
     <section
@@ -58,6 +63,18 @@ export const VeterinarianDetailIsland: React.FC<VeterinarianDetailIslandProps> =
       <div className="island-body">
         <div className="col" style={{ gap: '18px' }}>
           {vet.bio && <p>{vet.bio}</p>}
+
+          <div className="col" style={{ gap: '8px' }}>
+            <span className="section-title">Специализация и услуги</span>
+            <div className={`chips tone-${specTone}`}>
+              <span className="t-badge">{specName}</span>
+              {vetServices.map((svc) => (
+                <span key={svc.id} className="badge badge-outline">
+                  {svc.name}
+                </span>
+              ))}
+            </div>
+          </div>
 
           <div className="col" style={{ gap: '8px' }}>
             <span className="section-title">Лечит</span>
