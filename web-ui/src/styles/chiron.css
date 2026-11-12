@@ -297,11 +297,19 @@ html, body {
   transition: border-color .12s, box-shadow .12s;
 }
 
+.input::placeholder, .textarea::placeholder {
+  color: var(--muted-foreground);
+  opacity: 0.7;
+}
+
 .input {
   display: block;
   height: 36px;
   padding: 7px 11px;
   line-height: 20px;
+  color: var(--foreground);
+  background: var(--card);
+  caret-color: var(--foreground);
 }
 
 .input.pr-10 {
@@ -456,6 +464,10 @@ button.select, .select.dd-btn, .dd-btn {
 .slot:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
 .stepper { display: flex; gap: 6px; flex-wrap: wrap; }
 .step { display: flex; align-items: center; gap: 8px; height: 34px; padding: 0 12px 0 6px; border-radius: 999px; font-size: 13px; font-weight: 500; color: var(--muted-foreground); }
+button.step { border: 0; background: transparent; font-family: inherit; text-align: left; }
+button.step.done { cursor: pointer; transition: background .12s, color .12s; }
+button.step.done:hover { background: var(--muted); color: var(--foreground); }
+button.step.done:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
 .step-n { width: 22px; height: 22px; border-radius: 50%; border: 1px solid var(--input); display: grid; place-items: center; font-size: 12px; font-weight: 600; }
 .step.on { background: var(--primary-soft); color: var(--primary-text); }
 .step.on .step-n { background: var(--primary); color: var(--primary-foreground); border-color: var(--primary); }
@@ -473,8 +485,8 @@ button.select, .select.dd-btn, .dd-btn {
 .tl-appt:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
 .tl-card.past { opacity: .62; }
 .tl-card.past:hover { opacity: 1; }
-.tl-card.now, .tl-card.next { box-shadow: 0 0 0 2px var(--primary), 0 6px 18px color-mix(in oklch, var(--primary) 18%, transparent); }
-.tl-card.sel { box-shadow: 0 0 0 2px var(--ring); }
+.tl-card.now { border-color: color-mix(in oklch, var(--primary) 45%, var(--border)); }
+.tl-card.sel { background: color-mix(in srgb, var(--primary) 12%, var(--card)); border-color: var(--ring); box-shadow: 0 0 0 2px var(--ring), 0 6px 18px color-mix(in oklch, var(--primary) 16%, transparent); }
 .tl-break { margin: 7px 10px; border-radius: 10px; border: 1px dashed var(--input); padding: 10px 12px; color: var(--muted-foreground); font-size: 13px; background: repeating-linear-gradient(45deg, transparent, transparent 6px, color-mix(in oklch, var(--muted) 70%, transparent) 6px, color-mix(in oklch, var(--muted) 70%, transparent) 12px); }
 .tl-now-row { min-height: 0; background: color-mix(in oklch, var(--primary) 6%, transparent); }
 .tl-now-row .tl-time { padding: 4px 8px 4px 0; justify-content: center; background: transparent; }
@@ -628,14 +640,6 @@ button.select, .select.dd-btn, .dd-btn {
 .pass-toggle:focus-visible { outline: 2px solid var(--ring); outline-offset: 1px; }
 
 /* ---------- responsive ---------- */
-@media (min-width: 960px) {
-  /* В master-detail экранах с сеткой карточек (.cards) фиксированная ширина трека (260px)
-     позволяет боковому .detail-island открываться в flex-потоке рядом: карточки не ужимаются
-     и не перекрываются выдвижной панелью, а лишние карточки переносятся на следующую строку. */
-  .content-row:not(:has(.stepper)) .island.grow .cards {
-    grid-template-columns: repeat(auto-fill, 260px);
-  }
-}
 @media (min-width: 960px) and (max-width: 1279px) {
   .detail-island { width: min(400px, 38vw); }
 }
@@ -719,6 +723,8 @@ button.select, .select.dd-btn, .dd-btn {
   /* master–detail: detail opens as a full-screen sheet */
   .detail-island { position: fixed; inset: 0; width: auto !important; border-radius: 0; overflow: auto; z-index: 70; }
   .detail-island .island-head { position: sticky; top: 0; background: var(--card); z-index: 2; }
+  .detail-island .island-head:has(.detail-head-ava.ava-has-photo) { position: relative; top: auto; }
+  .detail-island .island-head:has(.detail-head-ava.ava-has-photo) > button[aria-label="Закрыть"] { right: 22px; }
 
   /* dialogs as bottom sheets */
   .overlay, .dialog-backdrop, .catcher, .toasts { position: fixed; }
@@ -805,8 +811,8 @@ button.select, .select.dd-btn, .dd-btn {
 .hm-pet-add:hover { border-color: var(--primary); color: var(--primary-text); background: color-mix(in srgb, var(--primary) 5%, transparent); }
 .hm-pet-add:focus-visible { outline: 2px solid var(--ring); outline-offset: 1px; }
 .hm-grid { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr); gap: 8px; align-items: stretch; }
-.hm-side { height: 0; min-height: 100%; }
-.hm-notifs { flex: 1 1 0; min-height: 0; }
+.hm-side { display: flex; flex-direction: column; gap: 8px; min-width: 0; height: 100%; }
+.hm-notifs { flex: 1 1 auto; min-height: 140px; display: flex; flex-direction: column; }
 .hm-notifs > .island-body { flex: 1; min-height: 0; overflow-y: auto; }
 @media (min-width: 1101px) { .hm-notifs > .island-body { -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - 28px), transparent); mask-image: linear-gradient(to bottom, #000 calc(100% - 28px), transparent); padding-bottom: 20px !important; } }
 .hm-day { display: flex; align-items: center; gap: 10px; padding: 14px 2px 6px; }
@@ -856,11 +862,68 @@ button.select, .select.dd-btn, .dd-btn {
 .t-ava.round { border-radius: 50%; }
 .ava-has-photo { overflow: hidden !important; padding: 0 !important; background: var(--muted) !important; }
 .ava-img { width: 100%; height: 100%; object-fit: cover; display: block; }
-.island-head:has(.detail-head-ava.ava-has-photo) { align-items: flex-start; }
-.island-head:has(.detail-head-ava.ava-has-photo) > .row { align-items: flex-start; gap: 14px; }
-.detail-head-ava.ava-has-photo { width: 128px !important; height: 128px !important; border-radius: 14px !important; border: 1px solid var(--border); }
+.island-head:has(.detail-head-ava.ava-has-photo) {
+  position: relative;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 10px;
+}
+.island-head:has(.detail-head-ava.ava-has-photo) > .row {
+  flex-direction: column;
+  align-items: stretch;
+  width: 100%;
+  min-width: 0;
+  gap: 12px;
+}
+.island-head:has(.detail-head-ava.ava-has-photo) > .row > .col {
+  min-width: 0;
+}
+.island-head:has(.detail-head-ava.ava-has-photo) > button[aria-label="Закрыть"] {
+  position: absolute;
+  top: 20px;
+  right: 24px;
+  z-index: 2;
+  background: color-mix(in srgb, var(--card) 78%, transparent);
+  border-color: color-mix(in srgb, var(--border) 85%, transparent);
+  backdrop-filter: blur(8px);
+  box-shadow: var(--shadow);
+}
+.island-head:has(.detail-head-ava.ava-has-photo) > button[aria-label="Закрыть"]:hover {
+  background: color-mix(in srgb, var(--card) 94%, transparent);
+}
+.detail-island:has(.detail-head-ava.ava-has-photo) {
+  overflow-y: auto;
+  overflow-x: hidden;
+  scrollbar-gutter: stable;
+}
+.detail-island:has(.detail-head-ava.ava-has-photo) > .island-head {
+  flex: none;
+}
+.detail-island:has(.detail-head-ava.ava-has-photo) > .island-body {
+  flex: 0 0 auto;
+  overflow: visible;
+}
+.detail-head-ava.ava-has-photo {
+  display: block !important;
+  width: 100% !important;
+  height: auto !important;
+  aspect-ratio: 1 / 1;
+  border-radius: 12px !important;
+  border: 1px solid var(--border);
+}
+.detail-head-ava.ava-has-photo .ava-img {
+  width: 100%;
+  height: 100%;
+  aspect-ratio: 1 / 1;
+  object-fit: cover;
+}
 .detail-head-ava.round.ava-has-photo,
-.avatar-lg.detail-head-ava.ava-has-photo { border-radius: 50% !important; }
+.avatar-lg.detail-head-ava.ava-has-photo {
+  border-radius: 12px !important;
+}
+.avatar-lg.detail-head-ava.ava-has-photo .ava-img {
+  object-position: 50% 25%;
+}
 .t-badge { display: inline-flex; align-items: center; gap: 5px; height: 22px; padding: 0 9px; border-radius: 999px; font-size: 12px; font-weight: 600; white-space: nowrap;
   color: color-mix(in srgb, var(--tone, var(--muted-foreground)) 80%, var(--foreground)); background: color-mix(in srgb, var(--tone, var(--muted-foreground)) 14%, transparent); }
 .t-badge .ic { width: 13px; height: 13px; }
