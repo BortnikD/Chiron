@@ -25,8 +25,8 @@ export function VaccinationsPetFilter({
 }: VaccinationsPetFilterProps) {
   const bookHref =
     selectedPetId !== 'all'
-      ? `/client/book?petId=${encodeURIComponent(selectedPetId)}`
-      : '/client/book';
+      ? `/client/book?petId=${encodeURIComponent(selectedPetId)}&intent=vaccination`
+      : '/client/book?intent=vaccination';
 
   return (
     <section className="island" aria-label="Фильтр по питомцам">

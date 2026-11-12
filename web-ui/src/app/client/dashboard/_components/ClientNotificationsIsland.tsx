@@ -47,7 +47,11 @@ export function ClientNotificationsIsland({
   );
 
   return (
-    <section className="island hm-notifs" id="notifs">
+    <section
+      className="island hm-notifs"
+      id="notifs"
+      style={{ flex: 1, minHeight: '140px', display: 'flex', flexDirection: 'column' }}
+    >
       <div className="island-head">
         <span className="island-title">
           <Bell className="ic" />
@@ -58,7 +62,7 @@ export function ClientNotificationsIsland({
           <ChevronRight className="ic" />
         </Link>
       </div>
-      <div className="island-body" style={{ padding: '0 6px 8px' }}>
+      <div className="island-body" style={{ padding: '0 6px 8px', flex: 1, display: 'flex', flexDirection: 'column' }}>
         {notifications.length === 0 ? (
           <div className="empty" style={{ padding: '20px' }}>
             <span className="small muted">Новых уведомлений нет</span>

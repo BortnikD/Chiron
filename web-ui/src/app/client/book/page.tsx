@@ -35,21 +35,28 @@ function BookAppointmentContent() {
     slots,
     resolvedVetId,
     doctorDisplay,
+    isVaccination,
+    isVetPreselected,
     isNextDisabled,
     handleSelectPet,
     handleSelectService,
     handleSelectSlot,
-    handleSelectSlotVetId,
     handleConfirmBooking,
     handleNewBooking,
   } = useBookingWizard(
     searchParams.get('serviceId'),
     searchParams.get('vetId'),
     searchParams.get('petId'),
-    searchParams.get('slot')
+    searchParams.get('slot'),
+    searchParams.get('intent'),
+    searchParams.get('vaccine')
   );
 
   const selectedService = data.selectedService;
+  const lockedDoctor = !data.isAnyVet && data.selectedVet ? data.selectedVet : null;
+  const stepServices = lockedDoctor?.specializationId
+    ? data.services.filter((s) => s.specializationId === lockedDoctor.specializationId)
+    : data.services;
   const serviceDurationMin = selectedService
     ? selectedService.effectiveDurationMin ??
       selectedService.baseDurationMin ??
@@ -68,7 +75,25 @@ function BookAppointmentContent() {
             <CalendarPlus className="ic" />
             Запись на приём
           </span>
-          <BookingStepper currentStep={step} isSuccess={isSuccess} />
+          <BookingStepper
+            currentStep={step}
+            isSuccess={isSuccess}
+            steps={
+              isVetPreselected
+                ? [
+                    { n: 1, label: 'Питомец' },
+                    { n: 2, label: 'Услуга' },
+                    { n: 4, displayNum: 3, label: 'Дата и время' },
+                    { n: 5, displayNum: 4, label: 'Подтверждение' },
+                  ]
+                : undefined
+            }
+            onStepClick={(targetStep) => {
+              if (!isSuccess && targetStep < step) {
+                setStep(targetStep);
+              }
+            }}
+          />
         </div>
         <div className="sep" />
         <div className="island-body" style={{ paddingTop: '16px' }}>
@@ -113,17 +138,53 @@ function BookAppointmentContent() {
                   onSelectPet={handleSelectPet}
                   speciesMap={data.speciesMap}
                   loading={data.loadingData}
+                  allowedSpeciesIds={
+                    isVetPreselected && data.selectedVet?.speciesIds?.length
+                      ? data.selectedVet.speciesIds
+                      : undefined
+                  }
+                  doctorLabel={isVetPreselected ? doctorDisplay : undefined}
+                  onResetDoctorFilter={
+                    isVetPreselected
+                      ? () => {
+                          data.setIsAnyVet(true);
+                          data.setSelectedVet(null);
+                          if (!data.selectedPet) {
+                            const firstActive = data.pets.find((p) => !p.isArchived) ?? null;
+                            if (firstActive) {
+                              data.setSelectedPet(firstActive);
+                            }
+                          }
+                          handleSelectSlot(null);
+                        }
+                      : undefined
+                  }
                 />
               )}
               {step === 2 && (
                 <StepServiceSelection
-                  services={data.services}
+                  services={stepServices}
                   specializations={data.specializations}
                   selectedService={selectedService}
                   onSelectService={handleSelectService}
                   specsMap={data.specsMap}
                   speciesName={data.selectedPet ? data.speciesMap[data.selectedPet.speciesId] : undefined}
                   loading={data.loadingServices}
+                  lockedDoctorName={lockedDoctor ? doctorDisplay : null}
+                  lockedSpecializationName={
+                    lockedDoctor?.specializationId
+                      ? data.specsMap[lockedDoctor.specializationId] || null
+                      : null
+                  }
+                  onResetDoctorFilter={
+                    lockedDoctor
+                      ? () => {
+                          data.setIsAnyVet(true);
+                          data.setSelectedVet(null);
+                          handleSelectSlot(null);
+                        }
+                      : undefined
+                  }
                 />
               )}
               {step === 3 && (
@@ -163,8 +224,6 @@ function BookAppointmentContent() {
                   selectedSlot={slots.selectedSlot}
                   onSelectSlot={handleSelectSlot}
                   isAnyVet={data.isAnyVet}
-                  selectedSlotVetId={slots.selectedSlotVetId}
-                  onSelectSlotVetId={handleSelectSlotVetId}
                   vetsMap={data.vetsMap}
                   specsMap={data.specsMap}
                 />
@@ -178,6 +237,7 @@ function BookAppointmentContent() {
                   selectedSlot={slots.selectedSlot}
                   comment={comment}
                   onCommentChange={setComment}
+                  isVaccination={isVaccination}
                 />
               )}
             </div>
@@ -189,8 +249,22 @@ function BookAppointmentContent() {
             isNextDisabled={isNextDisabled}
             submitting={submitting}
             canSubmit={Boolean(slots.selectedSlot && resolvedVetId)}
-            onPrev={() => (step > 1 ? setStep(step - 1) : router.push('/client/appointments'))}
-            onNext={() => setStep(step + 1)}
+            onPrev={() => {
+              if (step === 4 && isVetPreselected) {
+                setStep(2);
+              } else if (step > 1) {
+                setStep(step - 1);
+              } else {
+                router.push('/client/appointments');
+              }
+            }}
+            onNext={() => {
+              if (step === 2 && isVetPreselected) {
+                setStep(4);
+              } else {
+                setStep(step + 1);
+              }
+            }}
             onSubmit={handleConfirmBooking}
           />
         )}

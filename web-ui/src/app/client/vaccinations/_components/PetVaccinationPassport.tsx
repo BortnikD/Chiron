@@ -54,7 +54,7 @@ export function PetVaccinationPassport({
 
         {!pet.isArchived && (
           <Link
-            href={`/client/book?petId=${encodeURIComponent(pet.id)}`}
+            href={`/client/book?petId=${encodeURIComponent(pet.id)}&intent=vaccination`}
             className="btn btn-outline btn-sm"
           >
             <Plus className="ic" />

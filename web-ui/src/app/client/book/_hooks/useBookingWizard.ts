@@ -10,21 +10,25 @@ import {
   parseBookingError,
   resolveDoctorDisplayName,
 } from './bookingErrorHelpers';
-import { useBookingData } from './useBookingData';
+import { useBookingData, isVaccinationService } from './useBookingData';
 import { useBookingSlots } from './useBookingSlots';
 
 export function useBookingWizard(
   initialServiceId: string | null,
   initialVetId: string | null,
   initialPetId?: string | null,
-  initialSlot?: string | null
+  initialSlot?: string | null,
+  initialIntent?: string | null,
+  initialVaccine?: string | null
 ) {
   const { toast } = useToast();
   const [step, setStepState] = useState<number>(1);
   const [isSuccess, setIsSuccess] = useState<boolean>(false);
   const [createdApptId, setCreatedApptId] = useState<string | null>(null);
   const [bookedVetDisplay, setBookedVetDisplay] = useState<string>('');
-  const [comment, setComment] = useState<string>('');
+  const [comment, setComment] = useState<string>(() =>
+    initialVaccine?.trim() ? `Ревакцинация: ${initialVaccine.trim()}`.slice(0, 1000) : ''
+  );
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [slotConflictError, setSlotConflictError] = useState<string | null>(null);
@@ -39,14 +43,18 @@ export function useBookingWizard(
     initialVetId,
     setStepState,
     initialPetId,
-    initialSlot
+    initialSlot,
+    initialIntent
   );
+
+  const isVaccination = isVaccinationService(data.selectedService);
   const slots = useBookingSlots(
     data.selectedPet,
     data.selectedService,
     data.isAnyVet,
     data.selectedVet,
-    initialSlot
+    initialSlot,
+    data.vetsMap
   );
 
   const {
@@ -138,29 +146,12 @@ export function useBookingWizard(
     ) {
       return slots.selectedSlotVetId;
     }
-    return slots.selectedSlot.veterinarianIds.length === 1
-      ? slots.selectedSlot.veterinarianIds[0]
-      : null;
+    return slots.selectedSlot.veterinarianIds[0] ?? null;
   }, [data.isAnyVet, data.selectedVet, slots.selectedSlot, slots.selectedSlotVetId]);
 
   const doctorDisplay = useMemo(
-    () =>
-      resolveDoctorDisplayName(
-        data.isAnyVet,
-        data.selectedVet,
-        slots.selectedSlot,
-        slots.selectedSlotVetId,
-        data.veterinarians,
-        data.specsMap
-      ),
-    [
-      data.isAnyVet,
-      data.selectedVet,
-      slots.selectedSlot,
-      slots.selectedSlotVetId,
-      data.veterinarians,
-      data.specsMap,
-    ]
+    () => resolveDoctorDisplayName(data.isAnyVet, data.selectedVet, data.specsMap),
+    [data.isAnyVet, data.selectedVet, data.specsMap]
   );
 
   const handleConfirmBooking = useCallback(async () => {
@@ -190,7 +181,13 @@ export function useBookingWizard(
         endAt: slots.selectedSlot.endAt,
         clientComment: comment.trim() || null,
       });
-      setBookedVetDisplay(doctorDisplay);
+      const assignedVetId = res?.veterinarianId || resolvedVetId;
+      const assignedVet = data.vetsMap[assignedVetId] ?? null;
+      setBookedVetDisplay(
+        assignedVet
+          ? resolveDoctorDisplayName(false, assignedVet, data.specsMap)
+          : doctorDisplay
+      );
       setIsSuccess(true);
       setCreatedApptId(res?.id || null);
       toast('Запись создана', 'Статус «Ожидает подтверждения» — врач получит уведомление');
@@ -212,6 +209,8 @@ export function useBookingWizard(
   }, [
     data.selectedPet,
     data.selectedService,
+    data.vetsMap,
+    data.specsMap,
     slots.selectedSlot,
     resolvedVetId,
     comment,
@@ -253,6 +252,10 @@ export function useBookingWizard(
     slots,
     resolvedVetId,
     doctorDisplay,
+    isVaccination,
+    isVetPreselected: Boolean(
+      initialVetId && !data.isAnyVet && data.selectedVet?.id === initialVetId
+    ),
     isNextDisabled,
     handleSelectPet,
     handleSelectService,

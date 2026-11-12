@@ -23,14 +23,12 @@ export interface StepSlotSelectionProps {
   selectedSlot: AvailableSlotResponse | null;
   onSelectSlot: (slot: AvailableSlotResponse) => void;
   isAnyVet: boolean;
-  selectedSlotVetId: string | null;
-  onSelectSlotVetId: (vetId: string) => void;
   vetsMap: Record<string, Veterinarian>;
   specsMap: Record<string, string>;
 }
 
 /**
- * Шаг 4: выбор даты старта, диапазона (7 / 14 дней), временного слота и врача (при «Любой врач»).
+ * Шаг 4: выбор даты старта, диапазона (7 / 14 дней) и временного слота.
  */
 export const StepSlotSelection: React.FC<StepSlotSelectionProps> = ({
   fromDate,
@@ -48,14 +46,9 @@ export const StepSlotSelection: React.FC<StepSlotSelectionProps> = ({
   selectedSlot,
   onSelectSlot,
   isAnyVet,
-  selectedSlotVetId,
-  onSelectSlotVetId,
   vetsMap,
   specsMap,
 }) => {
-  const showMultiVetPicker =
-    Boolean(isAnyVet && selectedSlot && selectedSlot.veterinarianIds.length > 1);
-
   return (
     <div className="col" style={{ gap: '12px' }}>
       {conflictError && (
@@ -195,40 +188,6 @@ export const StepSlotSelection: React.FC<StepSlotSelectionProps> = ({
               </div>
             </div>
           ))}
-
-          {showMultiVetPicker && selectedSlot && (
-            <div className="card" style={{ borderColor: 'var(--primary)' }}>
-              <span className="cell-main">
-                В {formatSlotTime(selectedSlot.startAt)} свободны несколько врачей — выберите одного
-              </span>
-              <div className="chips">
-                {selectedSlot.veterinarianIds.map((vid) => {
-                  const v = vetsMap[vid];
-                  const display = v
-                    ? getDoctorDisplay(v, specsMap)
-                    : { name: 'Дежурный врач', initials: 'ДВ' };
-                  const isPicked = selectedSlotVetId === vid;
-                  return (
-                    <button
-                      key={vid}
-                      type="button"
-                      className={`chip ${isPicked ? 'on' : ''}`}
-                      onClick={() => onSelectSlotVetId(vid)}
-                    >
-                      <VetAvatar
-                        vet={v}
-                        initials={display.initials}
-                        className="avatar avatar-xs"
-                        style={{ margin: 0 }}
-                        alt={display.name}
-                      />
-                      {display.name}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-          )}
         </>
       )}
     </div>

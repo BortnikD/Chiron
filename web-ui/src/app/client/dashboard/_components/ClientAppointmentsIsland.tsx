@@ -70,7 +70,7 @@ export function ClientAppointmentsIsland({
   }, [upcomingAppts]);
 
   return (
-    <section className="island">
+    <section className="island" style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
       <div className="island-head">
         <span className="island-title">
           <Calendar className="ic" />
@@ -82,7 +82,7 @@ export function ClientAppointmentsIsland({
         </Link>
       </div>
 
-      <div className="island-body" style={{ paddingTop: 0 }}>
+      <div className="island-body" style={{ paddingTop: 0, flex: 1, display: 'flex', flexDirection: 'column' }}>
         {groupedUpcoming.length === 0 ? (
           <div className="empty" style={{ padding: '24px' }}>
             <span>Нет предстоящих записей</span>

@@ -11,6 +11,9 @@ export interface StepServiceSelectionProps {
   specsMap: Record<string, string>;
   speciesName?: string;
   loading?: boolean;
+  lockedDoctorName?: string | null;
+  lockedSpecializationName?: string | null;
+  onResetDoctorFilter?: () => void;
 }
 
 /**
@@ -24,6 +27,9 @@ export const StepServiceSelection: React.FC<StepServiceSelectionProps> = ({
   specsMap,
   speciesName,
   loading = false,
+  lockedDoctorName,
+  lockedSpecializationName,
+  onResetDoctorFilter,
 }) => {
   const [selectedSpecId, setSelectedSpecId] = useState<string>('ALL');
 
@@ -45,6 +51,24 @@ export const StepServiceSelection: React.FC<StepServiceSelectionProps> = ({
         </span>
         <span className="small muted">Цена и длительность — для этого вида</span>
       </div>
+
+      {lockedDoctorName && (
+        <div className="row between wrap" style={{ gap: '8px', alignItems: 'center' }}>
+          <span className="small muted">
+            Показаны услуги врача <b>{lockedDoctorName}</b>
+            {lockedSpecializationName ? ` (${lockedSpecializationName})` : ''}
+          </span>
+          {onResetDoctorFilter && (
+            <button
+              type="button"
+              className="btn btn-ghost btn-sm"
+              onClick={onResetDoctorFilter}
+            >
+              Показать все услуги
+            </button>
+          )}
+        </div>
+      )}
 
       {activeSpecializations.length > 1 && (
         <div className="seg">

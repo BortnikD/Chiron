@@ -1,28 +1,14 @@
-import type { AvailableSlotResponse, Veterinarian } from '@/modules/clinic/types';
+import type { Veterinarian } from '@/modules/clinic/types';
 import { formatApiError } from '@/shared/lib';
 import { getDoctorDisplay } from '@/utils/doctorHelpers';
 
 export function resolveDoctorDisplayName(
   isAnyVet: boolean,
   selectedVet: Veterinarian | null,
-  selectedSlot: AvailableSlotResponse | null,
-  selectedSlotVetId: string | null,
-  veterinarians: Veterinarian[],
   specsMap: Record<string, string>
 ): string {
   if (!isAnyVet && selectedVet) {
     return getDoctorDisplay(selectedVet, specsMap).name;
-  }
-  if (selectedSlotVetId) {
-    const picked = veterinarians.find((v) => v.id === selectedSlotVetId);
-    return picked ? getDoctorDisplay(picked, specsMap).name : 'Дежурный врач';
-  }
-  if (selectedSlot && selectedSlot.veterinarianIds.length > 1) {
-    return 'Выберите врача в шаге 4';
-  }
-  if (selectedSlot && selectedSlot.veterinarianIds.length === 1) {
-    const match = veterinarians.find((v) => v.id === selectedSlot.veterinarianIds[0]);
-    return match ? getDoctorDisplay(match, specsMap).name : 'Дежурный врач';
   }
   return 'Любой';
 }

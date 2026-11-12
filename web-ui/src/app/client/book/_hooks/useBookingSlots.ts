@@ -76,6 +76,33 @@ function addDaysIso(baseIso: string, offsetDays: number): string {
   return endDate.toISOString().slice(0, 10);
 }
 
+function filterSlotsBySpecialization(
+  slots: AvailableSlotResponse[],
+  isAnyVet: boolean,
+  specializationId: string | undefined,
+  vetsMap: Record<string, Veterinarian>
+): AvailableSlotResponse[] {
+  if (!isAnyVet || !specializationId) return slots;
+  const allVets = Object.values(vetsMap);
+  if (allVets.length === 0) return slots;
+  const hasMatchingVet = allVets.some(
+    (v) => v.isActive !== false && v.specializationId === specializationId
+  );
+  if (!hasMatchingVet) return slots;
+
+  return slots
+    .map((slot) => ({
+      ...slot,
+      veterinarianIds: slot.veterinarianIds.filter((id) => {
+        const vet = vetsMap[id];
+        return Boolean(
+          vet && vet.isActive !== false && vet.specializationId === specializationId
+        );
+      }),
+    }))
+    .filter((slot) => slot.veterinarianIds.length > 0);
+}
+
 /**
  * Хук поиска и управления свободными окнами для записи на приём.
  */
@@ -84,7 +111,8 @@ export function useBookingSlots(
   selectedService: Service | null,
   isAnyVet: boolean,
   selectedVet: Veterinarian | null,
-  initialSlot?: string | null
+  initialSlot?: string | null,
+  vetsMap: Record<string, Veterinarian> = {}
 ): BookingSlotsState {
   const todayStr = useMemo(() => getMoscowTodayIso(0), []);
   const [fromDate, setFromDate] = useState<string>(() => {
@@ -102,6 +130,8 @@ export function useBookingSlots(
   const [reloadTick, setReloadTick] = useState(0);
 
   const appliedSlotRef = useRef<string | null>(null);
+  const vetsMapRef = useRef(vetsMap);
+  vetsMapRef.current = vetsMap;
 
   const reloadSlots = useCallback(() => {
     setReloadTick((tick) => tick + 1);
@@ -111,6 +141,7 @@ export function useBookingSlots(
   const isPetArchived = Boolean(selectedPet?.isArchived);
   const speciesId = selectedPet?.speciesId ?? null;
   const serviceId = selectedService?.id ?? null;
+  const serviceSpecializationId = selectedService?.specializationId;
   const vetId = isAnyVet ? undefined : selectedVet?.id;
 
   useEffect(() => {
@@ -123,23 +154,33 @@ export function useBookingSlots(
     }
 
     let cancelled = false;
+    const controller = new AbortController();
     const toDate = addDaysIso(fromDate, horizonDays - 1);
 
     setLoadingSlots(true);
     setSlotsError(null);
 
     clinicApi
-      .findAvailableSlots({
-        speciesId,
-        serviceId,
-        veterinarianId: vetId,
-        from: fromDate,
-        to: toDate,
-      })
+      .findAvailableSlots(
+        {
+          speciesId,
+          serviceId,
+          veterinarianId: vetId,
+          from: fromDate,
+          to: toDate,
+        },
+        { signal: controller.signal }
+      )
       .then((slots) => {
-        if (cancelled) return;
-        const safeSlots = (Array.isArray(slots) ? slots : []).sort(
+        if (cancelled || controller.signal.aborted) return;
+        const sortedSlots = (Array.isArray(slots) ? slots : []).sort(
           (a, b) => new Date(a.startAt).getTime() - new Date(b.startAt).getTime()
+        );
+        const safeSlots = filterSlotsBySpecialization(
+          sortedSlots,
+          isAnyVet,
+          serviceSpecializationId,
+          vetsMapRef.current
         );
         setAvailableSlots(safeSlots);
 
@@ -189,24 +230,26 @@ export function useBookingSlots(
         }
       })
       .catch((err: unknown) => {
-        if (cancelled) return;
+        if (cancelled || controller.signal.aborted) return;
         setAvailableSlots([]);
         setSelectedSlot(null);
         setSelectedSlotVetId(null);
         setSlotsError(formatApiError(err, 'Не удалось загрузить свободные окна'));
       })
       .finally(() => {
-        if (!cancelled) setLoadingSlots(false);
+        if (!cancelled && !controller.signal.aborted) setLoadingSlots(false);
       });
 
     return () => {
       cancelled = true;
+      controller.abort();
     };
   }, [
     petId,
     isPetArchived,
     speciesId,
     serviceId,
+    serviceSpecializationId,
     vetId,
     isAnyVet,
     selectedVet,
@@ -242,9 +285,20 @@ export function useBookingSlots(
     setSelectedSlotVetId(null);
   }, []);
 
+  const scopedAvailableSlots = useMemo(
+    () =>
+      filterSlotsBySpecialization(
+        availableSlots,
+        isAnyVet,
+        serviceSpecializationId,
+        vetsMap
+      ),
+    [availableSlots, isAnyVet, serviceSpecializationId, vetsMap]
+  );
+
   const slotsByDay = useMemo(
-    () => groupSlotsByDay(availableSlots, todayStr),
-    [availableSlots, todayStr]
+    () => groupSlotsByDay(scopedAvailableSlots, todayStr),
+    [scopedAvailableSlots, todayStr]
   );
 
   const durationInfoText = useMemo(() => {
@@ -268,7 +322,7 @@ export function useBookingSlots(
     loadingSlots,
     slotsError,
     reloadSlots,
-    availableSlots,
+    availableSlots: scopedAvailableSlots,
     slotsByDay,
     selectedSlot,
     onSelectSlot,

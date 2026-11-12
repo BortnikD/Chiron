@@ -7,6 +7,24 @@ import type { Pet } from '@/modules/client/types';
 import type { Service, Veterinarian, Specialization, Species } from '@/modules/clinic/types';
 import { formatApiError, toIdNameMap } from '@/shared/lib';
 
+const VACCINATION_SERVICE_ID = '5eed0003-0000-0000-0000-000000000002';
+
+/**
+ * Определяет, является ли услуга вакцинацией.
+ */
+export function isVaccinationService(service: Service | null | undefined): boolean {
+  if (!service) return false;
+  return service.id === VACCINATION_SERVICE_ID || /вакцин|привив/i.test(service.name);
+}
+
+function findVaccinationService(services: Service[]): Service | null {
+  return (
+    services.find((s) => s.id === VACCINATION_SERVICE_ID) ??
+    services.find((s) => /вакцин|привив/i.test(s.name)) ??
+    null
+  );
+}
+
 /**
  * Хук загрузки справочников и инициализации выбранных сущностей мастера записи.
  */
@@ -15,7 +33,8 @@ export function useBookingData(
   initialVetId: string | null,
   onSetStep: (step: number) => void,
   initialPetId?: string | null,
-  initialSlot?: string | null
+  initialSlot?: string | null,
+  initialIntent?: string | null
 ) {
   const [pets, setPets] = useState<Pet[]>([]);
   const [services, setServices] = useState<Service[]>([]);
@@ -35,7 +54,10 @@ export function useBookingData(
 
   const onSetStepRef = useRef(onSetStep);
   onSetStepRef.current = onSetStep;
-  const didInitRef = useRef(false);
+  const initialIntentRef = useRef(initialIntent);
+  initialIntentRef.current = initialIntent;
+  const initKey = `${initialServiceId ?? ''}|${initialVetId ?? ''}|${initialPetId ?? ''}|${initialSlot ?? ''}|${initialIntent ?? ''}`;
+  const lastInitKeyRef = useRef<string | null>(null);
   const loadedSpeciesIdRef = useRef<string | null | undefined>(undefined);
   const selectedPetRef = useRef<Pet | null>(null);
   selectedPetRef.current = selectedPet;
@@ -48,6 +70,7 @@ export function useBookingData(
     let cancelled = false;
     setLoadingData(true);
     setDataError(null);
+    const isFreshInit = lastInitKeyRef.current !== initKey;
 
     Promise.all([
       clientApi.getPets(),
@@ -62,20 +85,53 @@ export function useBookingData(
         const activePets = safePets.filter((p) => !p.isArchived);
         const safeVets = Array.isArray(vetsData) ? vetsData : [];
 
-        const rawMatchedVet = initialVetId
+        const rawMatchedVetFound = initialVetId
           ? safeVets.find((v) => v.id === initialVetId) ?? null
           : null;
 
+        let rawMatchedVet = rawMatchedVetFound;
+        if (
+          rawMatchedVetFound &&
+          rawMatchedVetFound.isActive !== false &&
+          !Array.isArray(rawMatchedVetFound.speciesIds)
+        ) {
+          const perms = await clinicApi
+            .getVetSpeciesPermissions(rawMatchedVetFound.id)
+            .catch(() => []);
+          if (cancelled) return;
+          rawMatchedVet = {
+            ...rawMatchedVetFound,
+            speciesIds: Array.isArray(perms) ? perms.map((p) => p.speciesId) : [],
+          };
+        }
+
+        const normalizedVets = rawMatchedVet
+          ? safeVets.map((v) => (v.id === rawMatchedVet!.id ? rawMatchedVet! : v))
+          : safeVets;
+
+        const vetSpeciesFilter =
+          rawMatchedVet &&
+          rawMatchedVet.isActive !== false &&
+          Array.isArray(rawMatchedVet.speciesIds) &&
+          rawMatchedVet.speciesIds.length > 0
+            ? rawMatchedVet.speciesIds
+            : null;
+
         let resolvedPet: Pet | null = null;
-        if (!didInitRef.current) {
+        if (isFreshInit) {
           if (initialPetId) {
+            const candidate = activePets.find((p) => p.id === initialPetId) ?? null;
+            if (
+              candidate &&
+              (!vetSpeciesFilter || vetSpeciesFilter.includes(candidate.speciesId))
+            ) {
+              resolvedPet = candidate;
+            } else if (!vetSpeciesFilter) {
+              resolvedPet = activePets[0] ?? null;
+            }
+          } else if (vetSpeciesFilter) {
             resolvedPet =
-              activePets.find((p) => p.id === initialPetId) ?? activePets[0] ?? null;
-          } else if (rawMatchedVet && Array.isArray(rawMatchedVet.speciesIds)) {
-            resolvedPet =
-              activePets.find((p) => rawMatchedVet.speciesIds!.includes(p.speciesId)) ??
-              activePets[0] ??
-              null;
+              activePets.find((p) => vetSpeciesFilter.includes(p.speciesId)) ?? null;
           } else {
             resolvedPet = activePets[0] ?? null;
           }
@@ -96,51 +152,56 @@ export function useBookingData(
 
         setPets(safePets);
         setServices(safeSvc);
-        setVeterinarians(safeVets);
+        setVeterinarians(normalizedVets);
         setSpecializations(Array.isArray(specData) ? specData : []);
         setSpeciesList(Array.isArray(spData) ? spData : []);
 
-        if (didInitRef.current) {
+        if (!isFreshInit) {
           setSelectedPet(resolvedPet);
           setSelectedService((prev) =>
             prev ? safeSvc.find((s) => s.id === prev.id) ?? null : null
           );
           return;
         }
-        didInitRef.current = true;
+        lastInitKeyRef.current = initKey;
 
-        if (resolvedPet) {
-          setSelectedPet(resolvedPet);
-        }
+        setSelectedPet(resolvedPet);
 
         const matchedService = initialServiceId
           ? safeSvc.find((s) => s.id === initialServiceId) ?? null
-          : null;
-        if (matchedService) {
-          setSelectedService(matchedService);
-        }
+          : initialIntent === 'vaccination'
+            ? findVaccinationService(safeSvc)
+            : null;
+        setSelectedService(matchedService);
 
         const matchedVet =
           rawMatchedVet &&
           rawMatchedVet.isActive !== false &&
           (!matchedService?.specializationId ||
-            rawMatchedVet.specializationId === matchedService.specializationId) &&
-          (!resolvedPet ||
-            !Array.isArray(rawMatchedVet.speciesIds) ||
-            rawMatchedVet.speciesIds.includes(resolvedPet.speciesId))
+            rawMatchedVet.specializationId === matchedService.specializationId)
             ? rawMatchedVet
             : null;
         if (matchedVet) {
           setSelectedVet(matchedVet);
           setIsAnyVet(false);
+        } else {
+          setSelectedVet(null);
+          setIsAnyVet(true);
         }
 
+        const hasSingleActivePet = activePets.length === 1;
         if (resolvedPet && matchedService && (matchedVet || initialSlot)) {
           onSetStepRef.current(4);
-        } else if (resolvedPet && matchedService) {
+        } else if (
+          resolvedPet &&
+          matchedService &&
+          (initialServiceId || initialPetId || hasSingleActivePet)
+        ) {
           onSetStepRef.current(3);
         } else if (initialPetId && resolvedPet) {
           onSetStepRef.current(2);
+        } else {
+          onSetStepRef.current(1);
         }
       })
       .catch((err: unknown) => {
@@ -154,12 +215,12 @@ export function useBookingData(
     return () => {
       cancelled = true;
     };
-  }, [initialServiceId, initialVetId, initialPetId, initialSlot, reloadTick]);
+  }, [initKey, initialServiceId, initialVetId, initialPetId, initialSlot, initialIntent, reloadTick]);
 
   const selectedSpeciesId = selectedPet?.speciesId ?? null;
 
   useEffect(() => {
-    if (!didInitRef.current) return;
+    if (lastInitKeyRef.current === null) return;
     if (loadedSpeciesIdRef.current === selectedSpeciesId) return;
 
     let cancelled = false;
@@ -173,9 +234,15 @@ export function useBookingData(
         loadedSpeciesIdRef.current = selectedSpeciesId;
         const safeSvc = Array.isArray(svcData) ? svcData : [];
         setServices(safeSvc);
-        setSelectedService((prev) =>
-          prev ? safeSvc.find((s) => s.id === prev.id) ?? null : null
-        );
+        setSelectedService((prev) => {
+          if (prev) {
+            const matched = safeSvc.find((s) => s.id === prev.id);
+            if (matched) return matched;
+          }
+          return initialIntentRef.current === 'vaccination'
+            ? findVaccinationService(safeSvc)
+            : null;
+        });
       })
       .catch((err: unknown) => {
         if (cancelled) return;

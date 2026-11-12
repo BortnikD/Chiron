@@ -102,7 +102,17 @@ export function VaccinationDetailIsland({
       {pet && !pet.isArchived && (
         <div className="island-foot">
           <Link
-            href={`/client/book?petId=${encodeURIComponent(pet.id)}`}
+            href={(() => {
+              const params = new URLSearchParams({
+                petId: pet.id,
+                intent: 'vaccination',
+              });
+              const vaccineName = (vaccination.name || vaccination.vaccineName || '').trim();
+              if (vaccineName) {
+                params.set('vaccine', vaccineName);
+              }
+              return `/client/book?${params.toString()}`;
+            })()}
             className="btn btn-primary btn-sm"
           >
             <CalendarPlus className="ic" />
