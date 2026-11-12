@@ -94,15 +94,26 @@ export async function loadCommandPaletteData(role?: UserRole | null): Promise<Pa
   }
 
   if (role === 'VETERINARIAN') {
-    const [apptsRes, servicesRes, vetsRes] = await Promise.allSettled([
+    const [apptsRes, patientsRes, servicesRes, vetsRes] = await Promise.allSettled([
       vetApi.getAppointments({ page: 0, size: 50, direction: 'DESC' }),
+      vetApi.getPatientsPage({ page: 0, size: 50 }),
       clinicApi.getServices(),
       clinicApi.getVeterinarians(),
     ]);
     const appts = apptsRes.status === 'fulfilled' && Array.isArray(apptsRes.value?.items) ? apptsRes.value.items : [];
-    const petMap = await vetApi.getPatientPetsByIds(appts.map((a) => a.petId)).catch(() => ({} as Record<string, Pet>));
+    const patients = patientsRes.status === 'fulfilled' && Array.isArray(patientsRes.value?.items) ? patientsRes.value.items : [];
+    const initialPetMap: Record<string, Pet> = {};
+    for (const p of patients) {
+      if (p?.id) initialPetMap[p.id] = p;
+    }
+    const petMap = await vetApi
+      .getPatientPetsByIds(appts.map((a) => a.petId), initialPetMap)
+      .catch(() => initialPetMap);
+    const mergedPets = Array.from(
+      new Map([...patients, ...Object.values(petMap)].map((p) => [p.id, p])).values()
+    );
     return {
-      pets: Object.values(petMap),
+      pets: mergedPets,
       appointments: appts,
       users: [],
       services: servicesRes.status === 'fulfilled' && Array.isArray(servicesRes.value) ? servicesRes.value : [],

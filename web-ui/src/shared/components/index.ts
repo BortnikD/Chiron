@@ -12,3 +12,6 @@ export type { SearchComboboxOption, SearchComboboxProps } from './SearchCombobox
 
 export { ToastProvider, useToast } from './ToastProvider';
 export type { ToastContextValue, ToastItem, ToastKind } from './ToastProvider';
+
+export { PaginationFooter, DEFAULT_PAGE_SIZES } from './PaginationFooter';
+export type { PaginationFooterProps } from './PaginationFooter';

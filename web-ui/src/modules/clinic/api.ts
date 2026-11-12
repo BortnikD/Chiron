@@ -71,13 +71,16 @@ export const clinicApi = {
     return api.get<boolean>(`/api/v1/appointments/availability?${query.toString()}`);
   },
 
-  findAvailableSlots: (params: {
-    speciesId: string;
-    serviceId: string;
-    from: string;
-    to: string;
-    veterinarianId?: string;
-  }) => {
+  findAvailableSlots: (
+    params: {
+      speciesId: string;
+      serviceId: string;
+      from: string;
+      to: string;
+      veterinarianId?: string;
+    },
+    options?: { signal?: AbortSignal }
+  ) => {
     const query = new URLSearchParams({
       speciesId: params.speciesId,
       serviceId: params.serviceId,
@@ -87,6 +90,9 @@ export const clinicApi = {
     if (params.veterinarianId) {
       query.append('veterinarianId', params.veterinarianId);
     }
-    return api.get<AvailableSlotResponse[]>(`/api/v1/appointments/slots?${query.toString()}`);
+    return api.get<AvailableSlotResponse[]>(
+      `/api/v1/appointments/slots?${query.toString()}`,
+      options
+    );
   },
 };

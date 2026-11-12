@@ -1,6 +1,6 @@
 import { api, tokenStorage } from '@/shared/api/client';
 import { fetchAllPages, isPhotoUrlFresh, mapWithConcurrency } from '@/shared/lib';
-import type { AppointmentStatus, PageResponse, PhotoLinks } from '@/shared/types';
+import type { AppointmentStatus, Gender, PageResponse, PhotoLinks } from '@/shared/types';
 import type { Veterinarian } from '@/modules/clinic/types';
 import type {
   Appointment,
@@ -28,6 +28,16 @@ export interface VetVaccinationsQuery {
   name?: string;
   nextDueFrom?: string;
   nextDueTo?: string;
+}
+
+export interface VetPatientsQuery {
+  page?: number;
+  size?: number;
+  ownerId?: string;
+  speciesId?: string;
+  gender?: Gender | string;
+  isArchived?: boolean;
+  name?: string;
 }
 
 const PATIENTS_CACHE_TTL_MS = 60_000;
@@ -169,6 +179,36 @@ export const vetApi = {
     return out;
   },
 
+  getPatientsPage: async (
+    pageOrOptions: number | VetPatientsQuery = 0,
+    size = 20
+  ): Promise<PageResponse<Pet>> => {
+    syncCacheToken();
+    const opts: VetPatientsQuery =
+      typeof pageOrOptions === 'object' && pageOrOptions !== null
+        ? pageOrOptions
+        : { page: pageOrOptions, size };
+    const query = new URLSearchParams({
+      page: (opts.page ?? 0).toString(),
+      size: (opts.size ?? 20).toString(),
+    });
+    if (opts.ownerId) query.append('ownerId', opts.ownerId);
+    if (opts.speciesId) query.append('speciesId', opts.speciesId);
+    if (opts.gender) query.append('gender', opts.gender);
+    if (opts.isArchived !== undefined) query.append('isArchived', String(opts.isArchived));
+    if (opts.name) query.append('name', opts.name);
+    const res = await api.get<PageResponse<Pet>>(`/api/v1/veterinarian/pets?${query.toString()}`);
+    if (Array.isArray(res?.items)) {
+      for (const pet of res.items) {
+        if (pet?.id) cachedPetsById.set(pet.id, pet);
+      }
+    }
+    return res;
+  },
+
+  getPatientById: (id: string) =>
+    api.get<Pet>(`/api/v1/veterinarian/pets/${id}`),
+
   getPatients: async (forceRefresh = false): Promise<Pet[]> => {
     const token = syncCacheToken();
     if (
@@ -184,22 +224,10 @@ export const vetApi = {
     }
 
     const promise = (async () => {
-      const allAppointments = await fetchAllPages(
-        (page, size) => vetApi.getAppointments({ page, size, direction: 'DESC' }),
+      const resolved = await fetchAllPages(
+        (page, pageSize) => vetApi.getPatientsPage({ page, size: pageSize }),
         { pageSize: 100, maxPages: 50, concurrency: 4 }
       );
-      const petIds = Array.from(new Set(allAppointments.map((a) => a.petId)));
-      if (petIds.length === 0) return [];
-      const pets = await mapWithConcurrency(
-        petIds,
-        async (id) => {
-          const cached = cachedPetsById.get(id);
-          if (cached && isPhotoUrlFresh(cached)) return cached;
-          return vetApi.getPatientPet(id).catch(() => null);
-        },
-        6
-      );
-      const resolved = pets.filter((p): p is Pet => p !== null);
       if (syncCacheToken() === token) {
         cachedPatients = { ts: Date.now(), data: resolved };
       }

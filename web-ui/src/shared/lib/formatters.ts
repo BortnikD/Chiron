@@ -25,6 +25,17 @@ export function getMoscowDateKey(input?: string | Date | null): string {
 }
 
 /**
+ * Возвращает следующий календарный день для даты YYYY-MM-DD.
+ */
+export function nextMoscowDayIso(dateIso: string): string {
+  const parts = dateIso.split('-');
+  if (parts.length !== 3) return dateIso;
+  const d = new Date(Date.UTC(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2])));
+  d.setUTCDate(d.getUTCDate() + 1);
+  return d.toISOString().split('T')[0];
+}
+
+/**
  * Возвращает инициалы пользователя (2 символа в верхнем регистре).
  */
 export function getUserInitials(
@@ -214,9 +225,48 @@ export function getSpeciesTone(
     }
   }
   const norm = resolved.toLowerCase();
-  if (norm.includes('соб') || norm.includes('dog') || norm.includes('000000000002')) return 'dog';
-  if (norm.includes('крол') || norm.includes('rab') || norm.includes('000000000003')) return 'rab';
-  if (norm.includes('попуг') || norm.includes('птиц') || norm.includes('bird') || norm.includes('par') || norm.includes('000000000004')) return 'par';
+  if (
+    norm === '5eed0001-0000-0000-0000-000000000001' ||
+    norm.includes('соб') ||
+    norm.includes('dog')
+  ) {
+    return 'dog';
+  }
+  if (
+    norm === '5eed0001-0000-0000-0000-000000000002' ||
+    norm.includes('кош') ||
+    norm.includes('кот') ||
+    norm.includes('cat')
+  ) {
+    return 'cat';
+  }
+  if (
+    norm === '5eed0001-0000-0000-0000-000000000003' ||
+    norm === '5eed0001-0000-0000-0000-000000000004' ||
+    norm === '5eed0001-0000-0000-0000-000000000005' ||
+    norm.includes('крол') ||
+    norm.includes('rab') ||
+    norm.includes('морск') ||
+    norm.includes('свин') ||
+    norm.includes('guinea') ||
+    norm.includes('хорёк') ||
+    norm.includes('хорек') ||
+    norm.includes('ferret')
+  ) {
+    return 'rab';
+  }
+  if (
+    norm === '5eed0001-0000-0000-0000-000000000006' ||
+    norm.includes('попуг') ||
+    norm.includes('птиц') ||
+    norm.includes('bird') ||
+    norm.includes('par')
+  ) {
+    return 'par';
+  }
+  if (norm.includes('000000000002')) return 'dog';
+  if (norm.includes('000000000003')) return 'rab';
+  if (norm.includes('000000000004')) return 'par';
   return 'cat';
 }
 

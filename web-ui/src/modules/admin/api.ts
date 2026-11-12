@@ -1,5 +1,5 @@
 import { api } from '@/shared/api/client';
-import type { AppointmentStatus, User, PageResponse, PhotoLinks, StatisticsGranularity } from '@/shared/types';
+import type { AppointmentStatus, Gender, User, PageResponse, PhotoLinks, StatisticsGranularity } from '@/shared/types';
 import type {
   Veterinarian,
   Service,
@@ -37,10 +37,29 @@ import type {
 // ─── Административные операции ────────────────────────────
 
 export const adminApi = {
-  getUsers: (page = 0, size = 20, role?: string) => {
+  getUsers: (
+    page = 0,
+    size = 20,
+    filterOrRole?:
+      | string
+      | {
+          role?: string;
+          search?: string;
+          createdFrom?: string;
+          createdTo?: string;
+        },
+    options?: { signal?: AbortSignal }
+  ) => {
     const query = new URLSearchParams({ page: page.toString(), size: size.toString() });
-    if (role) query.append('role', role);
-    return api.get<PageResponse<User>>(`/api/v1/admin/users?${query.toString()}`);
+    if (typeof filterOrRole === 'string') {
+      if (filterOrRole && filterOrRole !== 'ALL') query.append('role', filterOrRole);
+    } else if (filterOrRole) {
+      if (filterOrRole.role && filterOrRole.role !== 'ALL') query.append('role', filterOrRole.role);
+      if (filterOrRole.search) query.append('search', filterOrRole.search);
+      if (filterOrRole.createdFrom) query.append('createdFrom', filterOrRole.createdFrom);
+      if (filterOrRole.createdTo) query.append('createdTo', filterOrRole.createdTo);
+    }
+    return api.get<PageResponse<User>>(`/api/v1/admin/users?${query.toString()}`, options);
   },
 
   getUserById: (id: string) => api.get<User>(`/api/v1/admin/users/${id}`),
@@ -71,7 +90,8 @@ export const adminApi = {
       status?: AppointmentStatus | AppointmentStatus[] | string;
       from?: string;
       to?: string;
-    }
+    },
+    options?: { signal?: AbortSignal }
   ) => {
     const params = new URLSearchParams({ page: page.toString(), size: size.toString() });
     if (filter?.status) {
@@ -89,7 +109,10 @@ export const adminApi = {
     if (filter?.serviceId) params.append('serviceId', filter.serviceId);
     if (filter?.from) params.append('from', filter.from);
     if (filter?.to) params.append('to', filter.to);
-    return api.get<PageResponse<Appointment>>(`/api/v1/admin/appointments?${params.toString()}`);
+    return api.get<PageResponse<Appointment>>(
+      `/api/v1/admin/appointments?${params.toString()}`,
+      options
+    );
   },
 
   getAppointmentById: (id: string) =>
@@ -108,17 +131,25 @@ export const adminApi = {
   getPets: (
     page = 0,
     size = 20,
-    filter?: { speciesId?: string; ownerId?: string; isArchived?: boolean; search?: string }
+    filter?: {
+      speciesId?: string;
+      ownerId?: string;
+      gender?: Gender | string;
+      isArchived?: boolean;
+      search?: string;
+    },
+    options?: { signal?: AbortSignal }
   ) => {
     const params = new URLSearchParams({ page: page.toString(), size: size.toString() });
     if (filter?.speciesId) params.append('speciesId', filter.speciesId);
     if (filter?.ownerId) params.append('ownerId', filter.ownerId);
+    if (filter?.gender) params.append('gender', filter.gender);
     if (filter?.isArchived !== undefined) params.append('isArchived', filter.isArchived.toString());
     if (filter?.search) {
       params.append('name', filter.search);
       params.append('search', filter.search);
     }
-    return api.get<PageResponse<Pet>>(`/api/v1/admin/pets?${params.toString()}`);
+    return api.get<PageResponse<Pet>>(`/api/v1/admin/pets?${params.toString()}`, options);
   },
 
   getPetById: (id: string) => api.get<Pet>(`/api/v1/admin/pets/${id}`),

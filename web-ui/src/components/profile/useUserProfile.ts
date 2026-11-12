@@ -167,12 +167,12 @@ export function useUserProfile(onProfileUpdated?: (user: User) => void) {
           });
 
           void vetApi
-            .getPatients()
-            .then((pts) => {
-              if (!cancelled && Array.isArray(pts)) {
+            .getPatientsPage({ page: 0, size: 1 })
+            .then((res) => {
+              if (!cancelled) {
                 setStats((prev) => ({
                   ...prev,
-                  s2: { val: pts.length, label: 'пациентов' },
+                  s2: { val: res?.totalElements ?? 0, label: 'пациентов' },
                 }));
               }
             })
