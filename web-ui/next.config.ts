@@ -7,6 +7,7 @@ const apiProxyTarget = (
 ).replace(/\/+$/, "");
 
 const nextConfig: NextConfig = {
+  output: "standalone",
   // Разрешаем Next.js работать через домены туннелей (ngrok, trycloudflare.com, lhr.life)
   allowedDevOrigins: [
     "*.ngrok-free.app",
@@ -31,7 +32,7 @@ const nextConfig: NextConfig = {
     },
   },
   env: {
-    NEXT_PUBLIC_API_PROXY_TARGET: apiProxyTarget,
+    NEXT_PUBLIC_API_PROXY_TARGET: process.env.NEXT_PUBLIC_API_PROXY_TARGET || apiProxyTarget,
   },
   async rewrites() {
     return [

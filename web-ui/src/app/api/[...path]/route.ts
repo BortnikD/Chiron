@@ -52,7 +52,6 @@ async function proxyApiRequest(
       headers.set(key, value);
     }
   });
-  headers.set('origin', 'http://localhost:3000');
 
   const hasBody = req.method !== 'GET' && req.method !== 'HEAD';
   const body = hasBody ? await req.arrayBuffer() : undefined;

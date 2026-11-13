@@ -73,6 +73,21 @@ services:
       postgres:
         condition: service_healthy
 
+  frontend:
+    build:
+      context: ../web-ui
+      args:
+        NEXT_PUBLIC_API_PROXY_TARGET: ${FRONTEND_ORIGIN:?Set FRONTEND_ORIGIN}
+    restart: unless-stopped
+    environment:
+      API_PROXY_TARGET: http://backend:8080
+      MEDIA_PROXY_TARGET: http://garage:3900
+    ports:
+      - "127.0.0.1:3000:3000"
+    depends_on:
+      backend:
+        condition: service_healthy
+
 volumes:
   postgres_data:
   garage_meta:
