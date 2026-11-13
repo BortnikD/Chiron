@@ -2,3 +2,5 @@
 .env.production
 .idea
 .vscode/
+
+.agent/
