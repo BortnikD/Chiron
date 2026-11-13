@@ -14,6 +14,7 @@ import {
   formatApiError,
   formatSlotTime,
   getMoscowDateKey,
+  timeToMinutes,
 } from '@/shared/lib';
 import { getDoctorDisplay } from '@/utils/doctorHelpers';
 import { buildUpdateAppointmentPayload, computeAppointmentEditRange } from './utils';
@@ -48,6 +49,7 @@ export const AdminEditAppointmentModal: React.FC<AdminEditAppointmentModalProps>
     veterinarianId: '',
     date: '',
     start: '',
+    end: '',
     status: 'CONFIRMED' as AppointmentStatus,
     cancelReason: '',
     clientComment: '',
@@ -66,6 +68,7 @@ export const AdminEditAppointmentModal: React.FC<AdminEditAppointmentModalProps>
       veterinarianId: appointment.veterinarianId,
       date: getMoscowDateKey(appointment.startAt),
       start: formatSlotTime(appointment.startAt),
+      end: formatSlotTime(appointment.endAt),
       status: appointment.status,
       cancelReason: appointment.cancelReason || appointment.cancellationReason || '',
       clientComment: appointment.clientComment || '',
@@ -96,7 +99,12 @@ export const AdminEditAppointmentModal: React.FC<AdminEditAppointmentModalProps>
 
   const handleCheckSlot = async () => {
     if (!form.veterinarianId || !form.date || !form.start || !appointment) return;
-    const range = computeAppointmentEditRange(appointment, services, form.date, form.start);
+    if (form.end && timeToMinutes(form.end) <= timeToMinutes(form.start)) {
+      setAvailStatus('err');
+      setAvailMsg('Время окончания должно быть позже времени начала');
+      return;
+    }
+    const range = computeAppointmentEditRange(appointment, services, form.date, form.start, form.end);
     setCheckingSlot(true);
     setAvailStatus('idle');
     try {
@@ -119,6 +127,10 @@ export const AdminEditAppointmentModal: React.FC<AdminEditAppointmentModalProps>
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!appointment) return;
+    if (form.end && timeToMinutes(form.end) <= timeToMinutes(form.start)) {
+      setSaveError('Время окончания должно быть позже времени начала');
+      return;
+    }
 
     setSaving(true);
     setSaveError(null);
@@ -185,7 +197,7 @@ export const AdminEditAppointmentModal: React.FC<AdminEditAppointmentModalProps>
               />
             </div>
 
-            <div className="form-grid">
+            <div className="form-grid" style={{ gridTemplateColumns: 'repeat(3, minmax(0, 1fr))' }}>
               <div className="field">
                 <label className="field-label" htmlFor="me-date">Дата</label>
                 <DatePicker
@@ -209,6 +221,21 @@ export const AdminEditAppointmentModal: React.FC<AdminEditAppointmentModalProps>
                   onChange={(e) => {
                     setAvailStatus('idle');
                     setForm({ ...form, start: e.target.value });
+                  }}
+                  required
+                />
+              </div>
+              <div className="field">
+                <label className="field-label" htmlFor="me-end">Конец</label>
+                <input
+                  id="me-end"
+                  type="time"
+                  step="900"
+                  className="input"
+                  value={form.end}
+                  onChange={(e) => {
+                    setAvailStatus('idle');
+                    setForm({ ...form, end: e.target.value });
                   }}
                   required
                 />

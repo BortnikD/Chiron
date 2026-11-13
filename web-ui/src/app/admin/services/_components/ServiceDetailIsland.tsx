@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { X, AlertCircle, Trash2 } from 'lucide-react';
 import type {
   Service,
@@ -60,6 +60,13 @@ export const ServiceDetailIsland: React.FC<ServiceDetailIslandProps> = ({
   const [savingService, setSavingService] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
+  const saveTimerRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (saveTimerRef.current !== null) window.clearTimeout(saveTimerRef.current);
+    };
+  }, []);
 
   const specsMap = useMemo(() => toIdNameMap(specializations), [specializations]);
 
@@ -134,7 +141,8 @@ export const ServiceDetailIsland: React.FC<ServiceDetailIslandProps> = ({
         service.id
       );
       setSaveSuccess(true);
-      setTimeout(() => setSaveSuccess(false), 2500);
+      if (saveTimerRef.current !== null) window.clearTimeout(saveTimerRef.current);
+      saveTimerRef.current = window.setTimeout(() => setSaveSuccess(false), 2500);
     } catch (err: unknown) {
       setSaveError(formatApiError(err, 'Ошибка сохранения услуги'));
       setDetailTab('main');

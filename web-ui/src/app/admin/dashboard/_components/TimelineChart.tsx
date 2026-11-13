@@ -439,7 +439,7 @@ export function TimelineChart({
                           justifyContent: 'flex-end',
                           position: 'relative',
                           cursor: 'pointer',
-                          background: isHovered ? 'rgba(255, 255, 255, 0.06)' : 'transparent',
+                          background: isHovered ? 'color-mix(in srgb, var(--foreground) 6%, transparent)' : 'transparent',
                           borderRadius: '4px 4px 0 0',
                           transition: 'background 0.15s ease',
                         }}

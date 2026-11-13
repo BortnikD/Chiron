@@ -14,7 +14,7 @@ import type {
 } from '@/modules/client/types';
 import type { Service, Species, Veterinarian } from '@/modules/clinic/types';
 import { useToast } from '@/shared/components';
-import { formatApiError, mapWithConcurrency } from '@/shared/lib';
+import { fetchAllPages, formatApiError, mapWithConcurrency } from '@/shared/lib';
 import type { User } from '@/shared/types';
 import type { GenderFilter, StatusFilter } from '../_components/types';
 
@@ -83,14 +83,14 @@ export function useAdminPets() {
   const loadRefs = useCallback(async () => {
     const reqId = ++refsReqIdRef.current;
     try {
-      const [speciesRes, initialUsersRes, servicesRes, vetsRes] = await Promise.all([
+      const [speciesRes, allClients, servicesRes, vetsRes] = await Promise.all([
         clinicApi.getSpecies(),
-        adminApi.getUsers(0, 50, 'CLIENT'),
+        adminApi.getUsers(0, 100, 'CLIENT').then((r) => r?.items || []),
         adminApi.getServices(),
         adminApi.getVeterinarians(),
       ]);
       if (reqId !== refsReqIdRef.current) return;
-      const safeUsers = initialUsersRes?.items ? [...initialUsersRes.items] : [];
+      const safeUsers = Array.isArray(allClients) ? [...allClients] : [];
       if (initialOwner && initialOwner !== 'ALL' && !safeUsers.some((u) => u.id === initialOwner)) {
         try {
           const u = await adminApi.getUserById(initialOwner);

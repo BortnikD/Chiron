@@ -134,7 +134,7 @@ export const CreatePetModal: React.FC<CreatePetModalProps> = ({
           </div>
         </div>
 
-        <form onSubmit={handleSubmit}>
+        <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', minHeight: 0, flex: 1 }}>
           <div className="dialog-body">
             <div style={{ marginBottom: 14 }}>
               <EntityPhotoControl

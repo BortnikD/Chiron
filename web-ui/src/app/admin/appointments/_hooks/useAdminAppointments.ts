@@ -12,7 +12,7 @@ import type { Appointment, Pet } from '@/modules/client/types';
 import type { Veterinarian, Service, Species } from '@/modules/clinic/types';
 import type { AppointmentStatus, User } from '@/shared/types';
 import { useToast } from '@/shared/components';
-import { formatCurrency, formatApiError, mapWithConcurrency } from '@/shared/lib';
+import { fetchAllPages, formatCurrency, formatApiError, mapWithConcurrency } from '@/shared/lib';
 import { buildActiveFilterChips, nextMoscowDayIso } from '../_components/utils';
 
 export function useAdminAppointments() {
@@ -72,20 +72,20 @@ export function useAdminAppointments() {
   const loadRefs = useCallback(async () => {
     const reqId = ++refsReqIdRef.current;
     try {
-      const [vetsRes, svcsRes, speciesRes, initialPetsRes, initialUsersRes] = await Promise.all([
+      const [vetsRes, svcsRes, speciesRes, allPets, allClients] = await Promise.all([
         adminApi.getVeterinarians(),
         adminApi.getServices(),
         clinicApi.getSpecies(),
-        adminApi.getPets(0, 50),
-        adminApi.getUsers(0, 50, 'CLIENT'),
+        adminApi.getPets(0, 100).then((r) => r?.items || []),
+        adminApi.getUsers(0, 100, 'CLIENT').then((r) => r?.items || []),
       ]);
       if (reqId !== refsReqIdRef.current) return;
       setVeterinarians(Array.isArray(vetsRes) ? vetsRes : []);
       setServices(Array.isArray(svcsRes) ? svcsRes : []);
       setSpeciesList(Array.isArray(speciesRes) ? speciesRes : []);
 
-      const safePets = initialPetsRes?.items ? [...initialPetsRes.items] : [];
-      const safeUsers = initialUsersRes?.items ? [...initialUsersRes.items] : [];
+      const safePets = Array.isArray(allPets) ? [...allPets] : [];
+      const safeUsers = Array.isArray(allClients) ? [...allClients] : [];
 
       if (initialPetId && !safePets.some((p) => p.id === initialPetId)) {
         try {

@@ -119,7 +119,7 @@ export const EditPetModal: React.FC<EditPetModalProps> = ({
           </div>
         </div>
 
-        <form onSubmit={handleSubmit}>
+        <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', minHeight: 0, flex: 1 }}>
           <div className="dialog-body">
             {error && (
               <div className="alert alert-destructive" role="alert">

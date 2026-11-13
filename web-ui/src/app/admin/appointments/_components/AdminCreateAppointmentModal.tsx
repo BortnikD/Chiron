@@ -4,7 +4,8 @@ import React, { useState, useEffect } from 'react';
 import { X } from 'lucide-react';
 import type { AdminCreateAppointmentRequest } from '@/modules/admin/types';
 import type { Appointment, Pet } from '@/modules/client/types';
-import type { Veterinarian, Service } from '@/modules/clinic/types';
+import { clinicApi } from '@/modules/clinic/api';
+import type { Veterinarian, Service, ServiceSpecies } from '@/modules/clinic/types';
 import type { User } from '@/shared/types';
 import { formatApiError, getMoscowTodayIso, timeToMinutes } from '@/shared/lib';
 import {
@@ -60,6 +61,7 @@ export const AdminCreateAppointmentModal: React.FC<AdminCreateAppointmentModalPr
     clientComment: '',
   });
   const [endEdited, setEndEdited] = useState(false);
+  const [serviceOverrides, setServiceOverrides] = useState<ServiceSpecies[]>([]);
   const [availStatus, setAvailStatus] = useState<'idle' | 'ok' | 'err'>('idle');
   const [availMsg, setAvailMsg] = useState('');
   const [checkingSlot, setCheckingSlot] = useState(false);
@@ -100,6 +102,42 @@ export const AdminCreateAppointmentModal: React.FC<AdminCreateAppointmentModalPr
     return () => window.removeEventListener('keydown', onKey);
   }, [isOpen, creating, onClose]);
 
+  useEffect(() => {
+    if (!isOpen || !form.serviceId) {
+      setServiceOverrides([]);
+      return;
+    }
+    let cancelled = false;
+    clinicApi
+      .getServiceSpecies(form.serviceId)
+      .then((links) => {
+        if (!cancelled) setServiceOverrides(Array.isArray(links) ? links : []);
+      })
+      .catch(() => {
+        if (!cancelled) setServiceOverrides([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [isOpen, form.serviceId]);
+
+  useEffect(() => {
+    if (!isOpen || !form.serviceId) return;
+    const svc = services.find((s) => s.id === form.serviceId);
+    if (!svc) return;
+    const pet = pets.find((p) => p.id === form.petId);
+    const override = pet
+      ? serviceOverrides.find((l) => l.speciesId === pet.speciesId)
+      : undefined;
+    const effectivePrice = override?.price ?? svc.basePrice ?? 1500;
+    const effectiveDur = override?.durationMin ?? svc.baseDurationMin ?? 30;
+    setForm((prev) => ({
+      ...prev,
+      price: effectivePrice,
+      end: endEdited ? prev.end : calculateEndTime(prev.start, effectiveDur),
+    }));
+  }, [isOpen, form.petId, form.serviceId, serviceOverrides, services, pets, endEdited]);
+
   const handleServiceChange = (svcId: string) => {
     const svc = services.find((s) => s.id === svcId);
     const dur = svc?.baseDurationMin || 30;
@@ -114,7 +152,11 @@ export const AdminCreateAppointmentModal: React.FC<AdminCreateAppointmentModalPr
 
   const handleStartChange = (newStart: string) => {
     const svc = services.find((s) => s.id === form.serviceId);
-    const dur = svc?.baseDurationMin || 30;
+    const pet = pets.find((p) => p.id === form.petId);
+    const override = pet
+      ? serviceOverrides.find((l) => l.speciesId === pet.speciesId)
+      : undefined;
+    const dur = override?.durationMin ?? svc?.baseDurationMin ?? 30;
     setAvailStatus('idle');
     setForm((prev) => ({
       ...prev,

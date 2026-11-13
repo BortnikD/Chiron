@@ -41,14 +41,21 @@ export function computeAppointmentEditRange(
   appointment: Appointment,
   services: Service[],
   date: string,
-  start: string
+  start: string,
+  end?: string
 ): { startAt: string; endAt: string } {
+  const startAt = new Date(`${date}T${start}:00+03:00`).toISOString();
+  if (end) {
+    const endAt = new Date(`${date}T${end}:00+03:00`).toISOString();
+    if (new Date(endAt).getTime() > new Date(startAt).getTime()) {
+      return { startAt, endAt };
+    }
+  }
   const selectedSvc = services.find((s) => s.id === appointment.serviceId);
   const origDurMin = Math.round(
     (new Date(appointment.endAt).getTime() - new Date(appointment.startAt).getTime()) / 60000
   );
   const dur = origDurMin > 0 ? origDurMin : (selectedSvc?.baseDurationMin ?? 30);
-  const startAt = new Date(`${date}T${start}:00+03:00`).toISOString();
   const endAt = new Date(new Date(startAt).getTime() + dur * 60000).toISOString();
   return { startAt, endAt };
 }
@@ -60,6 +67,7 @@ export function buildUpdateAppointmentPayload(
     veterinarianId: string;
     date: string;
     start: string;
+    end?: string;
     status: AppointmentStatus;
     cancelReason: string;
     clientComment: string;
@@ -68,7 +76,7 @@ export function buildUpdateAppointmentPayload(
 ): AdminUpdateAppointmentRequest {
   const range =
     form.date && form.start
-      ? computeAppointmentEditRange(appointment, services, form.date, form.start)
+      ? computeAppointmentEditRange(appointment, services, form.date, form.start, form.end)
       : { startAt: appointment.startAt, endAt: appointment.endAt };
 
   return {

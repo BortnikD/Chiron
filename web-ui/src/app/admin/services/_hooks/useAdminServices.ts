@@ -12,7 +12,7 @@ import type {
   Veterinarian,
 } from '@/modules/clinic/types';
 import { useToast } from '@/shared/components';
-import { formatApiError, toIdNameMap } from '@/shared/lib';
+import { formatApiError, mapWithConcurrency, toIdNameMap } from '@/shared/lib';
 import {
   SERVICE_NAV_TABS,
   filterAdminServices,
@@ -79,10 +79,10 @@ export function useAdminServices() {
         adminApi.getVeterinarians(),
       ]);
       const safeServices = Array.isArray(svcData) ? svcData : [];
-      const linkEntries = await Promise.all(
-        safeServices.map(
-          async (s) => [s.id, (await clinicApi.getServiceSpecies(s.id)) || []] as const
-        )
+      const linkEntries = await mapWithConcurrency(
+        safeServices,
+        async (s) => [s.id, (await clinicApi.getServiceSpecies(s.id)) || []] as const,
+        6
       );
 
       if (loadRequestIdRef.current !== reqId) return;
@@ -186,11 +186,10 @@ export function useAdminServices() {
       const links = await clinicApi.getServiceSpecies(serviceId);
       const safeLinks = Array.isArray(links) ? links : [];
       setServiceSpeciesMap((prev) => ({ ...prev, [serviceId]: safeLinks }));
-      await loadData();
       toast('Вид привязан', speciesMap[speciesId] || undefined);
       return safeLinks;
     },
-    [loadData, speciesMap, toast]
+    [speciesMap, toast]
   );
 
   const detachServiceSpecies = useCallback(
@@ -200,10 +199,9 @@ export function useAdminServices() {
         ...prev,
         [serviceId]: (prev[serviceId] || []).filter((l) => l.speciesId !== speciesId),
       }));
-      await loadData();
       toast('Вид отвязан', speciesMap[speciesId] || undefined);
     },
-    [loadData, speciesMap, toast]
+    [speciesMap, toast]
   );
 
   const saveServiceSpeciesOverrides = useCallback(

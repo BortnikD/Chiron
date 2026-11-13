@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { AlertCircle, Check, Trash2, Plus, Edit2 } from 'lucide-react';
 import type { Service, Species, ServiceSpecies } from '@/modules/clinic/types';
 import { SearchCombobox, type SearchComboboxOption } from '@/shared/components';
@@ -32,6 +32,13 @@ export const ServiceSpeciesOverridesSection: React.FC<ServiceSpeciesOverridesSec
   const [savingOverrides, setSavingOverrides] = useState(false);
   const [speciesError, setSpeciesError] = useState<string | null>(null);
   const [speciesSuccess, setSpeciesSuccess] = useState<string | null>(null);
+  const successTimerRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (successTimerRef.current !== null) window.clearTimeout(successTimerRef.current);
+    };
+  }, []);
 
   const speciesMap = useMemo(() => toIdNameMap(speciesList), [speciesList]);
 
@@ -81,7 +88,8 @@ export const ServiceSpeciesOverridesSection: React.FC<ServiceSpeciesOverridesSec
     try {
       await onSaveOverrides(service.id, serviceLinks);
       setSpeciesSuccess('Переопределения сохранены');
-      setTimeout(() => setSpeciesSuccess(null), 2500);
+      if (successTimerRef.current !== null) window.clearTimeout(successTimerRef.current);
+      successTimerRef.current = window.setTimeout(() => setSpeciesSuccess(null), 2500);
     } catch (err: unknown) {
       setSpeciesError(formatApiError(err, 'Ошибка сохранения переопределений'));
     } finally {
@@ -96,7 +104,7 @@ export const ServiceSpeciesOverridesSection: React.FC<ServiceSpeciesOverridesSec
         {formatCurrency(service.basePrice)}). Сохранение пустого поля отправляет null.
       </span>
 
-      <div className="dtable" style={{ '--cols': '0.9fr 1fr 1fr 70px' } as React.CSSProperties}>
+      <div className="dtable keep-table" style={{ '--cols': '0.9fr 1fr 1fr 70px' } as React.CSSProperties}>
         <div className="thead" style={{ padding: 0 }}>
           <span>Вид</span>
           <span>Длительность</span>

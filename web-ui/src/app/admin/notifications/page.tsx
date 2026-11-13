@@ -1,8 +1,14 @@
 'use client';
 
 import { Bell } from 'lucide-react';
+import { useShellHeader } from '@/components/layout/AppShell';
 
 export default function AdminNotificationsPage() {
+  useShellHeader({
+    crumbGroup: 'Личное',
+    crumb: 'Уведомления',
+  });
+
   return (
     <div className="scroll-col grow">
       <section className="island grow" style={{ maxWidth: '860px', width: '100%' }}>

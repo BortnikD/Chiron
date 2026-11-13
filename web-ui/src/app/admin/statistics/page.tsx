@@ -1,3 +1,5 @@
-'use client';
+import { redirect } from 'next/navigation';
 
-export { default } from '../dashboard/page';
+export default function AdminStatisticsPage() {
+  redirect('/admin/dashboard');
+}

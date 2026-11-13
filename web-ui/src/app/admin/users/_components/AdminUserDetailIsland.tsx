@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import {
   X,
@@ -60,6 +60,13 @@ export const AdminUserDetailIsland: React.FC<AdminUserDetailIslandProps> = ({
   const [savingUser, setSavingUser] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const saveTimerRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (saveTimerRef.current !== null) window.clearTimeout(saveTimerRef.current);
+    };
+  }, []);
 
   useEffect(() => {
     setEditForm({
@@ -98,7 +105,8 @@ export const AdminUserDetailIsland: React.FC<AdminUserDetailIslandProps> = ({
         phone: normalizedPhone,
       });
       setSaveSuccess(true);
-      setTimeout(() => setSaveSuccess(false), 2500);
+      if (saveTimerRef.current !== null) window.clearTimeout(saveTimerRef.current);
+      saveTimerRef.current = window.setTimeout(() => setSaveSuccess(false), 2500);
     } catch (err: unknown) {
       setErrorMessage(formatApiError(err, 'Ошибка обновления пользователя'));
       setActiveTab('profile');
