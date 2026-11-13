@@ -211,17 +211,27 @@ export function useUserProfile(onProfileUpdated?: (user: User) => void) {
 
   const handleProfileSubmit = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
+    const normalizedPhone = formData.phone.replace(/[\s()-]/g, '').trim();
+    if (!formData.firstName.trim() || !formData.lastName.trim() || !formData.email.trim()) {
+      setSaveError('Заполните обязательные поля: имя, фамилия и email');
+      return;
+    }
+    if (normalizedPhone && !/^\+?\d{10,15}$/.test(normalizedPhone)) {
+      setSaveError('Телефон должен содержать от 10 до 15 цифр (например, +79001234567)');
+      return;
+    }
+
     setSaving(true);
     setSaveSuccess(false);
     setSaveError(null);
 
     try {
       const updated = await userApi.updateMe({
-        firstName: formData.firstName.trim() || undefined,
-        middleName: formData.middleName.trim() || undefined,
-        lastName: formData.lastName.trim() || undefined,
-        email: formData.email.trim() || undefined,
-        phone: formData.phone.trim() || undefined,
+        firstName: formData.firstName.trim(),
+        middleName: formData.middleName.trim() || null,
+        lastName: formData.lastName.trim(),
+        email: formData.email.trim(),
+        phone: normalizedPhone || undefined,
       });
       setUser(updated);
       await refreshUser();

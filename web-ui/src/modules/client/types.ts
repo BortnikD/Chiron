@@ -24,6 +24,9 @@ export interface Pet {
   id: string;
   name: string;
   ownerId: string;
+  ownerName?: string | null;
+  ownerPhone?: string | null;
+  ownerEmail?: string | null;
   speciesId: string;
   speciesName?: string;
   species?: Species;

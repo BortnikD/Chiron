@@ -11,6 +11,35 @@ import type {
   ScheduleException,
 } from './types';
 
+const DICT_CACHE_TTL_MS = 30_000;
+const dictCache = new Map<string, { ts: number; data: unknown }>();
+const inFlightDict = new Map<string, Promise<unknown>>();
+
+function cachedGet<T>(key: string, fetcher: () => Promise<T>): Promise<T> {
+  const cached = dictCache.get(key);
+  if (cached && Date.now() - cached.ts < DICT_CACHE_TTL_MS) {
+    return Promise.resolve(cached.data as T);
+  }
+  const existing = inFlightDict.get(key);
+  if (existing) {
+    return existing as Promise<T>;
+  }
+  const promise = fetcher()
+    .then((res) => {
+      dictCache.set(key, { ts: Date.now(), data: res });
+      return res;
+    })
+    .finally(() => {
+      inFlightDict.delete(key);
+    });
+  inFlightDict.set(key, promise);
+  return promise;
+}
+
+export function clearClinicDictionariesCache(): void {
+  dictCache.clear();
+}
+
 // ─── Публичные справочники клиники и расписание ────────────
 
 export const clinicApi = {
@@ -19,7 +48,8 @@ export const clinicApi = {
     if (specializationId) params.append('specializationId', specializationId);
     if (speciesId) params.append('speciesId', speciesId);
     const query = params.toString() ? `?${params.toString()}` : '';
-    return api.get<Service[]>(`/api/v1/services${query}`);
+    const url = `/api/v1/services${query}`;
+    return cachedGet<Service[]>(url, () => api.get<Service[]>(url));
   },
 
   getServiceById: (id: string) => api.get<Service>(`/api/v1/services/${id}`),
@@ -34,9 +64,12 @@ export const clinicApi = {
 
   getVeterinarianById: (id: string) => api.get<Veterinarian>(`/api/v1/veterinarians/${id}`),
 
-  getSpecies: () => api.get<Species[]>('/api/v1/species'),
+  getSpecies: () => cachedGet<Species[]>('/api/v1/species', () => api.get<Species[]>('/api/v1/species')),
 
-  getSpecializations: () => api.get<Specialization[]>('/api/v1/specializations'),
+  getSpecializations: () =>
+    cachedGet<Specialization[]>('/api/v1/specializations', () =>
+      api.get<Specialization[]>('/api/v1/specializations')
+    ),
 
   getServiceSpecies: (serviceId: string) =>
     api.get<ServiceSpecies[]>(`/api/v1/services/${serviceId}/species`),
@@ -44,8 +77,10 @@ export const clinicApi = {
   getVetSpeciesPermissions: (vetId: string) =>
     api.get<VeterinarianSpeciesPermission[]>(`/api/v1/veterinarians/${vetId}/species`),
 
-  getWorkSchedules: (vetId: string) =>
-    api.get<WorkSchedule[]>(`/api/v1/work-schedules?veterinarianId=${vetId}`),
+  getWorkSchedules: (vetId: string) => {
+    const url = `/api/v1/work-schedules?veterinarianId=${vetId}`;
+    return cachedGet<WorkSchedule[]>(url, () => api.get<WorkSchedule[]>(url));
+  },
 
   getScheduleExceptions: (vetId: string, from?: string, to?: string) => {
     const params = new URLSearchParams({ veterinarianId: vetId });

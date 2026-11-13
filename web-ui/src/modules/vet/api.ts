@@ -42,17 +42,23 @@ export interface VetPatientsQuery {
 
 const PATIENTS_CACHE_TTL_MS = 60_000;
 let cachedToken = '';
+let cachedProfile: { ts: number; data: Veterinarian } | null = null;
+let inFlightProfile: { token: string; promise: Promise<Veterinarian> } | null = null;
 let cachedPatients: { ts: number; data: Pet[] } | null = null;
 let inFlightPatients: { token: string; promise: Promise<Pet[]> } | null = null;
-const cachedPetsById = new Map<string, Pet>();
+const cachedPetsById = new Map<string, { ts: number; pet: Pet }>();
+const inFlightPetsById = new Map<string, Promise<Pet>>();
 
 function syncCacheToken(): string {
   const token = tokenStorage.get() || '';
   if (token !== cachedToken) {
     cachedToken = token;
+    cachedProfile = null;
+    inFlightProfile = null;
     cachedPatients = null;
     inFlightPatients = null;
     cachedPetsById.clear();
+    inFlightPetsById.clear();
   }
   return token;
 }
@@ -60,18 +66,71 @@ function syncCacheToken(): string {
 // ─── Врачебные операции ───────────────────────────────────
 
 export const vetApi = {
-  getProfile: () => api.get<Veterinarian>('/api/v1/veterinarian/profile'),
-
-  updateProfile: (data: UpdateVetProfileRequest) =>
-    api.patch<Veterinarian>('/api/v1/veterinarian/profile', data),
-
-  uploadOwnPhoto: (file: File) => {
-    const formData = new FormData();
-    formData.append('file', file);
-    return api.putForm<PhotoLinks>('/api/v1/veterinarian/profile/photo', formData);
+  getProfile: async (forceRefresh = false): Promise<Veterinarian> => {
+    const token = syncCacheToken();
+    if (
+      !forceRefresh &&
+      cachedProfile &&
+      Date.now() - cachedProfile.ts < PATIENTS_CACHE_TTL_MS &&
+      isPhotoUrlFresh(cachedProfile.data)
+    ) {
+      return cachedProfile.data;
+    }
+    if (!forceRefresh && inFlightProfile && inFlightProfile.token === token) {
+      return inFlightProfile.promise;
+    }
+    const promise = api
+      .get<Veterinarian>('/api/v1/veterinarian/profile')
+      .then((prof) => {
+        if (syncCacheToken() === token && prof) {
+          cachedProfile = { ts: Date.now(), data: prof };
+        }
+        return prof;
+      })
+      .finally(() => {
+        if (inFlightProfile?.promise === promise) {
+          inFlightProfile = null;
+        }
+      });
+    inFlightProfile = { token, promise };
+    return promise;
   },
 
-  deleteOwnPhoto: () => api.delete<void>('/api/v1/veterinarian/profile/photo'),
+  updateProfile: async (data: UpdateVetProfileRequest) => {
+    const updated = await api.patch<Veterinarian>('/api/v1/veterinarian/profile', data);
+    if (updated) {
+      cachedProfile = { ts: Date.now(), data: updated };
+    }
+    return updated;
+  },
+
+  uploadOwnPhoto: async (file: File) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    const links = await api.putForm<PhotoLinks>('/api/v1/veterinarian/profile/photo', formData);
+    if (cachedProfile) {
+      cachedProfile = {
+        ts: Date.now(),
+        data: { ...cachedProfile.data, ...links },
+      };
+    }
+    return links;
+  },
+
+  deleteOwnPhoto: async () => {
+    await api.delete<void>('/api/v1/veterinarian/profile/photo');
+    if (cachedProfile) {
+      cachedProfile = {
+        ts: Date.now(),
+        data: {
+          ...cachedProfile.data,
+          photoUrl: null,
+          photoThumbnailUrl: null,
+          photoUrlExpiresAt: null,
+        },
+      };
+    }
+  },
 
   getAppointments: (
     pageOrOptions: number | VetAppointmentsQuery = 0,
@@ -139,9 +198,31 @@ export const vetApi = {
 
   getPatientPet: async (id: string): Promise<Pet> => {
     syncCacheToken();
-    const pet = await api.get<Pet>(`/api/v1/veterinarian/pets/${id}`);
-    if (pet?.id) cachedPetsById.set(pet.id, pet);
-    return pet;
+    const cachedEntry = cachedPetsById.get(id);
+    if (
+      cachedEntry &&
+      Date.now() - cachedEntry.ts < PATIENTS_CACHE_TTL_MS &&
+      isPhotoUrlFresh(cachedEntry.pet)
+    ) {
+      return cachedEntry.pet;
+    }
+    const existingPromise = inFlightPetsById.get(id);
+    if (existingPromise) {
+      return existingPromise;
+    }
+    const promise = api
+      .get<Pet>(`/api/v1/veterinarian/pets/${id}`)
+      .then((pet) => {
+        if (pet?.id) {
+          cachedPetsById.set(pet.id, { ts: Date.now(), pet });
+        }
+        return pet;
+      })
+      .finally(() => {
+        inFlightPetsById.delete(id);
+      });
+    inFlightPetsById.set(id, promise);
+    return promise;
   },
 
   getPatientPetsByIds: async (
@@ -155,7 +236,11 @@ export const vetApi = {
     for (const id of new Set(petIds)) {
       if (!id) continue;
       const existing = existingMap?.[id];
-      const cached = cachedPetsById.get(id);
+      const cachedEntry = cachedPetsById.get(id);
+      const cached =
+        cachedEntry && Date.now() - cachedEntry.ts < PATIENTS_CACHE_TTL_MS
+          ? cachedEntry.pet
+          : undefined;
       if (existing && isPhotoUrlFresh(existing)) {
         out[id] = existing;
       } else if (cached && isPhotoUrlFresh(cached)) {
@@ -199,15 +284,15 @@ export const vetApi = {
     if (opts.name) query.append('name', opts.name);
     const res = await api.get<PageResponse<Pet>>(`/api/v1/veterinarian/pets?${query.toString()}`);
     if (Array.isArray(res?.items)) {
+      const now = Date.now();
       for (const pet of res.items) {
-        if (pet?.id) cachedPetsById.set(pet.id, pet);
+        if (pet?.id) cachedPetsById.set(pet.id, { ts: now, pet });
       }
     }
     return res;
   },
 
-  getPatientById: (id: string) =>
-    api.get<Pet>(`/api/v1/veterinarian/pets/${id}`),
+  getPatientById: (id: string) => vetApi.getPatientPet(id),
 
   getPatients: async (forceRefresh = false): Promise<Pet[]> => {
     const token = syncCacheToken();
@@ -226,7 +311,7 @@ export const vetApi = {
     const promise = (async () => {
       const resolved = await fetchAllPages(
         (page, pageSize) => vetApi.getPatientsPage({ page, size: pageSize }),
-        { pageSize: 100, maxPages: 50, concurrency: 4 }
+        { pageSize: 100, maxPages: 2, concurrency: 2 }
       );
       if (syncCacheToken() === token) {
         cachedPatients = { ts: Date.now(), data: resolved };

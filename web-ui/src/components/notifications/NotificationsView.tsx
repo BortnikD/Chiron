@@ -147,6 +147,17 @@ export const NotificationsView: React.FC = () => {
     }
   };
 
+  const filtered = useMemo(
+    () => (onlyUnread ? notifications.filter((n) => !n.readAt) : notifications),
+    [notifications, onlyUnread]
+  );
+
+  const unreadCount = notifications.filter((n) => !n.readAt).length;
+  const pageCount = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const currentPage = Math.min(page, pageCount - 1);
+  const pageItems = filtered.slice(currentPage * PAGE_SIZE, (currentPage + 1) * PAGE_SIZE);
+  const groups = groupNotifications(pageItems);
+
   if (role === 'ADMIN') {
     return (
       <section className="island grow" style={{ maxWidth: '860px', width: '100%' }}>
@@ -169,17 +180,6 @@ export const NotificationsView: React.FC = () => {
     );
   }
 
-  const filtered = useMemo(
-    () => (onlyUnread ? notifications.filter((n) => !n.readAt) : notifications),
-    [notifications, onlyUnread]
-  );
-
-  const unreadCount = notifications.filter((n) => !n.readAt).length;
-  const pageCount = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
-  const currentPage = Math.min(page, pageCount - 1);
-  const pageItems = filtered.slice(currentPage * PAGE_SIZE, (currentPage + 1) * PAGE_SIZE);
-  const groups = groupNotifications(pageItems);
-
   return (
     <section className="island grow" style={{ maxWidth: '860px', width: '100%' }}>
       <div className="island-head">
@@ -188,7 +188,7 @@ export const NotificationsView: React.FC = () => {
           Уведомления <span className="count">непрочитанных: {unreadCount}</span>
         </span>
 
-        <div className="row wrap" style={{ gap: '12px' }}>
+        <div className="row wrap" style={{ gap: '10px', alignItems: 'center' }}>
           <span
             className="row small muted"
             style={{ gap: '6px' }}

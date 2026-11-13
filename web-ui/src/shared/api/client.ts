@@ -69,6 +69,17 @@ export async function request<T>(
   }
 
   if (!response.ok || !data.success) {
+    if (
+      response.status === 401 &&
+      !endpoint.includes('/auth/login') &&
+      !endpoint.includes('/auth/register') &&
+      !endpoint.includes('/users/me/password')
+    ) {
+      tokenStorage.clear();
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('chiron:unauthorized'));
+      }
+    }
     const errorDetails = data.error;
     const message = errorDetails?.message || `Ошибка сервера (${response.status})`;
     throw new ApiError(response.status, message, errorDetails?.violations, errorDetails);

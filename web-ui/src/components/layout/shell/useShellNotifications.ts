@@ -6,7 +6,7 @@ import { notificationsApi } from '@/shared/api';
 import { vetApi } from '@/modules/vet/api';
 import { useNotificationSocket } from '@/shared/realtime/useNotificationSocket';
 import { useToast } from '@/shared/components';
-import { getMoscowDateKey, getMoscowTodayIso } from '@/shared/lib';
+import { getMoscowDateKey, getMoscowTodayIso, nextMoscowDayIso } from '@/shared/lib';
 import type { AppNotification, UserRole } from '@/shared/types';
 import { getNotificationHref } from '@/components/notifications/notifMeta';
 
@@ -48,7 +48,13 @@ export function useShellNotifications(params: {
     const todayIso = getMoscowTodayIso();
     const nowMs = Date.now();
     vetApi
-      .getAppointments({ page: 0, size: 100, status: ['PENDING', 'CONFIRMED'] })
+      .getAppointments({
+        page: 0,
+        size: 100,
+        status: ['PENDING', 'CONFIRMED'],
+        from: new Date(`${todayIso}T00:00:00+03:00`).toISOString(),
+        to: new Date(`${nextMoscowDayIso(todayIso)}T00:00:00+03:00`).toISOString(),
+      })
       .then((res) => {
         const activeToday = (res?.items || []).filter(
           (a) => getMoscowDateKey(a.startAt) === todayIso && new Date(a.endAt).getTime() > nowMs
@@ -68,11 +74,11 @@ export function useShellNotifications(params: {
   useEffect(() => {
     fetchVetTodayCount();
     if (role !== 'VETERINARIAN') return;
-    window.addEventListener('chiron:notifications-received', fetchVetTodayCount);
+    window.addEventListener('chiron:notification-received', fetchVetTodayCount);
     window.addEventListener('chiron:notifications-updated', fetchVetTodayCount);
     window.addEventListener('chiron:vet-appointments-updated', fetchVetTodayCount);
     return () => {
-      window.removeEventListener('chiron:notifications-received', fetchVetTodayCount);
+      window.removeEventListener('chiron:notification-received', fetchVetTodayCount);
       window.removeEventListener('chiron:notifications-updated', fetchVetTodayCount);
       window.removeEventListener('chiron:vet-appointments-updated', fetchVetTodayCount);
     };

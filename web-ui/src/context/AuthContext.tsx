@@ -97,6 +97,14 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     setAuthError(null);
   }, []);
 
+  useEffect(() => {
+    const handleUnauthorized = () => {
+      logout();
+    };
+    window.addEventListener('chiron:unauthorized', handleUnauthorized);
+    return () => window.removeEventListener('chiron:unauthorized', handleUnauthorized);
+  }, [logout]);
+
   const refreshUser = useCallback(async () => {
     if (tokenStorage.get()) {
       await fetchCurrentUser();
