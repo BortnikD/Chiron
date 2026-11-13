@@ -104,7 +104,7 @@ export function ServiceDetailIsland({
 
           <div className="col" style={{ gap: '8px' }}>
             <span className="section-title">Цена и длительность по видам</span>
-            <div className="dtable" style={{ '--cols': '1fr 1.2fr 1.2fr' } as React.CSSProperties}>
+            <div className="dtable keep-table" style={{ '--cols': '1fr 1.2fr 1.2fr' } as React.CSSProperties}>
               <div className="thead" style={{ padding: 0 }}>
                 <span>Вид</span>
                 <span>Длительность</span>

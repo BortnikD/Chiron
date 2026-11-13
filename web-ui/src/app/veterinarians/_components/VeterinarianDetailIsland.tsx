@@ -93,7 +93,7 @@ export const VeterinarianDetailIsland: React.FC<VeterinarianDetailIslandProps> =
 
           <div className="col" style={{ gap: '8px' }}>
             <span className="section-title">Недельный график</span>
-            <div className="dtable" style={{ '--cols': '44px 1fr 1.4fr' } as React.CSSProperties}>
+            <div className="dtable keep-table" style={{ '--cols': '44px 1fr 1.4fr' } as React.CSSProperties}>
               {DOW_ORDER.map((dow) => {
                 const sched = schedules.find((s) => s.dayOfWeek === dow);
                 const dayLabel = DOW_LABELS[dow] || dow;

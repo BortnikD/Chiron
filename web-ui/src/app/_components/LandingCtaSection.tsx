@@ -18,7 +18,7 @@ export const LandingCtaSection: React.FC = () => {
         </span>
       </span>
 
-      <div className="row" style={{ gap: '6px' }}>
+      <div className="row wrap" style={{ gap: '6px' }}>
         <span className="sp-chip tone-cat">
           <SpeciesIcon species="cat" size={14} />
           Кошки
