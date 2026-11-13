@@ -180,7 +180,7 @@ export const VetAppointmentsCalendar: React.FC<VetAppointmentsCalendarProps> = (
             {days.map((d) => {
               const exc = exceptions.find((e) => e.startDate <= d.iso && e.endDate >= d.iso);
               const sched = workSchedules.find((s) => s.dayOfWeek === DOW_ORDER[d.dayIdx]);
-              const dayAppts = appointments.filter((a) => getMoscowDateKey(a.startAt) === d.iso);
+              const dayAppts = appointments.filter((a) => getMoscowDateKey(a.startAt) === d.iso && a.status !== 'CANCELLED');
 
               return (
                 <div

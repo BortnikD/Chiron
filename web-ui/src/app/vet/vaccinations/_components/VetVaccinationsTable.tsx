@@ -4,6 +4,7 @@ import React, { useMemo } from 'react';
 import { ChevronLeft, ChevronRight, Syringe } from 'lucide-react';
 import type { Pet, Vaccination } from '@/modules/client/types';
 import { PetAvatar } from '@/components/ui/EntityAvatar';
+import { PaginationFooter } from '@/shared/components';
 import { formatIsoDateDisplay, getSpeciesTone } from '@/shared/lib';
 import { getVetVaccinationDueInfo } from '../../dashboard/_components/vetHelpers';
 
@@ -138,39 +139,14 @@ export const VetVaccinationsTable: React.FC<VetVaccinationsTableProps> = ({
         )}
       </div>
 
-      <div className="island-foot">
-        <span className="small muted">Сортировка: по дате введения, новые сверху</span>
-        <div className="pager">
-          <button
-            type="button"
-            className="btn btn-ghost btn-sm btn-icon"
-            disabled={page <= 0}
-            aria-label="Назад"
-            onClick={() => onPageChange(Math.max(0, page - 1))}
-          >
-            <ChevronLeft className="ic" />
-          </button>
-          {pageNumbers.map((pg) => (
-            <button
-              key={pg}
-              type="button"
-              className={`btn btn-ghost btn-sm ${pg === page ? 'on' : ''}`}
-              onClick={() => onPageChange(pg)}
-            >
-              {pg + 1}
-            </button>
-          ))}
-          <button
-            type="button"
-            className="btn btn-ghost btn-sm btn-icon"
-            disabled={page >= totalPages - 1}
-            aria-label="Вперёд"
-            onClick={() => onPageChange(Math.min(totalPages - 1, page + 1))}
-          >
-            <ChevronRight className="ic" />
-          </button>
-        </div>
-      </div>
+      <PaginationFooter
+        page={page}
+        pageSize={10}
+        totalElements={totalElements}
+        totalPages={totalPages}
+        loading={loading}
+        onPageChange={onPageChange}
+      />
     </section>
   );
 };

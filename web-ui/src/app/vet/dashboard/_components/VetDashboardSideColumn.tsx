@@ -41,6 +41,8 @@ export interface VetDashboardSideColumnProps {
   petsMap: Record<string, Pet>;
   speciesMap: Record<string, string>;
   loading?: boolean;
+  selectedAppointmentId?: string | null;
+  onExpandPending?: () => void;
   onSelectAppointment: (appt: Appointment) => void;
   onUpdateStatus: (
     apptId: string,
@@ -57,10 +59,14 @@ export const VetDashboardSideColumn: React.FC<VetDashboardSideColumnProps> = ({
   petsMap,
   speciesMap,
   loading = false,
+  selectedAppointmentId = null,
+  onExpandPending,
   onSelectAppointment,
   onUpdateStatus,
 }) => {
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [showAllPending, setShowAllPending] = useState(false);
+  const visiblePending = showAllPending ? pendingAppointments : pendingAppointments.slice(0, 8);
   const [cancelTarget, setCancelTarget] = useState<Appointment | null>(null);
   const [cancelError, setCancelError] = useState<string | null>(null);
 
@@ -237,7 +243,8 @@ export const VetDashboardSideColumn: React.FC<VetDashboardSideColumnProps> = ({
                 <span>Все записи подтверждены</span>
               </div>
             ) : (
-              pendingAppointments.map((a) => {
+              <>
+              {visiblePending.map((a) => {
                 const dd = formatDateRu(a.startAt, { day: '2-digit' });
                 const mon = formatDateRu(a.startAt, { month: 'short' }).replace('.', '');
                 const startStr = formatSlotTime(a.startAt);
@@ -246,7 +253,11 @@ export const VetDashboardSideColumn: React.FC<VetDashboardSideColumnProps> = ({
                   a.serviceName || a.service?.name || servicesMap[a.serviceId] || 'Приём';
 
                 return (
-                  <div key={a.id} className="lrow" style={{ cursor: 'default' }}>
+                  <div
+                    key={a.id}
+                    className={`lrow ${selectedAppointmentId === a.id ? 'sel' : ''}`}
+                    style={{ cursor: 'default' }}
+                  >
                     <span className="datebox">
                       <b>{dd}</b>
                       <span>{mon}</span>
@@ -284,7 +295,22 @@ export const VetDashboardSideColumn: React.FC<VetDashboardSideColumnProps> = ({
                     </span>
                   </div>
                 );
-              })
+              })}
+              {!showAllPending && pendingAppointments.length > 8 && (
+                <div style={{ padding: '8px 8px 4px' }}>
+                  <button
+                    type="button"
+                    className="btn btn-ghost btn-sm btn-block"
+                    onClick={() => {
+                      setShowAllPending(true);
+                      onExpandPending?.();
+                    }}
+                  >
+                    Показать все ({pendingAppointments.length})
+                  </button>
+                </div>
+              )}
+              </>
             )}
           </div>
         </section>

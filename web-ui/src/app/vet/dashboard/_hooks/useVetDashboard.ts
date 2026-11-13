@@ -1,8 +1,7 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { vetApi } from '@/modules/vet/api';
-import type { CreateFollowUpRequest } from '@/modules/vet/types';
 import { clinicApi } from '@/modules/clinic/api';
-import type { Appointment, CreateVaccinationRequest, Pet } from '@/modules/client/types';
+import type { Appointment, Pet } from '@/modules/client/types';
 import type {
   Service,
   Specialization,
@@ -10,9 +9,7 @@ import type {
   Veterinarian,
   WorkSchedule,
 } from '@/modules/clinic/types';
-import type { AppointmentStatus } from '@/shared/types';
 import { useShellHeader } from '@/components/layout/AppShell';
-import { useToast } from '@/shared/components';
 import {
   formatApiError,
   formatSlotTime,
@@ -20,18 +17,16 @@ import {
   toIdNameMap,
 } from '@/shared/lib';
 import { getPetName } from '../_components/utils';
-import { getMoscowNowTime, moscowStartInstant } from '../_components/vetHelpers';
+import {
+  getMoscowNowTime,
+  moscowNextDayInstant,
+  moscowStartInstant,
+} from '../_components/vetHelpers';
+import { useVetAppointmentActions } from '../../appointments/_hooks/useVetAppointmentActions';
 
-const STATUS_TOASTS: Partial<Record<AppointmentStatus, [string, string]>> = {
-  CONFIRMED: ['Запись подтверждена', 'Владелец получит уведомление «Запись подтверждена»'],
-  COMPLETED: ['Приём завершён', 'Не забудьте заполнить заметки и прививки'],
-  NO_SHOW: ['Отмечена неявка', 'Статус приёма обновлён'],
-  CANCELLED: ['Запись отменена', 'Владелец получит уведомление с причиной'],
-};
+const INITIAL_PENDING_PETS_LIMIT = 8;
 
 export function useVetDashboard(initialSelId?: string | null) {
-  const { toast } = useToast();
-
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [services, setServices] = useState<Service[]>([]);
   const [specializations, setSpecializations] = useState<Specialization[]>([]);
@@ -70,8 +65,18 @@ export function useVetDashboard(initialSelId?: string | null) {
       setError(null);
     }
     try {
-      const [apptsRes, svcRes, profileRes, specsRes, speciesRes] = await Promise.all([
-        vetApi.getAppointments({ page: 0, size: 100, from: moscowStartInstant(currentDay) }),
+      const todayFrom = moscowStartInstant(currentDay);
+      const todayTo = moscowNextDayInstant(currentDay);
+
+      const [todayRes, pendingRes, svcRes, profileRes, specsRes, speciesRes] = await Promise.all([
+        vetApi.getAppointments({ page: 0, size: 100, from: todayFrom, to: todayTo }),
+        vetApi.getAppointments({
+          page: 0,
+          size: 50,
+          status: 'PENDING',
+          from: todayFrom,
+          direction: 'ASC',
+        }),
         clinicApi.getServices(),
         vetApi.getProfile().catch(() => null),
         clinicApi.getSpecializations().catch(() => [] as Specialization[]),
@@ -80,12 +85,29 @@ export function useVetDashboard(initialSelId?: string | null) {
 
       if (!isMountedRef.current || seq !== loadSeqRef.current) return [];
 
-      const items = apptsRes?.items ?? (Array.isArray(apptsRes) ? apptsRes : []);
-      items.sort((a, b) => new Date(a.startAt).getTime() - new Date(b.startAt).getTime());
+      const todayItems = todayRes?.items ?? (Array.isArray(todayRes) ? todayRes : []);
+      const pendingItems = pendingRes?.items ?? (Array.isArray(pendingRes) ? pendingRes : []);
+
+      const mergedMap = new Map<string, Appointment>();
+      for (const a of todayItems) mergedMap.set(a.id, a);
+      for (const a of pendingItems) mergedMap.set(a.id, a);
+      const items = Array.from(mergedMap.values()).sort(
+        (a, b) => new Date(a.startAt).getTime() - new Date(b.startAt).getTime()
+      );
+
+      // Загружаем карточки питомцев только для приёмов сегодняшнего дня и первых видимых в блоке «Ожидают подтверждения»
+      const priorityPetIds = [
+        ...todayItems.map((a) => a.petId),
+        ...pendingItems.slice(0, INITIAL_PENDING_PETS_LIMIT).map((a) => a.petId),
+      ];
 
       const [schedRes, resolvedPets] = await Promise.all([
-        profileRes?.id ? clinicApi.getWorkSchedules(profileRes.id).catch(() => [] as WorkSchedule[]) : Promise.resolve([] as WorkSchedule[]),
-        vetApi.getPatientPetsByIds(items.map((a) => a.petId), petsMapRef.current).catch(() => ({} as Record<string, Pet>)),
+        profileRes?.id
+          ? clinicApi.getWorkSchedules(profileRes.id).catch(() => [] as WorkSchedule[])
+          : Promise.resolve([] as WorkSchedule[]),
+        vetApi
+          .getPatientPetsByIds(priorityPetIds, petsMapRef.current)
+          .catch(() => ({} as Record<string, Pet>)),
       ]);
       if (!isMountedRef.current || seq !== loadSeqRef.current) return [];
 
@@ -132,6 +154,22 @@ export function useVetDashboard(initialSelId?: string | null) {
   }, [loadAll]);
 
   useEffect(() => {
+    if (!selectedAppt?.petId || petsMapRef.current[selectedAppt.petId]) return;
+    let cancelled = false;
+    vetApi
+      .getPatientPet(selectedAppt.petId)
+      .then((pet) => {
+        if (!cancelled && pet && isMountedRef.current) {
+          setPetsMap((prev) => ({ ...prev, [pet.id]: pet }));
+        }
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedAppt?.petId]);
+
+  useEffect(() => {
     if (!initialSelId || loading || appliedSelRef.current === initialSelId) return;
     appliedSelRef.current = initialSelId;
     const found = appointments.find((a) => a.id === initialSelId);
@@ -144,7 +182,7 @@ export function useVetDashboard(initialSelId?: string | null) {
       .getAppointmentById(initialSelId)
       .then(async (appt) => {
         if (cancelled || !isMountedRef.current) return;
-        if (!petsMap[appt.petId]) {
+        if (!petsMapRef.current[appt.petId]) {
           const pet = await vetApi.getPatientPet(appt.petId).catch(() => null);
           if (!cancelled && pet && isMountedRef.current) {
             setPetsMap((prev) => ({ ...prev, [pet.id]: pet }));
@@ -156,7 +194,7 @@ export function useVetDashboard(initialSelId?: string | null) {
     return () => {
       cancelled = true;
     };
-  }, [initialSelId, loading, appointments, petsMap]);
+  }, [initialSelId, loading, appointments]);
 
   const servicesMap = useMemo(() => toIdNameMap(services), [services]);
   const specsMap = useMemo(() => toIdNameMap(specializations), [specializations]);
@@ -182,6 +220,22 @@ export function useVetDashboard(initialSelId?: string | null) {
       .sort((a, b) => new Date(a.startAt).getTime() - new Date(b.startAt).getTime());
   }, [appointments]);
 
+  const loadAllPendingPets = useCallback(() => {
+    const restIds = pendingAppts
+      .slice(INITIAL_PENDING_PETS_LIMIT)
+      .map((a) => a.petId)
+      .filter((id) => id && !petsMapRef.current[id]);
+    if (restIds.length === 0) return;
+    void vetApi
+      .getPatientPetsByIds(restIds, petsMapRef.current)
+      .then((resolved) => {
+        if (isMountedRef.current && Object.keys(resolved).length > 0) {
+          setPetsMap((prev) => ({ ...prev, ...resolved }));
+        }
+      })
+      .catch(() => {});
+  }, [pendingAppts]);
+
   const nextAppt = useMemo(() => {
     const nowMs = Date.now();
     return (
@@ -193,75 +247,18 @@ export function useVetDashboard(initialSelId?: string | null) {
     );
   }, [todayAppts]);
 
-  const notifySidebarUpdated = () => {
-    window.dispatchEvent(new CustomEvent('chiron:vet-appointments-updated'));
-  };
-
-  const handleUpdateStatus = useCallback(
-    async (apptId: string, status: AppointmentStatus, cancelReason?: string | null) => {
-      setStatusError(null);
-      try {
-        const updated = await vetApi.updateAppointment(apptId, {
-          status,
-          ...(status === 'CANCELLED' ? { cancelReason: cancelReason ?? null } : {}),
-        });
-        const freshItems = await loadAll(true);
-        if (!isMountedRef.current) return;
-        const fresh = freshItems.find((a) => a.id === apptId) ?? updated;
-        setSelectedAppt((prev) => (prev?.id === apptId ? fresh : prev));
-        const msg = STATUS_TOASTS[status];
-        if (msg) toast(msg[0], msg[1]);
-        notifySidebarUpdated();
-      } catch (err: unknown) {
-        if (!isMountedRef.current) return;
-        const text = formatApiError(err, 'Ошибка обновления статуса');
-        if (status === 'CANCELLED') throw new Error(text);
-        setStatusError(text);
-        toast('Не удалось обновить статус', text, 'err');
-      }
-    },
-    [loadAll, toast]
-  );
-
-  const handleSaveNotes = useCallback(
-    async (apptId: string, notes: string | null): Promise<void> => {
-      try {
-        const updated = await vetApi.updateAppointment(apptId, { vetNotes: notes });
-        const freshItems = await loadAll(true);
-        if (!isMountedRef.current) return;
-        const fresh = freshItems.find((a) => a.id === apptId) ?? updated;
-        setSelectedAppt((prev) => (prev?.id === apptId ? fresh : prev));
-        toast(notes ? 'Заметки сохранены' : 'Заметки очищены');
-        notifySidebarUpdated();
-      } catch (err: unknown) {
-        throw new Error(formatApiError(err, 'Не удалось сохранить заметки'));
-      }
-    },
-    [loadAll, toast]
-  );
-
-  const handleCreateFollowUp = useCallback(
-    async (apptId: string, data: CreateFollowUpRequest): Promise<void> => {
-      try {
-        await vetApi.createFollowUp(apptId, data);
-        await loadAll(true);
-        toast('Повторный приём назначен', 'Запись подтверждена, владелец получит уведомление');
-        notifySidebarUpdated();
-      } catch (err: unknown) {
-        throw new Error(formatApiError(err, 'Не удалось назначить повторный приём'));
-      }
-    },
-    [loadAll, toast]
-  );
-
-  const handleCreateVaccination = useCallback(
-    async (payload: CreateVaccinationRequest): Promise<void> => {
-      await vetApi.createVaccination(payload);
-      const pName = petsMap[payload.petId]?.name || 'Пациент';
-      toast('Прививка внесена', `${pName} — ${payload.name}`);
-    },
-    [petsMap, toast]
-  );
+  const {
+    handleUpdateStatus,
+    handleSaveNotes,
+    handleCreateFollowUp,
+    handleCreateVaccination,
+  } = useVetAppointmentActions({
+    reloadAppointments: loadAll,
+    setSelectedAppt,
+    petsMap,
+    isMountedRef,
+    onStatusError: setStatusError,
+  });
 
   return {
     appointments,
@@ -281,6 +278,7 @@ export function useVetDashboard(initialSelId?: string | null) {
     nowTime,
     todayAppts,
     pendingAppts,
+    loadAllPendingPets,
     nextAppt,
     reload: loadAll,
     handleUpdateStatus,

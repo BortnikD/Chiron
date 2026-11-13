@@ -17,11 +17,8 @@ import {
 import { getPetName } from '../../dashboard/_components/utils';
 import { VET_STATUS_COLORS } from '../../dashboard/_components/vetTimelineUtils';
 
-const H0 = 8;
-const H1 = 19;
 const PPM = 1.4;
 const CAL_HOUR_PX = `${60 * PPM}px`;
-const CAL_HEIGHT = `${(H1 - H0) * 60 * PPM}px`;
 
 const px = (n: number): string => `${Math.round(n)}px`;
 
@@ -90,18 +87,43 @@ export const VetWeeklyScheduleTable: React.FC<VetWeeklyScheduleTableProps> = ({
     return `${weekDays[0].short} – ${weekDays[6].short} ${weekDays[6].date.getUTCFullYear()}`;
   }, [weekDays]);
 
+  const { h0, h1 } = useMemo(() => {
+    let minH = 8;
+    let maxH = 19;
+    schedules.forEach((s) => {
+      minH = Math.min(minH, Math.floor(timeToMinutes(s.startTime.slice(0, 5)) / 60));
+      maxH = Math.max(maxH, Math.ceil(timeToMinutes(s.endTime.slice(0, 5)) / 60));
+    });
+    exceptions.forEach((e) => {
+      if (e.type === 'CUSTOM_HOURS' && e.startTime && e.endTime) {
+        minH = Math.min(minH, Math.floor(timeToMinutes(e.startTime.slice(0, 5)) / 60));
+        maxH = Math.max(maxH, Math.ceil(timeToMinutes(e.endTime.slice(0, 5)) / 60));
+      }
+    });
+    appointments.forEach((a) => {
+      if (a.status === 'CANCELLED') return;
+      const sMin = timeToMinutes(formatSlotTime(a.startAt));
+      const eMin = timeToMinutes(formatSlotTime(a.endAt));
+      minH = Math.min(minH, Math.floor(sMin / 60));
+      maxH = Math.max(maxH, Math.ceil(eMin / 60));
+    });
+    return { h0: minH, h1: Math.max(minH + 2, maxH) };
+  }, [schedules, exceptions, appointments]);
+
+  const calHeight = px((h1 - h0) * 60 * PPM);
+
   const calHours = useMemo(
     () =>
-      Array.from({ length: H1 - H0 }, (_, i) => ({
-        label: `${String(H0 + i).padStart(2, '0')}:00`,
+      Array.from({ length: h1 - h0 }, (_, i) => ({
+        label: `${String(h0 + i).padStart(2, '0')}:00`,
         top: px(i * 60 * PPM),
       })),
-    []
+    [h0, h1]
   );
 
   const showNowLine =
-    typeof nowMinutes === 'number' && nowMinutes >= H0 * 60 && nowMinutes <= H1 * 60;
-  const nowTop = showNowLine ? px((nowMinutes - H0 * 60) * PPM) : null;
+    typeof nowMinutes === 'number' && nowMinutes >= h0 * 60 && nowMinutes <= h1 * 60;
+  const nowTop = showNowLine ? px((nowMinutes - h0 * 60) * PPM) : null;
 
   return (
     <section className="island grow" style={{ display: 'flex', flexDirection: 'column' }}>
@@ -131,7 +153,7 @@ export const VetWeeklyScheduleTable: React.FC<VetWeeklyScheduleTableProps> = ({
           </span>
         </div>
 
-        <span className="small muted">Только просмотр · график меняет администратор</span>
+
       </div>
 
       <div className="island-body" style={{ overflowX: 'auto', paddingBottom: '16px' }}>
@@ -159,7 +181,7 @@ export const VetWeeklyScheduleTable: React.FC<VetWeeklyScheduleTableProps> = ({
               </div>
             ))}
 
-            <div className="week-t" style={{ height: CAL_HEIGHT }}>
+            <div className="week-t" style={{ height: calHeight }}>
               {calHours.map((h) => (
                 <span key={h.label} className="wt-label" style={{ top: h.top }}>
                   {h.label}
@@ -189,7 +211,7 @@ export const VetWeeklyScheduleTable: React.FC<VetWeeklyScheduleTableProps> = ({
                 <div
                   key={d.i}
                   className={`week-c ${d.isWeekend ? 'we' : ''} ${d.isToday ? 'today' : ''}`}
-                  style={{ height: CAL_HEIGHT, '--hp': CAL_HOUR_PX } as React.CSSProperties}
+                  style={{ height: calHeight, '--hp': CAL_HOUR_PX } as React.CSSProperties}
                 >
                   {exc?.type === 'ABSENCE' ? (
                     <button
@@ -197,7 +219,7 @@ export const VetWeeklyScheduleTable: React.FC<VetWeeklyScheduleTableProps> = ({
                       className="wk-block wk-off"
                       style={{
                         top: 0,
-                        height: CAL_HEIGHT,
+                        height: calHeight,
                         left: 0,
                         right: 0,
                         width: '100%',
@@ -222,7 +244,7 @@ export const VetWeeklyScheduleTable: React.FC<VetWeeklyScheduleTableProps> = ({
                         <div
                           className="wk-block wk-work"
                           style={{
-                            top: px(Math.max(0, timeToMinutes(start) - H0 * 60) * PPM),
+                            top: px(Math.max(0, timeToMinutes(start) - h0 * 60) * PPM),
                             height: px(Math.max(0, timeToMinutes(end) - timeToMinutes(start)) * PPM),
                           }}
                         />
@@ -231,7 +253,7 @@ export const VetWeeklyScheduleTable: React.FC<VetWeeklyScheduleTableProps> = ({
                         <div
                           className="wk-block wk-break"
                           style={{
-                            top: px(Math.max(0, timeToMinutes(bs) - H0 * 60) * PPM),
+                            top: px(Math.max(0, timeToMinutes(bs) - h0 * 60) * PPM),
                             height: px(Math.max(0, timeToMinutes(be) - timeToMinutes(bs)) * PPM),
                           }}
                         >
@@ -241,7 +263,7 @@ export const VetWeeklyScheduleTable: React.FC<VetWeeklyScheduleTableProps> = ({
                       {dayAppts.map((a) => {
                         const sTime = formatSlotTime(a.startAt);
                         const eTime = formatSlotTime(a.endAt);
-                        const topMin = Math.max(0, timeToMinutes(sTime) - H0 * 60);
+                        const topMin = Math.max(0, timeToMinutes(sTime) - h0 * 60);
                         const durPx = Math.max(24, (timeToMinutes(eTime) - timeToMinutes(sTime)) * PPM - 3);
                         const petName = getPetName(a, petsMap);
                         const svcName =

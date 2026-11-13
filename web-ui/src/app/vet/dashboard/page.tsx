@@ -30,6 +30,7 @@ function VetDashboardContent() {
     nowTime,
     todayAppts,
     pendingAppts,
+    loadAllPendingPets,
     nextAppt,
     reload,
     handleUpdateStatus,
@@ -93,6 +94,8 @@ function VetDashboardContent() {
           petsMap={petsMap}
           speciesMap={speciesMap}
           loading={loading}
+          selectedAppointmentId={selectedAppt?.id ?? null}
+          onExpandPending={loadAllPendingPets}
           onSelectAppointment={setSelectedAppt}
           onUpdateStatus={handleUpdateStatus}
         />

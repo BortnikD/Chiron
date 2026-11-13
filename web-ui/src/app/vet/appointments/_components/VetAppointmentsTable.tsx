@@ -5,6 +5,7 @@ import { Calendar, CalendarDays, ChevronLeft, ChevronRight, Repeat, X } from 'lu
 import type { Appointment, Pet } from '@/modules/client/types';
 import type { AppointmentStatus } from '@/shared/types';
 import { PetAvatar } from '@/components/ui/EntityAvatar';
+import { PaginationFooter } from '@/shared/components';
 import {
   APPOINTMENT_STATUS_META,
   formatCurrency,
@@ -230,54 +231,16 @@ export const VetAppointmentsTable: React.FC<VetAppointmentsTableProps> = ({
         )}
       </div>
 
-      <div className="island-foot">
-        <div className="row small muted">
-          <span>На странице</span>
-          <div className="seg">
-            {PAGE_SIZES.map((n) => (
-              <button
-                key={n}
-                type="button"
-                className={`seg-item ${size === n ? 'on' : ''}`}
-                onClick={() => onSizeChange(n)}
-              >
-                {n}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        <div className="pager">
-          <button
-            type="button"
-            className="btn btn-ghost btn-sm btn-icon"
-            disabled={page <= 0}
-            aria-label="Назад"
-            onClick={() => onPageChange(Math.max(0, page - 1))}
-          >
-            <ChevronLeft className="ic" />
-          </button>
-          {pageNumbers.map((pg) => (
-            <button
-              key={pg}
-              type="button"
-              className={`btn btn-ghost btn-sm ${pg === page ? 'on' : ''}`}
-              onClick={() => onPageChange(pg)}
-            >
-              {pg + 1}
-            </button>
-          ))}
-          <button
-            type="button"
-            className="btn btn-ghost btn-sm btn-icon"
-            disabled={page >= totalPages - 1}
-            aria-label="Вперёд"
-            onClick={() => onPageChange(Math.min(totalPages - 1, page + 1))}
-          >
-            <ChevronRight className="ic" />
-          </button>
-        </div>
-      </div>
+      <PaginationFooter
+        page={page}
+        pageSize={size}
+        totalElements={totalElements}
+        totalPages={totalPages}
+        loading={loading}
+        pageSizes={PAGE_SIZES}
+        onPageChange={onPageChange}
+        onPageSizeChange={onSizeChange}
+      />
     </section>
   );
 };

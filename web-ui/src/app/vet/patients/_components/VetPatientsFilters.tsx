@@ -68,7 +68,7 @@ export function VetPatientsFilters({
             </div>
           )}
 
-          <div style={{ width: '170px' }}>
+          <div className="vp-filter-species" style={{ width: '170px', minWidth: '140px', flex: '1 1 150px' }}>
             <FilterDropdown
               value={speciesFilter}
               options={speciesOptions}
@@ -78,7 +78,7 @@ export function VetPatientsFilters({
             />
           </div>
 
-          <div className="input-icon" style={{ width: '240px', maxWidth: '100%' }}>
+          <div className="input-icon vp-filter-search" style={{ width: '240px', maxWidth: '100%', flex: '1 1 200px' }}>
             <Search size={14} className="ic" />
             <input
               type="text"

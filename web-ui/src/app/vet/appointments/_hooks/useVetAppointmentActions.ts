@@ -22,12 +22,14 @@ export function useVetAppointmentActions(options: {
   setSelectedAppt: React.Dispatch<React.SetStateAction<Appointment | null>>;
   petsMap: Record<string, Pet>;
   isMountedRef: React.MutableRefObject<boolean>;
+  onStatusError?: (msg: string | null) => void;
 }) {
-  const { reloadAppointments, setSelectedAppt, petsMap, isMountedRef } = options;
+  const { reloadAppointments, setSelectedAppt, petsMap, isMountedRef, onStatusError } = options;
   const { toast } = useToast();
 
   const handleUpdateStatus = useCallback(
     async (apptId: string, status: AppointmentStatus, cancelReason?: string | null) => {
+      onStatusError?.(null);
       try {
         const updated = await vetApi.updateAppointment(apptId, {
           status,
@@ -41,8 +43,10 @@ export function useVetAppointmentActions(options: {
         if (msg) toast(msg[0], msg[1]);
         notifyVetAppointmentsUpdated();
       } catch (err: unknown) {
+        if (!isMountedRef.current) return;
         const text = formatApiError(err, 'Ошибка обновления статуса');
         if (status === 'CANCELLED') throw new Error(text);
+        onStatusError?.(text);
         toast('Не удалось обновить статус', text, 'err');
       }
     },

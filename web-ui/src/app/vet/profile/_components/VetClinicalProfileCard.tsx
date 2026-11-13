@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useMemo, useState } from 'react';
-import { Stethoscope, Eye, Check, AlertCircle } from 'lucide-react';
+import { Stethoscope, Check, AlertCircle } from 'lucide-react';
 import { clinicApi } from '@/modules/clinic/api';
 import type { Species, Veterinarian } from '@/modules/clinic/types';
 import { useAuth } from '@/context/AuthContext';
@@ -226,12 +226,7 @@ export function VetClinicalProfileCard({
       </section>
 
       <section className="island w-full lg:w-[340px] flex-none" aria-label="Предпросмотр карточки врача">
-        <div className="island-head">
-          <span className="island-title">
-            <Eye className="ic" />
-            Так видят клиенты
-          </span>
-        </div>
+
         <div className="island-body">
           <div className={`tcard tone-${specTone}`} style={{ cursor: 'default' }}>
             <div className="tcard-head">
@@ -275,10 +270,7 @@ export function VetClinicalProfileCard({
             </div>
           </div>
 
-          <p className="small muted" style={{ marginTop: '12px' }}>
-            Карточка в каталоге обновляется после сохранения. Специализацию и допуски к видам
-            меняет администратор.
-          </p>
+
         </div>
       </section>
     </div>

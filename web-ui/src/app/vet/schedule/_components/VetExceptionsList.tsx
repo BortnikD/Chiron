@@ -128,7 +128,7 @@ export const VetExceptionsList: React.FC<VetExceptionsListProps> = ({
         <div className="col" style={{ gap: '6px' }}>
           <span className="section-title">Недельный шаблон</span>
           <div
-            className="dtable"
+            className="dtable keep-table"
             style={{ '--cols': '40px 1fr 1fr' } as React.CSSProperties}
           >
             {myWeek.map((w) => (

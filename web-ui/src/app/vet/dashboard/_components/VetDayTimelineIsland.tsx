@@ -146,17 +146,21 @@ export const VetDayTimelineIsland: React.FC<VetDayTimelineIslandProps> = ({
               title={`Перерыв ${breakStartStr}–${breakEndStr}`}
             />
           )}
-          {dayBlocks.map((b) => (
-            <button
-              key={b.appt.id}
-              type="button"
-              className="ds-block"
-              style={{ left: b.left, width: b.width, background: b.color }}
-              title={b.tip}
-              aria-label={b.tip}
-              onClick={() => onSelectAppointment(b.appt)}
-            />
-          ))}
+          {dayBlocks.map((b) => {
+            const isSelected = selectedAppointment?.id === b.appt.id;
+            return (
+              <button
+                key={b.appt.id}
+                type="button"
+                className={`ds-block ${isSelected ? 'sel' : ''}`}
+                style={{ left: b.left, width: b.width, background: b.color }}
+                title={b.tip}
+                aria-label={b.tip}
+                aria-pressed={isSelected}
+                onClick={() => onSelectAppointment(b.appt)}
+              />
+            );
+          })}
           {showNowPin && (
             <div className="ds-now" style={{ left: toPct(nowMinutes) }}>
               <span>{nowHhmm}</span>

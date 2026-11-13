@@ -62,13 +62,8 @@ export function VetPatientDetailIsland({
     [appointments, patient.id]
   );
 
-  const runtimeOwner = patient as Pet & {
-    ownerName?: string | null;
-    ownerPhone?: string | null;
-    ownerEmail?: string | null;
-  };
   const hasOwnerContact = Boolean(
-    runtimeOwner.ownerName || runtimeOwner.ownerPhone || runtimeOwner.ownerEmail
+    patient.ownerName || patient.ownerPhone || patient.ownerEmail
   );
 
   return (
@@ -151,7 +146,7 @@ export function VetPatientDetailIsland({
                 <>
                   <dt>Владелец</dt>
                   <dd>
-                    {[runtimeOwner.ownerName, runtimeOwner.ownerPhone, runtimeOwner.ownerEmail]
+                    {[patient.ownerName, patient.ownerPhone, patient.ownerEmail]
                       .filter(Boolean)
                       .join(' · ')}
                   </dd>

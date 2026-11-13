@@ -14,9 +14,10 @@ export const getPetName = (appt: Appointment, petsMap?: Record<string, Pet>): st
  * Получить отображение владельца из записи или карты питомцев
  */
 export const getOwnerDisplay = (appt: Appointment, petsMap?: Record<string, Pet>): string => {
+  const mappedPet = petsMap && appt.petId ? petsMap[appt.petId] : undefined;
+  if (appt.pet?.ownerName) return appt.pet.ownerName;
+  if (mappedPet?.ownerName) return mappedPet.ownerName;
   if (appt.pet?.ownerId) return `Владелец (${appt.pet.ownerId.slice(0, 6)})`;
-  if (petsMap && appt.petId && petsMap[appt.petId]?.ownerId) {
-    return `Владелец (${petsMap[appt.petId].ownerId.slice(0, 6)})`;
-  }
+  if (mappedPet?.ownerId) return `Владелец (${mappedPet.ownerId.slice(0, 6)})`;
   return 'Владелец';
 };

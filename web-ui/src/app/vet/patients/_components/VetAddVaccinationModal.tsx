@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { AlertCircle, X } from 'lucide-react';
 import type {
   Appointment,
@@ -32,6 +32,8 @@ interface FieldErrors {
   nextDueOn?: string;
 }
 
+const EMPTY_PATIENTS: Pet[] = [];
+
 /**
  * Модальное окно внесения или редактирования прививки пациента.
  */
@@ -40,7 +42,7 @@ export function VetAddVaccinationModal({
   mode,
   vaccination,
   patient,
-  patients = [],
+  patients = EMPTY_PATIENTS,
   appointment,
   serviceName,
   onClose,
@@ -58,8 +60,17 @@ export function VetAddVaccinationModal({
   const [saving, setSaving] = useState(false);
   const [apiError, setApiError] = useState<string | null>(null);
 
+  const initKeyRef = useRef<string | null>(null);
+
   useEffect(() => {
-    if (!isOpen) return;
+    if (!isOpen) {
+      initKeyRef.current = null;
+      return;
+    }
+    const currentKey = `${resolvedMode}:${vaccination?.id || ''}:${patient?.id || ''}:${appointment?.id || ''}`;
+    if (initKeyRef.current === currentKey) return;
+    initKeyRef.current = currentKey;
+
     setFieldErrors({});
     setApiError(null);
     setSaving(false);
@@ -189,7 +200,7 @@ export function VetAddVaccinationModal({
           </div>
         </div>
 
-        <form onSubmit={handleSubmit}>
+        <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', minHeight: 0, flex: 1 }}>
           <div className="dialog-body">
             {apiError && (
               <div className="alert alert-destructive" role="alert">

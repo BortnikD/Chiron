@@ -118,22 +118,18 @@ export function useVetPatients(initialSelId?: string | null) {
         const safeTotalElements = res?.totalElements ?? safePatients.length;
         const safeTotalPages = Math.max(1, res?.totalPages ?? 1);
 
-        const missingApptPetIds = safePatients
-          .map((p) => p.id)
-          .filter((id) => silent || !petApptsCacheRef.current.has(id));
-
-        if (missingApptPetIds.length > 0) {
-          const fetched = await mapWithConcurrency(
-            missingApptPetIds,
-            async (petId) => ({
-              petId,
-              items: await fetchPetAppointments(petId).catch(() => [] as Appointment[]),
-            }),
-            6
-          );
+        if (silent || petApptsCacheRef.current.size === 0) {
+          const allVetAppts = await fetchAllPages(
+            (pg, sz) => vetApi.getAppointments({ page: pg, size: sz, direction: 'DESC' }),
+            { pageSize: 100, maxPages: 3, concurrency: 2 }
+          ).catch(() => [] as Appointment[]);
           if (!isMountedRef.current || seq !== loadSeqRef.current) return;
-          for (const entry of fetched) {
-            petApptsCacheRef.current.set(entry.petId, entry.items);
+          petApptsCacheRef.current.clear();
+          for (const appt of allVetAppts) {
+            if (!appt.petId) continue;
+            const list = petApptsCacheRef.current.get(appt.petId) || [];
+            list.push(appt);
+            petApptsCacheRef.current.set(appt.petId, list);
           }
         }
 

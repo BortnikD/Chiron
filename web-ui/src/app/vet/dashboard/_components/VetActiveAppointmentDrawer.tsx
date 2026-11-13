@@ -13,6 +13,7 @@ import {
   formatCurrency,
   formatDateShort,
   formatSlotTime,
+  getSpeciesTone,
 } from '@/shared/lib';
 import { ConsultationPrintSheet } from '@/components/print/ConsultationPrintSheet';
 import { PetAvatar } from '@/components/ui/EntityAvatar';
@@ -89,7 +90,7 @@ export const VetActiveAppointmentDrawer: React.FC<VetActiveAppointmentDrawerProp
 
   const pet = appointment.pet || petsMap?.[appointment.petId] || null;
   const petName = getPetName(appointment, petsMap);
-  const tone = pet ? (pet.species?.name || pet.speciesName || pet.speciesId || 'cat').toLowerCase() : 'cat';
+  const tone = getSpeciesTone(pet?.species?.name || pet?.speciesName || pet?.speciesId || 'cat', speciesMap);
   const speciesName =
     pet?.species?.name ||
     pet?.speciesName ||
