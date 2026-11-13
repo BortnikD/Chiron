@@ -1,11 +1,11 @@
 'use client';
 
-import React, { Suspense } from 'react';
+import React, { Suspense, useMemo } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { CalendarPlus, AlertCircle } from 'lucide-react';
 import { useShellHeader } from '@/components/layout/AppShell';
 import { useBookingWizard } from './_hooks/useBookingWizard';
-import { BookingStepper } from './_components/BookingStepper';
+import { BookingStepper, type StepItem } from './_components/BookingStepper';
 import { StepPetSelection } from './_components/StepPetSelection';
 import { StepServiceSelection } from './_components/StepServiceSelection';
 import { StepDoctorSelection } from './_components/StepDoctorSelection';
@@ -37,6 +37,7 @@ function BookAppointmentContent() {
     doctorDisplay,
     isVaccination,
     isVetPreselected,
+    isServicePreselected,
     isNextDisabled,
     handleSelectPet,
     handleSelectService,
@@ -67,6 +68,50 @@ function BookAppointmentContent() {
     ? selectedService.effectivePrice ?? selectedService.basePrice ?? selectedService.price ?? null
     : null;
 
+  // Динамический список шагов: пропускает шаг «Услуга» (2), если услуга уже выбрана в каталоге,
+  // и шаг «Врач» (3), если врач уже был выбран в каталоге.
+  const activeSteps = useMemo<StepItem[]>(() => {
+    const raw: Array<{ n: number; label: string }> = [
+      { n: 1, label: 'Питомец' },
+      ...(!isServicePreselected ? [{ n: 2, label: 'Услуга' }] : []),
+      ...(!isVetPreselected ? [{ n: 3, label: 'Врач' }] : []),
+      { n: 4, label: 'Дата и время' },
+      { n: 5, label: 'Подтверждение' },
+    ];
+    return raw.map((item, idx) => ({
+      ...item,
+      displayNum: idx + 1,
+    }));
+  }, [isServicePreselected, isVetPreselected]);
+
+  // Пересечение допустимых видов животных (если предвыбран врач и/или услуга)
+  const allowedSpeciesIds = useMemo<string[] | undefined>(() => {
+    const vetSp =
+      isVetPreselected && data.selectedVet?.speciesIds?.length
+        ? data.selectedVet.speciesIds
+        : null;
+    const svcSp =
+      isServicePreselected && data.serviceSpeciesIds?.length
+        ? data.serviceSpeciesIds
+        : null;
+    if (vetSp && svcSp) {
+      return vetSp.filter((id) => svcSp.includes(id));
+    }
+    return vetSp ?? svcSp ?? undefined;
+  }, [
+    isVetPreselected,
+    data.selectedVet?.speciesIds,
+    isServicePreselected,
+    data.serviceSpeciesIds,
+  ]);
+
+  const handleResetServicePreselection = () => {
+    data.setIsServiceLocked(false);
+    data.setServiceSpeciesIds(null);
+    handleSelectSlot(null);
+    setStep(2);
+  };
+
   return (
     <div className="content-row">
       <section className="island grow">
@@ -78,16 +123,7 @@ function BookAppointmentContent() {
           <BookingStepper
             currentStep={step}
             isSuccess={isSuccess}
-            steps={
-              isVetPreselected
-                ? [
-                    { n: 1, label: 'Питомец' },
-                    { n: 2, label: 'Услуга' },
-                    { n: 4, displayNum: 3, label: 'Дата и время' },
-                    { n: 5, displayNum: 4, label: 'Подтверждение' },
-                  ]
-                : undefined
-            }
+            steps={activeSteps}
             onStepClick={(targetStep) => {
               if (!isSuccess && targetStep < step) {
                 setStep(targetStep);
@@ -138,12 +174,9 @@ function BookAppointmentContent() {
                   onSelectPet={handleSelectPet}
                   speciesMap={data.speciesMap}
                   loading={data.loadingData}
-                  allowedSpeciesIds={
-                    isVetPreselected && data.selectedVet?.speciesIds?.length
-                      ? data.selectedVet.speciesIds
-                      : undefined
-                  }
+                  allowedSpeciesIds={allowedSpeciesIds}
                   doctorLabel={isVetPreselected ? doctorDisplay : undefined}
+                  serviceLabel={isServicePreselected ? selectedService?.name : undefined}
                   onResetDoctorFilter={
                     isVetPreselected
                       ? () => {
@@ -158,6 +191,9 @@ function BookAppointmentContent() {
                           handleSelectSlot(null);
                         }
                       : undefined
+                  }
+                  onResetServiceFilter={
+                    isServicePreselected ? handleResetServicePreselection : undefined
                   }
                 />
               )}
@@ -205,6 +241,10 @@ function BookAppointmentContent() {
                     data.setSelectedVet(v);
                     handleSelectSlot(null);
                   }}
+                  lockedServiceName={isServicePreselected ? selectedService?.name : null}
+                  onResetServiceFilter={
+                    isServicePreselected ? handleResetServicePreselection : undefined
+                  }
                 />
               )}
               {step === 4 && (
@@ -250,18 +290,18 @@ function BookAppointmentContent() {
             submitting={submitting}
             canSubmit={Boolean(slots.selectedSlot && resolvedVetId)}
             onPrev={() => {
-              if (step === 4 && isVetPreselected) {
-                setStep(2);
-              } else if (step > 1) {
-                setStep(step - 1);
+              const idx = activeSteps.findIndex((s) => s.n === step);
+              if (idx > 0) {
+                setStep(activeSteps[idx - 1].n);
               } else {
                 router.push('/client/appointments');
               }
             }}
             onNext={() => {
-              if (step === 2 && isVetPreselected) {
-                setStep(4);
-              } else {
+              const idx = activeSteps.findIndex((s) => s.n === step);
+              if (idx >= 0 && idx + 1 < activeSteps.length) {
+                setStep(activeSteps[idx + 1].n);
+              } else if (step < 5) {
                 setStep(step + 1);
               }
             }}

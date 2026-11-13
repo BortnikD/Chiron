@@ -13,7 +13,9 @@ export interface StepPetSelectionProps {
   loading?: boolean;
   allowedSpeciesIds?: string[];
   doctorLabel?: string;
+  serviceLabel?: string;
   onResetDoctorFilter?: () => void;
+  onResetServiceFilter?: () => void;
 }
 
 /**
@@ -27,7 +29,9 @@ export const StepPetSelection: React.FC<StepPetSelectionProps> = ({
   loading = false,
   allowedSpeciesIds,
   doctorLabel,
+  serviceLabel,
   onResetDoctorFilter,
+  onResetServiceFilter,
 }) => {
   const allowedSet =
     Array.isArray(allowedSpeciesIds) && allowedSpeciesIds.length > 0
@@ -45,9 +49,11 @@ export const StepPetSelection: React.FC<StepPetSelectionProps> = ({
       <div className="row between wrap" style={{ alignItems: 'center' }}>
         <div className="col" style={{ gap: '2px' }}>
           <span className="h2">Кого записываем?</span>
-          {allowedSet && doctorLabel && (
+          {allowedSet && (doctorLabel || serviceLabel) && (
             <span className="small muted">
-              Доступны виды животных, с которыми работает {doctorLabel}
+              {doctorLabel
+                ? `Доступны виды животных, с которыми работает ${doctorLabel}`
+                : `Доступны виды животных для услуги «${serviceLabel}»`}
             </span>
           )}
         </div>
@@ -80,6 +86,15 @@ export const StepPetSelection: React.FC<StepPetSelectionProps> = ({
                   onClick={onResetDoctorFilter}
                 >
                   Записаться к другому врачу
+                </button>
+              )}
+              {onResetServiceFilter && (
+                <button
+                  type="button"
+                  className="btn btn-primary btn-sm"
+                  onClick={onResetServiceFilter}
+                >
+                  Выбрать другую услугу
                 </button>
               )}
               <Link href="/veterinarians" className="btn btn-outline btn-sm">

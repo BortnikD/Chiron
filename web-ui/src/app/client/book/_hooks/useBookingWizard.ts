@@ -256,6 +256,9 @@ export function useBookingWizard(
     isVetPreselected: Boolean(
       initialVetId && !data.isAnyVet && data.selectedVet?.id === initialVetId
     ),
+    isServicePreselected: Boolean(
+      data.isServiceLocked && data.selectedService
+    ),
     isNextDisabled,
     handleSelectPet,
     handleSelectService,

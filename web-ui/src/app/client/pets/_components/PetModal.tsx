@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { AlertCircle } from 'lucide-react';
+import { AlertCircle, X } from 'lucide-react';
 import { DatePicker, FilterDropdown } from '@/shared/components';
 import { EntityPhotoControl } from '@/components/ui/EntityPhotoControl';
 import { SpeciesIcon } from '@/components/ui/SpeciesIcon';
@@ -162,11 +162,27 @@ export function PetModal({
     >
       <div className="dialog" onClick={(e) => e.stopPropagation()}>
         <div className="dialog-head">
-          <span className="dialog-title">{modalTitle}</span>
-          <span className="dialog-desc">Поля со звёздочкой обязательны</span>
+          <div className="row between" style={{ alignItems: 'flex-start', gap: '12px' }}>
+            <div className="col" style={{ gap: '4px' }}>
+              <span className="dialog-title">{modalTitle}</span>
+              <span className="dialog-desc">Поля со звёздочкой обязательны</span>
+            </div>
+            <button
+              type="button"
+              className="btn btn-ghost btn-icon btn-sm"
+              onClick={onClose}
+              disabled={saving}
+              aria-label="Закрыть"
+            >
+              <X size={16} />
+            </button>
+          </div>
         </div>
 
-        <form onSubmit={handleSubmit}>
+        <form
+          onSubmit={handleSubmit}
+          style={{ display: 'flex', flexDirection: 'column', minHeight: 0, flex: 1 }}
+        >
           <div className="dialog-body">
             {error && (
               <div className="alert alert-destructive" role="alert">

@@ -13,6 +13,7 @@ import {
 import type { Appointment, Pet } from '@/modules/client/types';
 import type { Service, Veterinarian } from '@/modules/clinic/types';
 import { PetAvatar } from '@/components/ui/EntityAvatar';
+import { PaginationFooter } from '@/shared/components';
 import {
   APPOINTMENT_STATUS_META,
   formatCurrency,
@@ -219,54 +220,16 @@ export function AppointmentsList({
         )}
       </div>
 
-      <div className="island-foot">
-        <div className="row small muted">
-          <span>На странице</span>
-          <div className="seg">
-            {PAGE_SIZE_OPTIONS.map((opt) => (
-              <button
-                key={opt}
-                type="button"
-                className={`seg-item ${size === opt ? 'on' : ''}`}
-                onClick={() => onSizeChange(opt)}
-              >
-                {opt}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        <div className="pager">
-          <button
-            type="button"
-            className="btn btn-ghost btn-sm btn-icon"
-            disabled={page <= 0}
-            aria-label="Назад"
-            onClick={() => onPageChange(Math.max(0, page - 1))}
-          >
-            <ChevronLeft className="ic" />
-          </button>
-          {pageNumbers.map((pg) => (
-            <button
-              key={pg}
-              type="button"
-              className={`btn btn-ghost btn-sm ${pg === page ? 'on' : ''}`}
-              onClick={() => onPageChange(pg)}
-            >
-              {pg + 1}
-            </button>
-          ))}
-          <button
-            type="button"
-            className="btn btn-ghost btn-sm btn-icon"
-            disabled={totalPages <= 1 || page + 1 >= totalPages}
-            aria-label="Вперёд"
-            onClick={() => onPageChange(Math.min(Math.max(0, totalPages - 1), page + 1))}
-          >
-            <ChevronRight className="ic" />
-          </button>
-        </div>
-      </div>
+      <PaginationFooter
+        page={page}
+        pageSize={size}
+        totalElements={totalElements}
+        totalPages={totalPages}
+        loading={loading}
+        pageSizes={PAGE_SIZE_OPTIONS}
+        onPageChange={onPageChange}
+        onPageSizeChange={(next) => onSizeChange(next as PageSizeOption)}
+      />
     </section>
   );
 }

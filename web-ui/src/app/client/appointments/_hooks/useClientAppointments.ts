@@ -145,6 +145,14 @@ export function useClientAppointments(initialSelectedId?: string | null) {
           : undefined;
       const effectiveStatuses = statusChips.length > 0 ? statusChips : defaultStatuses;
 
+      const nowIso = new Date().toISOString();
+      const fromFilter = fromDate
+        ? toMoscowDayStartIso(fromDate)
+        : tab === 'UPCOMING'
+        ? nowIso
+        : undefined;
+      const toFilter = toDate ? toMoscowDayEndExclusiveIso(toDate) : undefined;
+
       try {
         const apptsRes = await clientApi.getAppointments({
           page,
@@ -152,8 +160,8 @@ export function useClientAppointments(initialSelectedId?: string | null) {
           direction,
           ...(effectiveStatuses ? { status: effectiveStatuses } : {}),
           ...(selectedPetId !== 'ALL' ? { petId: selectedPetId } : {}),
-          ...(fromDate ? { from: toMoscowDayStartIso(fromDate) } : {}),
-          ...(toDate ? { to: toMoscowDayEndExclusiveIso(toDate) } : {}),
+          ...(fromFilter ? { from: fromFilter } : {}),
+          ...(toFilter ? { to: toFilter } : {}),
         });
         if (!isMountedRef.current || isCancelled?.() || reqId !== apptsReqIdRef.current) return null;
 

@@ -22,10 +22,7 @@ export function VaccinationsSummaryCards({
   const attentionCount = overdueCount + soonCount;
 
   return (
-    <div
-      className="kpi-grid"
-      style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 'var(--gap)' }}
-    >
+    <div className="kpi-grid">
       <div className="island kpi">
         <span className="kpi-label">
           <Syringe className="ic" />

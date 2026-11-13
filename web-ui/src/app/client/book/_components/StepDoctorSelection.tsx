@@ -14,6 +14,8 @@ export interface StepDoctorSelectionProps {
   selectedVet: Veterinarian | null;
   onSelectAnyVet: () => void;
   onSelectVet: (vet: Veterinarian) => void;
+  lockedServiceName?: string | null;
+  onResetServiceFilter?: () => void;
 }
 
 /**
@@ -28,6 +30,8 @@ export const StepDoctorSelection: React.FC<StepDoctorSelectionProps> = ({
   selectedVet,
   onSelectAnyVet,
   onSelectVet,
+  lockedServiceName,
+  onResetServiceFilter,
 }) => {
   const filteredVeterinarians = useMemo(() => {
     const hasAnySpeciesIds = veterinarians.some(
@@ -52,7 +56,25 @@ export const StepDoctorSelection: React.FC<StepDoctorSelectionProps> = ({
 
   return (
     <div className="col" style={{ gap: '12px' }}>
-      <span className="h2">Врач</span>
+      <div className="row between wrap" style={{ gap: '8px', alignItems: 'center' }}>
+        <span className="h2">Врач</span>
+        {lockedServiceName && (
+          <div className="row wrap" style={{ gap: '8px', alignItems: 'center' }}>
+            <span className="small muted">
+              Услуга: <b>{lockedServiceName}</b>
+            </span>
+            {onResetServiceFilter && (
+              <button
+                type="button"
+                className="btn btn-ghost btn-sm"
+                onClick={onResetServiceFilter}
+              >
+                Изменить услугу
+              </button>
+            )}
+          </div>
+        )}
+      </div>
 
       <div className="cards">
         <button

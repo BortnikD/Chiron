@@ -119,12 +119,29 @@ export function useClientDashboard() {
   const vetsMap = useMemo(() => Object.fromEntries(veterinarians.map((v) => [v.id, v])), [veterinarians]);
 
   const upcomingAppts = useMemo(() => {
+    const nowMs = Date.now();
     return appointments
-      .filter((a) => a && (a.status === 'PENDING' || a.status === 'CONFIRMED'))
+      .filter(
+        (a) =>
+          a &&
+          (a.status === 'PENDING' || a.status === 'CONFIRMED') &&
+          new Date(a.endAt).getTime() > nowMs
+      )
       .sort((a, b) => new Date(a.startAt).getTime() - new Date(b.startAt).getTime());
   }, [appointments]);
 
-  const nextAppt = summary?.nextAppointment ?? upcomingAppts[0] ?? null;
+  const nextAppt = useMemo(() => {
+    const nowMs = Date.now();
+    const candidate = summary?.nextAppointment;
+    if (
+      candidate &&
+      (candidate.status === 'PENDING' || candidate.status === 'CONFIRMED') &&
+      new Date(candidate.endAt).getTime() > nowMs
+    ) {
+      return candidate;
+    }
+    return upcomingAppts[0] ?? null;
+  }, [summary?.nextAppointment, upcomingAppts]);
 
   const todayWord = useMemo(() => {
     const d = formatDateRu(new Date().toISOString(), { weekday: 'long', day: 'numeric', month: 'long' });

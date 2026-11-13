@@ -86,7 +86,7 @@ export function formatAppointmentCountdown(isoStr: string, nowMs: number = Date.
 
   if (diffDays <= 0) {
     const mins = Math.round((targetMs - nowMs) / 60000);
-    if (mins <= 0) return 'сейчас';
+    if (mins <= 0) return mins >= -120 ? 'идёт приём' : 'завершён';
     if (mins < 60) return `через ${mins} мин`;
     const hours = Math.floor(mins / 60);
     const remMins = mins % 60;
