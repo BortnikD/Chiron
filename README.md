@@ -1,196 +1,143 @@
 # Chiron
 
-Chiron — приложение для ветеринарной клиники: питомцы и прививки, запись на приём,
-расписания врачей, уведомления и статистика. Роли: клиент, ветеринар и администратор.
+Веб-приложение для ветеринарной клиники: учёт питомцев, запись на приём,
+расписания врачей и работа с пациентами. Роли: клиент, ветеринар и администратор.
 
 ## Стек
 
-- **Бэкенд (`chiron/`):** Kotlin 2.3, Java 21, Spring Boot 4.1, Spring Security / JWT,
-  Exposed, PostgreSQL 18, Flyway, WebSocket / STOMP, OpenAPI.
-- **Фронтенд (`web-ui/`):** TypeScript, Next.js 16, React 19, Tailwind CSS 4.
-  Пока это стартовая страница Next.js без подключения к API.
-- **Запуск:** Docker Compose; для разработки без контейнера бэкенда — JDK 21 и Gradle Wrapper.
+### Бэкенд — `chiron/`
 
-## Окружения и `.env`
+- Kotlin 2.3 и Java 21.
+- Spring Boot 4.1, Spring MVC и Bean Validation.
+- Spring Security и JWT — авторизация и разграничение доступа.
+- Exposed / JDBC и Flyway — доступ к данным и миграции.
+- WebSocket / STOMP — уведомления; OpenAPI, Swagger UI и Scalar — документация API.
+- AWS SDK for Java — работа с S3-совместимым хранилищем.
 
-Все команды ниже выполняются из корня репозитория, если не указано иначе.
-Для контейнеров нужен Docker с Compose; JDK и Gradle на хосте не требуются.
+### Фронтенд — `web-ui/`
 
-| Режим | Spring-профиль | Файл переменных | API / PostgreSQL на хосте |
+- TypeScript, Next.js 15 (App Router) и React 19.
+- Tailwind CSS 4 и собственная дизайн-система.
+- Lucide React — SVG-иконки.
+- Fetch API — HTTP-запросы; STOMP.js — уведомления.
+
+### Инфраструктура
+
+- Docker и Docker Compose — сборка и запуск окружений.
+- PostgreSQL 18 — основная база данных.
+- Garage 2.5 — S3-совместимое хранилище файлов.
+- Именованные Docker-тома — хранение БД, данных и метаданных Garage.
+
+## Запуск через Docker
+
+Нужен Docker с Compose. Команды выполняются **из корня репозитория**;
+Java и Node.js на хосте не требуются. Каждый вариант собирает и запускает
+фронтенд, бэкенд, PostgreSQL и Garage.
+
+| Вариант | Назначение | Веб-интерфейс | API |
 |---|---|---|---|
-| Локальный | `local` | `.env` из `.env.example` | `localhost:8080` / `localhost:5432` |
-| Production | `production` | `.env.production` из `.env.production.example` | `127.0.0.1:8080` / порт БД не публикуется |
-| Демо | `local` | Не нужен: значения заданы в Compose | `127.0.0.1:8081` / `127.0.0.1:5433` |
+| `local` | Локальная работа со своей БД | [localhost:3000](http://localhost:3000) | `localhost:8080` |
+| `demo` | Отдельная БД с готовыми тестовыми данными | [localhost:3001](http://localhost:3001) | `localhost:8081` |
+| `production` | Развёртывание на сервере за HTTPS-прокси | Публичный домен | `127.0.0.1:8080` |
 
-Spring-профилей два: `local` и `production`. Демо — отдельный Compose с тестовыми данными.
-Выбирайте один профиль; без профиля подключение к локальной БД не настроено, документация API закрыта.
+Во всех вариантах фронтенд работает из production-сборки. Spring-профиль в `local`
+и `demo` — `local`, в `production` — `production`. Окружения используют отдельные тома;
+`local` и `production` занимают одинаковые порты и одновременно не запускаются без их изменения.
 
-Файлы `.env` и `.env.production` находятся **в корне**, исключены из Git и содержат секреты:
+### Local
 
-| Переменные | Что задать |
-|---|---|
-| `JWT_SECRET` | Собственный секрет; команды генерации есть в `.env.example`. Смена секрета делает все выданные JWT недействительными |
-| `ADMIN_EMAIL`, `ADMIN_PASSWORD`, `ADMIN_PHONE`, `ADMIN_FIRST_NAME`, `ADMIN_LAST_NAME` | Первый администратор; создаётся при старте, если email ещё не занят. Изменение `.env` не меняет существующий аккаунт |
-| `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_DB` | Пользователь, пароль и имя БД; смена значений не обновляет уже инициализированную БД |
-| `FRONTEND_ORIGIN` | Для production: публичный origin фронтенда, например `https://chiron.example.com`, без пути и завершающего `/` |
-
-Compose явно выбирает профиль. `--env-file` нужен для подстановки значений в Compose;
-локальный Compose дополнительно передаёт `.env` бэкенду через `env_file`, production — через `environment`.
-Переменные текущего shell имеют приоритет над `--env-file`.
-**Spring Boot сам `.env` не читает**: при запуске из IDE или через Java переменные нужно передать процессу.
-
-## Локальный запуск
-
-Скопируйте `.env.example` в `.env` (`cp .env.example .env` в Linux/macOS/Git Bash
-или `Copy-Item .env.example .env` в PowerShell). Задайте свой JWT-секрет и пароль администратора, затем:
+Скопируйте [`.env.example`](.env.example) в `.env`, задайте собственный `JWT_SECRET`
+и пароль первого администратора `ADMIN_PASSWORD`.
 
 ```bash
 docker compose --env-file .env -f docker/docker-compose.local.yaml up -d --build
-docker compose --env-file .env -f docker/docker-compose.local.yaml ps
 ```
 
-Поднимутся PostgreSQL и бэкенд. Flyway применит миграции автоматически.
-Проверка готовности: [health/readiness](http://localhost:8080/actuator/health/readiness),
-документация: [Scalar](http://localhost:8080/scalar.html).
-Для входа используйте `ADMIN_EMAIL` и `ADMIN_PASSWORD` из `.env`.
+Откройте [localhost:3000](http://localhost:3000). Вход администратора — `ADMIN_EMAIL`
+и `ADMIN_PASSWORD` из `.env`. PostgreSQL доступен на `localhost:5432`.
+Миграции Flyway применяются автоматически.
 
-### Бэкенд из IDE / Gradle
+### Demo
 
-Нужен JDK 21. Поднимите только БД:
+`.env` не нужен: параметры заданы в Compose.
 
 ```bash
-docker compose --env-file .env -f docker/docker-compose.local.yaml up -d postgres
+docker compose -f docker/docker-compose.demo.yaml up -d --build
 ```
 
-Передайте процессу `JWT_SECRET` и `ADMIN_*` из `.env` и выберите `SPRING_PROFILES_ACTIVE=local`.
-Профиль использует `jdbc:postgresql://localhost:5432/chiron`, логин и пароль `postgres`.
-Если изменили `POSTGRES_*` или порт БД, задайте также `SPRING_DATASOURCE_URL`,
-`SPRING_DATASOURCE_USERNAME` и `SPRING_DATASOURCE_PASSWORD` с соответствующими значениями.
-Запустите приложение из IDE либо из каталога `chiron/`:
+Откройте [localhost:3001](http://localhost:3001) после успешного завершения `seed` и `seed-media`.
+Демо содержит 600 клиентов, 900 питомцев, восемь врачей и историю приёмов;
+на странице входа доступны кнопки быстрого входа.
 
-```bash
-./gradlew bootRun
-```
+| Роль | Логин | Пароль |
+|---|---|---|
+| Администратор | `admin@demo.chiron.local` | `demoAdmin123` |
+| Ветеринар | `vet1@seed.chiron.local` … `vet8@seed.chiron.local` | `password123` |
+| Клиент | `client1@seed.chiron.local` … `client600@seed.chiron.local` | `password123` |
 
-В PowerShell используйте `.\gradlew.bat bootRun`. Контейнер бэкенда при таком запуске должен быть остановлен,
-чтобы освободить порт `8080`.
+Демо доступно только с localhost; эти учётные данные предназначены для локального показа.
 
-## Production
+### Production
 
-Скопируйте `.env.production.example` в `.env.production` и заполните все пустые значения:
-отдельный JWT-секрет, уникальные пароли БД и администратора, `FRONTEND_ORIGIN`.
-На Linux ограничьте доступ к файлу: `chmod 600 .env.production`.
+Скопируйте [`.env.production.example`](.env.production.example) в `.env.production`.
+Заполните JWT-секрет, учётные данные администратора и PostgreSQL, `FRONTEND_ORIGIN`
+(публичный HTTPS origin фронтенда без пути и завершающего `/`).
+Добавьте параметры Garage: `STORAGE_BUCKET`, `STORAGE_ACCESS_KEY`, `STORAGE_SECRET_KEY`,
+`GARAGE_RPC_SECRET` (64 шестнадцатеричных символа) и `STORAGE_PUBLIC_ENDPOINT`
+(доступный браузеру HTTPS endpoint S3). Используйте собственные секреты.
 
 ```bash
 docker compose --env-file .env.production -f docker/docker-compose.production.yaml config --quiet
 docker compose --env-file .env.production -f docker/docker-compose.production.yaml up -d --build
-docker compose --env-file .env.production -f docker/docker-compose.production.yaml ps
 ```
 
-Это самостоятельный Compose для одного сервера: БД и бэкенд с профилем `production`.
-Бэкенд слушает только `127.0.0.1:8080`; настройте HTTPS reverse proxy на этом же хосте.
-Фронтенд, reverse proxy и TLS в Compose не входят. Документация API отключена и заблокирована;
-CORS разрешает `FRONTEND_ORIGIN`.
+Фронтенд слушает `127.0.0.1:3000`, API — `127.0.0.1:8080`; порт PostgreSQL не публикуется.
+HTTPS reverse proxy настраивается отдельно:
 
-Для запуска без Docker соберите jar командой `./gradlew bootJar` из `chiron/` и запустите
-`java -jar build/libs/chiron-0.0.1-SNAPSHOT.jar --spring.profiles.active=production`.
-Передайте процессу `SPRING_DATASOURCE_URL`, `SPRING_DATASOURCE_USERNAME`, `SPRING_DATASOURCE_PASSWORD`,
-`FRONTEND_ORIGIN`, `JWT_SECRET` и `ADMIN_*`; PostgreSQL в этом случае запускается отдельно.
+- `/ws` → `http://127.0.0.1:8080/ws` с поддержкой WebSocket Upgrade.
+- Остальные пути → `http://127.0.0.1:3000`.
+- HTTPS endpoint S3 → `http://127.0.0.1:3900` с сохранением Host, пути и query подписанного запроса.
 
-Перед обновлением сделайте резервную копию БД; для обновления контейнеров повторите `up -d --build`.
-Не меняйте имя Compose-проекта `chiron-production`: к нему привязан том данных.
-Локальный и production Compose используют один порт `8080`, поэтому одновременно требуют смены порта.
+Документация API в production отключена. `FRONTEND_ORIGIN` встраивается во фронтенд
+при сборке: после его смены повторите команду с `--build`. Файлы `.env` и `.env.production`
+содержат секреты и исключены из Git.
 
-## Демо
+## Архитектура
 
-Отдельные база и том, вымышленные данные: 600 клиентов, 900 питомцев, восемь врачей,
-услуги, прививки, уведомления и двухлетняя история приёмов. `.env` не нужен.
-Имена, справочники, заметки и остальные отображаемые тексты демоданных — на русском языке.
-Технические значения ролей и статусов, логины и пароли остаются прежними.
+### Компоненты и взаимодействие
 
-```bash
-docker compose -f docker/docker-compose.demo.yaml up -d --build
-docker compose -f docker/docker-compose.demo.yaml logs -f seed seed-media
-```
+Браузер обращается к фронтенду Next.js. HTTP-запросы `/api/*` проходят через серверный
+прокси фронтенда к Spring Boot, уведомления доставляются через WebSocket / STOMP.
+Бэкенд выполняет бизнес-операции, хранит основные данные в PostgreSQL через Exposed,
+а файлы — в Garage через S3 API. Браузер получает файлы по подписанным ссылкам.
+Все четыре компонента запускаются в общей сети Docker Compose.
 
-Дождитесь успешного завершения `seed` и `seed-media` (код `0`). `seed-media` проверяет загрузку, размеры,
-подписанные ссылки, права, замену, удаление и фоновую очистку, затем добавляет фотографии восьми врачам и всем 900 демопитомцам. При следующих запусках данные сохраняются;
-история привязана к дате первого заполнения.
+![Архитектура компонентов Chiron](docs/assets/architecture.svg)
 
-| Доступ | Адрес / логин | Пароль |
-|---|---|---|
-| API / Scalar | [localhost:8081/scalar.html](http://localhost:8081/scalar.html) | — |
-| Администратор | `admin@demo.chiron.local` | `demoAdmin123` |
-| Врачи | `vet1@seed.chiron.local` … `vet8@seed.chiron.local` | `password123` |
-| Клиенты | `client1@seed.chiron.local` … `client600@seed.chiron.local` | `password123` |
-| Garage S3 | `localhost:3905` | Только подписанные ссылки |
-| PostgreSQL | `localhost:5433`, база и пользователь `chiron_demo` | `demo_database_password` |
+### Организация кода
 
-Демопорты доступны только с localhost; общеизвестные пароли и JWT-секрет предназначены для локального демо.
+Бэкенд разделён на слои:
 
-## Фронтенд
+- `presentation` — REST-контроллеры, HTTP DTO и WebSocket-канал.
+- `application` — сценарии использования: запись на приём, работа с питомцами, расписаниями и уведомлениями.
+- `domain` — сущности, правила и интерфейсы репозиториев.
+- `infrastructure` — PostgreSQL / Exposed, S3, безопасность, планировщики и конфигурация Spring.
 
-Нужны Node.js 20.9+ и npm. Из каталога `web-ui/`:
+Во фронтенде `src/app` содержит страницы и серверные прокси, `src/modules` — API и типы
+предметных областей, `src/shared` — общие компоненты, HTTP-клиент и WebSocket,
+`src/context` — состояние авторизации и темы.
 
-```bash
-npm ci
-npm run dev
-```
+### Диаграмма прецедентов
 
-Страница откроется на [localhost:3000](http://localhost:3000).
-Для production-сборки: `npm run build`, затем `npm start`.
-Переменные подключения к API пока не реализованы; `.env` бэкенда фронтенд не использует.
+![Диаграмма прецедентов Chiron](docs/assets/usecase.svg)
 
-## Логи и остановка
-
-Для выбранного окружения используйте те же `--env-file` и `-f`, что при запуске, заменив
-`up -d --build` на `logs -f backend` для логов или на `down` для остановки.
-**`down -v` удаляет данные БД выбранного окружения.**
+Исходники для редактирования: [архитектура](docs/architecture.excalidraw)
+и [диаграмма прецедентов](docs/usecase.excalidraw).
 
 ## Документация
 
-- [Руководство по API](docs/api.md) — авторизация, роли, основные сценарии, ответы и уведомления.
-- В `local`: [Scalar](http://localhost:8080/scalar.html) (нужен интернет для CDN),
+- [Руководство по API](docs/api.md).
+- [Фронтенд: структура, переменные и запуск для разработки](web-ui/README.md).
+- Локальный API: [Scalar](http://localhost:8080/scalar.html),
   [Swagger UI](http://localhost:8080/swagger-ui.html), [OpenAPI JSON](http://localhost:8080/v3/api-docs).
-  В демо замените порт на `8081`.
-- [Use case диаграмма](docs/usecase.excalidraw) — открыть в [Excalidraw](https://excalidraw.com).
-
-## Фотографии ветеринаров и питомцев
-
-Garage запускается вместе с каждым Compose-окружением. Бакет и доступ создаются автоматически;
-данные и метаданные сохраняются в отдельных именованных томах. Пользователи фотографий не имеют.
-При загрузке Chiron проверяет JPEG/PNG до 5 МБ и 20 млн пикселей, вырезает центральный квадрат
-и сохраняет JPEG 64×64 и 512×512 без исходных метаданных. Прозрачность сводится на белый фон.
-Оригинал не сохраняется. Версия 64×64 предназначена для аватаров до 32×32 CSS-пикселей на экранах 2×.
-
-В БД хранится `photo_key`, API возвращает `photoUrl`, `photoThumbnailUrl` и `photoUrlExpiresAt`.
-Бакет закрыт; ссылки действуют 15 минут. Обладатель ссылки может читать файл до её истечения
-или физического удаления объекта; уже скачанные и кешированные копии отозвать нельзя.
-Клиент должен повторно получать ссылки через существующий GET ресурса после их истечения.
-Интеграция загрузки и отображения фотографий во фронтенд в эту задачу не входит.
-
-Для прямого запуска бэкенда задайте `STORAGE_ACCESS_KEY` и `STORAGE_SECRET_KEY` из `.env.example`,
-а Garage поднимите через выбранное Compose-окружение. В Compose внутренний адрес —
-`http://garage:3900`, браузерный — `STORAGE_PUBLIC_ENDPOINT` (локально `http://localhost:3900`,
-в демо `http://localhost:3905`). Для демо внешний адрес переопределяется отдельной переменной
-`DEMO_STORAGE_PUBLIC_ENDPOINT`, чтобы локальный `.env` не подменял демопорт.
-Для доступа с другого компьютера нужен внешний адрес вместо localhost.
-Production требует собственных ключей, `GARAGE_RPC_SECRET` и внешнего HTTPS endpoint;
-прокси для S3 должен сохранять Host, путь и query подписанного запроса. Служебные порты Garage не опубликованы.
-Используемый single-node режим не имеет резервирования: нужны резервные копии БД, данных и метаданных Garage.
-Тома не удалять при обычном перезапуске.
-
-Миграция V04 сохраняет старые URL врачей в `legacy_photo_url`, но не скачивает их автоматически.
-Они больше не используются для отображения; фотографии следует загрузить через новый API.
-Объекты после замены/удаления ставятся в очередь в той же транзакции, в том числе при удалении сущности.
-Очистка выполняется раз в минуту с повторными попытками. Незавершённые загрузки очищаются через 10 минут.
-
-Демо использует 20 локальных фотографий из `chiron/scripts/fixtures/photos`: восемь портретов врачей
-и 12 фотографий животных шести видов. Для питомцев фото выбирается по виду и стабильному ID.
-Исходники, авторы, лицензии и параметры обрезки описаны в `photos/sources.json` и `photos/README.md`.
-При запуске демо внешние сайты не используются. Два синтетических PNG остаются только для API-проверок.
-При обновлении старого демо заглушки распознаются по хешам и заменяются фотографиями;
-вручную загруженные фотографии и намеренно удалённые фото сохраняются.
-Состояние `seed-media` хранится в `photo_seed_state`; новая база определяется по дате создания демоадминистратора.
-Для переноса на другой S3-провайдер сначала скопируйте обе версии объектов с сохранением ключей,
-настройте доступ и endpoint, затем проверьте загрузку, подпись URL и удаление.
+  Для демо используйте порт `8081`.
