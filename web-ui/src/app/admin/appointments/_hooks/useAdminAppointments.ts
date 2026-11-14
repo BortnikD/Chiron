@@ -12,8 +12,19 @@ import type { Appointment, Pet } from '@/modules/client/types';
 import type { Veterinarian, Service, Species } from '@/modules/clinic/types';
 import type { AppointmentStatus, User } from '@/shared/types';
 import { useToast } from '@/shared/components';
-import { fetchAllPages, formatCurrency, formatApiError, mapWithConcurrency } from '@/shared/lib';
+import { formatApiError, mapWithConcurrency } from '@/shared/lib';
+import { useResourceList } from '@/shared/hooks';
 import { buildActiveFilterChips, nextMoscowDayIso } from '../_components/utils';
+
+export interface AdminAppointmentsFiltersState {
+  statusFilters: AppointmentStatus[];
+  vetFilter: string;
+  petFilter: string;
+  ownerFilter: string;
+  serviceFilter: string;
+  dateFrom: string;
+  dateTo: string;
+}
 
 export function useAdminAppointments() {
   const searchParams = useSearchParams();
@@ -25,27 +36,11 @@ export function useAdminAppointments() {
   const initialVetId = searchParams.get('veterinarianId') || 'ALL';
   const initialServiceId = searchParams.get('serviceId') || 'ALL';
 
-  const [appointments, setAppointments] = useState<Appointment[]>([]);
-  const [totalElements, setTotalElements] = useState(0);
-  const [totalPages, setTotalPages] = useState(1);
-  const [page, setPage] = useState(0);
-  const [pageSize, setPageSizeState] = useState<number>(25);
-
   const [veterinarians, setVeterinarians] = useState<Veterinarian[]>([]);
   const [services, setServices] = useState<Service[]>([]);
   const [speciesList, setSpeciesList] = useState<Species[]>([]);
   const [pets, setPets] = useState<Pet[]>([]);
   const [users, setUsers] = useState<User[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  const [statusFilters, setStatusFiltersState] = useState<AppointmentStatus[]>([]);
-  const [vetFilter, setVetFilterState] = useState<string>(initialVetId);
-  const [petFilter, setPetFilterState] = useState<string>(initialPetId);
-  const [ownerFilter, setOwnerFilterState] = useState<string>(initialOwnerId);
-  const [serviceFilter, setServiceFilterState] = useState<string>(initialServiceId);
-  const [dateFrom, setDateFromState] = useState<string>('');
-  const [dateTo, setDateToState] = useState<string>('');
 
   const [selectedAppt, setSelectedAppt] = useState<Appointment | null>(null);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
@@ -60,95 +55,60 @@ export function useAdminAppointments() {
   const [isDeleting, setIsDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
 
-  const requestIdRef = useRef(0);
   const refsReqIdRef = useRef(0);
-  const loadAbortRef = useRef<AbortController | null>(null);
   const appliedInitialSelRef = useRef<string | null>(null);
   const petsRef = useRef<Pet[]>(pets);
   petsRef.current = pets;
   const usersRef = useRef<User[]>(users);
   usersRef.current = users;
 
-  const loadRefs = useCallback(async () => {
-    const reqId = ++refsReqIdRef.current;
-    try {
-      const [vetsRes, svcsRes, speciesRes, allPets, allClients] = await Promise.all([
-        adminApi.getVeterinarians(),
-        adminApi.getServices(),
-        clinicApi.getSpecies(),
-        adminApi.getPets(0, 100).then((r) => r?.items || []),
-        adminApi.getUsers(0, 100, 'CLIENT').then((r) => r?.items || []),
-      ]);
-      if (reqId !== refsReqIdRef.current) return;
-      setVeterinarians(Array.isArray(vetsRes) ? vetsRes : []);
-      setServices(Array.isArray(svcsRes) ? svcsRes : []);
-      setSpeciesList(Array.isArray(speciesRes) ? speciesRes : []);
-
-      const safePets = Array.isArray(allPets) ? [...allPets] : [];
-      const safeUsers = Array.isArray(allClients) ? [...allClients] : [];
-
-      if (initialPetId && !safePets.some((p) => p.id === initialPetId)) {
-        try {
-          const p = await adminApi.getPetById(initialPetId);
-          if (p) safePets.push(p);
-        } catch {
-          // ignore
-        }
-      }
-      if (initialOwnerId && !safeUsers.some((u) => u.id === initialOwnerId)) {
-        try {
-          const u = await adminApi.getUserById(initialOwnerId);
-          if (u) safeUsers.push(u);
-        } catch {
-          // ignore
-        }
-      }
-
-      setPets(safePets);
-      setUsers(safeUsers);
-    } catch {
-      // справочные ошибки обрабатываются при основном запросе, либо доступны при повторном reload
-    }
-  }, [initialPetId, initialOwnerId]);
-
-  const loadData = useCallback(async () => {
-    loadAbortRef.current?.abort();
-    const controller = new AbortController();
-    loadAbortRef.current = controller;
-    const reqId = ++requestIdRef.current;
-    setLoading(true);
-    setError(null);
-    try {
-      const fromIso = dateFrom ? new Date(`${dateFrom}T00:00:00+03:00`).toISOString() : undefined;
-      const toIso = dateTo
-        ? new Date(`${nextMoscowDayIso(dateTo)}T00:00:00+03:00`).toISOString()
+  const resource = useResourceList<Appointment, AdminAppointmentsFiltersState>({
+    fetcher: async ({ page, pageSize, filters }, signal) => {
+      const fromIso = filters.dateFrom
+        ? new Date(`${filters.dateFrom}T00:00:00+03:00`).toISOString()
+        : undefined;
+      const toIso = filters.dateTo
+        ? new Date(`${nextMoscowDayIso(filters.dateTo)}T00:00:00+03:00`).toISOString()
         : undefined;
 
-      const apptsRes = await adminApi.getAppointments(
+      return adminApi.getAppointments(
         page,
         pageSize,
         {
-          status: statusFilters.length > 0 ? statusFilters : undefined,
-          veterinarianId: vetFilter !== 'ALL' ? vetFilter : undefined,
-          petId: petFilter !== 'ALL' ? petFilter : undefined,
-          ownerId: ownerFilter !== 'ALL' ? ownerFilter : undefined,
-          serviceId: serviceFilter !== 'ALL' ? serviceFilter : undefined,
+          status: filters.statusFilters.length > 0 ? filters.statusFilters : undefined,
+          veterinarianId: filters.vetFilter !== 'ALL' ? filters.vetFilter : undefined,
+          petId: filters.petFilter !== 'ALL' ? filters.petFilter : undefined,
+          ownerId: filters.ownerFilter !== 'ALL' ? filters.ownerFilter : undefined,
+          serviceId: filters.serviceFilter !== 'ALL' ? filters.serviceFilter : undefined,
           from: fromIso,
           to: toIso,
         },
-        { signal: controller.signal }
+        { signal }
       );
-
-      if (reqId !== requestIdRef.current || controller.signal.aborted) return;
-
-      const appts = apptsRes?.items || [];
-      setAppointments(appts);
-      setTotalElements(apptsRes?.totalElements ?? appts.length);
-      setTotalPages(Math.max(1, apptsRes?.totalPages ?? 1));
-
-      // Подгружаем недостающих питомцев и владельцев только для строк текущей страницы
+    },
+    initialFilters: {
+      statusFilters: [],
+      vetFilter: initialVetId,
+      petFilter: initialPetId,
+      ownerFilter: initialOwnerId,
+      serviceFilter: initialServiceId,
+      dateFrom: '',
+      dateTo: '',
+    },
+    urlSyncKeys: [
+      'vetFilter',
+      'petFilter',
+      'ownerFilter',
+      'serviceFilter',
+      'statusFilters',
+      'dateFrom',
+      'dateTo',
+    ],
+    defaultPageSize: 25,
+    onSuccess: async ({ items }) => {
+      // Подгружаем недостающих питомцев и владельцев для строк текущей страницы
       const missingPetIds = Array.from(
-        new Set(appts.map((a) => a.petId).filter((id): id is string => Boolean(id)))
+        new Set(items.map((a) => a.petId).filter((id): id is string => Boolean(id)))
       ).filter((id) => !petsRef.current.some((p) => p.id === id));
 
       let mergedPets = petsRef.current;
@@ -205,27 +165,59 @@ export function useAdminAppointments() {
 
       if (initialSel && appliedInitialSelRef.current !== initialSel) {
         appliedInitialSelRef.current = initialSel;
-        const foundInPage = appts.find((a) => a.id === initialSel);
+        const foundInPage = items.find((a) => a.id === initialSel);
         if (foundInPage) {
           setSelectedAppt(foundInPage);
         } else {
-          try {
-            const byId = await adminApi.getAppointmentById(initialSel);
-            if (reqId === requestIdRef.current && byId) setSelectedAppt(byId);
-          } catch {
-            // ignore missing deep link target
-          }
+          adminApi.getAppointmentById(initialSel).then(setSelectedAppt).catch(() => {});
         }
       } else {
-        setSelectedAppt((prev) => (prev ? appts.find((a) => a.id === prev.id) ?? prev : null));
+        setSelectedAppt((prev) => (prev ? items.find((a) => a.id === prev.id) ?? prev : null));
       }
-    } catch (err: unknown) {
-      if (reqId !== requestIdRef.current || controller.signal.aborted) return;
-      setError(formatApiError(err, 'Не удалось загрузить список записей на приём.'));
-    } finally {
-      if (reqId === requestIdRef.current && !controller.signal.aborted) setLoading(false);
+    },
+  });
+
+  const loadRefs = useCallback(async () => {
+    const reqId = ++refsReqIdRef.current;
+    try {
+      const [vetsRes, svcsRes, speciesRes, allPets, allClients] = await Promise.all([
+        adminApi.getVeterinarians(),
+        adminApi.getServices(),
+        clinicApi.getSpecies(),
+        adminApi.getPets(0, 100).then((r) => r?.items || []),
+        adminApi.getUsers(0, 100, 'CLIENT').then((r) => r?.items || []),
+      ]);
+      if (reqId !== refsReqIdRef.current) return;
+      setVeterinarians(Array.isArray(vetsRes) ? vetsRes : []);
+      setServices(Array.isArray(svcsRes) ? svcsRes : []);
+      setSpeciesList(Array.isArray(speciesRes) ? speciesRes : []);
+
+      const safePets = Array.isArray(allPets) ? [...allPets] : [];
+      const safeUsers = Array.isArray(allClients) ? [...allClients] : [];
+
+      if (initialPetId && initialPetId !== 'ALL' && !safePets.some((p) => p.id === initialPetId)) {
+        try {
+          const p = await adminApi.getPetById(initialPetId);
+          if (p) safePets.push(p);
+        } catch {
+          // ignore
+        }
+      }
+      if (initialOwnerId && initialOwnerId !== 'ALL' && !safeUsers.some((u) => u.id === initialOwnerId)) {
+        try {
+          const u = await adminApi.getUserById(initialOwnerId);
+          if (u) safeUsers.push(u);
+        } catch {
+          // ignore
+        }
+      }
+
+      setPets(safePets);
+      setUsers(safeUsers);
+    } catch {
+      // ignore
     }
-  }, [page, pageSize, statusFilters, vetFilter, petFilter, ownerFilter, serviceFilter, dateFrom, dateTo, initialSel]);
+  }, [initialPetId, initialOwnerId]);
 
   useEffect(() => {
     void loadRefs();
@@ -234,44 +226,17 @@ export function useAdminAppointments() {
     };
   }, [loadRefs]);
 
-  useEffect(() => {
-    void loadData();
-    return () => {
-      requestIdRef.current += 1;
-      loadAbortRef.current?.abort();
-    };
-  }, [loadData]);
-
-  const reloadAll = useCallback(() => {
-    void loadRefs();
-    void loadData();
-  }, [loadRefs, loadData]);
-
-  const toggleStatusFilter = useCallback((st: AppointmentStatus) => {
-    setPage(0);
-    setStatusFiltersState((prev) =>
-      prev.includes(st) ? prev.filter((item) => item !== st) : [...prev, st]
-    );
-  }, []);
-
-  const setVetFilter = useCallback((v: string) => { setPage(0); setVetFilterState(v); }, []);
-  const setPetFilter = useCallback((v: string) => { setPage(0); setPetFilterState(v); }, []);
-  const setOwnerFilter = useCallback((v: string) => { setPage(0); setOwnerFilterState(v); }, []);
-  const setServiceFilter = useCallback((v: string) => { setPage(0); setServiceFilterState(v); }, []);
-  const setDateFrom = useCallback((v: string) => { setPage(0); setDateFromState(v); }, []);
-  const setDateTo = useCallback((v: string) => { setPage(0); setDateToState(v); }, []);
-  const setPageSize = useCallback((size: number) => { setPage(0); setPageSizeState(size); }, []);
-
-  const resetFilters = useCallback(() => {
-    setPage(0);
-    setStatusFiltersState([]);
-    setVetFilterState('ALL');
-    setPetFilterState('ALL');
-    setOwnerFilterState('ALL');
-    setServiceFilterState('ALL');
-    setDateFromState('');
-    setDateToState('');
-  }, []);
+  const toggleStatusFilter = useCallback(
+    (st: AppointmentStatus) => {
+      resource.setFilter(
+        'statusFilters',
+        resource.filters.statusFilters.includes(st)
+          ? resource.filters.statusFilters.filter((item) => item !== st)
+          : [...resource.filters.statusFilters, st]
+      );
+    },
+    [resource]
+  );
 
   const enrichedVeterinarians = useMemo(
     () => veterinarians.map((v) => (v.user ? v : { ...v, user: users.find((u) => u.id === v.userId) })),
@@ -281,16 +246,32 @@ export function useAdminAppointments() {
   const activeFilters = useMemo(
     () =>
       buildActiveFilterChips({
-        vetFilter, petFilter, ownerFilter, serviceFilter, statusFilters, dateFrom, dateTo,
-        veterinarians: enrichedVeterinarians, pets, users, services,
-        setVetFilter, setPetFilter, setOwnerFilter, setServiceFilter,
-        toggleStatusFilter, setDateFrom, setDateTo,
+        vetFilter: resource.filters.vetFilter,
+        petFilter: resource.filters.petFilter,
+        ownerFilter: resource.filters.ownerFilter,
+        serviceFilter: resource.filters.serviceFilter,
+        statusFilters: resource.filters.statusFilters,
+        dateFrom: resource.filters.dateFrom,
+        dateTo: resource.filters.dateTo,
+        veterinarians: enrichedVeterinarians,
+        pets,
+        users,
+        services,
+        setVetFilter: (v) => resource.setFilter('vetFilter', v),
+        setPetFilter: (v) => resource.setFilter('petFilter', v),
+        setOwnerFilter: (v) => resource.setFilter('ownerFilter', v),
+        setServiceFilter: (v) => resource.setFilter('serviceFilter', v),
+        toggleStatusFilter,
+        setDateFrom: (v) => resource.setFilter('dateFrom', v),
+        setDateTo: (v) => resource.setFilter('dateTo', v),
       }),
     [
-      vetFilter, petFilter, ownerFilter, serviceFilter, statusFilters, dateFrom, dateTo,
-      enrichedVeterinarians, pets, users, services,
-      setVetFilter, setPetFilter, setOwnerFilter, setServiceFilter,
-      toggleStatusFilter, setDateFrom, setDateTo,
+      resource,
+      enrichedVeterinarians,
+      pets,
+      users,
+      services,
+      toggleStatusFilter,
     ]
   );
 
@@ -305,10 +286,10 @@ export function useAdminAppointments() {
       const created = await adminApi.createAppointment(payload);
       setSelectedAppt(created);
       toast('Запись создана');
-      await loadData();
+      await resource.reload();
       return created;
     },
-    [loadData, toast]
+    [resource, toast]
   );
 
   const updateAppointment = useCallback(
@@ -316,10 +297,10 @@ export function useAdminAppointments() {
       const updated = await adminApi.updateAppointment(id, payload);
       setSelectedAppt((prev) => updated || (prev?.id === id ? { ...prev, ...payload } : prev));
       toast('Изменения сохранены');
-      await loadData();
+      await resource.reload();
       return updated;
     },
-    [loadData, toast]
+    [resource, toast]
   );
 
   const openCancelModal = useCallback((appt: Appointment) => {
@@ -350,13 +331,13 @@ export function useAdminAppointments() {
       setSelectedAppt(updated || { ...cancelAppt, ...payload });
       setCancelAppt(null);
       toast('Запись отменена');
-      await loadData();
+      await resource.reload();
     } catch (err: unknown) {
       setCancelError(formatApiError(err, 'Ошибка при отмене записи'));
     } finally {
       setIsCancelling(false);
     }
-  }, [cancelAppt, cancelReason, loadData, toast]);
+  }, [cancelAppt, cancelReason, resource, toast]);
 
   const openDeleteModal = useCallback((appt: Appointment) => {
     setDeleteError(null);
@@ -377,32 +358,73 @@ export function useAdminAppointments() {
       if (selectedAppt?.id === deleteAppt.id) setSelectedAppt(null);
       setDeleteAppt(null);
       toast('Запись удалена');
-      await loadData();
+      await resource.reload();
     } catch (err: unknown) {
       setDeleteError(formatApiError(err, 'Ошибка при удалении записи'));
     } finally {
       setIsDeleting(false);
     }
-  }, [deleteAppt, selectedAppt?.id, loadData, toast]);
+  }, [deleteAppt, selectedAppt, resource, toast]);
 
   return {
-    appointments, totalElements, totalPages, page, setPage, pageSize, setPageSize,
-    veterinarians: enrichedVeterinarians, services, speciesList, pets, users,
-    loading, error, reload: reloadAll,
-    statusFilters, toggleStatusFilter,
-    vetFilter, setVetFilter,
-    petFilter, setPetFilter,
-    ownerFilter, setOwnerFilter,
-    serviceFilter, setServiceFilter,
-    dateFrom, setDateFrom, dateTo, setDateTo,
-    activeFilters, resetFilters,
-    selectedAppt, setSelectedAppt,
-    isCreateOpen, setIsCreateOpen,
-    editAppt, setEditAppt,
-    cancelAppt, cancelReason, setCancelReason, isCancelling, cancelError,
-    openCancelModal, closeCancelModal, confirmCancelAppt,
-    deleteAppt, isDeleting, deleteError,
-    openDeleteModal, closeDeleteModal, confirmDeleteAppt,
-    checkSlotAvailability, createAppointment, updateAppointment,
+    appointments: resource.items,
+    totalElements: resource.totalElements,
+    totalPages: resource.totalPages,
+    page: resource.page,
+    setPage: resource.setPage,
+    pageSize: resource.pageSize,
+    setPageSize: resource.setPageSize,
+    veterinarians: enrichedVeterinarians,
+    services,
+    speciesList,
+    pets,
+    users,
+    loading: resource.loading,
+    error: resource.error,
+    reload: resource.reload,
+    reloadAll: useCallback(() => {
+      void loadRefs();
+      void resource.reload();
+    }, [loadRefs, resource]),
+    statusFilters: resource.filters.statusFilters,
+    toggleStatusFilter,
+    vetFilter: resource.filters.vetFilter,
+    setVetFilter: useCallback((v: string) => resource.setFilter('vetFilter', v), [resource]),
+    petFilter: resource.filters.petFilter,
+    setPetFilter: useCallback((v: string) => resource.setFilter('petFilter', v), [resource]),
+    ownerFilter: resource.filters.ownerFilter,
+    setOwnerFilter: useCallback((v: string) => resource.setFilter('ownerFilter', v), [resource]),
+    serviceFilter: resource.filters.serviceFilter,
+    setServiceFilter: useCallback((v: string) => resource.setFilter('serviceFilter', v), [resource]),
+    dateFrom: resource.filters.dateFrom,
+    setDateFrom: useCallback((v: string) => resource.setFilter('dateFrom', v), [resource]),
+    dateTo: resource.filters.dateTo,
+    setDateTo: useCallback((v: string) => resource.setFilter('dateTo', v), [resource]),
+    resetFilters: resource.resetFilters,
+    activeFilters,
+    selectedAppt,
+    setSelectedAppt,
+    isCreateOpen,
+    setIsCreateOpen,
+    editAppt,
+    setEditAppt,
+    cancelAppt,
+    cancelReason,
+    setCancelReason,
+    isCancelling,
+    cancelError,
+    openCancelModal,
+    closeCancelModal,
+    confirmCancelAppt,
+    deleteAppt,
+    isDeleting,
+    deleteError,
+    openDeleteModal,
+    closeDeleteModal,
+    confirmDeleteAppt,
+    checkSlotAvailability,
+    createAppointment,
+    updateAppointment,
+    paginationProps: resource.paginationProps,
   };
 }

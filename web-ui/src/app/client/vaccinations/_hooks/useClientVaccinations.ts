@@ -43,11 +43,16 @@ export function useClientVaccinations(
   initialPetId?: string | null,
   initialSelectedVacId?: string | null
 ) {
+  const initialPet =
+    (typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('petId') : null) ||
+    initialPetId ||
+    'all';
   const [pets, setPets] = useState<Pet[]>([]);
   const [petVaccines, setPetVaccines] = useState<PetVaccines[]>([]);
   const [speciesMap, setSpeciesMap] = useState<Record<string, string>>({});
-  const [selectedPetId, setSelectedPetIdState] = useState<string>('all');
+  const [selectedPetId, setSelectedPetIdState] = useState<string>(initialPet);
   const [selectedVac, setSelectedVac] = useState<Vaccination | null>(null);
+
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -62,9 +67,19 @@ export function useClientVaccinations(
     };
   }, []);
 
-  const setSelectedPetId = useCallback((petId: string) => {
-    setSelectedPetIdState(petId);
-    setSelectedVac((prev) => (prev && petId !== 'all' && prev.petId !== petId ? null : prev));
+  const setSelectedPetId = useCallback((id: string) => {
+    setSelectedPetIdState(id);
+    setSelectedVac((prev) => (prev && id !== 'all' && prev.petId !== id ? null : prev));
+    if (typeof window !== 'undefined') {
+      const url = new URL(window.location.href);
+      if (id && id !== 'all') url.searchParams.set('petId', id);
+      else url.searchParams.delete('petId');
+      const nextSearch = url.searchParams.toString();
+      const currentSearch = window.location.search.replace(/^\?/, '');
+      if (nextSearch !== currentSearch) {
+        window.history.replaceState(null, '', url.pathname + (nextSearch ? `?${nextSearch}` : '') + url.hash);
+      }
+    }
   }, []);
 
   const loadAll = useCallback(

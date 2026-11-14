@@ -8,9 +8,9 @@ import type {
   Vaccination,
 } from '@/modules/client/types';
 import type { Species } from '@/modules/clinic/types';
-import { useShellHeader } from '@/components/layout/AppShell';
 import { useToast } from '@/shared/components';
 import { fetchAllPages, formatApiError, toIdNameMap } from '@/shared/lib';
+import { useResourceList } from '@/shared/hooks';
 import { getVetVaccinationDueInfo } from '../../dashboard/_components/vetHelpers';
 
 export type VaccinationStatusFilter = 'ALL' | 'OVERDUE' | 'SOON' | 'OK';
@@ -29,6 +29,14 @@ async function fetchAllFilteredVaccinations(params: {
   );
 }
 
+export interface VetVaccinationsFiltersState {
+  petFilter: string;
+  nameQuery: string;
+  nextDueFrom: string;
+  nextDueTo: string;
+  statusFilter: VaccinationStatusFilter;
+}
+
 export function useVetVaccinations(options?: {
   initialPetId?: string | null;
   initialSelId?: string | null;
@@ -37,28 +45,15 @@ export function useVetVaccinations(options?: {
   const initialSelId = options?.initialSelId ?? null;
   const { toast } = useToast();
 
-  const [petFilter, setPetFilter] = useState<string>(initialPetId || '');
-  const [nameQuery, setNameQuery] = useState<string>('');
-  const [nextDueFrom, setNextDueFrom] = useState<string>('');
-  const [nextDueTo, setNextDueTo] = useState<string>('');
-  const [statusFilter, setStatusFilter] = useState<VaccinationStatusFilter>('ALL');
-  const [page, setPage] = useState<number>(0);
-
-  const [vaccinations, setVaccinations] = useState<Vaccination[]>([]);
-  const [totalElements, setTotalElements] = useState<number>(0);
-  const [totalPages, setTotalPages] = useState<number>(1);
   const [patients, setPatients] = useState<Pet[]>([]);
   const [petsMap, setPetsMap] = useState<Record<string, Pet>>({});
   const [speciesList, setSpeciesList] = useState<Species[]>([]);
-  const [loading, setLoading] = useState<boolean>(true);
-  const [error, setError] = useState<string | null>(null);
 
   const [selectedVac, setSelectedVac] = useState<Vaccination | null>(null);
   const [modalOpen, setModalOpen] = useState<boolean>(false);
   const [editingVac, setEditingVac] = useState<Vaccination | null>(null);
 
   const isMountedRef = useRef(true);
-  const loadSeqRef = useRef(0);
   const appliedSelRef = useRef<string | null>(null);
   const petsMapRef = useRef<Record<string, Pet>>({});
   petsMapRef.current = petsMap;
@@ -98,73 +93,63 @@ export function useVetVaccinations(options?: {
     };
   }, []);
 
-  const loadVaccinations = useCallback(
-    async (silent = false) => {
-      const seq = ++loadSeqRef.current;
-      if (!silent) {
-        setLoading(true);
-        setError(null);
+  const resource = useResourceList<Vaccination, VetVaccinationsFiltersState>({
+    fetcher: async ({ page, pageSize, filters }) => {
+      const query = {
+        petId: filters.petFilter || undefined,
+        name: filters.nameQuery.trim() || undefined,
+        nextDueFrom: filters.nextDueFrom || undefined,
+        nextDueTo: filters.nextDueTo || undefined,
+      };
+
+      if (filters.statusFilter === 'ALL') {
+        const res = await vetApi.getVaccinations({ page, size: pageSize, ...query });
+        return res;
       }
-      try {
-        const query = {
-          petId: petFilter || undefined,
-          name: nameQuery.trim() || undefined,
-          nextDueFrom: nextDueFrom || undefined,
-          nextDueTo: nextDueTo || undefined,
-        };
 
-        let pageItems: Vaccination[] = [];
-        let totEl = 0;
-        let totPg = 1;
+      const all = await fetchAllFilteredVaccinations(query);
+      const filtered = all.filter((v) => {
+        const st = getVetVaccinationDueInfo(v.nextDueOn).status;
+        if (filters.statusFilter === 'OVERDUE') return st === 'OVERDUE';
+        if (filters.statusFilter === 'SOON') return st === 'SOON';
+        return st === 'LATER' || st === 'NONE';
+      });
+      const totEl = filtered.length;
+      const totPg = Math.max(1, Math.ceil(totEl / pageSize));
+      const safePage = Math.min(page, totPg - 1);
+      const items = filtered.slice(safePage * pageSize, (safePage + 1) * pageSize);
 
-        if (statusFilter === 'ALL') {
-          const res = await vetApi.getVaccinations({ page, size: PAGE_SIZE, ...query });
-          if (!isMountedRef.current || seq !== loadSeqRef.current) return;
-          pageItems = res?.items ?? [];
-          totEl = res?.totalElements ?? pageItems.length;
-          totPg = Math.max(1, res?.totalPages ?? 1);
-        } else {
-          const all = await fetchAllFilteredVaccinations(query);
-          if (!isMountedRef.current || seq !== loadSeqRef.current) return;
-          const filtered = all.filter((v) => {
-            const st = getVetVaccinationDueInfo(v.nextDueOn).status;
-            if (statusFilter === 'OVERDUE') return st === 'OVERDUE';
-            if (statusFilter === 'SOON') return st === 'SOON';
-            return st === 'LATER' || st === 'NONE';
-          });
-          totEl = filtered.length;
-          totPg = Math.max(1, Math.ceil(totEl / PAGE_SIZE));
-          const safePage = Math.min(page, totPg - 1);
-          pageItems = filtered.slice(safePage * PAGE_SIZE, (safePage + 1) * PAGE_SIZE);
-          if (safePage !== page) setPage(safePage);
-        }
-
-        setVaccinations(pageItems);
-        setTotalElements(totEl);
-        setTotalPages(totPg);
-        setError(null);
-        setSelectedVac((prev) => (prev ? pageItems.find((v) => v.id === prev.id) ?? prev : null));
-      } catch (err: unknown) {
-        if (!isMountedRef.current || seq !== loadSeqRef.current) return;
-        if (!silent) {
-          setError(formatApiError(err, 'Не удалось загрузить журнал прививок'));
-        }
-      } finally {
-        if (isMountedRef.current && seq === loadSeqRef.current) {
-          setLoading(false);
-        }
+      return {
+        items,
+        totalElements: totEl,
+        totalPages: totPg,
+      };
+    },
+    initialFilters: {
+      petFilter: initialPetId || '',
+      nameQuery: '',
+      nextDueFrom: '',
+      nextDueTo: '',
+      statusFilter: 'ALL',
+    },
+    urlSyncKeys: ['petFilter', 'nameQuery', 'nextDueFrom', 'nextDueTo', 'statusFilter'],
+    defaultPageSize: PAGE_SIZE,
+    debouncedKeys: ['nameQuery'],
+    debounceMs: 250,
+    onSuccess: ({ items }) => {
+      if (initialSelId && appliedSelRef.current !== initialSelId) {
+        appliedSelRef.current = initialSelId;
+        const found = items.find((v) => v.id === initialSelId);
+        if (found) setSelectedVac(found);
+      } else {
+        setSelectedVac((prev) => (prev ? items.find((v) => v.id === prev.id) ?? prev : null));
       }
     },
-    [petFilter, nameQuery, nextDueFrom, nextDueTo, statusFilter, page]
-  );
-
-  useEffect(() => {
-    void loadVaccinations();
-  }, [loadVaccinations]);
+  });
 
   useEffect(() => {
     const missingPetIds = Array.from(
-      new Set(vaccinations.map((v) => v.petId).filter((id) => id && !petsMapRef.current[id]))
+      new Set(resource.items.map((v) => v.petId).filter((id) => id && !petsMapRef.current[id]))
     );
     if (missingPetIds.length === 0) return;
     let cancelled = false;
@@ -180,22 +165,7 @@ export function useVetVaccinations(options?: {
     return () => {
       cancelled = true;
     };
-  }, [vaccinations]);
-
-  useEffect(() => {
-    if (!initialSelId || loading || appliedSelRef.current === initialSelId) return;
-    appliedSelRef.current = initialSelId;
-    const found = vaccinations.find((v) => v.id === initialSelId);
-    if (found) setSelectedVac(found);
-  }, [initialSelId, loading, vaccinations]);
-
-  const speciesMap = useMemo(() => toIdNameMap(speciesList), [speciesList]);
-
-  useShellHeader({
-    crumbGroup: 'Врач',
-    crumb: 'Прививки',
-    crumb2: selectedVac?.name || undefined,
-  });
+  }, [resource.items]);
 
   const openCreateModal = useCallback(() => {
     setEditingVac(null);
@@ -215,78 +185,54 @@ export function useVetVaccinations(options?: {
   const handleCreateVaccination = useCallback(
     async (payload: CreateVaccinationRequest) => {
       const created = await vetApi.createVaccination(payload);
-      const petName = petsMap[payload.petId]?.name || 'Пациент';
-      toast('Прививка внесена', `${petName} — ${payload.name}`);
-      await loadVaccinations(true);
-      if (isMountedRef.current && created) {
-        setSelectedVac(created);
-      }
+      toast('Прививка добавлена', created.name);
+      await resource.reload();
+      setSelectedVac(created);
     },
-    [petsMap, loadVaccinations, toast]
+    [resource, toast]
   );
 
   const handleUpdateVaccination = useCallback(
-    async (id: string, payload: UpdateVaccinationRequest) => {
-      const updated = await vetApi.updateVaccination(id, payload);
+    async (vacId: string, payload: UpdateVaccinationRequest) => {
+      const updated = await vetApi.updateVaccination(vacId, payload);
       toast(
         'Прививка обновлена',
         payload.nextDueOn ? undefined : 'Дата ревакцинации очищена'
       );
-      await loadVaccinations(true);
-      if (isMountedRef.current && updated) {
-        setSelectedVac((prev) => (prev?.id === id ? updated : prev));
-      }
+      await resource.reload();
+      setSelectedVac((prev) => (prev?.id === vacId ? updated : prev));
     },
-    [loadVaccinations, toast]
+    [resource, toast]
   );
 
-  const resetFilters = useCallback(() => {
-    setPetFilter('');
-    setNameQuery('');
-    setNextDueFrom('');
-    setNextDueTo('');
-    setStatusFilter('ALL');
-    setPage(0);
-  }, []);
+  const speciesMap = useMemo(() => toIdNameMap(speciesList), [speciesList]);
 
   return {
-    petFilter,
-    setPetFilter: (v: string) => {
-      setPetFilter(v);
-      setPage(0);
-    },
-    nameQuery,
-    setNameQuery: (v: string) => {
-      setNameQuery(v);
-      setPage(0);
-    },
-    nextDueFrom,
-    setNextDueFrom: (v: string) => {
-      setNextDueFrom(v);
-      setPage(0);
-    },
-    nextDueTo,
-    setNextDueTo: (v: string) => {
-      setNextDueTo(v);
-      setPage(0);
-    },
-    statusFilter,
-    setStatusFilter: (v: VaccinationStatusFilter) => {
-      setStatusFilter(v);
-      setPage(0);
-    },
-    page,
-    setPage,
-    resetFilters,
-    vaccinations,
-    totalElements,
-    totalPages,
+    petFilter: resource.filters.petFilter,
+    setPetFilter: useCallback((v: string) => resource.setFilter('petFilter', v), [resource]),
+    nameQuery: resource.filters.nameQuery,
+    setNameQuery: useCallback((v: string) => resource.setFilter('nameQuery', v), [resource]),
+    nextDueFrom: resource.filters.nextDueFrom,
+    setNextDueFrom: useCallback((v: string) => resource.setFilter('nextDueFrom', v), [resource]),
+    nextDueTo: resource.filters.nextDueTo,
+    setNextDueTo: useCallback((v: string) => resource.setFilter('nextDueTo', v), [resource]),
+    statusFilter: resource.filters.statusFilter,
+    setStatusFilter: useCallback(
+      (v: VaccinationStatusFilter) => resource.setFilter('statusFilter', v),
+      [resource]
+    ),
+    page: resource.page,
+    setPage: resource.setPage,
+    resetFilters: resource.resetFilters,
+    vaccinations: resource.items,
+    totalElements: resource.totalElements,
+    totalPages: resource.totalPages,
     patients,
     petsMap,
     speciesMap,
-    loading,
-    error,
-    reload: loadVaccinations,
+    loading: resource.loading,
+    error: resource.error,
+    reload: resource.reload,
     selectedVac,
     setSelectedVac,
     modalOpen,
@@ -296,5 +242,6 @@ export function useVetVaccinations(options?: {
     closeModal,
     handleCreateVaccination,
     handleUpdateVaccination,
+    paginationProps: resource.paginationProps,
   };
 }

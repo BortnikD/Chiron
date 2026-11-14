@@ -12,6 +12,16 @@ export function getMoscowTodayIso(offsetDays = 0): string {
 }
 
 /**
+ * Смещает дату в формате YYYY-MM-DD на указанное количество дней.
+ */
+export function addDaysIso(isoDate: string, days: number): string {
+  const [y, m, d] = isoDate.split('-').map(Number);
+  if (!y || !m || !d) return isoDate;
+  const shifted = new Date(Date.UTC(y, m - 1, d + days, 12, 0, 0));
+  return shifted.toISOString().slice(0, 10);
+}
+
+/**
  * Извлекает календарную дату YYYY-MM-DD в часовом поясе Europe/Moscow из ISO-строки или Date.
  */
 export function getMoscowDateKey(input?: string | Date | null): string {

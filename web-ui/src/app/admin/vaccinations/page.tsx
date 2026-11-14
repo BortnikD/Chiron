@@ -75,6 +75,8 @@ function AdminVaccinationsContent() {
               speciesList={vm.speciesList}
               selectedVaccination={vm.selectedVaccination}
               loading={vm.loading}
+              totalElements={vm.totalElements}
+              paginationProps={vm.paginationProps}
               onSelect={vm.setSelectedVaccination}
               onEdit={vm.handleOpenEdit}
               onDelete={vm.requestDelete}

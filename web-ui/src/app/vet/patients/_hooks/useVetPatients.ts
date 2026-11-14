@@ -9,35 +9,23 @@ import type {
   Vaccination,
 } from '@/modules/client/types';
 import type { Service, Species } from '@/modules/clinic/types';
-import { useShellHeader } from '@/components/layout/AppShell';
 import { useToast } from '@/shared/components';
-import { fetchAllPages, formatApiError, mapWithConcurrency, toIdNameMap } from '@/shared/lib';
+import { fetchAllPages, formatApiError, toIdNameMap } from '@/shared/lib';
+import { useResourceList } from '@/shared/hooks';
 
 const DEFAULT_PAGE_SIZE = 20;
 
-async function fetchPetAppointments(petId: string): Promise<Appointment[]> {
-  return fetchAllPages(
-    (page, size) => vetApi.getAppointments({ petId, page, size, direction: 'DESC' }),
-    { pageSize: 100, maxPages: 10, concurrency: 2 }
-  );
+export interface VetPatientsFiltersState {
+  search: string;
+  speciesFilter: string;
 }
 
 export function useVetPatients(initialSelId?: string | null) {
   const { toast } = useToast();
 
-  const [patients, setPatients] = useState<Pet[]>([]);
   const [appointmentsByPet, setAppointmentsByPet] = useState<Record<string, Appointment[]>>({});
   const [speciesList, setSpeciesList] = useState<Species[]>([]);
   const [servicesMap, setServicesMap] = useState<Record<string, string>>({});
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [search, setSearch] = useState('');
-  const [debouncedSearch, setDebouncedSearch] = useState('');
-  const [speciesFilter, setSpeciesFilterState] = useState('');
-  const [page, setPage] = useState(0);
-  const [pageSize, setPageSizeState] = useState(DEFAULT_PAGE_SIZE);
-  const [totalElements, setTotalElements] = useState(0);
-  const [totalPages, setTotalPages] = useState(1);
   const [viewMode, setViewMode] = useState<'table' | 'cards'>('table');
 
   const [selectedPatient, setSelectedPatient] = useState<Pet | null>(null);
@@ -47,12 +35,10 @@ export function useVetPatients(initialSelId?: string | null) {
   const [editingVac, setEditingVac] = useState<Vaccination | null>(null);
 
   const isMountedRef = useRef(true);
-  const loadSeqRef = useRef(0);
   const activePatientIdRef = useRef<string | null>(null);
   const vacReqSeqRef = useRef(0);
   const appliedSelRef = useRef<string | null>(null);
   const petApptsCacheRef = useRef<Map<string, Appointment[]>>(new Map());
-  const refsLoadedRef = useRef(false);
 
   useEffect(() => {
     isMountedRef.current = true;
@@ -61,15 +47,58 @@ export function useVetPatients(initialSelId?: string | null) {
     };
   }, []);
 
-  useEffect(() => {
-    const trimmed = search.trim();
-    if (trimmed === debouncedSearch) return;
-    const timer = window.setTimeout(() => {
-      setDebouncedSearch(trimmed);
-      setPage(0);
-    }, 250);
-    return () => window.clearTimeout(timer);
-  }, [search, debouncedSearch]);
+  const resource = useResourceList<Pet, VetPatientsFiltersState>({
+    fetcher: async ({ page, pageSize, filters }) => {
+      return vetApi.getPatientsPage({
+        page,
+        size: pageSize,
+        speciesId: filters.speciesFilter || undefined,
+        name: filters.search || undefined,
+      });
+    },
+    initialFilters: {
+      search: '',
+      speciesFilter: '',
+    },
+    urlSyncKeys: ['search', 'speciesFilter'],
+    defaultPageSize: DEFAULT_PAGE_SIZE,
+    debouncedKeys: ['search'],
+    debounceMs: 250,
+    onSuccess: async ({ items }) => {
+      if (petApptsCacheRef.current.size === 0) {
+        const allVetAppts = await fetchAllPages(
+          (pg, sz) => vetApi.getAppointments({ page: pg, size: sz, direction: 'DESC' }),
+          { pageSize: 100, maxPages: 3, concurrency: 2 }
+        ).catch(() => [] as Appointment[]);
+
+        if (!isMountedRef.current) return;
+        petApptsCacheRef.current.clear();
+        for (const appt of allVetAppts) {
+          if (!appt.petId) continue;
+          const list = petApptsCacheRef.current.get(appt.petId) || [];
+          list.push(appt);
+          petApptsCacheRef.current.set(appt.petId, list);
+        }
+      }
+
+      const nextApptsByPet: Record<string, Appointment[]> = {};
+      for (const p of items) {
+        nextApptsByPet[p.id] = petApptsCacheRef.current.get(p.id) || [];
+      }
+      setAppointmentsByPet((prev) => ({ ...prev, ...nextApptsByPet }));
+
+      if (initialSelId && appliedSelRef.current !== initialSelId) {
+        appliedSelRef.current = initialSelId;
+        const found = items.find((p) => p.id === initialSelId);
+        if (found) setSelectedPatient(found);
+      } else {
+        setSelectedPatient((prev) => {
+          if (!prev) return null;
+          return items.find((p) => p.id === prev.id) ?? prev;
+        });
+      }
+    },
+  });
 
   const loadRefs = useCallback(async () => {
     try {
@@ -78,13 +107,10 @@ export function useVetPatients(initialSelId?: string | null) {
         clinicApi.getServices().catch(() => [] as Service[]),
       ]);
       if (!isMountedRef.current) return;
-      const safeSpecies = Array.isArray(speciesData) ? speciesData : [];
-      const safeServices = Array.isArray(servicesData) ? servicesData : [];
-      setSpeciesList(safeSpecies);
-      setServicesMap(toIdNameMap(safeServices));
-      refsLoadedRef.current = true;
+      setSpeciesList(Array.isArray(speciesData) ? speciesData : []);
+      setServicesMap(toIdNameMap(Array.isArray(servicesData) ? servicesData : []));
     } catch {
-      // Справочники загрузятся повторно при reload
+      // ignore
     }
   }, []);
 
@@ -92,157 +118,30 @@ export function useVetPatients(initialSelId?: string | null) {
     void loadRefs();
   }, [loadRefs]);
 
-  const loadData = useCallback(
-    async (silent = false) => {
-      const seq = ++loadSeqRef.current;
-      if (!silent) {
-        setLoading(true);
-        setError(null);
-      } else {
-        petApptsCacheRef.current.clear();
-      }
-      if (!refsLoadedRef.current) {
-        void loadRefs();
-      }
-      try {
-        const res = await vetApi.getPatientsPage({
-          page,
-          size: pageSize,
-          speciesId: speciesFilter || undefined,
-          name: debouncedSearch || undefined,
-        });
-
-        if (!isMountedRef.current || seq !== loadSeqRef.current) return;
-
-        const safePatients = Array.isArray(res?.items) ? res.items : [];
-        const safeTotalElements = res?.totalElements ?? safePatients.length;
-        const safeTotalPages = Math.max(1, res?.totalPages ?? 1);
-
-        if (silent || petApptsCacheRef.current.size === 0) {
-          const allVetAppts = await fetchAllPages(
-            (pg, sz) => vetApi.getAppointments({ page: pg, size: sz, direction: 'DESC' }),
-            { pageSize: 100, maxPages: 3, concurrency: 2 }
-          ).catch(() => [] as Appointment[]);
-          if (!isMountedRef.current || seq !== loadSeqRef.current) return;
-          petApptsCacheRef.current.clear();
-          for (const appt of allVetAppts) {
-            if (!appt.petId) continue;
-            const list = petApptsCacheRef.current.get(appt.petId) || [];
-            list.push(appt);
-            petApptsCacheRef.current.set(appt.petId, list);
-          }
-        }
-
-        const nextApptsByPet: Record<string, Appointment[]> = {};
-        for (const p of safePatients) {
-          nextApptsByPet[p.id] = petApptsCacheRef.current.get(p.id) || [];
-        }
-
-        setError(null);
-        setPatients(safePatients);
-        setTotalElements(safeTotalElements);
-        setTotalPages(safeTotalPages);
-        setAppointmentsByPet((prev) => ({ ...prev, ...nextApptsByPet }));
-
-        setSelectedPatient((prev) => {
-          if (!prev) return null;
-          return safePatients.find((p) => p.id === prev.id) ?? prev;
-        });
-      } catch (err: unknown) {
-        if (!isMountedRef.current || seq !== loadSeqRef.current) return;
-        if (!silent) {
-          setError(formatApiError(err, 'Не удалось загрузить список пациентов'));
-        }
-      } finally {
-        if (isMountedRef.current && seq === loadSeqRef.current) {
-          setLoading(false);
-        }
-      }
-    },
-    [page, pageSize, speciesFilter, debouncedSearch, loadRefs]
-  );
-
-  useEffect(() => {
-    void loadData();
-    const handleRefresh = () => void loadData(true);
-    window.addEventListener('chiron:notification-received', handleRefresh);
-    window.addEventListener('chiron:vet-appointments-updated', handleRefresh);
-    return () => {
-      window.removeEventListener('chiron:notification-received', handleRefresh);
-      window.removeEventListener('chiron:vet-appointments-updated', handleRefresh);
-    };
-  }, [loadData]);
-
-  useEffect(() => {
-    if (!initialSelId || loading || appliedSelRef.current === initialSelId) return;
-    appliedSelRef.current = initialSelId;
-    const found = patients.find((p) => p.id === initialSelId);
-    if (found) {
-      setSelectedPatient(found);
-      return;
-    }
-    let cancelled = false;
-    Promise.all([
-      vetApi.getPatientPet(initialSelId),
-      petApptsCacheRef.current.has(initialSelId)
-        ? Promise.resolve(petApptsCacheRef.current.get(initialSelId) || [])
-        : fetchPetAppointments(initialSelId).catch(() => [] as Appointment[]),
-    ])
-      .then(([pet, appts]) => {
-        if (cancelled || !isMountedRef.current || !pet) return;
-        petApptsCacheRef.current.set(pet.id, appts);
-        setAppointmentsByPet((prev) => ({ ...prev, [pet.id]: appts }));
-        setSelectedPatient(pet);
-      })
-      .catch(() => {});
-    return () => {
-      cancelled = true;
-    };
-  }, [initialSelId, loading, patients]);
-
-  useShellHeader({
-    crumbGroup: 'Врач',
-    crumb: 'Пациенты',
-    crumb2: selectedPatient?.name || undefined,
-  });
-
   const loadPatientVaccinations = useCallback(async (petId: string) => {
-    const reqSeq = ++vacReqSeqRef.current;
+    const seq = ++vacReqSeqRef.current;
     setVacsError(null);
     try {
-      const res = await vetApi.getVaccinations(0, 100, petId);
-      if (
-        !isMountedRef.current ||
-        activePatientIdRef.current !== petId ||
-        reqSeq !== vacReqSeqRef.current
-      ) {
-        return;
-      }
-      setPatientVacs(res?.items || []);
+      const vacs = await vetApi.getVaccinations({ petId });
+      if (!isMountedRef.current || seq !== vacReqSeqRef.current) return;
+      setPatientVacs(Array.isArray(vacs) ? vacs : vacs?.items || []);
     } catch (err: unknown) {
-      if (
-        !isMountedRef.current ||
-        activePatientIdRef.current !== petId ||
-        reqSeq !== vacReqSeqRef.current
-      ) {
-        return;
-      }
+      if (!isMountedRef.current || seq !== vacReqSeqRef.current) return;
       setPatientVacs([]);
       setVacsError(formatApiError(err, 'Не удалось загрузить историю прививок'));
     }
   }, []);
 
   useEffect(() => {
-    const petId = selectedPatient?.id ?? null;
-    activePatientIdRef.current = petId;
-    setPatientVacs([]);
-    setVacsError(null);
-    if (!petId) {
-      vacReqSeqRef.current += 1;
+    if (!selectedPatient) {
+      activePatientIdRef.current = null;
+      setPatientVacs([]);
+      setVacsError(null);
       return;
     }
-    void loadPatientVaccinations(petId);
-  }, [selectedPatient?.id, loadPatientVaccinations]);
+    activePatientIdRef.current = selectedPatient.id;
+    void loadPatientVaccinations(selectedPatient.id);
+  }, [selectedPatient, loadPatientVaccinations]);
 
   const openCreateVaccination = useCallback(() => {
     setEditingVac(null);
@@ -260,23 +159,19 @@ export function useVetPatients(initialSelId?: string | null) {
   }, []);
 
   const handleAddVaccination = useCallback(
-    async (payload: CreateVaccinationRequest): Promise<void> => {
-      await vetApi.createVaccination(payload);
-      const pName =
-        patients.find((p) => p.id === payload.petId)?.name ||
-        selectedPatient?.name ||
-        'Пациент';
-      toast('Прививка внесена', `${pName} — ${payload.name}`);
-      if (isMountedRef.current && activePatientIdRef.current === payload.petId) {
-        await loadPatientVaccinations(payload.petId);
+    async (payload: CreateVaccinationRequest) => {
+      const created = await vetApi.createVaccination(payload);
+      toast('Прививка добавлена', created.name);
+      if (isMountedRef.current && activePatientIdRef.current) {
+        await loadPatientVaccinations(activePatientIdRef.current);
       }
     },
-    [patients, selectedPatient?.name, loadPatientVaccinations, toast]
+    [loadPatientVaccinations, toast]
   );
 
   const handleUpdateVaccination = useCallback(
-    async (id: string, payload: UpdateVaccinationRequest): Promise<void> => {
-      await vetApi.updateVaccination(id, payload);
+    async (vacId: string, payload: UpdateVaccinationRequest) => {
+      await vetApi.updateVaccination(vacId, payload);
       toast(
         'Прививка обновлена',
         payload.nextDueOn ? undefined : 'Дата ревакцинации очищена'
@@ -293,34 +188,24 @@ export function useVetPatients(initialSelId?: string | null) {
     [appointmentsByPet]
   );
 
-  const setSpeciesFilter = useCallback((next: string) => {
-    setSpeciesFilterState(next);
-    setPage(0);
-  }, []);
-
-  const setPageSize = useCallback((next: number) => {
-    setPageSizeState(next);
-    setPage(0);
-  }, []);
-
   return {
-    patients,
+    patients: resource.items,
     appointments,
     speciesList,
     servicesMap,
-    loading,
-    error,
-    reload: loadData,
-    search,
-    setSearch,
-    speciesFilter,
-    setSpeciesFilter,
-    page,
-    setPage,
-    pageSize,
-    setPageSize,
-    totalElements,
-    totalPages,
+    loading: resource.loading,
+    error: resource.error,
+    reload: resource.reload,
+    search: resource.filters.search,
+    setSearch: useCallback((v: string) => resource.setFilter('search', v), [resource]),
+    speciesFilter: resource.filters.speciesFilter,
+    setSpeciesFilter: useCallback((v: string) => resource.setFilter('speciesFilter', v), [resource]),
+    page: resource.page,
+    setPage: resource.setPage,
+    pageSize: resource.pageSize,
+    setPageSize: resource.setPageSize,
+    totalElements: resource.totalElements,
+    totalPages: resource.totalPages,
     viewMode,
     setViewMode,
     selectedPatient,
@@ -334,5 +219,6 @@ export function useVetPatients(initialSelId?: string | null) {
     closeVaccinationModal,
     handleAddVaccination,
     handleUpdateVaccination,
+    paginationProps: resource.paginationProps,
   };
 }

@@ -9,6 +9,7 @@ import type { Service, Veterinarian, Species } from '@/modules/clinic/types';
 import type { AppointmentStatus } from '@/shared/types';
 import { useToast } from '@/shared/components';
 import { formatApiError, toIdNameMap } from '@/shared/lib';
+import { useResourceList } from '@/shared/hooks';
 import {
   type AppointmentsFilterTab,
   toMoscowDayStartIso,
@@ -19,38 +20,28 @@ import { useAppointmentCancel } from './useAppointmentCancel';
 export type FilterTab = AppointmentsFilterTab;
 export type PageSizeOption = 10 | 20 | 50;
 
+export interface ClientAppointmentsFiltersState {
+  tab: AppointmentsFilterTab;
+  selectedPetId: string;
+  statusChips: AppointmentStatus[];
+  fromDate: string;
+  toDate: string;
+  direction: 'ASC' | 'DESC';
+}
+
 export function useClientAppointments(initialSelectedId?: string | null) {
   const { user } = useAuth();
   const { toast } = useToast();
 
-  const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [pets, setPets] = useState<Pet[]>([]);
   const [services, setServices] = useState<Service[]>([]);
   const [veterinarians, setVeterinarians] = useState<Veterinarian[]>([]);
   const [speciesList, setSpeciesList] = useState<Species[]>([]);
   const [parentApptsMap, setParentApptsMap] = useState<Record<string, Appointment>>({});
 
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  const [tab, setTabState] = useState<AppointmentsFilterTab>(() =>
-    initialSelectedId ? 'ALL' : 'UPCOMING'
-  );
-  const [selectedPetId, setSelectedPetIdState] = useState<string>('ALL');
-  const [statusChips, setStatusChipsState] = useState<AppointmentStatus[]>([]);
-  const [fromDate, setFromDateState] = useState<string>('');
-  const [toDate, setToDateState] = useState<string>('');
-  const [direction, setDirection] = useState<'ASC' | 'DESC'>(() =>
-    initialSelectedId ? 'DESC' : 'ASC'
-  );
-  const [page, setPage] = useState<number>(0);
-  const [size, setSizeState] = useState<PageSizeOption>(10);
-  const [totalElements, setTotalElements] = useState<number>(0);
-  const [totalPages, setTotalPages] = useState<number>(0);
   const [selectedAppt, setSelectedAppt] = useState<Appointment | null>(null);
 
   const didApplyInitialSelRef = useRef<string | null>(null);
-  const apptsReqIdRef = useRef(0);
   const refsReqIdRef = useRef(0);
   const isMountedRef = useRef(true);
 
@@ -61,224 +52,194 @@ export function useClientAppointments(initialSelectedId?: string | null) {
     };
   }, []);
 
-  const setTab = useCallback((nextTab: AppointmentsFilterTab) => {
-    setPage(0);
-    setTabState(nextTab);
-    setDirection(nextTab === 'UPCOMING' ? 'ASC' : 'DESC');
-  }, []);
+  const resource = useResourceList<Appointment, ClientAppointmentsFiltersState>({
+    fetcher: async ({ page, pageSize, filters }, signal) => {
+      let fromIso: string | undefined;
+      let toIso: string | undefined;
 
-  const setSelectedPetId = useCallback((nextPetId: string) => {
-    setPage(0);
-    setSelectedPetIdState(nextPetId);
-  }, []);
-
-  const toggleStatusChip = useCallback((status: AppointmentStatus) => {
-    setPage(0);
-    setStatusChipsState((prev) =>
-      prev.includes(status) ? prev.filter((x) => x !== status) : [...prev, status]
-    );
-  }, []);
-
-  const setFromDate = useCallback((iso: string) => {
-    setPage(0);
-    setFromDateState(iso);
-  }, []);
-
-  const setToDate = useCallback((iso: string) => {
-    setPage(0);
-    setToDateState(iso);
-  }, []);
-
-  const setSize = useCallback((nextSize: PageSizeOption) => {
-    setPage(0);
-    setSizeState(nextSize);
-  }, []);
-
-  const toggleDirection = useCallback(() => {
-    setPage(0);
-    setDirection((prev) => (prev === 'ASC' ? 'DESC' : 'ASC'));
-  }, []);
-
-  const resetFilters = useCallback(() => {
-    setPage(0);
-    setTabState('ALL');
-    setDirection('DESC');
-    setSelectedPetIdState('ALL');
-    setStatusChipsState([]);
-    setFromDateState('');
-    setToDateState('');
-  }, []);
-
-  const loadReferences = useCallback(async (isCancelled?: () => boolean) => {
-    const reqId = ++refsReqIdRef.current;
-    try {
-      const [petsRes, svcRes, vetsRes, speciesRes] = await Promise.all([
-        clientApi.getPets(),
-        clinicApi.getServices(),
-        clinicApi.getVeterinarians(),
-        clinicApi.getSpecies().catch(() => [] as Species[]),
-      ]);
-      if (!isMountedRef.current || isCancelled?.() || reqId !== refsReqIdRef.current) return;
-      setPets(Array.isArray(petsRes) ? petsRes : []);
-      setServices(Array.isArray(svcRes) ? svcRes : []);
-      setVeterinarians(Array.isArray(vetsRes) ? vetsRes : []);
-      setSpeciesList(Array.isArray(speciesRes) ? speciesRes : []);
-    } catch (err: unknown) {
-      if (!isMountedRef.current || isCancelled?.() || reqId !== refsReqIdRef.current) return;
-      setError((prev) => prev || formatApiError(err, 'Не удалось загрузить справочники записей'));
-    }
-  }, []);
-
-  const loadAppointments = useCallback(
-    async (isCancelled?: () => boolean, silent = false): Promise<Appointment[] | null> => {
-      const reqId = ++apptsReqIdRef.current;
-      if (!silent) {
-        setLoading(true);
-        setError(null);
+      if (filters.fromDate) {
+        fromIso = toMoscowDayStartIso(filters.fromDate);
+      }
+      if (filters.toDate) {
+        toIso = toMoscowDayEndExclusiveIso(filters.toDate);
       }
 
-      const defaultStatuses: AppointmentStatus[] | undefined =
-        tab === 'UPCOMING'
-          ? ['PENDING', 'CONFIRMED']
-          : tab === 'HISTORY'
-          ? ['COMPLETED', 'CANCELLED', 'NO_SHOW']
-          : undefined;
-      const effectiveStatuses = statusChips.length > 0 ? statusChips : defaultStatuses;
+      if (filters.tab === 'UPCOMING') {
+        const nowIso = new Date().toISOString();
+        if (!fromIso || fromIso < nowIso) fromIso = nowIso;
+      } else if (filters.tab === 'HISTORY') {
+        const nowIso = new Date().toISOString();
+        if (!toIso || toIso > nowIso) toIso = nowIso;
+      }
 
-      const nowIso = new Date().toISOString();
-      const fromFilter = fromDate
-        ? toMoscowDayStartIso(fromDate)
-        : tab === 'UPCOMING'
-        ? nowIso
-        : undefined;
-      const toFilter = toDate ? toMoscowDayEndExclusiveIso(toDate) : undefined;
+      return clientApi.getAppointments({
+        petId: filters.selectedPetId === 'ALL' ? undefined : filters.selectedPetId,
+        status: filters.statusChips.length > 0 ? filters.statusChips : undefined,
+        from: fromIso,
+        to: toIso,
+        direction: filters.direction,
+        page,
+        size: pageSize,
+      });
+    },
+    initialFilters: {
+      tab: initialSelectedId ? 'ALL' : 'UPCOMING',
+      selectedPetId: 'ALL',
+      statusChips: [],
+      fromDate: '',
+      toDate: '',
+      direction: initialSelectedId ? 'DESC' : 'ASC',
+    },
+    urlSyncKeys: ['tab', 'selectedPetId', 'statusChips', 'fromDate', 'toDate'],
+    defaultPageSize: 10,
+    onSuccess: async ({ items }) => {
+      const followUpParents = items.filter((a) => a.followUpOf);
+      if (followUpParents.length > 0) {
+        const missingParentIds = followUpParents
+          .map((a) => a.followUpOf as string)
+          .filter((id) => !parentApptsMap[id]);
 
-      try {
-        const apptsRes = await clientApi.getAppointments({
-          page,
-          size,
-          direction,
-          ...(effectiveStatuses ? { status: effectiveStatuses } : {}),
-          ...(selectedPetId !== 'ALL' ? { petId: selectedPetId } : {}),
-          ...(fromFilter ? { from: fromFilter } : {}),
-          ...(toFilter ? { to: toFilter } : {}),
-        });
-        if (!isMountedRef.current || isCancelled?.() || reqId !== apptsReqIdRef.current) return null;
-
-        const items = apptsRes?.items ?? (Array.isArray(apptsRes) ? apptsRes : []);
-        setAppointments(items);
-        setTotalElements(apptsRes?.totalElements ?? items.length);
-        setTotalPages(apptsRes?.totalPages ?? (items.length > 0 ? 1 : 0));
-
-        if (initialSelectedId && didApplyInitialSelRef.current !== initialSelectedId) {
-          didApplyInitialSelRef.current = initialSelectedId;
-          const inList = items.find((item) => item.id === initialSelectedId);
-          if (inList) {
-            setSelectedAppt(inList);
-          } else {
-            void clientApi
-              .getAppointmentById(initialSelectedId)
-              .then((fetched) => {
-                if (isMountedRef.current && fetched) setSelectedAppt(fetched);
-              })
-              .catch(() => {});
+        if (missingParentIds.length > 0) {
+          try {
+            const fetched = await Promise.all(
+              missingParentIds.map((id) => clientApi.getAppointmentById(id).catch(() => null))
+            );
+            const valid = fetched.filter((a): a is Appointment => a !== null);
+            if (valid.length > 0) {
+              setParentApptsMap((prev) => {
+                const next = { ...prev };
+                for (const a of valid) next[a.id] = a;
+                return next;
+              });
+            }
+          } catch {
+            // ignore
           }
+        }
+      }
+
+      if (initialSelectedId && didApplyInitialSelRef.current !== initialSelectedId) {
+        didApplyInitialSelRef.current = initialSelectedId;
+        const target = items.find((a) => a.id === initialSelectedId);
+        if (target) {
+          setSelectedAppt(target);
         } else {
-          setSelectedAppt((prev) => {
-            if (!prev) return null;
-            return items.find((item) => item.id === prev.id) ?? prev;
-          });
+          clientApi
+            .getAppointmentById(initialSelectedId)
+            .then((res) => {
+              if (res) setSelectedAppt(res);
+            })
+            .catch(() => {});
         }
-        return items;
-      } catch (err: unknown) {
-        if (!isMountedRef.current || isCancelled?.() || reqId !== apptsReqIdRef.current) return null;
-        if (!silent) {
-          setError(formatApiError(err, 'Не удалось загрузить записи на приём'));
-        }
-        return null;
-      } finally {
-        if (isMountedRef.current && !isCancelled?.() && reqId === apptsReqIdRef.current && !silent) {
-          setLoading(false);
-        }
+      } else {
+        setSelectedAppt((prev) => (prev ? items.find((a) => a.id === prev.id) || prev : null));
       }
     },
-    [tab, selectedPetId, statusChips, fromDate, toDate, direction, page, size, initialSelectedId]
+  });
+
+  const loadRefs = useCallback(async () => {
+    const reqId = ++refsReqIdRef.current;
+    try {
+      const [petsData, servicesData, vetsData, speciesData] = await Promise.all([
+        clientApi.getPets().catch(() => [] as Pet[]),
+        clinicApi.getServices().catch(() => [] as Service[]),
+        clinicApi.getVeterinarians().catch(() => [] as Veterinarian[]),
+        clinicApi.getSpecies().catch(() => [] as Species[]),
+      ]);
+      if (!isMountedRef.current || reqId !== refsReqIdRef.current) return;
+      setPets(Array.isArray(petsData) ? petsData : []);
+      setServices(Array.isArray(servicesData) ? servicesData : []);
+      setVeterinarians(Array.isArray(vetsData) ? vetsData : []);
+      setSpeciesList(Array.isArray(speciesData) ? speciesData : []);
+    } catch {
+      // ignore
+    }
+  }, []);
+
+  useEffect(() => {
+    void loadRefs();
+    return () => {
+      refsReqIdRef.current += 1;
+    };
+  }, [loadRefs]);
+
+  const setTab = useCallback(
+    (nextTab: AppointmentsFilterTab) => {
+      resource.setFilters((prev) => ({
+        ...prev,
+        tab: nextTab,
+        direction: nextTab === 'UPCOMING' ? 'ASC' : 'DESC',
+      }));
+    },
+    [resource]
   );
 
-  useEffect(() => {
-    let cancelled = false;
-    void loadReferences(() => cancelled);
-    return () => {
-      cancelled = true;
-    };
-  }, [loadReferences]);
+  const setSelectedPetId = useCallback(
+    (nextPetId: string) => {
+      resource.setFilter('selectedPetId', nextPetId);
+    },
+    [resource]
+  );
 
-  useEffect(() => {
-    let cancelled = false;
-    void loadAppointments(() => cancelled);
-    return () => {
-      cancelled = true;
-    };
-  }, [loadAppointments]);
+  const toggleStatusChip = useCallback(
+    (status: AppointmentStatus) => {
+      resource.setFilter(
+        'statusChips',
+        resource.filters.statusChips.includes(status)
+          ? resource.filters.statusChips.filter((x) => x !== status)
+          : [...resource.filters.statusChips, status]
+      );
+    },
+    [resource]
+  );
 
-  useEffect(() => {
-    const parentId = selectedAppt?.followUpOf;
-    if (!parentId) return;
-    const inList = appointments.find((a) => a.id === parentId);
-    if (inList) {
-      setParentApptsMap((prev) => (prev[parentId] ? prev : { ...prev, [parentId]: inList }));
-      return;
-    }
-    if (parentApptsMap[parentId]) return;
+  const setFromDate = useCallback(
+    (iso: string) => {
+      resource.setFilter('fromDate', iso);
+    },
+    [resource]
+  );
 
-    let cancelled = false;
-    void clientApi
-      .getAppointmentById(parentId)
-      .then((fetched) => {
-        if (!cancelled && isMountedRef.current && fetched) {
-          setParentApptsMap((prev) => ({ ...prev, [parentId]: fetched }));
-        }
-      })
-      .catch(() => {});
-    return () => {
-      cancelled = true;
-    };
-  }, [selectedAppt?.followUpOf, appointments, parentApptsMap]);
+  const setToDate = useCallback(
+    (iso: string) => {
+      resource.setFilter('toDate', iso);
+    },
+    [resource]
+  );
 
-  useEffect(() => {
-    const handleNotification = () => {
-      void loadAppointments(undefined, true);
-    };
-    window.addEventListener('chiron:notification-received', handleNotification);
-    window.addEventListener('chiron:notifications-updated', handleNotification);
-    return () => {
-      window.removeEventListener('chiron:notification-received', handleNotification);
-      window.removeEventListener('chiron:notifications-updated', handleNotification);
-    };
-  }, [loadAppointments]);
+  const setSize = useCallback(
+    (nextSize: PageSizeOption) => {
+      resource.setPageSize(nextSize);
+    },
+    [resource]
+  );
 
-  const reload = useCallback(() => {
-    void loadReferences();
-    void loadAppointments();
-  }, [loadReferences, loadAppointments]);
+  const toggleDirection = useCallback(() => {
+    resource.setFilter(
+      'direction',
+      resource.filters.direction === 'ASC' ? 'DESC' : 'ASC'
+    );
+  }, [resource]);
 
   const selectAppointmentById = useCallback(
-    async (id: string) => {
-      const local = appointments.find((a) => a.id === id) || parentApptsMap[id];
-      if (local) {
-        setSelectedAppt(local);
+    async (id: string | null) => {
+      if (!id) {
+        setSelectedAppt(null);
+        return;
+      }
+      const existing = resource.items.find((a) => a.id === id);
+      if (existing) {
+        setSelectedAppt(existing);
         return;
       }
       try {
         const fetched = await clientApi.getAppointmentById(id);
-        if (isMountedRef.current && fetched) {
-          setSelectedAppt(fetched);
-        }
+        if (fetched) setSelectedAppt(fetched);
       } catch (err: unknown) {
-        toast('Не удалось открыть запись', formatApiError(err, 'Запись недоступна'), 'err');
+        toast('Не удалось открыть запись', formatApiError(err, 'Ошибка'));
       }
     },
-    [appointments, parentApptsMap, toast]
+    [resource.items, toast]
   );
 
   const petsMap = useMemo(() => Object.fromEntries(pets.map((p) => [p.id, p])), [pets]);
@@ -289,14 +250,14 @@ export function useClientAppointments(initialSelectedId?: string | null) {
   const cancelModal = useAppointmentCancel({
     selectedAppt,
     setSelectedAppt,
-    loadAppointments,
+    loadAppointments: resource.reload,
     isMountedRef,
   });
 
   return {
-    loading,
-    error,
-    reload,
+    loading: resource.loading,
+    error: resource.error,
+    reload: resource.reload,
     currentUserId: user?.id,
     pets,
     petsMap,
@@ -304,29 +265,30 @@ export function useClientAppointments(initialSelectedId?: string | null) {
     vetsMap,
     speciesMap,
     parentApptsMap,
-    tab,
+    tab: resource.filters.tab,
     setTab,
-    selectedPetId,
+    selectedPetId: resource.filters.selectedPetId,
     setSelectedPetId,
-    statusChips,
+    statusChips: resource.filters.statusChips,
     toggleStatusChip,
-    fromDate,
+    fromDate: resource.filters.fromDate,
     setFromDate,
-    toDate,
+    toDate: resource.filters.toDate,
     setToDate,
-    direction,
+    direction: resource.filters.direction,
     toggleDirection,
-    resetFilters,
-    page,
-    setPage,
-    size,
+    resetFilters: resource.resetFilters,
+    page: resource.page,
+    setPage: resource.setPage,
+    size: resource.pageSize as PageSizeOption,
     setSize,
-    totalElements,
-    totalPages,
+    totalElements: resource.totalElements,
+    totalPages: resource.totalPages,
     selectedAppt,
     setSelectedAppt,
     selectAppointmentById,
-    filteredAppointments: appointments,
+    filteredAppointments: resource.items,
+    paginationProps: resource.paginationProps,
     ...cancelModal,
   };
 }

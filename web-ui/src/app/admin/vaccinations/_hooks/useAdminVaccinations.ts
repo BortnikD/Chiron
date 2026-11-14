@@ -8,9 +8,9 @@ import type { Vaccination, Pet } from '@/modules/client/types';
 import type { Species } from '@/modules/clinic/types';
 import type { User } from '@/shared/types';
 import { useToast } from '@/shared/components';
-import { fetchAllPages, formatApiError } from '@/shared/lib';
+import { formatApiError, getMoscowTodayIso, addDaysIso } from '@/shared/lib';
+import { useResourceList } from '@/shared/hooks';
 import type { VaccinationStatusTone } from '../_components/types';
-import { filterVaccinations, countVaccinationTones } from '../_components/utils';
 
 export interface VaccinationSaveInput {
   petId: string;
@@ -19,23 +19,27 @@ export interface VaccinationSaveInput {
   nextDueOn: string | null;
 }
 
+export interface AdminVaccinationsFiltersState {
+  search: string;
+  statusFilter: VaccinationStatusTone;
+  petFilter: string;
+  nextDueFrom: string;
+  nextDueTo: string;
+}
+
 export function useAdminVaccinations() {
   const searchParams = useSearchParams();
   const { toast } = useToast();
   const initialSel = searchParams.get('sel');
 
-  const [vaccinations, setVaccinations] = useState<Vaccination[]>([]);
   const [pets, setPets] = useState<Pet[]>([]);
+  const [petsMap, setPetsMap] = useState<Record<string, Pet>>({});
+  const petsMapRef = useRef<Record<string, Pet>>({});
+  petsMapRef.current = petsMap;
+
   const [speciesList, setSpeciesList] = useState<Species[]>([]);
   const [users, setUsers] = useState<User[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  const [search, setSearch] = useState('');
-  const [statusFilter, setStatusFilter] = useState<VaccinationStatusTone>('all');
-  const [petFilter, setPetFilter] = useState<string>('all');
-  const [nextDueFrom, setNextDueFrom] = useState<string>('');
-  const [nextDueTo, setNextDueTo] = useState<string>('');
+  const [stats, setStats] = useState({ overdue: 0, soon: 0, total: 0 });
 
   const [selectedVaccination, setSelectedVaccination] = useState<Vaccination | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -45,95 +49,147 @@ export function useAdminVaccinations() {
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
 
-  const loadReqIdRef = useRef(0);
+  const isMountedRef = useRef(true);
   const appliedSelRef = useRef<string | null>(null);
 
-  const loadData = useCallback(async () => {
-    const reqId = ++loadReqIdRef.current;
-    setLoading(true);
-    setError(null);
-    try {
-      const [vaxItems, petItems, speciesRes, userItems] = await Promise.all([
-        fetchAllPages(
-          (p, s) =>
-            adminApi.getVaccinations(
-              {
-                petId: petFilter !== 'all' ? petFilter : undefined,
-                nextDueFrom: nextDueFrom || undefined,
-                nextDueTo: nextDueTo || undefined,
-              },
-              p,
-              s
-            ),
-          { pageSize: 100, maxPages: 50, concurrency: 4 }
-        ),
-        fetchAllPages((p, s) => adminApi.getPets(p, s), { pageSize: 100, maxPages: 50, concurrency: 4 }),
-        clinicApi.getSpecies(),
-        fetchAllPages((p, s) => adminApi.getUsers(p, s), { pageSize: 100, maxPages: 50, concurrency: 4 }),
-      ]);
-      if (loadReqIdRef.current !== reqId) return;
-      setVaccinations(vaxItems);
-      setPets(petItems);
-      setSpeciesList(Array.isArray(speciesRes) ? speciesRes : []);
-      setUsers(userItems);
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
 
-      if (initialSel && appliedSelRef.current !== initialSel) {
-        appliedSelRef.current = initialSel;
-        const found = vaxItems.find((v) => v.id === initialSel);
-        if (found) {
-          setSelectedVaccination(found);
-        } else {
-          try {
-            const byId = await adminApi.getVaccinationById(initialSel);
-            if (loadReqIdRef.current === reqId && byId) setSelectedVaccination(byId);
-          } catch {
-            // ignore missing target
-          }
-        }
-      } else {
-        setSelectedVaccination((prev) =>
-          prev ? vaxItems.find((v) => v.id === prev.id) ?? prev : null
-        );
-      }
-    } catch (err: unknown) {
-      if (loadReqIdRef.current !== reqId) return;
-      setError(formatApiError(err, 'Не удалось загрузить реестр вакцинаций'));
-    } finally {
-      if (loadReqIdRef.current === reqId) setLoading(false);
+  // Загрузка справочников и статистики ключевых показателей
+  const loadRefsAndStats = useCallback(async () => {
+    const todayIso = getMoscowTodayIso();
+    const in30DaysIso = addDaysIso(todayIso, 30);
+
+    try {
+      const [allVaxRes, overdueVaxRes, soonVaxRes, petsRes, speciesRes, usersRes] = await Promise.all([
+        adminApi.getVaccinations({}, 0, 1).catch(() => null),
+        adminApi.getVaccinations({ nextDueTo: todayIso }, 0, 1).catch(() => null),
+        adminApi.getVaccinations({ nextDueFrom: todayIso, nextDueTo: in30DaysIso }, 0, 1).catch(() => null),
+        adminApi.getPets(0, 100).catch(() => null),
+        clinicApi.getSpecies().catch(() => [] as Species[]),
+        adminApi.getUsers(0, 100, 'CLIENT').catch(() => null),
+      ]);
+
+      if (!isMountedRef.current) return;
+
+      setStats({
+        total: allVaxRes?.totalElements ?? 0,
+        overdue: overdueVaxRes?.totalElements ?? 0,
+        soon: soonVaxRes?.totalElements ?? 0,
+      });
+
+      const loadedPets = petsRes?.items || [];
+      setPets(loadedPets);
+      const pMap: Record<string, Pet> = {};
+      loadedPets.forEach((p) => {
+        pMap[p.id] = p;
+      });
+      setPetsMap((prev) => ({ ...prev, ...pMap }));
+
+      setSpeciesList(Array.isArray(speciesRes) ? speciesRes : []);
+      setUsers(usersRes?.items || []);
+    } catch {
+      // Игнорируем ошибки загрузки справочников
     }
-  }, [petFilter, nextDueFrom, nextDueTo, initialSel]);
+  }, []);
 
   useEffect(() => {
-    void loadData();
-    return () => {
-      loadReqIdRef.current += 1;
-    };
-  }, [loadData]);
+    void loadRefsAndStats();
+  }, [loadRefsAndStats]);
+
+  const resource = useResourceList<Vaccination, AdminVaccinationsFiltersState>({
+    fetcher: async ({ page, pageSize, filters }) => {
+      let effDueFrom = filters.nextDueFrom || undefined;
+      let effDueTo = filters.nextDueTo || undefined;
+
+      const todayIso = getMoscowTodayIso();
+      if (filters.statusFilter === 'overdue') {
+        effDueTo = effDueTo && effDueTo < todayIso ? effDueTo : todayIso;
+      } else if (filters.statusFilter === 'soon') {
+        const in30Iso = addDaysIso(todayIso, 30);
+        effDueFrom = effDueFrom && effDueFrom > todayIso ? effDueFrom : todayIso;
+        effDueTo = effDueTo && effDueTo < in30Iso ? effDueTo : in30Iso;
+      }
+
+      const res = await adminApi.getVaccinations(
+        {
+          name: filters.search.trim() || undefined,
+          petId: filters.petFilter !== 'all' ? filters.petFilter : undefined,
+          nextDueFrom: effDueFrom,
+          nextDueTo: effDueTo,
+        },
+        page,
+        pageSize
+      );
+
+      return {
+        items: res?.items || [],
+        totalElements: res?.totalElements ?? 0,
+        totalPages: Math.max(1, res?.totalPages ?? 1),
+      };
+    },
+    defaultPageSize: 20,
+    initialFilters: {
+      search: '',
+      statusFilter: 'all',
+      petFilter: 'all',
+      nextDueFrom: '',
+      nextDueTo: '',
+    },
+    urlSyncKeys: ['search', 'statusFilter', 'petFilter', 'nextDueFrom', 'nextDueTo'],
+    debouncedKeys: ['search'],
+    onSuccess: ({ items }) => {
+      if (!isMountedRef.current) return;
+      setSelectedVaccination((prev) =>
+        prev ? items.find((x) => x.id === prev.id) ?? prev : null
+      );
+
+      // Догрузка карточек питомцев, отсутствующих в кэше
+      const missing = items
+        .map((x) => x.petId)
+        .filter((id) => id && !petsMapRef.current[id]);
+      if (missing.length > 0) {
+        Promise.all(
+          missing.map((id) => adminApi.getPetById(id).catch(() => null))
+        ).then((resolved) => {
+          if (!isMountedRef.current) return;
+          const nextMap: Record<string, Pet> = {};
+          resolved.forEach((pet) => {
+            if (pet?.id) nextMap[pet.id] = pet;
+          });
+          if (Object.keys(nextMap).length > 0) {
+            setPetsMap((prev) => ({ ...prev, ...nextMap }));
+          }
+        });
+      }
+    },
+  });
+
+  useEffect(() => {
+    if (!initialSel || resource.loading || appliedSelRef.current === initialSel) return;
+    appliedSelRef.current = initialSel;
+    const found = resource.items.find((v) => v.id === initialSel);
+    if (found) {
+      setSelectedVaccination(found);
+      return;
+    }
+    adminApi
+      .getVaccinationById(initialSel)
+      .then((byId) => {
+        if (isMountedRef.current && byId) setSelectedVaccination(byId);
+      })
+      .catch(() => {});
+  }, [initialSel, resource.loading, resource.items]);
 
   const petMap = useMemo(() => {
     const map = new Map<string, Pet>();
-    pets.forEach((p) => map.set(p.id, p));
+    Object.values(petsMap).forEach((p) => map.set(p.id, p));
     return map;
-  }, [pets]);
-
-  const filteredVaccinations = useMemo(
-    () =>
-      filterVaccinations(
-        vaccinations,
-        petMap,
-        search,
-        statusFilter,
-        petFilter,
-        nextDueFrom,
-        nextDueTo
-      ),
-    [vaccinations, petMap, search, statusFilter, petFilter, nextDueFrom, nextDueTo]
-  );
-
-  const { overdue, soon, total } = useMemo(
-    () => countVaccinationTones(vaccinations),
-    [vaccinations]
-  );
+  }, [petsMap]);
 
   const handleOpenCreate = useCallback(() => {
     setEditingVaccination(null);
@@ -170,20 +226,21 @@ export function useAdminVaccinations() {
       }
       setIsModalOpen(false);
       setEditingVaccination(null);
-      await loadData();
+      await resource.reload();
+      void loadRefsAndStats();
     },
-    [loadData, toast]
+    [resource, loadRefsAndStats, toast]
   );
 
   const requestDelete = useCallback(
     (id: string) => {
       const target =
-        vaccinations.find((v) => v.id === id) ??
+        resource.items.find((v) => v.id === id) ??
         (selectedVaccination?.id === id ? selectedVaccination : null);
       setDeleteError(null);
       setDeleteTarget(target);
     },
-    [vaccinations, selectedVaccination]
+    [resource.items, selectedVaccination]
   );
 
   const cancelDelete = useCallback(() => {
@@ -199,36 +256,47 @@ export function useAdminVaccinations() {
     setDeleteError(null);
     try {
       await adminApi.deleteVaccination(deleteTarget.id);
-      setVaccinations((prev) => prev.filter((v) => v.id !== deleteTarget.id));
       setSelectedVaccination((prev) => (prev?.id === deleteTarget.id ? null : prev));
       toast('Запись о вакцинации удалена');
       setDeleteTarget(null);
+      await resource.reload();
+      void loadRefsAndStats();
     } catch (err: unknown) {
       setDeleteError(formatApiError(err, 'Ошибка при удалении'));
     } finally {
       setDeleting(false);
     }
-  }, [deleteTarget, toast]);
+  }, [deleteTarget, resource, loadRefsAndStats, toast]);
 
   return {
-    vaccinations: filteredVaccinations,
+    vaccinations: resource.items,
     pets,
     petMap,
     speciesList,
     users,
-    loading,
-    error,
-    reload: loadData,
-    search,
-    setSearch,
-    statusFilter,
-    setStatusFilter,
-    petFilter,
-    setPetFilter,
-    nextDueFrom,
-    setNextDueFrom,
-    nextDueTo,
-    setNextDueTo,
+    loading: resource.loading,
+    error: resource.error,
+    reload: resource.reload,
+    search: resource.filters.search,
+    setSearch: useCallback((v: string) => resource.setFilter('search', v), [resource]),
+    statusFilter: resource.filters.statusFilter,
+    setStatusFilter: useCallback(
+      (v: VaccinationStatusTone) => resource.setFilter('statusFilter', v),
+      [resource]
+    ),
+    petFilter: resource.filters.petFilter,
+    setPetFilter: useCallback((v: string) => resource.setFilter('petFilter', v), [resource]),
+    nextDueFrom: resource.filters.nextDueFrom,
+    setNextDueFrom: useCallback((v: string) => resource.setFilter('nextDueFrom', v), [resource]),
+    nextDueTo: resource.filters.nextDueTo,
+    setNextDueTo: useCallback((v: string) => resource.setFilter('nextDueTo', v), [resource]),
+    page: resource.page,
+    setPage: resource.setPage,
+    totalElements: resource.totalElements,
+    totalPages: resource.totalPages,
+    pageSize: resource.pageSize,
+    setPageSize: resource.setPageSize,
+    paginationProps: resource.paginationProps,
     selectedVaccination,
     setSelectedVaccination,
     isModalOpen,
@@ -237,7 +305,7 @@ export function useAdminVaccinations() {
     deleteTarget,
     deleting,
     deleteError,
-    stats: { overdue, soon, total },
+    stats,
     handleOpenCreate,
     handleOpenEdit,
     saveVaccination,

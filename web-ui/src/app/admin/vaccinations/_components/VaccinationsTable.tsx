@@ -5,6 +5,7 @@ import { Syringe, Edit2, Trash2 } from 'lucide-react';
 import type { Vaccination, Pet } from '@/modules/client/types';
 import type { Species } from '@/modules/clinic/types';
 import { PetAvatar } from '@/components/ui/EntityAvatar';
+import { PaginationFooter, type PaginationFooterProps } from '@/shared/components';
 import { formatIsoDateDisplay, getSpeciesTone } from '@/shared/lib';
 import { calculateVaccinationStatus } from './utils';
 import { VACCINATIONS_TABLE_COLS } from './constants';
@@ -15,6 +16,8 @@ export interface VaccinationsTableProps {
   speciesList: Species[];
   selectedVaccination?: Vaccination | null;
   loading: boolean;
+  totalElements?: number;
+  paginationProps?: PaginationFooterProps;
   onSelect: (vaccination: Vaccination) => void;
   onEdit: (vaccination: Vaccination) => void;
   onDelete: (id: string) => void;
@@ -29,6 +32,8 @@ export const VaccinationsTable: React.FC<VaccinationsTableProps> = ({
   speciesList,
   selectedVaccination,
   loading,
+  totalElements,
+  paginationProps,
   onSelect,
   onEdit,
   onDelete,
@@ -39,13 +44,15 @@ export const VaccinationsTable: React.FC<VaccinationsTableProps> = ({
     return map;
   }, [pets]);
 
+  const displayTotal = totalElements ?? paginationProps?.totalElements ?? vaccinations.length;
+
   return (
     <section className="island grow" aria-label="Таблица вакцинаций">
       <div className="island-head">
         <span className="island-title">
           <Syringe className="ic" />
           Прививки
-          <span className="count">Найдено: {vaccinations.length}</span>
+          <span className="count">Найдено: {displayTotal}</span>
         </span>
       </div>
 
@@ -163,6 +170,18 @@ export const VaccinationsTable: React.FC<VaccinationsTableProps> = ({
           </div>
         )}
       </div>
+
+      {paginationProps && (
+        <PaginationFooter
+          page={paginationProps.page}
+          pageSize={paginationProps.pageSize}
+          totalElements={paginationProps.totalElements}
+          totalPages={paginationProps.totalPages}
+          loading={loading || paginationProps.loading}
+          onPageChange={paginationProps.onPageChange}
+          onPageSizeChange={paginationProps.onPageSizeChange}
+        />
+      )}
     </section>
   );
 };

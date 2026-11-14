@@ -24,9 +24,57 @@ export function useClientPets(
   const [loading, setLoading] = useState(true);
   const [loadingAppts, setLoadingAppts] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [archiveFilter, setArchiveFilter] = useState<ArchiveFilter>('ACTIVE');
-  const [selectedSpeciesId, setSelectedSpeciesId] = useState<string>('');
-  const [searchQuery, setSearchQuery] = useState('');
+  const initialArchive = (typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('archive') : null) as ArchiveFilter || 'ACTIVE';
+  const initialSpecies = typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('speciesId') || '' : '';
+  const initialQuery = typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('q') || '' : '';
+
+  const [archiveFilter, setArchiveFilterState] = useState<ArchiveFilter>(initialArchive);
+  const [selectedSpeciesId, setSelectedSpeciesIdState] = useState<string>(initialSpecies);
+  const [searchQuery, setSearchQueryState] = useState(initialQuery);
+
+  const syncPetFiltersToUrl = useCallback((arch: string, sp: string, q: string) => {
+    if (typeof window === 'undefined') return;
+    const url = new URL(window.location.href);
+    if (arch && arch !== 'ACTIVE') url.searchParams.set('archive', arch);
+    else url.searchParams.delete('archive');
+    if (sp) url.searchParams.set('speciesId', sp);
+    else url.searchParams.delete('speciesId');
+    if (q.trim()) url.searchParams.set('q', q.trim());
+    else url.searchParams.delete('q');
+
+    const nextSearch = url.searchParams.toString();
+    const currentSearch = window.location.search.replace(/^\?/, '');
+    if (nextSearch !== currentSearch) {
+      window.history.replaceState(null, '', url.pathname + (nextSearch ? `?${nextSearch}` : '') + url.hash);
+    }
+  }, []);
+
+  const setArchiveFilter = useCallback(
+    (action: React.SetStateAction<ArchiveFilter>) => {
+      setArchiveFilterState((prev) => {
+        const next = typeof action === 'function' ? action(prev) : action;
+        syncPetFiltersToUrl(next, selectedSpeciesId, searchQuery);
+        return next;
+      });
+    },
+    [selectedSpeciesId, searchQuery, syncPetFiltersToUrl]
+  );
+
+  const setSelectedSpeciesId = useCallback(
+    (v: string) => {
+      setSelectedSpeciesIdState(v);
+      syncPetFiltersToUrl(archiveFilter, v, searchQuery);
+    },
+    [archiveFilter, searchQuery, syncPetFiltersToUrl]
+  );
+
+  const setSearchQuery = useCallback(
+    (v: string) => {
+      setSearchQueryState(v);
+      syncPetFiltersToUrl(archiveFilter, selectedSpeciesId, v);
+    },
+    [archiveFilter, selectedSpeciesId, syncPetFiltersToUrl]
+  );
   const [selectedPet, setSelectedPet] = useState<Pet | null>(null);
 
   const requestIdRef = useRef(0);

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { adminApi } from '@/modules/admin/api';
 import { clinicApi } from '@/modules/clinic/api';
@@ -8,6 +8,7 @@ import type { Pet, Appointment } from '@/modules/client/types';
 import type { Service, Species, Veterinarian } from '@/modules/clinic/types';
 import { useToast } from '@/shared/components';
 import { formatApiError, nextMoscowDayIso } from '@/shared/lib';
+import { useResourceList } from '@/shared/hooks';
 import type { User, UserRole } from '@/shared/types';
 
 export interface CreateUserInput {
@@ -20,27 +21,21 @@ export interface CreateUserInput {
   middleName?: string;
 }
 
+export interface AdminUsersFiltersState {
+  roleFilter: string;
+  search: string;
+  createdFrom: string;
+  createdTo: string;
+}
+
 export function useAdminUsers() {
   const searchParams = useSearchParams();
   const { toast } = useToast();
   const initialSel = searchParams.get('sel');
 
-  const [users, setUsers] = useState<User[]>([]);
-  const [totalElements, setTotalElements] = useState(0);
-  const [totalPages, setTotalPages] = useState(1);
   const [veterinarians, setVeterinarians] = useState<Veterinarian[]>([]);
   const [speciesList, setSpeciesList] = useState<Species[]>([]);
   const [services, setServices] = useState<Service[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  const [roleFilter, setRoleFilter] = useState<string>('ALL');
-  const [search, setSearch] = useState('');
-  const [debouncedSearch, setDebouncedSearch] = useState('');
-  const [createdFrom, setCreatedFrom] = useState('');
-  const [createdTo, setCreatedTo] = useState('');
-  const [page, setPage] = useState(0);
-  const [pageSize, setPageSize] = useState(20);
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
 
   const [userPets, setUserPets] = useState<Pet[]>([]);
@@ -55,20 +50,54 @@ export function useAdminUsers() {
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
 
-  const loadReqIdRef = useRef(0);
-  const loadAbortRef = useRef<AbortController | null>(null);
   const detailsReqIdRef = useRef(0);
   const appliedSelRef = useRef<string | null>(null);
 
-  useEffect(() => {
-    const trimmed = search.trim();
-    if (trimmed === debouncedSearch) return;
-    const timer = window.setTimeout(() => {
-      setDebouncedSearch(trimmed);
-      setPage(0);
-    }, 250);
-    return () => window.clearTimeout(timer);
-  }, [search, debouncedSearch]);
+  const resource = useResourceList<User, AdminUsersFiltersState>({
+    fetcher: async ({ page, pageSize, filters }, signal) => {
+      const createdFromIso = filters.createdFrom
+        ? new Date(`${filters.createdFrom}T00:00:00+03:00`).toISOString()
+        : undefined;
+      const createdToIso = filters.createdTo
+        ? new Date(`${nextMoscowDayIso(filters.createdTo)}T00:00:00+03:00`).toISOString()
+        : undefined;
+
+      return adminApi.getUsers(
+        page,
+        pageSize,
+        {
+          role: filters.roleFilter !== 'ALL' ? (filters.roleFilter as UserRole) : undefined,
+          search: filters.search || undefined,
+          createdFrom: createdFromIso,
+          createdTo: createdToIso,
+        },
+        { signal }
+      );
+    },
+    initialFilters: {
+      roleFilter: 'ALL',
+      search: '',
+      createdFrom: '',
+      createdTo: '',
+    },
+    urlSyncKeys: ['roleFilter', 'search', 'createdFrom', 'createdTo'],
+    defaultPageSize: 20,
+    debouncedKeys: ['search'],
+    debounceMs: 250,
+    onSuccess: ({ items }) => {
+      if (initialSel && appliedSelRef.current !== initialSel) {
+        appliedSelRef.current = initialSel;
+        const found = items.find((u) => u.id === initialSel);
+        if (found) {
+          setSelectedUser(found);
+        } else {
+          adminApi.getUserById(initialSel).then(setSelectedUser).catch(() => {});
+        }
+      } else {
+        setSelectedUser((prev) => (prev ? items.find((u) => u.id === prev.id) ?? prev : null));
+      }
+    },
+  });
 
   const loadRefs = useCallback(async () => {
     try {
@@ -85,77 +114,9 @@ export function useAdminUsers() {
     }
   }, []);
 
-  const loadUsers = useCallback(async () => {
-    loadAbortRef.current?.abort();
-    const controller = new AbortController();
-    loadAbortRef.current = controller;
-    const reqId = ++loadReqIdRef.current;
-    setLoading(true);
-    setError(null);
-    try {
-      const createdFromIso = createdFrom
-        ? new Date(`${createdFrom}T00:00:00+03:00`).toISOString()
-        : undefined;
-      const createdToIso = createdTo
-        ? new Date(`${nextMoscowDayIso(createdTo)}T00:00:00+03:00`).toISOString()
-        : undefined;
-
-      const res = await adminApi.getUsers(
-        page,
-        pageSize,
-        {
-          role: roleFilter !== 'ALL' ? (roleFilter as UserRole) : undefined,
-          search: debouncedSearch || undefined,
-          createdFrom: createdFromIso,
-          createdTo: createdToIso,
-        },
-        { signal: controller.signal }
-      );
-
-      if (loadReqIdRef.current !== reqId || controller.signal.aborted) return;
-      const items = res?.items || [];
-      const total = res?.totalElements ?? items.length;
-      const pages = Math.max(1, res?.totalPages ?? 1);
-
-      setUsers(items);
-      setTotalElements(total);
-      setTotalPages(pages);
-
-      if (initialSel && appliedSelRef.current !== initialSel) {
-        appliedSelRef.current = initialSel;
-        const found = items.find((u) => u.id === initialSel);
-        if (found) {
-          setSelectedUser(found);
-        } else {
-          try {
-            const byId = await adminApi.getUserById(initialSel);
-            if (loadReqIdRef.current === reqId && byId) setSelectedUser(byId);
-          } catch {
-            // ignore missing target
-          }
-        }
-      } else {
-        setSelectedUser((prev) => (prev ? items.find((u) => u.id === prev.id) ?? prev : null));
-      }
-    } catch (err: unknown) {
-      if (loadReqIdRef.current !== reqId || controller.signal.aborted) return;
-      setError(formatApiError(err, 'Не удалось загрузить пользователей'));
-    } finally {
-      if (loadReqIdRef.current === reqId && !controller.signal.aborted) setLoading(false);
-    }
-  }, [page, pageSize, roleFilter, debouncedSearch, createdFrom, createdTo, initialSel]);
-
   useEffect(() => {
     void loadRefs();
   }, [loadRefs]);
-
-  useEffect(() => {
-    void loadUsers();
-    return () => {
-      loadReqIdRef.current += 1;
-      loadAbortRef.current?.abort();
-    };
-  }, [loadUsers]);
 
   const loadUserDetails = useCallback(async (userId: string) => {
     const reqId = ++detailsReqIdRef.current;
@@ -217,86 +178,61 @@ export function useAdminUsers() {
       setIsDeleteConfirmOpen(false);
       toast('Пользователь удалён');
       setSelectedUser(null);
-      await loadUsers();
+      await resource.reload();
     } catch (err: unknown) {
       setDeleteError(formatApiError(err, 'Ошибка при удалении пользователя'));
     } finally {
       setDeleting(false);
     }
-  }, [selectedUser, loadUsers, toast]);
+  }, [selectedUser, resource, toast]);
 
   const createUser = useCallback(
     async (data: CreateUserInput): Promise<User> => {
       const created = await adminApi.createUser(data);
       toast('Пользователь создан', created.fullName || created.email);
-      await loadUsers();
+      await resource.reload();
       setSelectedUser(created);
       if (created.role === 'VETERINARIAN') {
         setVetOfferUser(created);
       }
       return created;
     },
-    [loadUsers, toast]
+    [resource, toast]
   );
 
   const updateUser = useCallback(
     async (id: string, data: Partial<User>): Promise<User> => {
       const updated = await adminApi.updateUser(id, data);
       toast('Данные пользователя сохранены');
-      await loadUsers();
+      await resource.reload();
       setSelectedUser((prev) => (prev?.id === id ? updated : prev));
       return updated;
     },
-    [loadUsers, toast]
+    [resource, toast]
   );
 
-  const handleRoleFilterChange = useCallback((newRole: string) => {
-    setRoleFilter(newRole);
-    setPage(0);
-  }, []);
-
-  const handleSearchChange = useCallback((newSearch: string) => {
-    setSearch(newSearch);
-    setPage(0);
-  }, []);
-
-  const handleCreatedFromChange = useCallback((newFrom: string) => {
-    setCreatedFrom(newFrom);
-    setPage(0);
-  }, []);
-
-  const handleCreatedToChange = useCallback((newTo: string) => {
-    setCreatedTo(newTo);
-    setPage(0);
-  }, []);
-
-  const handlePageSizeChange = useCallback((newSize: number) => {
-    setPageSize(newSize);
-    setPage(0);
-  }, []);
-
   return {
-    users,
-    totalElements,
-    totalPages,
-    page,
-    setPage,
-    pageSize,
-    setPageSize: handlePageSizeChange,
+    users: resource.items,
+    totalElements: resource.totalElements,
+    totalPages: resource.totalPages,
+    page: resource.page,
+    setPage: resource.setPage,
+    pageSize: resource.pageSize,
+    setPageSize: resource.setPageSize,
     veterinarians,
     speciesList,
     services,
-    loading,
-    error,
-    reload: loadUsers,
-    roleFilter,
-    setRoleFilter: handleRoleFilterChange,
-    search,
-    setSearch: handleSearchChange,
-    createdFrom,
-    setCreatedFrom: handleCreatedFromChange,
-    createdTo,
-    setCreatedTo: handleCreatedToChange,
+    loading: resource.loading,
+    error: resource.error,
+    reload: resource.reload,
+    roleFilter: resource.filters.roleFilter,
+    setRoleFilter: useCallback((val: string) => resource.setFilter('roleFilter', val), [resource]),
+    search: resource.filters.search,
+    setSearch: useCallback((val: string) => resource.setFilter('search', val), [resource]),
+    createdFrom: resource.filters.createdFrom,
+    setCreatedFrom: useCallback((val: string) => resource.setFilter('createdFrom', val), [resource]),
+    createdTo: resource.filters.createdTo,
+    setCreatedTo: useCallback((val: string) => resource.setFilter('createdTo', val), [resource]),
     selectedUser,
     setSelectedUser,
     userPets,
@@ -317,5 +253,6 @@ export function useAdminUsers() {
     handleDeleteUser,
     createUser,
     updateUser,
+    paginationProps: resource.paginationProps,
   };
 }

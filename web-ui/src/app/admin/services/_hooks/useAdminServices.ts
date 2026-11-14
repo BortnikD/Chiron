@@ -42,11 +42,55 @@ export function useAdminServices() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  const initialSpec = searchParams.get('specializationId') || searchParams.get('filterSpec') || 'ALL';
+  const initialSpecies = searchParams.get('speciesId') || searchParams.get('filterSpecies') || 'ALL';
+  const initialActive = (searchParams.get('filterActive') as ServiceActiveFilter) || 'ALL';
+  const initialSearch = searchParams.get('search') || '';
+
   const [mainTab, setMainTab] = useState<ServicesMainTab>(() => resolveServicesTab(tabParam));
-  const [filterSpec, setFilterSpec] = useState<string>('ALL');
-  const [filterSpecies, setFilterSpecies] = useState<string>('ALL');
-  const [filterActive, setFilterActive] = useState<ServiceActiveFilter>('ALL');
-  const [search, setSearch] = useState('');
+  const [filterSpec, setFilterSpecState] = useState<string>(initialSpec);
+  const [filterSpecies, setFilterSpeciesState] = useState<string>(initialSpecies);
+  const [filterActive, setFilterActiveState] = useState<ServiceActiveFilter>(initialActive);
+  const [search, setSearchState] = useState(initialSearch);
+
+  const syncServiceFiltersToUrl = useCallback((spec: string, species: string, active: string, q: string) => {
+    if (typeof window === 'undefined') return;
+    const url = new URL(window.location.href);
+    if (spec && spec !== 'ALL') url.searchParams.set('filterSpec', spec);
+    else url.searchParams.delete('filterSpec');
+    if (species && species !== 'ALL') url.searchParams.set('filterSpecies', species);
+    else url.searchParams.delete('filterSpecies');
+    if (active && active !== 'ALL') url.searchParams.set('filterActive', active);
+    else url.searchParams.delete('filterActive');
+    if (q.trim()) url.searchParams.set('search', q.trim());
+    else url.searchParams.delete('search');
+
+    const nextSearch = url.searchParams.toString();
+    const currentSearch = window.location.search.replace(/^\?/, '');
+    if (nextSearch !== currentSearch) {
+      window.history.replaceState(null, '', url.pathname + (nextSearch ? `?${nextSearch}` : '') + url.hash);
+    }
+  }, []);
+
+  const setFilterSpec = useCallback((v: string) => {
+    setFilterSpecState(v);
+    syncServiceFiltersToUrl(v, filterSpecies, filterActive, search);
+  }, [filterSpecies, filterActive, search, syncServiceFiltersToUrl]);
+
+  const setFilterSpecies = useCallback((v: string) => {
+    setFilterSpeciesState(v);
+    syncServiceFiltersToUrl(filterSpec, v, filterActive, search);
+  }, [filterSpec, filterActive, search, syncServiceFiltersToUrl]);
+
+  const setFilterActive = useCallback((v: ServiceActiveFilter) => {
+    setFilterActiveState(v);
+    syncServiceFiltersToUrl(filterSpec, filterSpecies, v, search);
+  }, [filterSpec, filterSpecies, search, syncServiceFiltersToUrl]);
+
+  const setSearch = useCallback((v: string) => {
+    setSearchState(v);
+    syncServiceFiltersToUrl(filterSpec, filterSpecies, filterActive, v);
+  }, [filterSpec, filterSpecies, filterActive, syncServiceFiltersToUrl]);
 
   const [selectedService, setSelectedService] = useState<Service | null>(null);
   const [serviceModal, setServiceModal] = useState<{ open: boolean; service?: Service | null }>({

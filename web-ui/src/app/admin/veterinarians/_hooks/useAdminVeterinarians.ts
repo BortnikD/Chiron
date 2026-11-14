@@ -32,6 +32,10 @@ export function useAdminVeterinarians() {
   const initialSel = searchParams.get('sel');
   const initialUserId = searchParams.get('userId');
 
+  const initialSpec = searchParams.get('specializationId') || searchParams.get('filterSpec') || 'ALL';
+  const initialSpecies = searchParams.get('speciesId') || searchParams.get('filterSpecies') || 'ALL';
+  const initialActive = (searchParams.get('filterActive') as VetActiveFilter) || 'ALL';
+
   const [veterinarians, setVeterinarians] = useState<Veterinarian[]>([]);
   const [users, setUsers] = useState<User[]>([]);
   const [specializations, setSpecializations] = useState<Specialization[]>([]);
@@ -40,9 +44,49 @@ export function useAdminVeterinarians() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const [filterSpec, setFilterSpec] = useState<string>('ALL');
-  const [filterSpecies, setFilterSpecies] = useState<string>('ALL');
-  const [filterActive, setFilterActive] = useState<VetActiveFilter>('ALL');
+  const [filterSpec, setFilterSpecState] = useState<string>(initialSpec);
+  const [filterSpecies, setFilterSpeciesState] = useState<string>(initialSpecies);
+  const [filterActive, setFilterActiveState] = useState<VetActiveFilter>(initialActive);
+
+  const syncVetFiltersToUrl = useCallback((spec: string, species: string, active: string) => {
+    if (typeof window === 'undefined') return;
+    const url = new URL(window.location.href);
+    if (spec && spec !== 'ALL') url.searchParams.set('filterSpec', spec);
+    else url.searchParams.delete('filterSpec');
+    if (species && species !== 'ALL') url.searchParams.set('filterSpecies', species);
+    else url.searchParams.delete('filterSpecies');
+    if (active && active !== 'ALL') url.searchParams.set('filterActive', active);
+    else url.searchParams.delete('filterActive');
+    const nextSearch = url.searchParams.toString();
+    const currentSearch = window.location.search.replace(/^\?/, '');
+    if (nextSearch !== currentSearch) {
+      window.history.replaceState(null, '', url.pathname + (nextSearch ? `?${nextSearch}` : '') + url.hash);
+    }
+  }, []);
+
+  const setFilterSpec = useCallback(
+    (v: string) => {
+      setFilterSpecState(v);
+      syncVetFiltersToUrl(v, filterSpecies, filterActive);
+    },
+    [filterSpecies, filterActive, syncVetFiltersToUrl]
+  );
+
+  const setFilterSpecies = useCallback(
+    (v: string) => {
+      setFilterSpeciesState(v);
+      syncVetFiltersToUrl(filterSpec, v, filterActive);
+    },
+    [filterSpec, filterActive, syncVetFiltersToUrl]
+  );
+
+  const setFilterActive = useCallback(
+    (v: VetActiveFilter) => {
+      setFilterActiveState(v);
+      syncVetFiltersToUrl(filterSpec, filterSpecies, v);
+    },
+    [filterSpec, filterSpecies, syncVetFiltersToUrl]
+  );
   const [selectedVet, setSelectedVet] = useState<Veterinarian | null>(null);
   const [preferredDetailTab, setPreferredDetailTab] = useState<'profile' | 'species'>('profile');
 

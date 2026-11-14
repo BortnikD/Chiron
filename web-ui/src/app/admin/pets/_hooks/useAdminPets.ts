@@ -14,12 +14,21 @@ import type {
 } from '@/modules/client/types';
 import type { Service, Species, Veterinarian } from '@/modules/clinic/types';
 import { useToast } from '@/shared/components';
-import { fetchAllPages, formatApiError, mapWithConcurrency } from '@/shared/lib';
+import { formatApiError, mapWithConcurrency } from '@/shared/lib';
+import { useResourceList } from '@/shared/hooks';
 import type { User } from '@/shared/types';
 import type { GenderFilter, StatusFilter } from '../_components/types';
 
 function getErrMsg(err: unknown, fallback: string): string {
   return formatApiError(err, fallback);
+}
+
+export interface AdminPetsFiltersState {
+  search: string;
+  ownerFilter: string;
+  speciesFilter: string;
+  genderFilter: GenderFilter;
+  statusFilter: StatusFilter;
 }
 
 export function useAdminPets() {
@@ -29,24 +38,11 @@ export function useAdminPets() {
   const initialSel = searchParams.get('sel');
   const initialOwner = searchParams.get('ownerId') || 'ALL';
 
-  const [pets, setPets] = useState<Pet[]>([]);
   const [speciesList, setSpeciesList] = useState<Species[]>([]);
   const [users, setUsers] = useState<User[]>([]);
   const [services, setServices] = useState<Service[]>([]);
   const [veterinarians, setVeterinarians] = useState<Veterinarian[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
 
-  const [search, setSearch] = useState('');
-  const [debouncedSearch, setDebouncedSearch] = useState('');
-  const [ownerFilter, setOwnerFilterState] = useState(initialOwner);
-  const [speciesFilter, setSpeciesFilterState] = useState('ALL');
-  const [genderFilter, setGenderFilterState] = useState<GenderFilter>('ALL');
-  const [statusFilter, setStatusFilterState] = useState<StatusFilter>('ALL');
-  const [page, setPage] = useState(0);
-  const [pageSize, setPageSizeState] = useState(20);
-  const [totalElements, setTotalElements] = useState(0);
-  const [totalPages, setTotalPages] = useState(1);
   const [selectedPet, setSelectedPet] = useState<Pet | null>(null);
   const [petAppointments, setPetAppointments] = useState<Appointment[]>([]);
   const [petVaccinations, setPetVaccinations] = useState<Vaccination[]>([]);
@@ -61,24 +57,84 @@ export function useAdminPets() {
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
 
-  const loadReqIdRef = useRef(0);
-  const loadAbortRef = useRef<AbortController | null>(null);
   const refsReqIdRef = useRef(0);
-  const refsLoadedRef = useRef(false);
   const detailsReqIdRef = useRef(0);
   const appliedSelRef = useRef<string | null>(null);
   const usersRef = useRef<User[]>(users);
   usersRef.current = users;
 
-  useEffect(() => {
-    const trimmed = search.trim();
-    if (trimmed === debouncedSearch) return;
-    const timer = window.setTimeout(() => {
-      setDebouncedSearch(trimmed);
-      setPage(0);
-    }, 250);
-    return () => window.clearTimeout(timer);
-  }, [search, debouncedSearch]);
+  const resource = useResourceList<Pet, AdminPetsFiltersState>({
+    fetcher: async ({ page, pageSize, filters }, signal) => {
+      return adminApi.getPets(
+        page,
+        pageSize,
+        {
+          ownerId: filters.ownerFilter !== 'ALL' ? filters.ownerFilter : undefined,
+          speciesId: filters.speciesFilter !== 'ALL' ? filters.speciesFilter : undefined,
+          gender: filters.genderFilter !== 'ALL' ? filters.genderFilter : undefined,
+          isArchived:
+            filters.statusFilter === 'ACTIVE'
+              ? false
+              : filters.statusFilter === 'ARCHIVED'
+              ? true
+              : undefined,
+          search: filters.search || undefined,
+        },
+        { signal }
+      );
+    },
+    initialFilters: {
+      search: '',
+      ownerFilter: initialOwner,
+      speciesFilter: 'ALL',
+      genderFilter: 'ALL',
+      statusFilter: 'ALL',
+    },
+    urlSyncKeys: ['search', 'ownerFilter', 'speciesFilter', 'genderFilter', 'statusFilter'],
+    defaultPageSize: 20,
+    debouncedKeys: ['search'],
+    debounceMs: 250,
+    onSuccess: async ({ items }) => {
+      // Подгрузка недостающих владельцев
+      const missingOwnerIds = Array.from(
+        new Set(items.map((p) => p.ownerId).filter((id): id is string => Boolean(id)))
+      ).filter((id) => !usersRef.current.some((u) => u.id === id));
+
+      if (missingOwnerIds.length > 0) {
+        try {
+          const fetchedUsers = await mapWithConcurrency(
+            missingOwnerIds,
+            (id) => adminApi.getUserById(id).catch(() => null),
+            4
+          );
+          const validUsers = fetchedUsers.filter((u): u is User => u !== null);
+          if (validUsers.length > 0) {
+            setUsers((prev) => {
+              const prevIds = new Set(prev.map((u) => u.id));
+              const next = [...prev];
+              for (const u of validUsers) {
+                if (!prevIds.has(u.id)) next.push(u);
+              }
+              return next;
+            });
+          }
+        } catch {
+          // ignore
+        }
+      }
+
+      if (initialSel && appliedSelRef.current !== initialSel) {
+        appliedSelRef.current = initialSel;
+        const found = items.find((p) => p.id === initialSel);
+        if (found) setSelectedPet(found);
+        else {
+          adminApi.getPetById(initialSel).then(setSelectedPet).catch(() => {});
+        }
+      } else {
+        setSelectedPet((prev) => (prev ? items.find((p) => p.id === prev.id) || prev : null));
+      }
+    },
+  });
 
   const loadRefs = useCallback(async () => {
     const reqId = ++refsReqIdRef.current;
@@ -107,9 +163,8 @@ export function useAdminPets() {
           v.user ? v : { ...v, user: safeUsers.find((u) => u.id === v.userId) }
         )
       );
-      refsLoadedRef.current = true;
     } catch {
-      // Справочники загрузятся повторно при reload
+      // ignore
     }
   }, [initialOwner]);
 
@@ -120,99 +175,6 @@ export function useAdminPets() {
     };
   }, [loadRefs]);
 
-  const loadData = useCallback(async () => {
-    loadAbortRef.current?.abort();
-    const controller = new AbortController();
-    loadAbortRef.current = controller;
-    const reqId = ++loadReqIdRef.current;
-    setLoading(true);
-    setError(null);
-    if (!refsLoadedRef.current) {
-      void loadRefs();
-    }
-    try {
-      const isArchived =
-        statusFilter === 'ACTIVE' ? false : statusFilter === 'ARCHIVED' ? true : undefined;
-      const petsRes = await adminApi.getPets(
-        page,
-        pageSize,
-        {
-          ownerId: ownerFilter !== 'ALL' ? ownerFilter : undefined,
-          speciesId: speciesFilter !== 'ALL' ? speciesFilter : undefined,
-          gender: genderFilter !== 'ALL' ? genderFilter : undefined,
-          isArchived,
-          search: debouncedSearch || undefined,
-        },
-        { signal: controller.signal }
-      );
-
-      if (reqId !== loadReqIdRef.current || controller.signal.aborted) return;
-
-      const safePets = Array.isArray(petsRes?.items) ? petsRes.items : [];
-      const nextTotalElements = petsRes?.totalElements ?? safePets.length;
-      const nextTotalPages = Math.max(1, petsRes?.totalPages ?? 1);
-
-      if (page > nextTotalPages - 1) {
-        setPage(Math.max(0, nextTotalPages - 1));
-        return;
-      }
-
-      setPets(safePets);
-      setTotalElements(nextTotalElements);
-      setTotalPages(nextTotalPages);
-
-      // Подгружаем недостающих владельцев для питомцев текущей страницы
-      const missingOwnerIds = Array.from(
-        new Set(safePets.map((p) => p.ownerId).filter((id): id is string => Boolean(id)))
-      ).filter((id) => !usersRef.current.some((u) => u.id === id));
-
-      if (missingOwnerIds.length > 0) {
-        try {
-          const loadedUsers = await mapWithConcurrency(
-            missingOwnerIds,
-            (id) => adminApi.getUserById(id).catch(() => null),
-            4
-          );
-          const validUsers = loadedUsers.filter((u): u is User => u !== null);
-          if (validUsers.length > 0) {
-            setUsers((prev) => {
-              const prevIds = new Set(prev.map((u) => u.id));
-              const next = [...prev];
-              for (const u of validUsers) {
-                if (!prevIds.has(u.id)) next.push(u);
-              }
-              return next;
-            });
-          }
-        } catch {
-          // ignore
-        }
-      }
-
-      if (initialSel && appliedSelRef.current !== initialSel) {
-        appliedSelRef.current = initialSel;
-        const found = safePets.find((p) => p.id === initialSel);
-        if (found) {
-          setSelectedPet(found);
-        } else {
-          try {
-            const byId = await adminApi.getPetById(initialSel);
-            if (reqId === loadReqIdRef.current && byId) setSelectedPet(byId);
-          } catch {
-            // ignore
-          }
-        }
-      } else {
-        setSelectedPet((prev) => (prev ? safePets.find((p) => p.id === prev.id) ?? prev : null));
-      }
-    } catch (err: unknown) {
-      if (reqId !== loadReqIdRef.current || controller.signal.aborted) return;
-      setError(getErrMsg(err, 'Не удалось загрузить список питомцев.'));
-    } finally {
-      if (reqId === loadReqIdRef.current && !controller.signal.aborted) setLoading(false);
-    }
-  }, [page, pageSize, ownerFilter, speciesFilter, genderFilter, statusFilter, debouncedSearch, initialSel, loadRefs]);
-
   const loadPetDetails = useCallback(async (petId: string) => {
     const reqId = ++detailsReqIdRef.current;
     setLoadingDetails(true);
@@ -222,89 +184,72 @@ export function useAdminPets() {
         adminApi.getAppointments(0, 50, { petId }),
         adminApi.getVaccinations({ petId }),
       ]);
-      if (reqId !== detailsReqIdRef.current) return;
+      if (detailsReqIdRef.current !== reqId) return;
       setPetAppointments(apptsRes?.items || []);
-      setPetVaccinations(vacRes?.items || []);
+      setPetVaccinations(Array.isArray(vacRes) ? vacRes : []);
     } catch (err: unknown) {
-      if (reqId !== detailsReqIdRef.current) return;
-      setDetailsError(getErrMsg(err, 'Не удалось загрузить историю питомца.'));
+      if (detailsReqIdRef.current !== reqId) return;
+      setDetailsError(getErrMsg(err, 'Не удалось загрузить данные визитов и прививок'));
     } finally {
-      if (reqId === detailsReqIdRef.current) setLoadingDetails(false);
+      if (detailsReqIdRef.current === reqId) setLoadingDetails(false);
     }
   }, []);
 
   useEffect(() => {
-    loadData();
-    return () => {
-      loadReqIdRef.current += 1;
-      loadAbortRef.current?.abort();
-    };
-  }, [loadData]);
-
-  useEffect(() => {
-    if (selectedPet?.id) {
-      loadPetDetails(selectedPet.id);
-    } else {
+    if (!selectedPet?.id) {
       detailsReqIdRef.current += 1;
       setPetAppointments([]);
       setPetVaccinations([]);
       setDetailsError(null);
       setLoadingDetails(false);
+      return;
     }
+    void loadPetDetails(selectedPet.id);
+    return () => {
+      detailsReqIdRef.current += 1;
+    };
   }, [selectedPet?.id, loadPetDetails]);
 
   const createPet = useCallback(
-    async (payload: CreatePetRequest, photoFile?: File | null) => {
-      let created = await adminApi.createPet(payload);
-      if (photoFile && created?.id) {
-        try {
-          const links = await adminApi.uploadPetPhoto(created.id, photoFile);
-          created = { ...created, ...links };
-        } catch (photoErr: unknown) {
-          toast(
-            'Питомец добавлен, но фото не загрузилось',
-            formatApiError(photoErr, 'Попробуйте загрузить фото в карточке питомца'),
-            'err'
-          );
-        }
-      }
+    async (payload: CreatePetRequest): Promise<Pet> => {
+      const created = await adminApi.createPet(payload);
       toast('Питомец добавлен', created.name);
-      await loadData();
-      if (created) setSelectedPet(created);
+      await resource.reload();
+      setSelectedPet(created);
       return created;
     },
-    [loadData, toast]
+    [resource, toast]
   );
 
   const updatePet = useCallback(
     async (id: string, payload: UpdatePetRequest) => {
       const updated = await adminApi.updatePet(id, payload);
       toast('Данные питомца обновлены');
-      await loadData();
+      await resource.reload();
       return updated;
     },
-    [loadData, toast]
+    [resource, toast]
   );
 
   const uploadPetPhoto = useCallback(
     async (petId: string, file: File) => {
       const links = await adminApi.uploadPetPhoto(petId, file);
-      setPets((prev) => prev.map((p) => (p.id === petId ? { ...p, ...links } : p)));
+      resource.setItems((prev) => prev.map((p) => (p.id === petId ? { ...p, ...links } : p)));
       setSelectedPet((prev) => (prev?.id === petId ? { ...prev, ...links } : prev));
       toast('Фотография питомца обновлена');
     },
-    [toast]
+    [resource, toast]
   );
 
   const deletePetPhoto = useCallback(
     async (petId: string) => {
       await adminApi.deletePetPhoto(petId);
       const empty = { photoUrl: null, photoThumbnailUrl: null, photoUrlExpiresAt: null };
-      setPets((prev) => prev.map((p) => (p.id === petId ? { ...p, ...empty } : p)));
+      resource.setItems((prev) => prev.map((p) => (p.id === petId ? { ...p, ...empty } : p)));
       setSelectedPet((prev) => (prev?.id === petId ? { ...prev, ...empty } : prev));
       toast('Фотография питомца удалена');
     },
-    [toast]
+    [resource, toast]
   );
 
   const createVaccination = useCallback(
@@ -324,11 +269,11 @@ export function useAdminPets() {
     try {
       await adminApi.updatePet(selectedPet.id, { isArchived: nextArchived });
       toast(nextArchived ? 'Питомец перенесён в архив' : 'Питомец возвращён из архива');
-      await loadData();
+      await resource.reload();
     } catch (err: unknown) {
       setActionError(getErrMsg(err, 'Ошибка обновления статуса питомца'));
     }
-  }, [selectedPet, loadData, toast]);
+  }, [selectedPet, resource, toast]);
 
   const openDeleteConfirm = useCallback(() => {
     setDeleteError(null);
@@ -349,64 +294,39 @@ export function useAdminPets() {
       setIsDeleteConfirmOpen(false);
       toast('Питомец удалён', selectedPet.name);
       setSelectedPet(null);
-      await loadData();
+      await resource.reload();
     } catch (err: unknown) {
       setDeleteError(getErrMsg(err, 'Ошибка при удалении питомца'));
     } finally {
       setDeleting(false);
     }
-  }, [selectedPet, loadData, toast]);
-
-  const setOwnerFilter = useCallback((next: string) => {
-    setOwnerFilterState(next);
-    setPage(0);
-  }, []);
-
-  const setSpeciesFilter = useCallback((next: string) => {
-    setSpeciesFilterState(next);
-    setPage(0);
-  }, []);
-
-  const setGenderFilter = useCallback((next: GenderFilter) => {
-    setGenderFilterState(next);
-    setPage(0);
-  }, []);
-
-  const setStatusFilter = useCallback((next: StatusFilter) => {
-    setStatusFilterState(next);
-    setPage(0);
-  }, []);
-
-  const setPageSize = useCallback((next: number) => {
-    setPageSizeState(next);
-    setPage(0);
-  }, []);
+  }, [selectedPet, resource, toast]);
 
   return {
-    pets,
-    totalElements,
-    totalPages,
-    page,
-    setPage,
-    pageSize,
-    setPageSize,
+    pets: resource.items,
+    totalElements: resource.totalElements,
+    totalPages: resource.totalPages,
+    page: resource.page,
+    setPage: resource.setPage,
+    pageSize: resource.pageSize,
+    setPageSize: resource.setPageSize,
     speciesList,
     users,
     services,
     veterinarians,
-    loading,
-    error,
-    reload: loadData,
-    search,
-    setSearch,
-    ownerFilter,
-    setOwnerFilter,
-    speciesFilter,
-    setSpeciesFilter,
-    genderFilter,
-    setGenderFilter,
-    statusFilter,
-    setStatusFilter,
+    loading: resource.loading,
+    error: resource.error,
+    reload: resource.reload,
+    search: resource.filters.search,
+    setSearch: useCallback((val: string) => resource.setFilter('search', val), [resource]),
+    ownerFilter: resource.filters.ownerFilter,
+    setOwnerFilter: useCallback((val: string) => resource.setFilter('ownerFilter', val), [resource]),
+    speciesFilter: resource.filters.speciesFilter,
+    setSpeciesFilter: useCallback((val: string) => resource.setFilter('speciesFilter', val), [resource]),
+    genderFilter: resource.filters.genderFilter,
+    setGenderFilter: useCallback((val: GenderFilter) => resource.setFilter('genderFilter', val), [resource]),
+    statusFilter: resource.filters.statusFilter,
+    setStatusFilter: useCallback((val: StatusFilter) => resource.setFilter('statusFilter', val), [resource]),
     selectedPet,
     setSelectedPet,
     petAppointments,
@@ -433,5 +353,6 @@ export function useAdminPets() {
     createVaccination,
     handleToggleArchive,
     handleDeletePet,
+    paginationProps: resource.paginationProps,
   };
 }

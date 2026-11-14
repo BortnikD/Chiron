@@ -32,14 +32,45 @@ export function useAdminSchedules() {
   const tabParam = searchParams.get('tab');
   const vetParam = searchParams.get('vetId') || searchParams.get('vet') || '';
 
-  const [activeTab, setActiveTab] = useState<'sched' | 'exc'>(() => resolveScheduleTab(tabParam));
+  const [activeTab, setActiveTabState] = useState<'sched' | 'exc'>(() => resolveScheduleTab(tabParam));
   const [vets, setVets] = useState<Veterinarian[]>([]);
   const [specializations, setSpecializations] = useState<Specialization[]>([]);
   const [loadingVets, setLoadingVets] = useState(true);
   const [vetsError, setVetsError] = useState<string | null>(null);
 
   const [selectedVetId, setSelectedVetId] = useState<string>('');
-  const [excVetFilter, setExcVetFilter] = useState<string>(vetParam);
+  const [excVetFilter, setExcVetFilterState] = useState<string>(vetParam);
+
+  const syncSchedulesToUrl = useCallback((tab: string, vetId: string) => {
+    if (typeof window === 'undefined') return;
+    const url = new URL(window.location.href);
+    if (tab && tab !== 'sched') url.searchParams.set('tab', tab);
+    else url.searchParams.delete('tab');
+    if (vetId) url.searchParams.set('vetId', vetId);
+    else url.searchParams.delete('vetId');
+
+    const nextSearch = url.searchParams.toString();
+    const currentSearch = window.location.search.replace(/^\?/, '');
+    if (nextSearch !== currentSearch) {
+      window.history.replaceState(null, '', url.pathname + (nextSearch ? `?${nextSearch}` : '') + url.hash);
+    }
+  }, []);
+
+  const setActiveTab = useCallback(
+    (tab: 'sched' | 'exc') => {
+      setActiveTabState(tab);
+      syncSchedulesToUrl(tab, excVetFilter);
+    },
+    [excVetFilter, syncSchedulesToUrl]
+  );
+
+  const setExcVetFilter = useCallback(
+    (vetId: string) => {
+      setExcVetFilterState(vetId);
+      syncSchedulesToUrl(activeTab, vetId);
+    },
+    [activeTab, syncSchedulesToUrl]
+  );
   const [schedules, setSchedules] = useState<WorkSchedule[]>([]);
   const [loadingSchedule, setLoadingSchedule] = useState(false);
   const [scheduleError, setScheduleError] = useState<string | null>(null);
