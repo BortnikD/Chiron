@@ -7,18 +7,20 @@ import { SpeciesIcon } from '@/components/ui/SpeciesIcon';
 export const LandingCtaSection: React.FC = () => {
   return (
     <section className="island ab-cta" style={{ flex: 'none' }} aria-label="Виды животных и часы приёма">
-      <span className="t-ava lg tone-prev">
-        <ShieldCheck className="ic" style={{ width: '26px', height: '26px' }} />
-      </span>
-
-      <span className="col grow" style={{ gap: '2px', minWidth: 0 }}>
-        <b>Мы делаем животных здоровыми, а хозяев — спокойными</b>
-        <span className="muted small">
-          Лечим кошек, собак, кроликов и попугаев · приём Пн–Пт 9:00–18:00, Сб 10:00–15:00
+      <div className="ab-cta-lead">
+        <span className="t-ava lg tone-prev">
+          <ShieldCheck className="ic" style={{ width: '26px', height: '26px' }} />
         </span>
-      </span>
 
-      <div className="row wrap" style={{ gap: '6px' }}>
+        <div className="ab-cta-text">
+          <b>Мы делаем животных здоровыми, а хозяев — спокойными</b>
+          <span className="muted small">
+            Лечим кошек, собак, кроликов и попугаев · приём Пн–Пт 9:00–18:00, Сб 10:00–15:00
+          </span>
+        </div>
+      </div>
+
+      <div className="ab-cta-chips">
         <span className="sp-chip tone-cat">
           <SpeciesIcon species="cat" size={14} />
           Кошки

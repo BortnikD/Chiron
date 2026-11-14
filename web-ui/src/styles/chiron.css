@@ -1088,10 +1088,25 @@ button.step.done:focus-visible { outline: 2px solid var(--ring); outline-offset:
 .ab-steps b { font-weight: 600; }
 .ab-steps .col > span { font-size: 13px; color: var(--muted-foreground); }
 .ab-step-n { width: 28px; height: 28px; border-radius: 50%; flex: none; display: grid; place-items: center; font-weight: 700; font-size: 13px; color: var(--primary-foreground); background: var(--primary); }
-.ab-cta { display: flex; flex-direction: row; align-items: center; gap: 14px; padding: 18px 20px; flex-wrap: wrap; }
-.ab-cta > * { flex: none; }
-.ab-cta > .col { flex: 1 1 200px; min-width: 0; }
-.ab-cta > .row { flex: 1 1 auto; flex-wrap: wrap; }
+.ab-cta { display: flex; flex-direction: row; align-items: center; justify-content: space-between; gap: 16px; padding: 18px 20px; }
+.ab-cta-lead { display: flex; align-items: center; gap: 14px; min-width: 0; flex: 1 1 auto; }
+.ab-cta-lead .t-ava { flex-shrink: 0; }
+.ab-cta-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1 1 0% !important; max-width: 100%; }
+.ab-cta-text b { font-size: 14px; line-height: 1.35; overflow-wrap: break-word; }
+.ab-cta-text .muted { line-height: 1.4; overflow-wrap: break-word; }
+.ab-cta-chips { display: flex; flex-wrap: wrap; gap: 6px; justify-content: flex-end; flex-shrink: 0; }
+@media (max-width: 900px) {
+  .ab-cta { flex-direction: column; align-items: flex-start; gap: 14px; padding: 16px; }
+  .ab-cta-lead { width: 100%; }
+  .ab-cta-chips { width: 100%; justify-content: flex-start; }
+}
+@media (max-width: 480px) {
+  .ab-cta { padding: 14px 12px; gap: 12px; }
+  .ab-cta-lead { gap: 10px; }
+  .ab-cta-lead .t-ava { width: 36px; height: 36px; }
+  .ab-cta-chips { gap: 5px; }
+  .ab-cta-chips .sp-chip { font-size: 11px; height: 22px; padding: 0 6px 0 4px; }
+}
 @media (max-width: 1100px) { .ab-grid { grid-template-columns: minmax(0, 1fr); } }
 @media (max-width: 900px) {
   .ab-hero { grid-template-columns: minmax(0, 1fr); }
@@ -1403,6 +1418,7 @@ button.step.done:focus-visible { outline: 2px solid var(--ring); outline-offset:
     display: none !important;
   }
 }
+
 
 .print-sheet {
   background: #fff;
