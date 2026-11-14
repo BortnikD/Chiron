@@ -11,20 +11,14 @@ import {
   calculateAgeRu,
   formatDateTimeCompact,
   formatIsoDateDisplay,
-  getMoscowTodayIso,
   getSpeciesTone,
+  getVaccinationDueInfo,
 } from '@/shared/lib';
 import { getDoctorDisplay } from '@/utils/doctorHelpers';
 import type { PetDetailIslandProps, PetDetailTab } from './types';
 
 function getVaccinationBadgeClass(nextDueOn?: string | null): string {
-  if (!nextDueOn) return 'due-none';
-  const today = getMoscowTodayIso();
-  const iso = nextDueOn.slice(0, 10);
-  if (iso < today) return 'due-over';
-  const soonIso = getMoscowTodayIso(30);
-  if (iso <= soonIso) return 'due-soon';
-  return 'badge-accent';
+  return getVaccinationDueInfo(nextDueOn).cls;
 }
 
 /**

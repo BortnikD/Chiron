@@ -428,3 +428,127 @@ export function formatApiError(err: unknown, fallback = 'Произошла ош
 
   return msg || fallback;
 }
+
+/**
+ * Вычисляет конечное время слота по начальному времени и длительности в минутах.
+ * Поддерживает ISO-строки и формат "HH:mm".
+ */
+export function calculateEndTime(startTime: string, durationMin: number): string {
+  if (!startTime || !durationMin) return '';
+  if (startTime.includes('T')) {
+    const d = new Date(startTime);
+    if (Number.isNaN(d.getTime())) return '';
+    d.setMinutes(d.getMinutes() + durationMin);
+    return d.toISOString();
+  }
+  const [h, m] = startTime.split(':').map(Number);
+  if (Number.isNaN(h) || Number.isNaN(m)) return '';
+  const totalMins = h * 60 + m + durationMin;
+  const endH = Math.floor(totalMins / 60) % 24;
+  const endM = totalMins % 60;
+  return `${String(endH).padStart(2, '0')}:${String(endM).padStart(2, '0')}`;
+}
+
+/**
+ * Короткое название дня недели с заглавной буквы ("Пн", "Вт", ...).
+ */
+export function formatWeekdayShortRu(isoOrDate: string | Date): string {
+  if (!isoOrDate) return '';
+  const d =
+    typeof isoOrDate === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(isoOrDate)
+      ? new Date(`${isoOrDate}T12:00:00+03:00`)
+      : typeof isoOrDate === 'string'
+      ? new Date(isoOrDate)
+      : isoOrDate;
+  if (Number.isNaN(d.getTime())) return '';
+  const rawDow = d.toLocaleDateString('ru-RU', {
+    weekday: 'short',
+    timeZone: MOSCOW_TIMEZONE,
+  });
+  return rawDow.charAt(0).toUpperCase() + rawDow.slice(1);
+}
+
+/**
+ * Дата в формате "24 окт" по московскому времени.
+ */
+export function formatMoscowMonthDay(isoOrDate: string | Date): string {
+  if (!isoOrDate) return '';
+  const d =
+    typeof isoOrDate === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(isoOrDate)
+      ? new Date(`${isoOrDate}T12:00:00+03:00`)
+      : typeof isoOrDate === 'string'
+      ? new Date(isoOrDate)
+      : isoOrDate;
+  if (Number.isNaN(d.getTime())) return '';
+  return d
+    .toLocaleDateString('ru-RU', {
+      day: 'numeric',
+      month: 'short',
+      timeZone: MOSCOW_TIMEZONE,
+    })
+    .replace(/\.$/, '');
+}
+
+export type VaccinationDueStatus = 'OVERDUE' | 'TODAY' | 'SOON' | 'UPCOMING' | 'LATER' | 'NONE';
+
+export interface VaccinationDueInfo {
+  text: string;
+  label: string;
+  cls: string;
+  tone: 'danger' | 'warn' | 'normal';
+  status: VaccinationDueStatus;
+  diffDays: number | null;
+}
+
+export function getVaccinationDueInfo(nextDueOn?: string | null): VaccinationDueInfo {
+  if (!nextDueOn) {
+    return { text: 'не задана', label: '—', cls: 'due-none', tone: 'normal', status: 'NONE', diffDays: null };
+  }
+  const dueIso = getMoscowDateKey(nextDueOn) || nextDueOn.slice(0, 10);
+  const todayIso = getMoscowTodayIso();
+  const todayMs = Date.parse(`${todayIso}T00:00:00Z`);
+  const dueMs = Date.parse(`${dueIso}T00:00:00Z`);
+
+  if (Number.isNaN(dueMs)) {
+    return { text: 'не задана', label: '—', cls: 'due-none', tone: 'normal', status: 'NONE', diffDays: null };
+  }
+
+  const diffDays = Math.round((dueMs - todayMs) / 86400000);
+  const label = formatIsoDateDisplay(dueIso);
+
+  if (diffDays < 0) {
+    return { text: 'просрочена', label, cls: 'due-over', tone: 'danger', status: 'OVERDUE', diffDays };
+  }
+  if (diffDays === 0) {
+    return { text: 'сегодня', label, cls: 'due-soon', tone: 'warn', status: 'TODAY', diffDays: 0 };
+  }
+  if (diffDays <= 7) {
+    return {
+      text: `через ${diffDays} ${pluralRu(diffDays, 'день', 'дня', 'дней')}`,
+      label,
+      cls: 'due-soon',
+      tone: 'warn',
+      status: 'SOON',
+      diffDays,
+    };
+  }
+  if (diffDays <= 30) {
+    return {
+      text: `через ${diffDays} ${pluralRu(diffDays, 'день', 'дня', 'дней')}`,
+      label,
+      cls: 'badge-accent',
+      tone: 'normal',
+      status: 'UPCOMING',
+      diffDays,
+    };
+  }
+  const months = Math.max(1, Math.round(diffDays / 30));
+  return {
+    text: `через ${months} мес.`,
+    label,
+    cls: 'due-later',
+    tone: 'normal',
+    status: 'LATER',
+    diffDays,
+  };
+}

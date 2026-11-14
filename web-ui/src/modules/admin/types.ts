@@ -1,4 +1,4 @@
-import { DayOfWeek, ScheduleExceptionType, AppointmentStatus } from '@/shared/types';
+import { DayOfWeek, ScheduleExceptionType, AppointmentStatus, BaseAppointment } from '@/shared/types';
 import type { WorkSchedule, ScheduleException } from '@/modules/clinic/types';
 
 export type { WorkSchedule, ScheduleException };
@@ -7,27 +7,22 @@ export type { WorkSchedule, ScheduleException };
  * Типы для административной панели Chiron.
  */
 
-export interface AdminCreateAppointmentRequest {
-  veterinarianId: string;
-  petId: string;
-  serviceId: string;
-  startAt: string;
-  endAt: string;
+export type AdminCreateAppointmentRequest = Pick<
+  BaseAppointment,
+  'veterinarianId' | 'petId' | 'serviceId' | 'startAt' | 'endAt'
+> & {
   priceSnapshot?: number;
   status?: AppointmentStatus;
   clientComment?: string | null;
   followUpOf?: string | null;
-}
+};
 
-export interface AdminUpdateAppointmentRequest {
-  veterinarianId?: string;
-  startAt?: string;
-  endAt?: string;
-  status?: AppointmentStatus;
-  clientComment?: string | null;
-  vetNotes?: string | null;
-  cancelReason?: string | null;
-}
+export type AdminUpdateAppointmentRequest = Partial<
+  Pick<
+    BaseAppointment,
+    'veterinarianId' | 'startAt' | 'endAt' | 'status' | 'clientComment' | 'vetNotes' | 'cancelReason'
+  >
+>;
 
 export interface CreateWorkScheduleRequest {
   veterinarianId: string;

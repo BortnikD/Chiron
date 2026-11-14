@@ -6,7 +6,7 @@ import type { Appointment, Pet } from '@/modules/client/types';
 import type { Veterinarian, Service } from '@/modules/clinic/types';
 import type { AppointmentStatus, User } from '@/shared/types';
 import { DatePicker, SearchCombobox, type SearchComboboxOption } from '@/shared/components';
-import { formatCurrency, formatDateTimeCompact } from '@/shared/lib';
+import { APPOINTMENT_STATUS_META, formatCurrency, formatDateTimeCompact } from '@/shared/lib';
 import { getDoctorDisplay } from '@/utils/doctorHelpers';
 
 export interface CreateAppointmentFormState {
@@ -248,14 +248,14 @@ export const CreateAppointmentFields: React.FC<CreateAppointmentFieldsProps> = (
               className={`seg-item ${form.status === 'PENDING' ? 'on' : ''}`}
               onClick={() => onChangeForm((p) => ({ ...p, status: 'PENDING' }))}
             >
-              Ожидает
+              {APPOINTMENT_STATUS_META.PENDING.short}
             </button>
             <button
               type="button"
               className={`seg-item ${form.status === 'CONFIRMED' ? 'on' : ''}`}
               onClick={() => onChangeForm((p) => ({ ...p, status: 'CONFIRMED' }))}
             >
-              Подтверждена
+              {APPOINTMENT_STATUS_META.CONFIRMED.label}
             </button>
           </div>
         </div>

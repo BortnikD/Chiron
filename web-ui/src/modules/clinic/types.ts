@@ -1,4 +1,4 @@
-import { DayOfWeek, ScheduleExceptionType, User } from '@/shared/types';
+import { DayOfWeek, ScheduleExceptionType, User, BaseVeterinarian } from '@/shared/types';
 
 /**
  * Типы общеклинических сущностей (справочники, услуги, врачи).
@@ -40,25 +40,14 @@ export interface ServiceSpecies {
   price?: number | null;
 }
 
-export interface Veterinarian {
-  id: string;
-  userId: string;
+export interface Veterinarian extends BaseVeterinarian {
   firstName?: string;
   middleName?: string | null;
   lastName?: string;
   fullName?: string;
   speciesIds?: string[];
   user?: User;
-  specializationId: string;
   specialization?: Specialization;
-  bio?: string | null;
-  photoUrl?: string | null;
-  photoThumbnailUrl?: string | null;
-  photoUrlExpiresAt?: string | null;
-  experienceYears: number;
-  isActive: boolean;
-  createdAt: string;
-  updatedAt: string;
 }
 
 export interface VeterinarianSpeciesPermission {

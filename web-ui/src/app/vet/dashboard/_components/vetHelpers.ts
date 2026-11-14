@@ -4,6 +4,7 @@ import {
   formatIsoDateDisplay,
   getMoscowDateKey,
   getMoscowTodayIso,
+  getVaccinationDueInfo,
   pluralRu,
   timeToMinutes,
 } from '@/shared/lib';
@@ -99,40 +100,17 @@ export interface VetVaccinationDueInfo {
 }
 
 export function getVetVaccinationDueInfo(nextDueOn?: string | null): VetVaccinationDueInfo {
-  if (!nextDueOn) {
-    return { label: '—', text: 'не задана', cls: 'due-none', status: 'NONE' };
-  }
+  const info = getVaccinationDueInfo(nextDueOn);
+  let status: VetVaccinationDueStatus = 'NONE';
+  if (info.status === 'OVERDUE') status = 'OVERDUE';
+  else if (info.status === 'TODAY' || info.status === 'SOON') status = 'SOON';
+  else if (info.status === 'UPCOMING' || info.status === 'LATER') status = 'LATER';
 
-  const todayIso = getMoscowTodayIso();
-  const dueIso = getMoscowDateKey(nextDueOn) || nextDueOn.slice(0, 10);
-  const todayMs = Date.parse(`${todayIso}T00:00:00Z`);
-  const dueMs = Date.parse(`${dueIso}T00:00:00Z`);
-
-  if (Number.isNaN(dueMs)) {
-    return { label: '—', text: 'не задана', cls: 'due-none', status: 'NONE' };
-  }
-
-  const diffDays = Math.round((dueMs - todayMs) / 86400000);
-  const label = formatIsoDateDisplay(dueIso);
-
-  if (diffDays < 0) {
-    return { label, text: 'просрочена', cls: 'due-over', status: 'OVERDUE' };
-  }
-
-  if (diffDays <= 30) {
-    const text =
-      diffDays === 0
-        ? 'сегодня'
-        : `через ${diffDays} ${pluralRu(diffDays, 'день', 'дня', 'дней')}`;
-    return { label, text, cls: 'due-soon', status: 'SOON' };
-  }
-
-  const months = Math.max(1, Math.round(diffDays / 30));
   return {
-    label,
-    text: `через ${months} ${pluralRu(months, 'мес.', 'мес.', 'мес.')}`,
-    cls: 'badge-accent',
-    status: 'LATER',
+    label: info.label,
+    text: info.text,
+    cls: (info.cls === 'due-later' ? 'badge-accent' : info.cls) as VetVaccinationDueInfo['cls'],
+    status,
   };
 }
 

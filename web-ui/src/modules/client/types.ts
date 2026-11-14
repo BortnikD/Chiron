@@ -1,4 +1,10 @@
-import { Gender, AppointmentStatus } from '@/shared/types';
+import {
+  Gender,
+  AppointmentStatus,
+  BasePet,
+  BaseAppointment,
+  BaseVaccination,
+} from '@/shared/types';
 import { Service, Species, Veterinarian } from '@/modules/clinic/types';
 
 /**
@@ -20,120 +26,62 @@ export interface PetSummary {
   hasOverdueVaccination: boolean;
 }
 
-export interface Pet {
-  id: string;
-  name: string;
-  ownerId: string;
+export interface Pet extends BasePet {
   ownerName?: string | null;
   ownerPhone?: string | null;
   ownerEmail?: string | null;
-  speciesId: string;
   speciesName?: string;
   species?: Species;
-  breed?: string | null;
-  chipNumber?: string | null;
-  birthDate?: string | null;
-  weightKg?: number | null;
-  gender: Gender;
-  notes?: string | null;
-  isArchived: boolean;
-  photoUrl?: string | null;
-  photoThumbnailUrl?: string | null;
-  photoUrlExpiresAt?: string | null;
   summary?: PetSummary | null;
-  createdAt: string;
-  updatedAt: string;
 }
 
-export interface CreatePetRequest {
-  name: string;
-  speciesId: string;
-  birthDate?: string | null;
-  weightKg?: number | null;
-  gender: Gender;
-  notes?: string | null;
-  ownerId?: string;
-}
+export type CreatePetRequest = Pick<BasePet, 'name' | 'speciesId' | 'gender'> &
+  Partial<Pick<BasePet, 'birthDate' | 'weightKg' | 'notes' | 'ownerId'>>;
 
-export interface UpdatePetRequest {
-  name?: string;
-  speciesId?: string;
-  birthDate?: string | null;
-  weightKg?: number | null;
-  gender?: Gender;
-  notes?: string | null;
-  isArchived?: boolean;
-}
+export type UpdatePetRequest = Partial<
+  Pick<BasePet, 'name' | 'speciesId' | 'birthDate' | 'weightKg' | 'gender' | 'notes' | 'isArchived'>
+>;
 
-export interface Appointment {
-  id: string;
-  veterinarianId: string;
+export interface Appointment extends BaseAppointment {
   veterinarianName?: string;
   veterinarian?: Veterinarian;
-  petId: string;
   petName?: string;
   pet?: Pet;
-  serviceId: string;
   serviceName?: string;
   service?: Service;
-  followUpOf?: string | null;
-  startAt: string;
-  endAt: string;
-  status: AppointmentStatus;
-  priceSnapshot: number;
   price?: number;
-  clientComment?: string | null;
-  vetNotes?: string | null;
   notes?: string | null;
-  cancelledBy?: string | null;
-  cancelledAt?: string | null;
-  cancelReason?: string | null;
   cancellationReason?: string | null;
-  createdAt: string;
-  updatedAt: string;
 }
 
-export interface BookAppointmentRequest {
-  veterinarianId: string;
-  petId: string;
-  serviceId: string;
-  startAt: string;
-  endAt: string;
+export type BookAppointmentRequest = Pick<
+  BaseAppointment,
+  'veterinarianId' | 'petId' | 'serviceId' | 'startAt' | 'endAt'
+> & {
   clientComment?: string | null;
-}
+};
 
-export interface Vaccination {
-  id: string;
-  petId: string;
-  appointmentId?: string | null;
-  name: string;
-  administeredOn: string;
-  nextDueOn?: string | null;
+export interface Vaccination extends BaseVaccination {
   vaccineName?: string;
   administeredAt?: string;
   validUntil?: string;
-  batchNumber?: string | null;
-  notes?: string | null;
 }
 
-export interface CreateVaccinationRequest {
-  petId: string;
-  appointmentId?: string | null;
-  name: string;
-  administeredOn: string;
-  nextDueOn?: string | null;
-  vaccineName?: string;
-  administeredAt?: string;
-  validUntil?: string;
-  batchNumber?: string | null;
-  notes?: string | null;
-}
+export type CreateVaccinationRequest = Pick<
+  BaseVaccination,
+  'petId' | 'name' | 'administeredOn'
+> &
+  Partial<
+    Pick<BaseVaccination, 'appointmentId' | 'nextDueOn' | 'batchNumber' | 'notes'>
+  > & {
+    vaccineName?: string;
+    administeredAt?: string;
+    validUntil?: string;
+  };
 
-export interface UpdateVaccinationRequest {
-  name?: string;
-  administeredOn?: string;
-  nextDueOn?: string | null;
-}
+export type UpdateVaccinationRequest = Partial<
+  Pick<BaseVaccination, 'name' | 'administeredOn' | 'nextDueOn'>
+>;
 
 export interface ClientSummary {
   activePets: number;

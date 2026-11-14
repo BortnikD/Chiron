@@ -101,3 +101,73 @@ export interface AppNotification {
   readAt?: string | null;
   createdAt: string;
 }
+
+/**
+ * Базовые сущности доменной модели Chiron.
+ * Используются как фундамент для расширенных интерфейсов в modules/*
+ * и позволяют типизировать запросы через Pick/Omit без дублирования полей.
+ */
+
+export interface BasePet {
+  id: string;
+  name: string;
+  ownerId: string;
+  speciesId: string;
+  gender: Gender;
+  breed?: string | null;
+  chipNumber?: string | null;
+  birthDate?: string | null;
+  weightKg?: number | null;
+  notes?: string | null;
+  isArchived: boolean;
+  photoUrl?: string | null;
+  photoThumbnailUrl?: string | null;
+  photoUrlExpiresAt?: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface BaseAppointment {
+  id: string;
+  veterinarianId: string;
+  petId: string;
+  serviceId: string;
+  startAt: string;
+  endAt: string;
+  status: AppointmentStatus;
+  priceSnapshot: number;
+  followUpOf?: string | null;
+  clientComment?: string | null;
+  vetNotes?: string | null;
+  cancelReason?: string | null;
+  cancelledBy?: string | null;
+  cancelledAt?: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface BaseVeterinarian {
+  id: string;
+  userId: string;
+  specializationId: string;
+  experienceYears: number;
+  isActive: boolean;
+  bio?: string | null;
+  photoUrl?: string | null;
+  photoThumbnailUrl?: string | null;
+  photoUrlExpiresAt?: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface BaseVaccination {
+  id: string;
+  petId: string;
+  appointmentId?: string | null;
+  name: string;
+  administeredOn: string;
+  nextDueOn?: string | null;
+  batchNumber?: string | null;
+  notes?: string | null;
+}
+

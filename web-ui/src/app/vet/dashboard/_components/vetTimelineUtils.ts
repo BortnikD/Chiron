@@ -6,16 +6,11 @@ import {
   DOW_ORDER,
   formatSlotTime,
   timeToMinutes,
+  VET_STATUS_COLORS,
 } from '@/shared/lib';
 import { getPetName } from './utils';
 
-export const VET_STATUS_COLORS: Record<AppointmentStatus, string> = {
-  PENDING: 'var(--st-pending-fg)',
-  CONFIRMED: 'var(--st-confirmed-fg)',
-  COMPLETED: 'var(--st-completed-fg)',
-  CANCELLED: 'var(--st-cancelled-fg)',
-  NO_SHOW: 'var(--st-noshow-fg)',
-};
+export { VET_STATUS_COLORS };
 
 export const VET_DAY_STAT_ORDER: Array<[AppointmentStatus, string]> = [
   ['COMPLETED', 'завершено'],
