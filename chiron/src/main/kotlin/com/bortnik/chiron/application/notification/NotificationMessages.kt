@@ -45,5 +45,6 @@ object NotificationMessages {
         NotificationType.FOLLOW_UP_SCHEDULED -> "Назначен повторный приём"
         NotificationType.APPOINTMENT_REMINDER -> "Напоминание о приёме"
         NotificationType.VACCINATION_DUE -> "Скоро ревакцинация"
+        NotificationType.ADMIN_MESSAGE -> error("Admin messages use custom titles")
     }
 }

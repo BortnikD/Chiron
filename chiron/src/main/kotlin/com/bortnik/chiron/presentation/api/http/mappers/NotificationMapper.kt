@@ -1,8 +1,10 @@
 package com.bortnik.chiron.presentation.api.http.mappers
 
 import com.bortnik.chiron.domain.dto.notification.NotificationFilter
+import com.bortnik.chiron.domain.dto.notification.SendAdminMessageDto
 import com.bortnik.chiron.domain.entities.Notification
 import com.bortnik.chiron.presentation.api.http.dto.request.notification.NotificationFilterRequest
+import com.bortnik.chiron.presentation.api.http.dto.request.notification.SendAdminMessageRequest
 import com.bortnik.chiron.presentation.api.http.dto.response.NotificationResponse
 
 fun Notification.toResponse(): NotificationResponse = NotificationResponse(
@@ -19,3 +21,11 @@ fun Notification.toResponse(): NotificationResponse = NotificationResponse(
 )
 
 fun NotificationFilterRequest.toDto(): NotificationFilter = NotificationFilter(unreadOnly = unreadOnly)
+
+fun SendAdminMessageRequest.toDto(): SendAdminMessageDto = SendAdminMessageDto(
+    title = title,
+    body = body,
+    appointmentId = appointmentId,
+    petId = petId,
+    vaccinationId = vaccinationId,
+)

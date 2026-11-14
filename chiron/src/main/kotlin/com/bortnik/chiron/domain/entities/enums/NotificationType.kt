@@ -9,4 +9,5 @@ enum class NotificationType {
     FOLLOW_UP_SCHEDULED,
     APPOINTMENT_REMINDER,
     VACCINATION_DUE,
+    ADMIN_MESSAGE,
 }
