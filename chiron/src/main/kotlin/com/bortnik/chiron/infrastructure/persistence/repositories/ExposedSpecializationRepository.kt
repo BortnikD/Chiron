@@ -1,5 +1,6 @@
 package com.bortnik.chiron.infrastructure.persistence.repositories
 
+import com.bortnik.chiron.domain.dto.ifPresent
 import com.bortnik.chiron.domain.dto.specialization.CreateSpecializationDto
 import com.bortnik.chiron.domain.dto.specialization.UpdateSpecializationDto
 import com.bortnik.chiron.domain.entities.Specialization
@@ -25,6 +26,7 @@ class ExposedSpecializationRepository : SpecializationRepository {
         ExposedSpecializationTable.insertReturning {
             it[name] = dto.name
             it[description] = dto.description
+            it[color] = dto.color
         }.single().toSpecialization()
     }
 
@@ -47,6 +49,7 @@ class ExposedSpecializationRepository : SpecializationRepository {
         ExposedSpecializationTable.updateReturning(where = { ExposedSpecializationTable.id eq id }) {
             dto.name?.let { value -> it[name] = value }
             dto.description?.let { value -> it[description] = value }
+            dto.color.ifPresent { value -> it[color] = value }
         }.singleOrNull()?.toSpecialization()
     }
 

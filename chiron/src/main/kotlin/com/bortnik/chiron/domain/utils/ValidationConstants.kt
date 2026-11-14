@@ -11,6 +11,10 @@ object ValidationConstants {
 
     const val SEARCH_MAX_LENGTH = 100
 
+    // CHECK (color ~ '^#[0-9A-Fa-f]{6}$')
+    const val COLOR_PATTERN = "^#[0-9A-Fa-f]{6}$"
+    val COLOR_REGEX = Regex(COLOR_PATTERN)
+
     object UserRules {
         const val EMAIL_MAX_LENGTH = 254
         const val NAME_MAX_LENGTH = 100
