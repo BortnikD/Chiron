@@ -37,6 +37,7 @@ object ValidationConstants {
 
     object PetRules {
         const val NAME_MAX_LENGTH = 100
+        const val BREED_MAX_LENGTH = 100
         const val NOTES_MAX_LENGTH = 2000
 
         // NUMERIC(6, 2), CHECK (weight_kg > 0)

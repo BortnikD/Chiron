@@ -16,11 +16,13 @@ object PetValidator {
 
     fun validate(dto: CreatePetDto, today: LocalDate) = validateAll {
         pet(dto.name, dto.birthDate, dto.weightKg, dto.notes, today)
+        ensureMaxLength("breed", dto.breed, PetRules.BREED_MAX_LENGTH)
     }
 
     // Only the fields present in the partial update are checked.
     fun validate(dto: UpdatePetDto, today: LocalDate) = validateAll {
         pet(dto.name, dto.birthDate.orElse(null), dto.weightKg.orElse(null), dto.notes.orElse(null), today)
+        ensureMaxLength("breed", dto.breed.orElse(null), PetRules.BREED_MAX_LENGTH)
     }
 
     private fun ValidationErrorCollector.pet(

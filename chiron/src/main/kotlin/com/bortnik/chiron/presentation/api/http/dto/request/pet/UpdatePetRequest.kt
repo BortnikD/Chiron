@@ -24,4 +24,6 @@ data class UpdatePetRequest(
     @field:Size(max = PetRules.NOTES_MAX_LENGTH, message = "must be at most ${PetRules.NOTES_MAX_LENGTH} characters")
     val notes: JsonNullable<String?> = JsonNullable.undefined(),
     val isArchived: Boolean? = null,
+    @field:Size(max = PetRules.BREED_MAX_LENGTH, message = "must be at most ${PetRules.BREED_MAX_LENGTH} characters")
+    val breed: JsonNullable<String?> = JsonNullable.undefined(),
 )

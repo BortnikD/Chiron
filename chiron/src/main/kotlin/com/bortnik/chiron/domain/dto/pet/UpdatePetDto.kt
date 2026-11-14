@@ -14,4 +14,5 @@ data class UpdatePetDto(
     val gender: Gender? = null,
     val notes: Patch<String?> = Patch.Unchanged,
     val isArchived: Boolean? = null,
+    val breed: Patch<String?> = Patch.Unchanged,
 )

@@ -12,4 +12,5 @@ data class CreateOwnPetDto(
     val weightKg: Double? = null,
     val gender: Gender,
     val notes: String? = null,
+    val breed: String? = null,
 )

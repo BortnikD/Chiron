@@ -43,6 +43,7 @@ class ExposedPetRepository : PetRepository {
             it[weightKg] = dto.weightKg?.toDbDecimal()
             it[gender] = dto.gender
             it[notes] = dto.notes
+            it[breed] = dto.breed
         }.single().toPet()
     }
 
@@ -80,6 +81,7 @@ class ExposedPetRepository : PetRepository {
             dto.weightKg.ifPresent { value -> it[weightKg] = value?.toDbDecimal() }
             dto.gender?.let { value -> it[gender] = value }
             dto.notes.ifPresent { value -> it[notes] = value }
+            dto.breed.ifPresent { value -> it[breed] = value }
             dto.isArchived?.let { value -> it[isArchived] = value }
             it[updatedAt] = CurrentTimestampWithTimeZone
         }.singleOrNull()?.toPet()

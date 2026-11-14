@@ -20,4 +20,5 @@ data class PetResponse(
     val photoUrlExpiresAt: Instant? = null,
     val createdAt: Instant,
     val updatedAt: Instant,
+    val breed: String? = null,
 )
