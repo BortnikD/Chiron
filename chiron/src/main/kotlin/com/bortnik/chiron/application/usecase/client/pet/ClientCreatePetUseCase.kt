@@ -26,6 +26,7 @@ class ClientCreatePetUseCase(private val createPetUseCase: CreatePetUseCase) {
                 weightKg = dto.weightKg,
                 gender = dto.gender,
                 notes = dto.notes,
+                breed = dto.breed,
             ),
         )
         log.info("Client {} ({}) created pet {} '{}'", actor.userId, actor.fullName, pet.id, pet.name)

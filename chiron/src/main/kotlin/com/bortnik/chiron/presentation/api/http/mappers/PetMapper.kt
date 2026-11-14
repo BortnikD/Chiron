@@ -25,6 +25,7 @@ fun Pet.toResponse(photo: PhotoLinks? = null): PetResponse = PetResponse(
     weightKg = weightKg,
     gender = gender,
     notes = notes,
+    breed = breed,
     isArchived = isArchived,
     photoUrl = photo?.photoUrl,
     photoThumbnailUrl = photo?.photoThumbnailUrl,
@@ -57,6 +58,7 @@ fun CreatePetRequest.toDto(): CreatePetDto = CreatePetDto(
     weightKg = weightKg,
     gender = gender,
     notes = notes,
+    breed = breed,
 )
 
 fun ClientCreatePetRequest.toDto(): CreateOwnPetDto = CreateOwnPetDto(
@@ -66,6 +68,7 @@ fun ClientCreatePetRequest.toDto(): CreateOwnPetDto = CreateOwnPetDto(
     weightKg = weightKg,
     gender = gender,
     notes = notes,
+    breed = breed,
 )
 
 fun UpdatePetRequest.toDto(): UpdatePetDto = UpdatePetDto(
@@ -75,6 +78,7 @@ fun UpdatePetRequest.toDto(): UpdatePetDto = UpdatePetDto(
     weightKg = weightKg.toPatch(),
     gender = gender,
     notes = notes.toPatch(),
+    breed = breed.toPatch(),
     isArchived = isArchived,
 )
 

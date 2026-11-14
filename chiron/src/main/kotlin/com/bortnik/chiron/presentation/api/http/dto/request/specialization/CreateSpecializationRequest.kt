@@ -1,7 +1,9 @@
 package com.bortnik.chiron.presentation.api.http.dto.request.specialization
 
+import com.bortnik.chiron.domain.utils.ValidationConstants.COLOR_PATTERN
 import com.bortnik.chiron.domain.utils.ValidationConstants.SpecializationRules
 import jakarta.validation.constraints.NotBlank
+import jakarta.validation.constraints.Pattern
 import jakarta.validation.constraints.Size
 
 data class CreateSpecializationRequest(
@@ -16,4 +18,6 @@ data class CreateSpecializationRequest(
         message = "must be at most ${SpecializationRules.DESCRIPTION_MAX_LENGTH} characters",
     )
     val description: String,
+    @field:Pattern(regexp = COLOR_PATTERN, message = "must be a HEX color in #RRGGBB format")
+    val color: String? = null,
 )

@@ -8,4 +8,5 @@ fun ResultRow.toSpecialization(): Specialization = Specialization(
     id = this[ExposedSpecializationTable.id].value,
     name = this[ExposedSpecializationTable.name],
     description = this[ExposedSpecializationTable.description],
+    color = this[ExposedSpecializationTable.color],
 )

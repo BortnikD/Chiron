@@ -11,14 +11,17 @@ fun Specialization.toResponse(): SpecializationResponse = SpecializationResponse
     id = id,
     name = name,
     description = description,
+    color = color,
 )
 
 fun CreateSpecializationRequest.toDto(): CreateSpecializationDto = CreateSpecializationDto(
     name = name,
     description = description,
+    color = color,
 )
 
 fun UpdateSpecializationRequest.toDto(): UpdateSpecializationDto = UpdateSpecializationDto(
     name = name,
     description = description,
+    color = color.toPatch(),
 )

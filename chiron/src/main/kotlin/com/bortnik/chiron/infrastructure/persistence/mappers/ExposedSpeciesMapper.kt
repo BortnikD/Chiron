@@ -7,4 +7,6 @@ import org.jetbrains.exposed.v1.core.ResultRow
 fun ResultRow.toSpecies(): Species = Species(
     id = this[ExposedSpeciesTable.id].value,
     name = this[ExposedSpeciesTable.name],
+    color = this[ExposedSpeciesTable.color],
+    iconKey = this[ExposedSpeciesTable.iconKey],
 )

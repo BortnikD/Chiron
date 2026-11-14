@@ -5,4 +5,6 @@ import java.util.UUID
 data class SpeciesResponse(
     val id: UUID,
     val name: String,
+    val color: String?,
+    val iconKey: String?,
 )

@@ -18,4 +18,5 @@ data class Pet(
     val isArchived: Boolean = false,
     val createdAt: Instant,
     val updatedAt: Instant,
+    val breed: String? = null,
 )

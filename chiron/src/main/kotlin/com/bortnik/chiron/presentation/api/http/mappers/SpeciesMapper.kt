@@ -10,12 +10,18 @@ import com.bortnik.chiron.presentation.api.http.dto.response.SpeciesResponse
 fun Species.toResponse(): SpeciesResponse = SpeciesResponse(
     id = id,
     name = name,
+    color = color,
+    iconKey = iconKey,
 )
 
 fun CreateSpeciesRequest.toDto(): CreateSpeciesDto = CreateSpeciesDto(
     name = name,
+    color = color,
+    iconKey = iconKey,
 )
 
 fun UpdateSpeciesRequest.toDto(): UpdateSpeciesDto = UpdateSpeciesDto(
     name = name,
+    color = color.toPatch(),
+    iconKey = iconKey.toPatch(),
 )

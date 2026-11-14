@@ -1,5 +1,6 @@
 package com.bortnik.chiron.infrastructure.persistence.repositories
 
+import com.bortnik.chiron.domain.dto.ifPresent
 import com.bortnik.chiron.domain.dto.species.CreateSpeciesDto
 import com.bortnik.chiron.domain.dto.species.UpdateSpeciesDto
 import com.bortnik.chiron.domain.entities.Species
@@ -24,6 +25,8 @@ class ExposedSpeciesRepository : SpeciesRepository {
     override fun create(dto: CreateSpeciesDto): Species = exposedSql {
         ExposedSpeciesTable.insertReturning {
             it[name] = dto.name
+            it[color] = dto.color
+            it[iconKey] = dto.iconKey
         }.single().toSpecies()
     }
 
@@ -52,6 +55,8 @@ class ExposedSpeciesRepository : SpeciesRepository {
         if (dto == UpdateSpeciesDto()) return@exposedSql findById(id)
         ExposedSpeciesTable.updateReturning(where = { ExposedSpeciesTable.id eq id }) {
             dto.name?.let { value -> it[name] = value }
+            dto.color.ifPresent { value -> it[color] = value }
+            dto.iconKey.ifPresent { value -> it[iconKey] = value }
         }.singleOrNull()?.toSpecies()
     }
 

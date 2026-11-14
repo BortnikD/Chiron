@@ -16,6 +16,7 @@ object ExposedPetTable : UUIDTable("pet") {
     val weightKg = decimal("weight_kg", DECIMAL_PRECISION, DECIMAL_SCALE).nullable()
     val gender = enumerationByName<Gender>("gender", ENUM_LENGTH)
     val notes = text("notes").nullable()
+    val breed = text("breed").nullable()
     val photoKey = text("photo_key").nullable()
     val isArchived = bool("is_archived")
     val createdAt = timestampWithTimeZone("created_at")
