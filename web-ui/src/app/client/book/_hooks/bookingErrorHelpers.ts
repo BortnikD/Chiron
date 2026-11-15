@@ -1,6 +1,6 @@
 import type { Veterinarian } from '@/modules/clinic/types';
 import { formatApiError } from '@/shared/lib';
-import { getDoctorDisplay } from '@/utils/doctorHelpers';
+import { getDoctorDisplay } from '@/shared/lib';
 
 export function resolveDoctorDisplayName(
   isAnyVet: boolean,

@@ -15,7 +15,7 @@ import type {
 import type { AppointmentStatus } from '@/shared/types';
 import { useShellHeader } from '@/components/layout/AppShell';
 import { formatSlotTime, toIdNameMap } from '@/shared/lib';
-import { useResourceList } from '@/shared/hooks';
+import { useResourceList, useDictionaries } from '@/shared/hooks';
 import { getPetName } from '../../dashboard/_components/utils';
 import { getMoscowNowTime } from '../../dashboard/_components/vetHelpers';
 import { useVetAppointmentActions } from './useVetAppointmentActions';
@@ -47,14 +47,32 @@ export function useVetAppointments(options?: {
   const initialSelId = options?.initialSelId ?? null;
   const initialPetId = options?.initialPetId ?? null;
 
+  const {
+    services: dictServices,
+    species: dictSpecies,
+    specializations: dictSpecializations,
+  } = useDictionaries();
+
   const [exceptions, setExceptions] = useState<ScheduleException[]>([]);
   const [workSchedules, setWorkSchedules] = useState<WorkSchedule[]>([]);
   const [patients, setPatients] = useState<Pet[]>([]);
   const [petsMap, setPetsMap] = useState<Record<string, Pet>>({});
-  const [services, setServices] = useState<Service[]>([]);
-  const [speciesList, setSpeciesList] = useState<Species[]>([]);
-  const [specializations, setSpecializations] = useState<Specialization[]>([]);
+  const [services, setServices] = useState<Service[]>(() => dictServices);
+  const [speciesList, setSpeciesList] = useState<Species[]>(() => dictSpecies);
+  const [specializations, setSpecializations] = useState<Specialization[]>(() => dictSpecializations);
   const [vetProfile, setVetProfile] = useState<Veterinarian | null>(null);
+
+  useEffect(() => {
+    if (dictServices.length > 0) setServices(dictServices);
+  }, [dictServices]);
+
+  useEffect(() => {
+    if (dictSpecies.length > 0) setSpeciesList(dictSpecies);
+  }, [dictSpecies]);
+
+  useEffect(() => {
+    if (dictSpecializations.length > 0) setSpecializations(dictSpecializations);
+  }, [dictSpecializations]);
 
   const [selectedAppt, setSelectedAppt] = useState<Appointment | null>(null);
   const [nowTime, setNowTime] = useState(() => getMoscowNowTime());
@@ -77,16 +95,8 @@ export function useVetAppointments(options?: {
 
   const loadRefs = useCallback(async () => {
     try {
-      const [svc, sp, specs, profile] = await Promise.all([
-        clinicApi.getServices().catch(() => [] as Service[]),
-        clinicApi.getSpecies().catch(() => [] as Species[]),
-        clinicApi.getSpecializations().catch(() => [] as Specialization[]),
-        vetApi.getProfile().catch(() => null),
-      ]);
+      const profile = await vetApi.getProfile().catch(() => null);
       if (!isMountedRef.current) return;
-      setServices(Array.isArray(svc) ? svc : []);
-      setSpeciesList(Array.isArray(sp) ? sp : []);
-      setSpecializations(Array.isArray(specs) ? specs : []);
       setVetProfile(profile);
 
       if (profile?.id) {

@@ -1,9 +1,10 @@
 'use client';
 
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
-import { useAuth } from '@/context/AuthContext';
+import { useAuth } from '@/providers';
 import { clientApi } from '@/modules/client/api';
 import { clinicApi } from '@/modules/clinic/api';
+import { useDictionaries } from '@/shared/hooks';
 import type { Appointment, Pet } from '@/modules/client/types';
 import type { Service, Veterinarian, Species } from '@/modules/clinic/types';
 import type { AppointmentStatus } from '@/shared/types';
@@ -33,11 +34,29 @@ export function useClientAppointments(initialSelectedId?: string | null) {
   const { user } = useAuth();
   const { toast } = useToast();
 
+  const {
+    services: dictServices,
+    veterinarians: dictVets,
+    species: dictSpecies,
+  } = useDictionaries();
+
   const [pets, setPets] = useState<Pet[]>([]);
-  const [services, setServices] = useState<Service[]>([]);
-  const [veterinarians, setVeterinarians] = useState<Veterinarian[]>([]);
-  const [speciesList, setSpeciesList] = useState<Species[]>([]);
+  const [services, setServices] = useState<Service[]>(() => dictServices);
+  const [veterinarians, setVeterinarians] = useState<Veterinarian[]>(() => dictVets);
+  const [speciesList, setSpeciesList] = useState<Species[]>(() => dictSpecies);
   const [parentApptsMap, setParentApptsMap] = useState<Record<string, Appointment>>({});
+
+  useEffect(() => {
+    if (dictServices.length > 0) setServices(dictServices);
+  }, [dictServices]);
+
+  useEffect(() => {
+    if (dictVets.length > 0) setVeterinarians(dictVets);
+  }, [dictVets]);
+
+  useEffect(() => {
+    if (dictSpecies.length > 0) setSpeciesList(dictSpecies);
+  }, [dictSpecies]);
 
   const [selectedAppt, setSelectedAppt] = useState<Appointment | null>(null);
 
@@ -140,17 +159,9 @@ export function useClientAppointments(initialSelectedId?: string | null) {
   const loadRefs = useCallback(async () => {
     const reqId = ++refsReqIdRef.current;
     try {
-      const [petsData, servicesData, vetsData, speciesData] = await Promise.all([
-        clientApi.getPets().catch(() => [] as Pet[]),
-        clinicApi.getServices().catch(() => [] as Service[]),
-        clinicApi.getVeterinarians().catch(() => [] as Veterinarian[]),
-        clinicApi.getSpecies().catch(() => [] as Species[]),
-      ]);
+      const petsData = await clientApi.getPets().catch(() => [] as Pet[]);
       if (!isMountedRef.current || reqId !== refsReqIdRef.current) return;
       setPets(Array.isArray(petsData) ? petsData : []);
-      setServices(Array.isArray(servicesData) ? servicesData : []);
-      setVeterinarians(Array.isArray(vetsData) ? vetsData : []);
-      setSpeciesList(Array.isArray(speciesData) ? speciesData : []);
     } catch {
       // ignore
     }

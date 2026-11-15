@@ -4,11 +4,11 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { Stethoscope, Check, AlertCircle } from 'lucide-react';
 import { clinicApi } from '@/modules/clinic/api';
 import type { Species, Veterinarian } from '@/modules/clinic/types';
-import { useAuth } from '@/context/AuthContext';
+import { useAuth } from '@/providers';
 import { SpeciesIcon } from '@/components/ui/SpeciesIcon';
 import { VetAvatar } from '@/components/ui/EntityAvatar';
 import { EntityPhotoControl } from '@/components/ui/EntityPhotoControl';
-import { getDoctorDisplay } from '@/utils/doctorHelpers';
+import { getDoctorDisplay } from '@/shared/lib';
 import { getSpecTone, getSpeciesTone, pluralRu, toIdNameMap } from '@/shared/lib';
 
 export interface VetPracticeFormData {

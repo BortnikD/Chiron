@@ -79,7 +79,7 @@ export function useVetAppointmentActions(options: {
   const handleCreateVaccination = useCallback(
     async (payload: CreateVaccinationRequest) => {
       await vetApi.createVaccination(payload);
-      const pName = petsMap[payload.petId]?.name || 'Пациент';
+      const pName = (payload.petId ? petsMap[payload.petId]?.name : null) || 'Пациент';
       toast('Прививка внесена', `${pName} — ${payload.name}`);
     },
     [petsMap, toast]

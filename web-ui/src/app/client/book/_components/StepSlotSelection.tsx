@@ -4,7 +4,7 @@ import type { Veterinarian, AvailableSlotResponse } from '@/modules/clinic/types
 import { DatePicker } from '@/shared/components';
 import { VetAvatar } from '@/components/ui/EntityAvatar';
 import { formatSlotTime } from '@/shared/lib';
-import { getDoctorDisplay } from '@/utils/doctorHelpers';
+import { getDoctorDisplay } from '@/shared/lib';
 import type { GroupedDaySlots } from '../_hooks/useBookingSlots';
 
 export interface StepSlotSelectionProps {

@@ -2,7 +2,7 @@ import React, { useMemo } from 'react';
 import { Stethoscope, Check } from 'lucide-react';
 import type { Veterinarian } from '@/modules/clinic/types';
 import { VetAvatar } from '@/components/ui/EntityAvatar';
-import { getDoctorDisplay } from '@/utils/doctorHelpers';
+import { getDoctorDisplay } from '@/shared/lib';
 import { getSpecTone, pluralRu } from '@/shared/lib';
 
 export interface StepDoctorSelectionProps {
