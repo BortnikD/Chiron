@@ -61,12 +61,11 @@ function validateRegisterForm(form: RegisterFormData): RegisterFieldErrors {
     errors.middleName = 'Не более 100 символов';
   }
 
-  const phoneRaw = form.phone.trim();
-  const normalizedPhone = phoneRaw.replace(/[\s\-()]/g, '');
-  if (!phoneRaw) {
+  const phoneDigits = form.phone.replace(/\D/g, '');
+  if (!form.phone.trim()) {
     errors.phone = 'Обязательное поле';
-  } else if (!PHONE_REGEX.test(normalizedPhone)) {
-    errors.phone = 'Формат +7…, от 10 до 15 цифр';
+  } else if (phoneDigits.length !== 11) {
+    errors.phone = 'Номер должен содержать 11 цифр (+7 (XXX) XXX-XX-XX)';
   }
 
   return errors;

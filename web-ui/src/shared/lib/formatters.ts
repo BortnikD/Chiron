@@ -576,17 +576,21 @@ export function formatPhoneInput(val: string): string {
     nationalDigits = digits.slice(1);
   }
 
-  let formatted = '+7';
-  if (nationalDigits.length > 0) {
-    formatted += ` (${nationalDigits.slice(0, 3)}`;
+  if (nationalDigits.length === 0) {
+    if (!val.includes('7') && !val.includes('8')) return '';
+    return '+7';
   }
-  if (nationalDigits.length >= 3) {
+
+  let formatted = `+7 (${nationalDigits.slice(0, 3)}`;
+  if (nationalDigits.length > 3) {
     formatted += `) ${nationalDigits.slice(3, 6)}`;
+  } else if (nationalDigits.length === 3) {
+    formatted += ')';
   }
-  if (nationalDigits.length >= 6) {
+  if (nationalDigits.length > 6) {
     formatted += `-${nationalDigits.slice(6, 8)}`;
   }
-  if (nationalDigits.length >= 8) {
+  if (nationalDigits.length > 8) {
     formatted += `-${nationalDigits.slice(8, 10)}`;
   }
   return formatted;

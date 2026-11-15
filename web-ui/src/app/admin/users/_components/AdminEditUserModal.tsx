@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { AlertCircle, X } from 'lucide-react';
 import type { User } from '@/shared/types';
-import { buildPatchPayload, formatApiError } from '@/shared/lib';
+import { buildPatchPayload, formatApiError, normalizePhone } from '@/shared/lib';
 import { PhoneInput } from '@/shared/components';
 
 export interface AdminEditUserModalProps {
@@ -59,13 +59,14 @@ export const AdminEditUserModal: React.FC<AdminEditUserModalProps> = ({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const normalizedPhone = editForm.phone.replace(/[\s()-]/g, '').trim();
+    const phoneDigits = editForm.phone.replace(/\D/g, '');
+    const normalizedPhone = phoneDigits ? normalizePhone(editForm.phone) : '';
     if (!editForm.firstName.trim() || !editForm.lastName.trim() || !editForm.email.trim()) {
       setError('Заполните обязательные поля');
       return;
     }
-    if (normalizedPhone && !/^\+?\d{10,15}$/.test(normalizedPhone)) {
-      setError('Телефон должен содержать от 10 до 15 цифр (например, +79001234567)');
+    if (phoneDigits && phoneDigits.length !== 11) {
+      setError('Номер телефона должен содержать 11 цифр (например, +7 (900) 123-45-67)');
       return;
     }
     setSaving(true);
