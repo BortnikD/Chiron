@@ -15,3 +15,9 @@ export type { ToastContextValue, ToastItem, ToastKind } from './ToastProvider';
 
 export { PaginationFooter, DEFAULT_PAGE_SIZES } from './PaginationFooter';
 export type { PaginationFooterProps } from './PaginationFooter';
+
+export { DataTable } from './DataTable';
+export type { DataTableProps, DataTableColumn } from './DataTable';
+
+export { PhoneInput } from './PhoneInput';
+export type { PhoneInputProps } from './PhoneInput';

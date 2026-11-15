@@ -562,3 +562,65 @@ export function getVaccinationDueInfo(nextDueOn?: string | null): VaccinationDue
     diffDays,
   };
 }
+
+/**
+ * Форматирует строку в вид +7 (XXX) XXX-XX-XX при вводе в форму.
+ */
+export function formatPhoneInput(val: string): string {
+  if (!val) return '';
+  const digits = val.replace(/\D/g, '');
+  if (!digits) return '';
+
+  let nationalDigits = digits;
+  if (digits.startsWith('7') || digits.startsWith('8')) {
+    nationalDigits = digits.slice(1);
+  }
+
+  let formatted = '+7';
+  if (nationalDigits.length > 0) {
+    formatted += ` (${nationalDigits.slice(0, 3)}`;
+  }
+  if (nationalDigits.length >= 3) {
+    formatted += `) ${nationalDigits.slice(3, 6)}`;
+  }
+  if (nationalDigits.length >= 6) {
+    formatted += `-${nationalDigits.slice(6, 8)}`;
+  }
+  if (nationalDigits.length >= 8) {
+    formatted += `-${nationalDigits.slice(8, 10)}`;
+  }
+  return formatted;
+}
+
+/**
+ * Нормализует телефон к формату E.164 (+7XXXXXXXXXX) для отправки на сервер.
+ */
+export function normalizePhone(val: string | null | undefined): string {
+  if (!val) return '';
+  const digits = val.replace(/\D/g, '');
+  if (!digits) return '';
+  if (digits.length === 11 && (digits.startsWith('7') || digits.startsWith('8'))) {
+    return `+7${digits.slice(1)}`;
+  }
+  if (digits.length === 10) {
+    return `+7${digits}`;
+  }
+  return `+${digits}`;
+}
+
+/**
+ * Красивое отображение телефона в интерфейсе (таблицы, карточки).
+ */
+export function formatPhoneDisplay(phone?: string | null, emptyLabel = '—'): string {
+  if (!phone) return emptyLabel;
+  const digits = phone.replace(/\D/g, '');
+  if (digits.length === 11 && (digits.startsWith('7') || digits.startsWith('8'))) {
+    const nat = digits.slice(1);
+    return `+7 (${nat.slice(0, 3)}) ${nat.slice(3, 6)}-${nat.slice(6, 8)}-${nat.slice(8, 10)}`;
+  }
+  if (digits.length === 10) {
+    return `+7 (${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6, 8)}-${digits.slice(8, 10)}`;
+  }
+  return phone;
+}
+
