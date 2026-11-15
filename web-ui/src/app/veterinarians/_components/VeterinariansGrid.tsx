@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { Stethoscope } from 'lucide-react';
-import { getDoctorDisplay } from '@/utils/doctorHelpers';
+import { getDoctorDisplay } from '@/shared/lib';
 import { getSpecTone, getSpeciesTone, pluralRu } from '@/shared/lib';
 import { SpeciesIcon } from '@/components/ui/SpeciesIcon';
 import { VetAvatar } from '@/components/ui/EntityAvatar';
@@ -84,7 +84,7 @@ export const VeterinariansGrid: React.FC<VeterinariansGridProps> = ({
                     <span className="t-badge">{specName}</span>
                   </div>
 
-                  {v.bio && <span className="tcard-desc">{v.bio}</span>}
+                  <span className="tcard-desc">{v.bio || '\u00A0'}</span>
 
                   <div className="tcard-foot" style={{ justifyContent: 'flex-start' }}>
                     <div className="chips">

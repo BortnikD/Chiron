@@ -17,21 +17,22 @@ import {
   getSpeciesTone,
   toIdNameMap,
 } from '@/shared/lib';
-import { SPECIALIZATION_NAMES_RU, getDoctorDisplay } from '@/utils/doctorHelpers';
+import { SPECIALIZATION_NAMES_RU, getDoctorDisplay } from '@/shared/lib';
 
 export function useVeterinariansCatalog(
   specParam: string | null = null,
   openParam: string | null = null,
-  speciesParam: string | null = null
+  speciesParam: string | null = null,
+  searchParam: string | null = null
 ) {
   const [vets, setVets] = useState<Veterinarian[]>([]);
   const [specializations, setSpecializations] = useState<Specialization[]>([]);
   const [speciesList, setSpeciesList] = useState<Species[]>([]);
   const [services, setServices] = useState<Service[]>([]);
   const [vetPermissions, setVetPermissions] = useState<Record<string, string[]>>({});
-  const [selectedSpec, setSelectedSpec] = useState<string>('ALL');
-  const [selectedSpecies, setSelectedSpecies] = useState<string>('ALL');
-  const [searchQuery, setSearchQuery] = useState<string>('');
+  const [selectedSpec, setSelectedSpec] = useState<string>(specParam || 'ALL');
+  const [selectedSpecies, setSelectedSpecies] = useState<string>(speciesParam || 'ALL');
+  const [searchQuery, setSearchQuery] = useState<string>(searchParam || '');
   const [selectedVet, setSelectedVet] = useState<Veterinarian | null>(null);
   const [vetSchedules, setVetSchedules] = useState<WorkSchedule[]>([]);
   const [vetExceptions, setVetExceptions] = useState<ScheduleException[]>([]);
@@ -42,6 +43,7 @@ export function useVeterinariansCatalog(
   const appliedSpecRef = useRef<string | null>(null);
   const appliedOpenRef = useRef<string | null>(null);
   const appliedSpeciesRef = useRef<string | null>(null);
+  const isInitialSyncRef = useRef(true);
 
   const reload = useCallback(() => {
     setReloadTick((tick) => tick + 1);
@@ -199,11 +201,94 @@ export function useVeterinariansCatalog(
   const speciesMap = useMemo(() => toIdNameMap(speciesList), [speciesList]);
   const hasFilters = selectedSpec !== 'ALL' || selectedSpecies !== 'ALL' || searchQuery.trim() !== '';
 
-  const resetFilters = () => {
+  const syncToUrl = useCallback(
+    (spec: string, species: string, q: string, openId: string | null) => {
+      if (typeof window === 'undefined') return;
+      const url = new URL(window.location.href);
+
+      if (spec && spec !== 'ALL') {
+        url.searchParams.set('spec', spec);
+      } else {
+        url.searchParams.delete('spec');
+      }
+
+      if (species && species !== 'ALL') {
+        url.searchParams.set('species', species);
+      } else {
+        url.searchParams.delete('species');
+      }
+
+      const trimmedQ = q.trim();
+      if (trimmedQ) {
+        url.searchParams.set('q', trimmedQ);
+        url.searchParams.delete('search');
+      } else {
+        url.searchParams.delete('q');
+        url.searchParams.delete('search');
+      }
+
+      if (openId) {
+        url.searchParams.set('open', openId);
+        url.searchParams.delete('sel');
+      } else {
+        url.searchParams.delete('open');
+        url.searchParams.delete('sel');
+      }
+
+      const nextSearch = url.searchParams.toString();
+      const currentSearch = window.location.search.replace(/^\?/, '');
+      if (nextSearch !== currentSearch) {
+        window.history.replaceState(
+          null,
+          '',
+          url.pathname + (nextSearch ? `?${nextSearch}` : '') + url.hash
+        );
+      }
+    },
+    []
+  );
+
+  useEffect(() => {
+    if (isInitialSyncRef.current) {
+      isInitialSyncRef.current = false;
+      return;
+    }
+    const timer = setTimeout(() => {
+      syncToUrl(selectedSpec, selectedSpecies, searchQuery, selectedVet?.id ?? null);
+    }, 150);
+    return () => clearTimeout(timer);
+  }, [selectedSpec, selectedSpecies, searchQuery, selectedVet?.id, syncToUrl]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const handlePopState = () => {
+      const params = new URLSearchParams(window.location.search);
+      const s = params.get('spec') || 'ALL';
+      const sp = params.get('species') || 'ALL';
+      const q = params.get('q') || params.get('search') || '';
+      const openId = params.get('open') || params.get('sel') || null;
+
+      setSelectedSpec(s);
+      setSelectedSpecies(sp);
+      setSearchQuery(q);
+      if (!openId) {
+        setSelectedVet(null);
+      } else {
+        setSelectedVet(
+          (prev) => (prev?.id === openId ? prev : vets.find((item) => item.id === openId) ?? null)
+        );
+      }
+    };
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, [vets]);
+
+  const resetFilters = useCallback(() => {
     setSelectedSpec('ALL');
     setSelectedSpecies('ALL');
     setSearchQuery('');
-  };
+    syncToUrl('ALL', 'ALL', '', selectedVet?.id ?? null);
+  }, [selectedVet?.id, syncToUrl]);
 
   const filteredVets = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();

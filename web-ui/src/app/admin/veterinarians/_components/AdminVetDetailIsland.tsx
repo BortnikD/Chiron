@@ -10,7 +10,7 @@ import { SearchCombobox, type SearchComboboxOption } from '@/shared/components';
 import { VetAvatar } from '@/components/ui/EntityAvatar';
 import { EntityPhotoControl } from '@/components/ui/EntityPhotoControl';
 import { formatApiError, toIdNameMap } from '@/shared/lib';
-import { getDoctorDisplay } from '@/utils/doctorHelpers';
+import { getDoctorDisplay } from '@/shared/lib';
 import { VetDetailTabsSection } from './VetDetailTabsSection';
 
 export interface AdminVetDetailIslandProps {

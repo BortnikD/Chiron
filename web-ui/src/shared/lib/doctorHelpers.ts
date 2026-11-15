@@ -1,7 +1,6 @@
 /**
  * Вспомогательные функции для отображения информации о ветеринарных врачах в интерфейсе Chiron.
- * Предоставляют имена, специализации и инициалы для сидовых врачей клиники,
- * чьи профили пользователей могут не объединяться в базовых ответах API.
+ * Динамически формируют ФИО, инициалы, компактное имя и специализацию из данных API.
  */
 
 export interface DoctorDisplayInfo {
@@ -12,40 +11,6 @@ export interface DoctorDisplayInfo {
   title: string;
 }
 
-export const KNOWN_DOCTORS: Record<
-  string,
-  { fullName: string; shortName: string; initials: string; title: string; specName: string }
-> = {
-  '5eed0006-0000-0000-0000-000000000001': {
-    fullName: 'Анна Сергеевна Иванова',
-    shortName: 'Анна Иванова',
-    initials: 'АИ',
-    title: 'Ведущий терапевт',
-    specName: 'Терапия',
-  },
-  '5eed0006-0000-0000-0000-000000000002': {
-    fullName: 'Павел Петров',
-    shortName: 'Павел Петров',
-    initials: 'ПП',
-    title: 'Ветеринарный врач-терапевт',
-    specName: 'Терапия',
-  },
-  '5eed0006-0000-0000-0000-000000000003': {
-    fullName: 'Елена Викторовна Смирнова',
-    shortName: 'Елена Смирнова',
-    initials: 'ЕС',
-    title: 'Ведущий хирург',
-    specName: 'Хирургия',
-  },
-  '5eed0006-0000-0000-0000-000000000004': {
-    fullName: 'Олег Кузнецов',
-    shortName: 'Олег Кузнецов',
-    initials: 'ОК',
-    title: 'Ветеринарный стоматолог',
-    specName: 'Стоматология',
-  },
-};
-
 export const SPECIALIZATION_NAMES_RU: Record<string, string> = {
   Therapy: 'Терапия',
   Surgery: 'Хирургия',
@@ -53,12 +18,6 @@ export const SPECIALIZATION_NAMES_RU: Record<string, string> = {
   Dermatology: 'Дерматология',
   Ophthalmology: 'Офтальмология',
   Preventive: 'Профилактика',
-  '5eed0002-0000-0000-0000-000000000001': 'Терапия',
-  '5eed0002-0000-0000-0000-000000000002': 'Хирургия',
-  '5eed0002-0000-0000-0000-000000000003': 'Стоматология',
-  '5eed0002-0000-0000-0000-000000000004': 'Дерматология',
-  '5eed0002-0000-0000-0000-000000000005': 'Офтальмология',
-  '5eed0002-0000-0000-0000-000000000006': 'Профилактика',
 };
 
 export function getDoctorDisplay(
@@ -68,6 +27,7 @@ export function getDoctorDisplay(
     middleName?: string | null;
     lastName?: string | null;
     fullName?: string | null;
+    title?: string | null;
     user?: {
       firstName?: string | null;
       lastName?: string | null;
@@ -89,7 +49,6 @@ export function getDoctorDisplay(
     };
   }
 
-  const known = vet.id ? KNOWN_DOCTORS[vet.id] : undefined;
   const fName = vet.user?.firstName || vet.firstName || null;
   const mName = vet.user?.middleName ?? vet.middleName ?? null;
   const lName = vet.user?.lastName || vet.lastName || null;
@@ -99,19 +58,12 @@ export function getDoctorDisplay(
   const fullName =
     (fName && lName
       ? [fName, mName, lName].filter(Boolean).join(' ')
-      : rawFull) ||
-    known?.fullName ||
-    'Ветеринарный врач';
+      : rawFull) || 'Ветеринарный врач';
 
-  // Компактное имя для карточек ("Имя Фамилия", 12-14 символов)
-  // Исключает перенос отчества вниз на 2-ю строку при сжатии карточки (открытие бокового острова)
+  // Компактное имя для карточек ("Имя Фамилия")
   let name =
-    (fName && lName
-      ? `${fName} ${lName}`.trim()
-      : known?.shortName) ||
-    fullName;
+    (fName && lName ? `${fName} ${lName}`.trim() : rawFull) || fullName;
 
-  // Если имя из API содержит отчество (3 слова), сокращаем для карточки до "Имя Фамилия"
   const nameParts = name.split(/\s+/).filter(Boolean);
   if (nameParts.length >= 3) {
     name = `${nameParts[0]} ${nameParts[nameParts.length - 1]}`;
@@ -124,26 +76,20 @@ export function getDoctorDisplay(
     const parts = rawFull.replace(/\./g, '').trim().split(/\s+/).filter(Boolean);
     if (parts.length >= 2) {
       initials = `${parts[0].charAt(0)}${parts[parts.length - 1].charAt(0)}`.toUpperCase();
-    } else if (known) {
-      initials = known.initials;
     } else {
-      initials = 'ВР';
+      initials = parts[0]?.slice(0, 2).toUpperCase() || 'ВР';
     }
-  } else if (known) {
-    initials = known.initials;
   } else {
     initials = 'ВР';
   }
 
-  let rawSpec =
+  const rawSpec =
     vet.specialization?.name ||
     (vet.specializationId && specializationsMap?.[vet.specializationId]) ||
-    (vet.specializationId && SPECIALIZATION_NAMES_RU[vet.specializationId]) ||
-    known?.specName ||
     'Терапия';
 
   const specName = SPECIALIZATION_NAMES_RU[rawSpec] || rawSpec;
-  const title = known?.title || `Врач-${specName.toLowerCase()}`;
+  const title = vet.title || `Врач-${specName.toLowerCase()}`;
 
   return {
     name,

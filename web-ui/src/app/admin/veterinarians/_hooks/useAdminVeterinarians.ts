@@ -9,7 +9,7 @@ import type { Veterinarian, Specialization, Species } from '@/modules/clinic/typ
 import type { User } from '@/shared/types';
 import { useToast } from '@/shared/components';
 import { fetchAllPages, formatApiError, toIdNameMap } from '@/shared/lib';
-import { getDoctorDisplay } from '@/utils/doctorHelpers';
+import { getDoctorDisplay } from '@/shared/lib';
 
 export type VetActiveFilter = 'ALL' | 'ACTIVE' | 'INACTIVE';
 
