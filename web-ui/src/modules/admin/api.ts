@@ -1,5 +1,15 @@
 import { api } from '@/shared/api/client';
-import type { AppointmentStatus, Gender, User, PageResponse, PhotoLinks, StatisticsGranularity } from '@/shared/types';
+import { invalidateWorkScheduleCache } from '@/modules/clinic/api';
+import { petCache } from '@/shared/lib';
+import type {
+  AppointmentStatus,
+  Gender,
+  User,
+  PageResponse,
+  PhotoLinks,
+  StatisticsGranularity,
+  CreateServiceRequest,
+} from '@/shared/types';
 import type {
   Veterinarian,
   Service,
@@ -128,7 +138,7 @@ export const adminApi = {
     api.delete<void>(`/api/v1/admin/appointments/${id}`),
 
   // Питомцы
-  getPets: (
+  getPets: async (
     page = 0,
     size = 20,
     filter?: {
@@ -149,35 +159,66 @@ export const adminApi = {
       params.append('name', filter.search);
       params.append('search', filter.search);
     }
-    return api.get<PageResponse<Pet>>(`/api/v1/admin/pets?${params.toString()}`, options);
+    const res = await api.get<PageResponse<Pet>>(`/api/v1/admin/pets?${params.toString()}`, options);
+    if (res?.items) {
+      petCache.setMany(res.items);
+    }
+    return res;
   },
 
-  getPetById: (id: string) => api.get<Pet>(`/api/v1/admin/pets/${id}`),
+  getPetById: (id: string) =>
+    petCache.fetchWithCache(id, (petId) => api.get<Pet>(`/api/v1/admin/pets/${petId}`)),
 
-  createPet: (data: CreatePetRequest) => api.post<Pet>('/api/v1/admin/pets', data),
+  createPet: async (data: CreatePetRequest) => {
+    const res = await api.post<Pet>('/api/v1/admin/pets', data);
+    if (res) petCache.set(res);
+    return res;
+  },
 
-  updatePet: (id: string, data: UpdatePetRequest) =>
-    api.patch<Pet>(`/api/v1/admin/pets/${id}`, data),
+  updatePet: async (id: string, data: UpdatePetRequest) => {
+    const res = await api.patch<Pet>(`/api/v1/admin/pets/${id}`, data);
+    if (res) petCache.set(res);
+    return res;
+  },
 
-  uploadPetPhoto: (id: string, file: File) => {
+  uploadPetPhoto: async (id: string, file: File) => {
     const formData = new FormData();
     formData.append('file', file);
-    return api.putForm<PhotoLinks>(`/api/v1/admin/pets/${id}/photo`, formData);
+    const res = await api.putForm<PhotoLinks>(`/api/v1/admin/pets/${id}/photo`, formData);
+    petCache.invalidate(id);
+    return res;
   },
 
-  deletePetPhoto: (id: string) => api.delete<void>(`/api/v1/admin/pets/${id}/photo`),
+  deletePetPhoto: async (id: string) => {
+    const res = await api.delete<void>(`/api/v1/admin/pets/${id}/photo`);
+    petCache.invalidate(id);
+    return res;
+  },
 
-  deletePet: (id: string) => api.delete<void>(`/api/v1/admin/pets/${id}`),
+  deletePet: async (id: string) => {
+    const res = await api.delete<void>(`/api/v1/admin/pets/${id}`);
+    petCache.invalidate(id);
+    return res;
+  },
 
   // Графики врачей
-  createWorkSchedule: (data: CreateWorkScheduleRequest) =>
-    api.post<WorkSchedule>('/api/v1/admin/work-schedules', data),
+  createWorkSchedule: async (data: CreateWorkScheduleRequest) => {
+    const res = await api.post<WorkSchedule>('/api/v1/admin/work-schedules', data);
+    invalidateWorkScheduleCache(data.veterinarianId);
+    return res;
+  },
 
-  updateWorkSchedule: (id: string, data: UpdateWorkScheduleRequest) =>
-    api.patch<WorkSchedule>(`/api/v1/admin/work-schedules/${id}`, data),
+  updateWorkSchedule: async (id: string, data: UpdateWorkScheduleRequest) => {
+    const res = await api.patch<WorkSchedule>(`/api/v1/admin/work-schedules/${id}`, data);
+    invalidateWorkScheduleCache();
+    return res;
+  },
 
-  deleteWorkSchedule: (id: string) =>
-    api.delete<void>(`/api/v1/admin/work-schedules/${id}`),
+  deleteWorkSchedule: async (id: string) => {
+    const res = await api.delete<void>(`/api/v1/admin/work-schedules/${id}`);
+    invalidateWorkScheduleCache();
+    return res;
+  },
 
   // Исключения расписания
   getScheduleExceptions: (page = 0, size = 20, veterinarianId?: string) => {
@@ -285,7 +326,7 @@ export const adminApi = {
     return api.get<Service[]>(`/api/v1/admin/services${query}`);
   },
 
-  createService: (data: Omit<Service, 'id' | 'createdAt' | 'updatedAt'>) =>
+  createService: (data: CreateServiceRequest | Partial<Service>) =>
     api.post<Service>('/api/v1/admin/services', data),
 
   updateService: (id: string, data: Partial<Service>) =>

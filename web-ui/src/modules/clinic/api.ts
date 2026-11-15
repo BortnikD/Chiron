@@ -38,6 +38,22 @@ function cachedGet<T>(key: string, fetcher: () => Promise<T>): Promise<T> {
 
 export function clearClinicDictionariesCache(): void {
   dictCache.clear();
+  inFlightDict.clear();
+}
+
+export function invalidateWorkScheduleCache(vetId?: string): void {
+  if (vetId) {
+    const url = `/api/v1/work-schedules?veterinarianId=${vetId}`;
+    dictCache.delete(url);
+    inFlightDict.delete(url);
+  } else {
+    for (const key of Array.from(dictCache.keys())) {
+      if (key.startsWith('/api/v1/work-schedules')) {
+        dictCache.delete(key);
+        inFlightDict.delete(key);
+      }
+    }
+  }
 }
 
 // ─── Публичные справочники клиники и расписание ────────────
@@ -77,8 +93,12 @@ export const clinicApi = {
   getVetSpeciesPermissions: (vetId: string) =>
     api.get<VeterinarianSpeciesPermission[]>(`/api/v1/veterinarians/${vetId}/species`),
 
-  getWorkSchedules: (vetId: string) => {
+  getWorkSchedules: (vetId: string, forceFresh = false) => {
     const url = `/api/v1/work-schedules?veterinarianId=${vetId}`;
+    if (forceFresh) {
+      dictCache.delete(url);
+      inFlightDict.delete(url);
+    }
     return cachedGet<WorkSchedule[]>(url, () => api.get<WorkSchedule[]>(url));
   },
 

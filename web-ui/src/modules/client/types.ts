@@ -1,94 +1,41 @@
-import {
-  Gender,
-  AppointmentStatus,
-  BasePet,
-  BaseAppointment,
-  BaseVaccination,
-} from '@/shared/types';
-import { Service, Species, Veterinarian } from '@/modules/clinic/types';
-
 /**
  * Типы сущностей и запросов для личного кабинета клиента.
+ * Синхронизированы с OpenAPI схемой через @/shared/types.
  */
 
-export interface PetNextAppointmentSummary {
-  id: string;
-  startAt: string;
-  serviceId: string;
-}
+import type {
+  ClientCreateAppointmentRequest,
+  CreatePetRequest as SharedCreatePetRequest,
+  ClientCreatePetRequest as SharedClientCreatePetRequest,
+  UpdatePetRequest as SharedUpdatePetRequest,
+  CreateVaccinationRequest as SharedCreateVaccinationRequest,
+  UpdateVaccinationRequest as SharedUpdateVaccinationRequest,
+} from '@/shared/types';
 
-export interface PetSummary {
-  completedVisits: number;
-  appointmentsCount: number;
-  vaccinationsCount: number;
-  nextAppointment?: PetNextAppointmentSummary | null;
-  nextVaccinationDueOn?: string | null;
-  hasOverdueVaccination: boolean;
-}
+export type {
+  Pet,
+  Appointment,
+  Vaccination,
+  PetSummary,
+  PetNextAppointmentSummary,
+  ClientSummary,
+  PetResponse,
+  ClientPetResponse,
+  PetSummaryResponse,
+  PetNextAppointmentResponse,
+  ClientSummaryResponse,
+  AppointmentResponse,
+  VaccinationResponse,
+} from '@/shared/types';
 
-export interface Pet extends BasePet {
-  ownerName?: string | null;
-  ownerPhone?: string | null;
-  ownerEmail?: string | null;
-  speciesName?: string;
-  species?: Species;
-  summary?: PetSummary | null;
-}
+export type BookAppointmentRequest = ClientCreateAppointmentRequest;
 
-export type CreatePetRequest = Pick<BasePet, 'name' | 'speciesId' | 'gender'> &
-  Partial<Pick<BasePet, 'birthDate' | 'weightKg' | 'notes' | 'ownerId'>>;
-
-export type UpdatePetRequest = Partial<
-  Pick<BasePet, 'name' | 'speciesId' | 'birthDate' | 'weightKg' | 'gender' | 'notes' | 'isArchived'>
->;
-
-export interface Appointment extends BaseAppointment {
-  veterinarianName?: string;
-  veterinarian?: Veterinarian;
-  petName?: string;
-  pet?: Pet;
-  serviceName?: string;
-  service?: Service;
-  price?: number;
-  notes?: string | null;
-  cancellationReason?: string | null;
-}
-
-export type BookAppointmentRequest = Pick<
-  BaseAppointment,
-  'veterinarianId' | 'petId' | 'serviceId' | 'startAt' | 'endAt'
-> & {
-  clientComment?: string | null;
-};
-
-export interface Vaccination extends BaseVaccination {
+// Разрешаем как полные типы схем, так и гибкие вариации для форм
+export type CreatePetRequest = SharedCreatePetRequest | SharedClientCreatePetRequest;
+export type UpdatePetRequest = SharedUpdatePetRequest;
+export type CreateVaccinationRequest = SharedCreateVaccinationRequest & {
   vaccineName?: string;
   administeredAt?: string;
   validUntil?: string;
-}
-
-export type CreateVaccinationRequest = Pick<
-  BaseVaccination,
-  'petId' | 'name' | 'administeredOn'
-> &
-  Partial<
-    Pick<BaseVaccination, 'appointmentId' | 'nextDueOn' | 'batchNumber' | 'notes'>
-  > & {
-    vaccineName?: string;
-    administeredAt?: string;
-    validUntil?: string;
-  };
-
-export type UpdateVaccinationRequest = Partial<
-  Pick<BaseVaccination, 'name' | 'administeredOn' | 'nextDueOn'>
->;
-
-export interface ClientSummary {
-  activePets: number;
-  upcomingAppointments: number;
-  completedAppointments: number;
-  vaccinationsDue: number;
-  vaccinationsOverdue: number;
-  unreadNotifications: number;
-  nextAppointment?: Appointment | null;
-}
+};
+export type UpdateVaccinationRequest = SharedUpdateVaccinationRequest;
