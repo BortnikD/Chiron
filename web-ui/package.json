@@ -6,7 +6,8 @@
     "dev": "next dev --turbopack",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "api:gen": "openapi-typescript ../chiron-api.json -o src/shared/api/schema.d.ts --properties-required-by-default"
   },
   "dependencies": {
     "@stomp/stompjs": "^7.5.0",
@@ -22,6 +23,7 @@
     "@types/node": "^22.0.0",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
+    "openapi-typescript": "^7.13.0",
     "postcss": "^8.4.49",
     "tailwindcss": "^4.0.0",
     "typescript": "^5.7.0"
