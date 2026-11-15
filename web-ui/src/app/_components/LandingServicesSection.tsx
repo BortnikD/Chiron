@@ -10,7 +10,7 @@ import {
   Clock,
 } from 'lucide-react';
 import { formatCurrency, getSpecTone, toIdNameMap } from '@/shared/lib';
-import { SPECIALIZATION_NAMES_RU, getDoctorDisplay } from '@/utils/doctorHelpers';
+import { SPECIALIZATION_NAMES_RU, getDoctorDisplay } from '@/shared/lib';
 import type { Service } from '@/modules/clinic/types';
 import type { LandingServicesSectionProps, PopularOffer } from './types';
 

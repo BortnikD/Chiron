@@ -74,10 +74,7 @@ export default function AdminDashboardPage() {
 
       <KpiMetricsGrid stats={stats} />
 
-      <div
-        className="dash-2col"
-        style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 2fr) minmax(0, 1fr)', gap: '8px' }}
-      >
+      <div className="dash-2col">
         <TimelineChart
           timeline={timeline}
           metric={metric}
@@ -90,10 +87,7 @@ export default function AdminDashboardPage() {
 
       <TopVeterinariansIsland vetsStats={vetsStats} />
 
-      <div
-        className="dash-2col"
-        style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 2fr) minmax(0, 1fr)', gap: 'var(--gap)' }}
-      >
+      <div className="dash-2col">
         <TopServicesIsland servicesStats={servicesStats} />
         <SpeciesDistributionIsland speciesStats={speciesStats} />
       </div>

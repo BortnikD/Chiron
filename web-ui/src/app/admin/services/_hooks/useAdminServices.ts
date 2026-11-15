@@ -13,6 +13,7 @@ import type {
 } from '@/modules/clinic/types';
 import { useToast } from '@/shared/components';
 import { formatApiError, mapWithConcurrency, toIdNameMap } from '@/shared/lib';
+import { useDictionaries } from '@/shared/hooks';
 import {
   SERVICE_NAV_TABS,
   filterAdminServices,
@@ -30,6 +31,7 @@ export function useAdminServices() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { toast } = useToast();
+  const { invalidateDictionaries } = useDictionaries();
 
   const tabParam = searchParams.get('tab');
   const selParam = searchParams.get('sel');
@@ -216,12 +218,13 @@ export function useAdminServices() {
       const saved = id
         ? await adminApi.updateService(id, data)
         : await adminApi.createService(data);
+      await invalidateDictionaries(['services']);
       await loadData();
       setSelectedService(saved);
       toast(id ? 'Услуга сохранена' : 'Услуга создана', saved.name);
       return saved;
     },
-    [loadData, toast]
+    [invalidateDictionaries, loadData, toast]
   );
 
   const attachServiceSpecies = useCallback(
@@ -307,6 +310,7 @@ export function useAdminServices() {
       await adminApi.deleteService(deleteTarget.id);
       if (selectedService?.id === deleteTarget.id) setSelectedService(null);
       setDeleteTarget(null);
+      await invalidateDictionaries(['services']);
       await loadData();
       toast('Услуга удалена');
     } catch (err: unknown) {
