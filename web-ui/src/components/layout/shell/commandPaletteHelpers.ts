@@ -8,7 +8,7 @@ import type { Service, Veterinarian } from '@/modules/clinic/types';
 import type { Appointment, Pet } from '@/modules/client/types';
 import type { User, UserRole } from '@/shared/types';
 import { formatCurrency, formatDateTimeCompact } from '@/shared/lib';
-import { getDoctorDisplay } from '@/utils/doctorHelpers';
+import { getDoctorDisplay } from '@/shared/lib';
 import { getNavGroups } from './navConfig';
 
 export interface PaletteDataset {

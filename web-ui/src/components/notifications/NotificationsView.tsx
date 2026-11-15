@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
-import { useAuth } from '@/context/AuthContext';
+import { useAuth } from '@/providers';
 import { notificationsApi } from '@/shared/api';
 import { useToast } from '@/shared/components';
 import { useAppShell } from '@/components/layout/AppShell';

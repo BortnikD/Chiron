@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { Eye, EyeOff } from 'lucide-react';
 import { useRegisterForm } from '@/app/register/_hooks/useRegisterForm';
+import { PhoneInput } from '@/shared/components';
 import type { RegisterFormProps } from './types';
 
 export function RegisterForm({
@@ -164,14 +165,11 @@ export function RegisterForm({
             <label className="field-label" htmlFor="r-phone">
               Телефон <span className="req">*</span>
             </label>
-            <input
+            <PhoneInput
               id="r-phone"
-              type="tel"
               className={`input${errors.phone ? ' invalid' : ''}`}
-              autoComplete="tel"
               value={form.phone}
               onChange={(e) => setField('phone', e.target.value)}
-              placeholder="+7 900 000-00-00"
             />
             {errors.phone && <span className="field-error">{errors.phone}</span>}
           </div>

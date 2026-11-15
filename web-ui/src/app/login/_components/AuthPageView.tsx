@@ -3,7 +3,7 @@
 import { Suspense } from 'react';
 import Link from 'next/link';
 import { AlertCircle, ArrowRight, Check, CheckCircle2 } from 'lucide-react';
-import { useTheme } from '@/context/ThemeContext';
+import { useTheme } from '@/providers';
 import { ThemeToggle } from '@/components/ui/ThemeToggle';
 import { AuthHeroMobile } from '@/components/auth/AuthHeroMobile';
 import { useLoginForm } from '../_hooks/useLoginForm';
