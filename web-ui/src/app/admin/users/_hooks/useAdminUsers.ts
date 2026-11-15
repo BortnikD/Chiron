@@ -8,7 +8,7 @@ import type { Pet, Appointment } from '@/modules/client/types';
 import type { Service, Species, Veterinarian } from '@/modules/clinic/types';
 import { useToast } from '@/shared/components';
 import { formatApiError, nextMoscowDayIso } from '@/shared/lib';
-import { useResourceList } from '@/shared/hooks';
+import { useResourceList, useSelectionSync } from '@/shared/hooks';
 import type { User, UserRole } from '@/shared/types';
 
 export interface CreateUserInput {
@@ -36,7 +36,6 @@ export function useAdminUsers() {
   const [veterinarians, setVeterinarians] = useState<Veterinarian[]>([]);
   const [speciesList, setSpeciesList] = useState<Species[]>([]);
   const [services, setServices] = useState<Service[]>([]);
-  const [selectedUser, setSelectedUser] = useState<User | null>(null);
 
   const [userPets, setUserPets] = useState<Pet[]>([]);
   const [userAppointments, setUserAppointments] = useState<Appointment[]>([]);
@@ -51,7 +50,6 @@ export function useAdminUsers() {
   const [deleteError, setDeleteError] = useState<string | null>(null);
 
   const detailsReqIdRef = useRef(0);
-  const appliedSelRef = useRef<string | null>(null);
 
   const resource = useResourceList<User, AdminUsersFiltersState>({
     fetcher: async ({ page, pageSize, filters }, signal) => {
@@ -84,19 +82,13 @@ export function useAdminUsers() {
     defaultPageSize: 20,
     debouncedKeys: ['search'],
     debounceMs: 250,
-    onSuccess: ({ items }) => {
-      if (initialSel && appliedSelRef.current !== initialSel) {
-        appliedSelRef.current = initialSel;
-        const found = items.find((u) => u.id === initialSel);
-        if (found) {
-          setSelectedUser(found);
-        } else {
-          adminApi.getUserById(initialSel).then(setSelectedUser).catch(() => {});
-        }
-      } else {
-        setSelectedUser((prev) => (prev ? items.find((u) => u.id === prev.id) ?? prev : null));
-      }
-    },
+  });
+
+  const [selectedUser, setSelectedUser] = useSelectionSync<User>({
+    items: resource.items,
+    storageKey: 'chiron-admin-users-sel',
+    paramKey: 'sel',
+    fetchById: (id) => adminApi.getUserById(id),
   });
 
   const loadRefs = useCallback(async () => {

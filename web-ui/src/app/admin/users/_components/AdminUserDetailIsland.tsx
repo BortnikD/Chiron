@@ -14,6 +14,7 @@ import type { Pet, Appointment } from '@/modules/client/types';
 import type { Service, Species, Veterinarian } from '@/modules/clinic/types';
 import type { User } from '@/shared/types';
 import { USER_ROLE_META, formatApiError, formatDateShort, getUserInitials } from '@/shared/lib';
+import { PhoneInput } from '@/shared/components';
 import { UserRelationsTabs } from './UserRelationsTabs';
 
 export interface AdminUserDetailIslandProps {
@@ -234,10 +235,8 @@ export const AdminUserDetailIsland: React.FC<AdminUserDetailIslandProps> = ({
                 <label className="field-label" htmlFor="ud-phone">
                   Телефон
                 </label>
-                <input
+                <PhoneInput
                   id="ud-phone"
-                  type="tel"
-                  className="input"
                   value={editForm.phone}
                   onChange={(e) => setEditForm({ ...editForm, phone: e.target.value })}
                 />

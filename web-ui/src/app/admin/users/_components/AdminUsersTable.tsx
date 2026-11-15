@@ -1,10 +1,10 @@
 'use client';
 
-import React from 'react';
+import React, { useMemo } from 'react';
 import { Users } from 'lucide-react';
 import type { User } from '@/shared/types';
-import { PaginationFooter } from '@/shared/components';
-import { USER_ROLE_META, formatDateShort, getUserInitials } from '@/shared/lib';
+import { DataTable, type DataTableColumn, type PaginationFooterProps } from '@/shared/components';
+import { USER_ROLE_META, formatDateShort, formatPhoneDisplay, getUserInitials } from '@/shared/lib';
 
 export interface AdminUsersTableProps {
   users: User[];
@@ -17,10 +17,11 @@ export interface AdminUsersTableProps {
   onPageChange: (page: number) => void;
   onPageSizeChange: (size: number) => void;
   onSelectUser: (user: User) => void;
+  paginationProps?: PaginationFooterProps;
 }
 
 /**
- * Таблица пользователей клиники с аватарками, ролями и контактной информацией.
+ * Таблица пользователей клиники с аватарками, ролями и контактной информацией на базе DataTable.
  */
 export const AdminUsersTable: React.FC<AdminUsersTableProps> = ({
   users,
@@ -33,87 +34,84 @@ export const AdminUsersTable: React.FC<AdminUsersTableProps> = ({
   onPageChange,
   onPageSizeChange,
   onSelectUser,
+  paginationProps,
 }) => {
+  const columns: DataTableColumn<User>[] = useMemo(
+    () => [
+      {
+        key: 'name',
+        title: 'ФИО',
+        width: '1.4fr',
+        render: (u) => (
+          <span className="row" style={{ gap: 8 }}>
+            <span className={`t-ava sm round tone-${u.role}`}>
+              {getUserInitials(u, 'ПЛ')}
+            </span>
+            <span className="cell-main">{u.fullName || `${u.firstName} ${u.lastName}`}</span>
+          </span>
+        ),
+      },
+      {
+        key: 'email',
+        title: 'Email',
+        width: '1.4fr',
+        render: (u) => <span className="muted">{u.email}</span>,
+      },
+      {
+        key: 'phone',
+        title: 'Телефон',
+        width: '1.2fr',
+        render: (u) => (
+          <span className="tnum" style={{ whiteSpace: 'nowrap' }}>
+            {formatPhoneDisplay(u.phone)}
+          </span>
+        ),
+      },
+      {
+        key: 'role',
+        title: 'Роль',
+        width: '0.9fr',
+        render: (u) => {
+          const rInfo = USER_ROLE_META[u.role] || { label: u.role, cls: 'badge-outline' };
+          return <span className={`t-badge tone-${u.role}`}>{rInfo.label}</span>;
+        },
+      },
+      {
+        key: 'created',
+        title: 'Регистрация ↑',
+        width: '0.8fr',
+        render: (u) => (
+          <span className="tnum">{u.createdAt ? formatDateShort(u.createdAt) : '—'}</span>
+        ),
+      },
+    ],
+    []
+  );
+
+  const pagProps = paginationProps || {
+    page,
+    pageSize,
+    totalElements,
+    totalPages,
+    loading,
+    pageSizes: [10, 20, 50],
+    onPageChange,
+    onPageSizeChange,
+  };
+
   return (
-    <section className="island grow">
-      <div className="island-head">
-        <span className="island-title">
-          <Users size={18} />
-          Пользователи <span className="count">Найдено: {totalElements}</span>
-        </span>
-      </div>
-
-      <div className="table-wrap">
-        <div
-          className="dtable"
-          style={
-            {
-              '--cols': '1.4fr 1.4fr 1fr 0.9fr 0.8fr',
-              minWidth: '760px',
-            } as React.CSSProperties
-          }
-        >
-          <div className="thead">
-            <span>ФИО</span>
-            <span>Email</span>
-            <span>Телефон</span>
-            <span>Роль</span>
-            <span>Регистрация ↑</span>
-          </div>
-
-          {users.map((u) => {
-            const isSelected = selectedUser?.id === u.id;
-            const rInfo = USER_ROLE_META[u.role] || { label: u.role, cls: 'badge-outline' };
-            const created = u.createdAt ? formatDateShort(u.createdAt) : '—';
-
-            return (
-              <button
-                key={u.id}
-                type="button"
-                className={`trow ${isSelected ? 'sel' : ''}`}
-                onClick={() => onSelectUser(u)}
-              >
-                <span className="row" style={{ gap: 8 }}>
-                  <span className={`t-ava sm round tone-${u.role}`}>
-                    {getUserInitials(u, 'ПЛ')}
-                  </span>
-                  <span className="cell-main">{u.fullName || `${u.firstName} ${u.lastName}`}</span>
-                </span>
-                <span className="muted">{u.email}</span>
-                <span className="tnum">{u.phone || '—'}</span>
-                <span>
-                  <span className={`t-badge tone-${u.role}`}>{rInfo.label}</span>
-                </span>
-                <span className="tnum">{created}</span>
-              </button>
-            );
-          })}
-        </div>
-
-        {loading && users.length === 0 && (
-          <div className="empty">
-            <span className="spinner" aria-hidden="true" />
-            <span className="muted">Загрузка пользователей…</span>
-          </div>
-        )}
-
-        {users.length === 0 && !loading && (
-          <div className="empty">
-            <span className="empty-title">Пользователи не найдены</span>
-          </div>
-        )}
-      </div>
-
-      <PaginationFooter
-        page={page}
-        pageSize={pageSize}
-        totalElements={totalElements}
-        totalPages={totalPages}
-        loading={loading}
-        pageSizes={[10, 20, 50]}
-        onPageChange={onPageChange}
-        onPageSizeChange={onPageSizeChange}
-      />
-    </section>
+    <DataTable<User>
+      columns={columns}
+      data={users}
+      selectedId={selectedUser?.id}
+      onRowClick={onSelectUser}
+      loading={loading}
+      emptyText="Пользователи не найдены"
+      title="Пользователи"
+      icon={<Users size={18} />}
+      count={totalElements}
+      paginationProps={pagProps}
+      minWidth="760px"
+    />
   );
 };

@@ -7,7 +7,7 @@ import type { Veterinarian, Service } from '@/modules/clinic/types';
 import type { AppointmentStatus, User } from '@/shared/types';
 import { DatePicker, SearchCombobox, type SearchComboboxOption } from '@/shared/components';
 import { APPOINTMENT_STATUS_LIST, APPOINTMENT_STATUS_META, formatCurrency } from '@/shared/lib';
-import { getDoctorDisplay } from '@/utils/doctorHelpers';
+import { getDoctorDisplay } from '@/shared/lib';
 
 export interface AdminAppointmentsFiltersProps {
   vetFilter: string;
@@ -158,30 +158,32 @@ export const AdminAppointmentsFilters: React.FC<AdminAppointmentsFiltersProps> =
         />
       </div>
 
-      <div className="field" style={{ width: 145 }}>
-        <label className="field-label" htmlFor="aa-from">
-          С
-        </label>
-        <DatePicker
-          id="aa-from"
-          value={dateFrom}
-          max={dateTo || undefined}
-          onChange={onDateFromChange}
-          ariaLabel="Фильтр даты с"
-        />
-      </div>
+      <div className="row" style={{ gap: 8, alignItems: 'flex-end', flexWrap: 'nowrap' }}>
+        <div className="field" style={{ width: 140 }}>
+          <label className="field-label" htmlFor="aa-from">
+            С
+          </label>
+          <DatePicker
+            id="aa-from"
+            value={dateFrom}
+            max={dateTo || undefined}
+            onChange={onDateFromChange}
+            ariaLabel="Фильтр даты с"
+          />
+        </div>
 
-      <div className="field" style={{ width: 145 }}>
-        <label className="field-label" htmlFor="aa-to">
-          По
-        </label>
-        <DatePicker
-          id="aa-to"
-          value={dateTo}
-          min={dateFrom || undefined}
-          onChange={onDateToChange}
-          ariaLabel="Фильтр даты по"
-        />
+        <div className="field" style={{ width: 140 }}>
+          <label className="field-label" htmlFor="aa-to">
+            По
+          </label>
+          <DatePicker
+            id="aa-to"
+            value={dateTo}
+            min={dateFrom || undefined}
+            onChange={onDateToChange}
+            ariaLabel="Фильтр даты по"
+          />
+        </div>
       </div>
 
       <div className="field" style={{ width: 'auto' }}>

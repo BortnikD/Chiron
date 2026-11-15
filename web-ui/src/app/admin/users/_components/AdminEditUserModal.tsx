@@ -3,7 +3,8 @@
 import React, { useState, useEffect } from 'react';
 import { AlertCircle, X } from 'lucide-react';
 import type { User } from '@/shared/types';
-import { formatApiError } from '@/shared/lib';
+import { buildPatchPayload, formatApiError } from '@/shared/lib';
+import { PhoneInput } from '@/shared/components';
 
 export interface AdminEditUserModalProps {
   isOpen: boolean;
@@ -70,13 +71,22 @@ export const AdminEditUserModal: React.FC<AdminEditUserModalProps> = ({
     setSaving(true);
     setError(null);
     try {
-      await onUpdateUser(user.id, {
+      const initial = {
+        firstName: user.firstName,
+        middleName: user.middleName || null,
+        lastName: user.lastName,
+        email: user.email,
+        phone: user.phone,
+      };
+      const current = {
         firstName: editForm.firstName.trim(),
         middleName: editForm.middleName.trim() || null,
         lastName: editForm.lastName.trim(),
         email: editForm.email.trim(),
         phone: normalizedPhone,
-      });
+      };
+      const patch = buildPatchPayload(initial, current);
+      await onUpdateUser(user.id, patch);
       onClose();
     } catch (err: unknown) {
       setError(formatApiError(err, 'Ошибка обновления пользователя'));
@@ -178,10 +188,8 @@ export const AdminEditUserModal: React.FC<AdminEditUserModalProps> = ({
                 <label className="field-label" htmlFor="me-phone">
                   Телефон
                 </label>
-                <input
+                <PhoneInput
                   id="me-phone"
-                  type="tel"
-                  className="input"
                   value={editForm.phone}
                   onChange={(e) => setEditForm({ ...editForm, phone: e.target.value })}
                 />

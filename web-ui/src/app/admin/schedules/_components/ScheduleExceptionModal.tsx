@@ -11,7 +11,7 @@ import {
 } from '@/shared/components';
 import type { ScheduleExceptionType } from '@/shared/types';
 import { formatApiError, getMoscowTodayIso, timeToMinutes } from '@/shared/lib';
-import { getDoctorDisplay } from '@/utils/doctorHelpers';
+import { getDoctorDisplay } from '@/shared/lib';
 import type { ScheduleExceptionSavePayload } from './types';
 
 export interface ScheduleExceptionModalProps {

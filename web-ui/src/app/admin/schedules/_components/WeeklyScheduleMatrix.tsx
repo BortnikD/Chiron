@@ -12,7 +12,7 @@ import {
   timeToMinutes,
   formatDurationMinutes,
 } from '@/shared/lib';
-import { getDoctorDisplay } from '@/utils/doctorHelpers';
+import { getDoctorDisplay } from '@/shared/lib';
 
 export interface WeeklyScheduleMatrixProps {
   vets: Veterinarian[];

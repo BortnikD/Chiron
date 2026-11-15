@@ -4,6 +4,7 @@ import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { adminApi } from '@/modules/admin/api';
 import { clinicApi } from '@/modules/clinic/api';
+import { useDictionaries } from '@/shared/hooks';
 import type {
   AdminCreateAppointmentRequest,
   AdminUpdateAppointmentRequest,
@@ -13,7 +14,7 @@ import type { Veterinarian, Service, Species } from '@/modules/clinic/types';
 import type { AppointmentStatus, User } from '@/shared/types';
 import { useToast } from '@/shared/components';
 import { formatApiError, mapWithConcurrency } from '@/shared/lib';
-import { useResourceList } from '@/shared/hooks';
+import { useResourceList, useSelectionSync } from '@/shared/hooks';
 import { buildActiveFilterChips, nextMoscowDayIso } from '../_components/utils';
 
 export interface AdminAppointmentsFiltersState {
@@ -36,13 +37,30 @@ export function useAdminAppointments() {
   const initialVetId = searchParams.get('veterinarianId') || 'ALL';
   const initialServiceId = searchParams.get('serviceId') || 'ALL';
 
-  const [veterinarians, setVeterinarians] = useState<Veterinarian[]>([]);
-  const [services, setServices] = useState<Service[]>([]);
-  const [speciesList, setSpeciesList] = useState<Species[]>([]);
+  const {
+    species: dictSpecies,
+    services: dictServices,
+    veterinarians: dictVets,
+  } = useDictionaries();
+
+  const [veterinarians, setVeterinarians] = useState<Veterinarian[]>(() => dictVets);
+  const [services, setServices] = useState<Service[]>(() => dictServices);
+  const [speciesList, setSpeciesList] = useState<Species[]>(() => dictSpecies);
   const [pets, setPets] = useState<Pet[]>([]);
   const [users, setUsers] = useState<User[]>([]);
 
-  const [selectedAppt, setSelectedAppt] = useState<Appointment | null>(null);
+  useEffect(() => {
+    if (dictVets.length > 0) setVeterinarians(dictVets);
+  }, [dictVets]);
+
+  useEffect(() => {
+    if (dictServices.length > 0) setServices(dictServices);
+  }, [dictServices]);
+
+  useEffect(() => {
+    if (dictSpecies.length > 0) setSpeciesList(dictSpecies);
+  }, [dictSpecies]);
+
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [editAppt, setEditAppt] = useState<Appointment | null>(null);
 
@@ -56,7 +74,6 @@ export function useAdminAppointments() {
   const [deleteError, setDeleteError] = useState<string | null>(null);
 
   const refsReqIdRef = useRef(0);
-  const appliedInitialSelRef = useRef<string | null>(null);
   const petsRef = useRef<Pet[]>(pets);
   petsRef.current = pets;
   const usersRef = useRef<User[]>(users);
@@ -162,35 +179,24 @@ export function useAdminAppointments() {
           // ignore
         }
       }
-
-      if (initialSel && appliedInitialSelRef.current !== initialSel) {
-        appliedInitialSelRef.current = initialSel;
-        const foundInPage = items.find((a) => a.id === initialSel);
-        if (foundInPage) {
-          setSelectedAppt(foundInPage);
-        } else {
-          adminApi.getAppointmentById(initialSel).then(setSelectedAppt).catch(() => {});
-        }
-      } else {
-        setSelectedAppt((prev) => (prev ? items.find((a) => a.id === prev.id) ?? prev : null));
-      }
     },
+  });
+
+  const [selectedAppt, setSelectedAppt] = useSelectionSync<Appointment>({
+    items: resource.items,
+    storageKey: 'chiron-admin-appts-sel',
+    paramKey: 'sel',
+    fetchById: (id) => adminApi.getAppointmentById(id),
   });
 
   const loadRefs = useCallback(async () => {
     const reqId = ++refsReqIdRef.current;
     try {
-      const [vetsRes, svcsRes, speciesRes, allPets, allClients] = await Promise.all([
-        adminApi.getVeterinarians(),
-        adminApi.getServices(),
-        clinicApi.getSpecies(),
+      const [allPets, allClients] = await Promise.all([
         adminApi.getPets(0, 100).then((r) => r?.items || []),
         adminApi.getUsers(0, 100, 'CLIENT').then((r) => r?.items || []),
       ]);
       if (reqId !== refsReqIdRef.current) return;
-      setVeterinarians(Array.isArray(vetsRes) ? vetsRes : []);
-      setServices(Array.isArray(svcsRes) ? svcsRes : []);
-      setSpeciesList(Array.isArray(speciesRes) ? speciesRes : []);
 
       const safePets = Array.isArray(allPets) ? [...allPets] : [];
       const safeUsers = Array.isArray(allClients) ? [...allClients] : [];

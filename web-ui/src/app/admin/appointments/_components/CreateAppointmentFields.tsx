@@ -7,7 +7,7 @@ import type { Veterinarian, Service } from '@/modules/clinic/types';
 import type { AppointmentStatus, User } from '@/shared/types';
 import { DatePicker, SearchCombobox, type SearchComboboxOption } from '@/shared/components';
 import { APPOINTMENT_STATUS_META, formatCurrency, formatDateTimeCompact } from '@/shared/lib';
-import { getDoctorDisplay } from '@/utils/doctorHelpers';
+import { getDoctorDisplay } from '@/shared/lib';
 
 export interface CreateAppointmentFormState {
   veterinarianId: string;

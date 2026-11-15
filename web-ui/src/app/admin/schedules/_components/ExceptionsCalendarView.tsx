@@ -5,7 +5,7 @@ import { CalendarOff } from 'lucide-react';
 import type { ScheduleException } from '@/modules/admin/types';
 import type { Veterinarian } from '@/modules/clinic/types';
 import { formatIsoDateDisplay, getMoscowTodayIso } from '@/shared/lib';
-import { getDoctorDisplay } from '@/utils/doctorHelpers';
+import { getDoctorDisplay } from '@/shared/lib';
 
 export interface ExceptionsCalendarViewProps {
   exceptions: ScheduleException[];
