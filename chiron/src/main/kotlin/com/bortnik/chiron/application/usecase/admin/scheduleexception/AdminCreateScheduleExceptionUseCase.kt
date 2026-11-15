@@ -1,6 +1,7 @@
 package com.bortnik.chiron.application.usecase.admin.scheduleexception
 
 import com.bortnik.chiron.application.security.Actor
+import com.bortnik.chiron.application.usecase.common.notification.NotifyScheduleConflictsUseCase
 import com.bortnik.chiron.domain.dto.scheduleexception.CreateScheduleExceptionDto
 import com.bortnik.chiron.domain.dto.scheduleexception.ScheduleExceptionFilter
 import com.bortnik.chiron.domain.entities.ScheduleException
@@ -12,7 +13,10 @@ import org.springframework.transaction.annotation.Transactional
 
 @Service
 @Transactional
-class AdminCreateScheduleExceptionUseCase(private val scheduleExceptionRepository: ScheduleExceptionRepository) {
+class AdminCreateScheduleExceptionUseCase(
+    private val scheduleExceptionRepository: ScheduleExceptionRepository,
+    private val notifyScheduleConflicts: NotifyScheduleConflictsUseCase,
+) {
 
     private val log = LoggerFactory.getLogger(javaClass)
 
@@ -21,7 +25,9 @@ class AdminCreateScheduleExceptionUseCase(private val scheduleExceptionRepositor
             ScheduleExceptionFilter(veterinarianId = dto.veterinarianId, from = dto.startDate, to = dto.endDate),
         )
         ScheduleExceptionValidator.validate(dto, exceptions)
+        val conflictsBefore = notifyScheduleConflicts.conflictingIds(dto.veterinarianId)
         val exception = scheduleExceptionRepository.create(dto)
+        notifyScheduleConflicts.notifyNewConflicts(actor.userId, exception.veterinarianId, conflictsBefore)
         log.info(
             "Admin {} ({}) created schedule exception {} ({}) for veterinarian {}: {} - {}",
             actor.userId,

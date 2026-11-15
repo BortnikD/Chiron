@@ -13,6 +13,8 @@ import com.bortnik.chiron.support.TestEntities.pet
 import com.bortnik.chiron.support.TestEntities.vaccination
 import org.junit.jupiter.api.Test
 import org.mockito.Mockito.CALLS_REAL_METHODS
+import org.mockito.ArgumentCaptor
+import org.mockito.Mockito.any
 import org.mockito.Mockito.mock
 import org.mockito.Mockito.mockStatic
 import org.mockito.Mockito.times
@@ -44,7 +46,7 @@ class SendVaccinationDueRemindersUseCaseTest {
         val text = NotificationMessages.forVaccinationDue(pet.name, vaccination.name, today)
         val dto = CreateNotificationDto(
             pet.ownerId, type = NotificationType.VACCINATION_DUE, title = text.title, body = text.body,
-            petId = pet.id, vaccinationId = vaccination.id,
+            petId = pet.id, vaccinationId = vaccination.id, reminderDueOn = today,
         )
         `when`(create.createIfAbsent(dto)).thenReturn(notification, null)
         assertEquals(1, useCase.send())
@@ -94,9 +96,27 @@ class SendVaccinationDueRemindersUseCaseTest {
         verify(create).createIfAbsent(
             CreateNotificationDto(
                 pet.ownerId, type = NotificationType.VACCINATION_DUE, title = text.title, body = text.body,
-                petId = pet.id, vaccinationId = vaccination.id,
+                petId = pet.id, vaccinationId = vaccination.id, reminderDueOn = today,
             )
         )
+    }
+
+    @Test
+    fun `changed due date carries a new reminder key for the same vaccination`() = withClinicDate {
+        val moved = vaccination.copy(nextDueOn = today.plusDays(1))
+        `when`(vaccinations.findAll(filter)).thenReturn(listOf(vaccination), listOf(moved))
+        `when`(pets.findById(pet.id)).thenReturn(pet)
+        val fallback =
+            CreateNotificationDto(pet.ownerId, type = NotificationType.VACCINATION_DUE, title = "Due", body = "Due")
+        `when`(create.createIfAbsent(any(CreateNotificationDto::class.java) ?: fallback)).thenReturn(notification)
+
+        assertEquals(1, useCase.send())
+        assertEquals(1, useCase.send())
+
+        val captor = ArgumentCaptor.forClass(CreateNotificationDto::class.java)
+        verify(create, times(2)).createIfAbsent(captor.capture() ?: fallback)
+        assertEquals(listOf(today, moved.nextDueOn), captor.allValues.map { it.reminderDueOn })
+        assertEquals(setOf(vaccination.id), captor.allValues.map { it.vaccinationId }.toSet())
     }
 
     private fun withClinicDate(block: () -> Unit) {

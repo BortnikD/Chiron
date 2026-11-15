@@ -87,7 +87,10 @@ class AdminAppointmentController(
     ): ApiResponse<AppointmentResponse> =
         ApiResponse.success(updateAppointmentUseCase.update(actor, id, request.toDto()).toResponse())
 
-    @Operation(summary = "Delete appointment")
+    @Operation(
+        summary = "Delete cancelled appointment",
+        description = "Only CANCELLED appointments can be deleted; other statuses return 422. Notification history is kept.",
+    )
     @DeleteMapping("/{id}")
     fun delete(@AuthenticationPrincipal actor: Actor, @PathVariable id: UUID): ResponseEntity<Nothing> {
         deleteAppointmentUseCase.delete(actor, id)

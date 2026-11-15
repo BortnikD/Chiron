@@ -78,11 +78,63 @@ class NotificationRulesTest {
     }
 
     @Test
-    fun `completion and repeated status notify nobody`() {
+    fun `completion notifies the owner and repeated status notifies nobody`() {
         val before = appointment(status = AppointmentStatus.CONFIRMED)
 
-        assertTrue(rules(before, before.copy(status = AppointmentStatus.COMPLETED), actorId = VET_USER).isEmpty())
-        assertTrue(rules(before, before.copy(vetNotes = "notes"), actorId = VET_USER).isEmpty())
+        assertEquals(
+            listOf(NotificationTarget(NotificationType.APPOINTMENT_COMPLETED, setOf(OWNER))),
+            rules(before, before.copy(status = AppointmentStatus.COMPLETED), actorId = VET_USER),
+        )
+        assertTrue(rules(before, before, actorId = VET_USER).isEmpty())
+    }
+
+    @Test
+    fun `initial status determines the notification instead of announcing a booking`() {
+        val types = mapOf(
+            AppointmentStatus.CONFIRMED to NotificationType.APPOINTMENT_CONFIRMED,
+            AppointmentStatus.CANCELLED to NotificationType.APPOINTMENT_CANCELLED,
+            AppointmentStatus.COMPLETED to NotificationType.APPOINTMENT_COMPLETED,
+            AppointmentStatus.NO_SHOW to NotificationType.APPOINTMENT_NO_SHOW,
+        )
+        for ((status, type) in types) {
+            assertEquals(
+                listOf(NotificationTarget(type, setOf(OWNER, VET_USER))),
+                rules(null, appointment(status), actorId = ADMIN),
+            )
+        }
+    }
+
+    @Test
+    fun `adding editing and clearing veterinarian notes notifies the owner`() {
+        for ((old, updated) in listOf(null to "Notes", "Notes" to "New notes", "Notes" to null)) {
+            val before = appointment().copy(vetNotes = old)
+            assertEquals(
+                listOf(NotificationTarget(NotificationType.APPOINTMENT_NOTES_UPDATED, setOf(OWNER))),
+                rules(before, before.copy(vetNotes = updated), actorId = VET_USER),
+            )
+        }
+    }
+
+    @Test
+    fun `client comment updates notify veterinarian and unchanged notes notify nobody`() {
+        val before = appointment().copy(vetNotes = "Notes")
+        assertEquals(
+            listOf(NotificationTarget(NotificationType.APPOINTMENT_NOTES_UPDATED, setOf(VET_USER))),
+            rules(before, before.copy(clientComment = "Comment"), actorId = ADMIN),
+        )
+        assertTrue(rules(before, before.copy(vetNotes = "Notes"), actorId = ADMIN).isEmpty())
+    }
+
+    @Test
+    fun `completion together with notes notifies about both changes`() {
+        val before = appointment(status = AppointmentStatus.CONFIRMED)
+        assertEquals(
+            listOf(
+                NotificationTarget(NotificationType.APPOINTMENT_COMPLETED, setOf(OWNER)),
+                NotificationTarget(NotificationType.APPOINTMENT_NOTES_UPDATED, setOf(OWNER)),
+            ),
+            rules(before, before.copy(status = AppointmentStatus.COMPLETED, vetNotes = "Notes"), actorId = VET_USER),
+        )
     }
 
     @Test

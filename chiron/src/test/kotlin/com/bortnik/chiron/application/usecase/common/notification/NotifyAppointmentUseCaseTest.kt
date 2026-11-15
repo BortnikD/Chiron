@@ -5,6 +5,7 @@ import com.bortnik.chiron.application.notification.AppointmentNotificationDetail
 import com.bortnik.chiron.application.notification.NotificationMessages
 import com.bortnik.chiron.domain.dto.notification.CreateNotificationDto
 import com.bortnik.chiron.domain.entities.enums.NotificationType
+import com.bortnik.chiron.domain.entities.enums.AppointmentStatus
 import com.bortnik.chiron.domain.repositories.PetRepository
 import com.bortnik.chiron.domain.repositories.ServiceRepository
 import com.bortnik.chiron.domain.repositories.UserRepository
@@ -42,7 +43,7 @@ class NotifyAppointmentUseCaseTest {
     fun `client booking addresses veterinarian user and includes appointment context`() {
         allowContext()
         `when`(create.create(any(CreateNotificationDto::class.java) ?: fallback)).thenReturn(notification)
-        useCase.notifyChange(pet.ownerId, null, appointment)
+        useCase.notifyChange(pet.ownerId, null, appointment.copy(status = AppointmentStatus.PENDING))
         val captor = ArgumentCaptor.forClass(CreateNotificationDto::class.java)
         verify(create).create(captor.capture() ?: fallback)
         assertEquals(expected(user.id, pet.ownerId, NotificationType.APPOINTMENT_BOOKED), captor.value)
@@ -81,10 +82,56 @@ class NotifyAppointmentUseCaseTest {
     fun `reminder addresses owner without an actor and reports duplicate suppression`() {
         allowContext()
         val dto = expected(pet.ownerId, null, NotificationType.APPOINTMENT_REMINDER)
+            .copy(reminderStartAt = appointment.startAt)
         `when`(create.createIfAbsent(dto)).thenReturn(notification, null)
         assertTrue(useCase.remind(appointment))
         assertFalse(useCase.remind(appointment))
         verify(create, times(2)).createIfAbsent(dto)
+    }
+
+    @Test
+    fun `rescheduled appointment carries a new reminder key without changing its identity`() {
+        allowContext()
+        `when`(create.createIfAbsent(any(CreateNotificationDto::class.java) ?: fallback)).thenReturn(notification)
+        val moved = appointment.copy(
+            startAt = appointment.startAt.plusSeconds(86400),
+            endAt = appointment.endAt.plusSeconds(86400),
+        )
+        assertTrue(useCase.remind(appointment))
+        assertTrue(useCase.remind(moved))
+        val captor = ArgumentCaptor.forClass(CreateNotificationDto::class.java)
+        verify(create, times(2)).createIfAbsent(captor.capture() ?: fallback)
+        assertEquals(listOf(appointment.startAt, moved.startAt), captor.allValues.map { it.reminderStartAt })
+        assertEquals(setOf(appointment.id), captor.allValues.map { it.appointmentId }.toSet())
+    }
+
+    @Test
+    fun `completion and changed notes create separate stored notifications for the owner`() {
+        allowContext()
+        `when`(create.create(any(CreateNotificationDto::class.java) ?: fallback)).thenReturn(notification)
+        useCase.notifyChange(
+            user.id, appointment, appointment.copy(status = AppointmentStatus.COMPLETED, vetNotes = "New notes"),
+        )
+        val captor = ArgumentCaptor.forClass(CreateNotificationDto::class.java)
+        verify(create, times(2)).create(captor.capture() ?: fallback)
+        assertEquals(
+            setOf(NotificationType.APPOINTMENT_COMPLETED, NotificationType.APPOINTMENT_NOTES_UPDATED),
+            captor.allValues.map { it.type }.toSet(),
+        )
+        assertTrue(captor.allValues.all { it.recipientId == pet.ownerId && it.actorId == user.id })
+    }
+
+    @Test
+    fun `schedule conflict is stored for all administrators including the actor`() {
+        allowContext()
+        val actorId = UUID.randomUUID()
+        val otherAdminId = UUID.randomUUID()
+        `when`(create.create(any(CreateNotificationDto::class.java) ?: fallback)).thenReturn(notification)
+        useCase.notifyScheduleConflict(actorId, appointment, setOf(actorId, otherAdminId))
+        val captor = ArgumentCaptor.forClass(CreateNotificationDto::class.java)
+        verify(create, times(2)).create(captor.capture() ?: fallback)
+        assertEquals(setOf(actorId, otherAdminId), captor.allValues.map { it.recipientId }.toSet())
+        assertTrue(captor.allValues.all { it.type == NotificationType.SCHEDULE_CONFLICT && it.appointmentId == appointment.id })
     }
 
     private fun allowContext() {
@@ -97,7 +144,9 @@ class NotifyAppointmentUseCaseTest {
     private fun expected(recipient: UUID, actor: UUID?, type: NotificationType): CreateNotificationDto {
         val text = NotificationMessages.forAppointment(
             type,
-            AppointmentNotificationDetails(pet.name, service.name, user.fullName, appointment.startAt, null),
+            AppointmentNotificationDetails(
+                pet.name, service.name, user.fullName, appointment.startAt, null, appointment.status,
+            ),
             clinic.zoneId,
         )
         return CreateNotificationDto(recipient, actor, type, text.title, text.body, appointment.id, pet.id)

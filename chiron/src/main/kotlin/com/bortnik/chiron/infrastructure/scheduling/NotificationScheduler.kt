@@ -5,7 +5,7 @@ import com.bortnik.chiron.application.usecase.common.notification.SendVaccinatio
 import org.springframework.scheduling.annotation.Scheduled
 import org.springframework.stereotype.Component
 
-// Only triggers the use cases; both jobs are idempotent (one reminder per appointment / vaccination),
+// Only triggers the use cases; both jobs are idempotent (one reminder per appointment start / vaccination due date),
 // so a missed or repeated run is harmless.
 @Component
 class NotificationScheduler(

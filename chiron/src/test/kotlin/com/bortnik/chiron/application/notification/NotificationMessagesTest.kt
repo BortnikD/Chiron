@@ -1,11 +1,13 @@
 package com.bortnik.chiron.application.notification
 
 import com.bortnik.chiron.domain.entities.enums.NotificationType
+import com.bortnik.chiron.domain.entities.enums.AppointmentStatus
 import org.junit.jupiter.api.Test
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
 import kotlin.test.assertEquals
+import kotlin.test.assertNotEquals
 
 class NotificationMessagesTest {
 
@@ -52,6 +54,18 @@ class NotificationMessagesTest {
         assertEquals("Барсик: срок ревакцинации «Бешенство» — 01.11.2026.", text.body)
     }
 
+    @Test
+    fun `follow-up text explicitly distinguishes pending and confirmed status`() {
+        val pending = NotificationMessages.forAppointment(
+            NotificationType.FOLLOW_UP_SCHEDULED, details().copy(status = AppointmentStatus.PENDING), ZONE,
+        )
+        val confirmed = NotificationMessages.forAppointment(
+            NotificationType.FOLLOW_UP_SCHEDULED, details().copy(status = AppointmentStatus.CONFIRMED), ZONE,
+        )
+        assertEquals(pending.title, confirmed.title)
+        assertNotEquals(pending.body, confirmed.body)
+    }
+
     private fun details(
         startAt: Instant = Instant.parse("2026-10-27T07:30:00Z"),
         cancelReason: String? = null,
@@ -61,6 +75,7 @@ class NotificationMessagesTest {
         veterinarianName = "А. С. Иванова",
         startAt = startAt,
         cancelReason = cancelReason,
+        status = AppointmentStatus.PENDING,
     )
 
     private companion object {

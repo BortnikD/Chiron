@@ -52,11 +52,19 @@ class NotifyAppointmentUseCase(
         }
     }
 
-    // Returns false when the owner has already been reminded of this appointment.
+    fun notifyScheduleConflict(actorId: UUID, appointment: Appointment, administratorIds: Set<UUID>) {
+        val context = contextOf(appointment)
+        val type = NotificationType.SCHEDULE_CONFLICT
+        val text = textOf(type, context)
+        administratorIds.forEach { createNotificationUseCase.create(dtoOf(it, actorId, type, text, appointment)) }
+    }
+
+    // Returns false when the owner has already been reminded of this start time.
     fun remind(appointment: Appointment): Boolean {
         val context = contextOf(appointment)
         val type = NotificationType.APPOINTMENT_REMINDER
         val dto = dtoOf(context.ownerId, null, type, textOf(type, context), appointment)
+            .copy(reminderStartAt = appointment.startAt)
         return createNotificationUseCase.createIfAbsent(dto) != null
     }
 
@@ -77,6 +85,7 @@ class NotifyAppointmentUseCase(
                 veterinarianName = veterinarianUser.fullName,
                 startAt = appointment.startAt,
                 cancelReason = appointment.cancelReason,
+                status = appointment.status,
             ),
         )
     }

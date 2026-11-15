@@ -27,7 +27,7 @@ class SendVaccinationDueRemindersUseCase(
 
     private val log = LoggerFactory.getLogger(javaClass)
 
-    // Owners of non-archived pets are reminded once per vaccination whose next due date is within the lead days.
+    // Owners of non-archived pets are reminded once per due date within the lead days.
     // Returns how many reminders were sent.
     fun send(): Int {
         val today = LocalDate.now(clinicProperties.zoneId)
@@ -55,6 +55,7 @@ class SendVaccinationDueRemindersUseCase(
                 body = text.body,
                 petId = pet.id,
                 vaccinationId = vaccination.id,
+                reminderDueOn = dueOn,
             ),
         )
         return notification != null

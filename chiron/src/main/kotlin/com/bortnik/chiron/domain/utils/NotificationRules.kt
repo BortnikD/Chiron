@@ -6,9 +6,7 @@ import com.bortnik.chiron.domain.entities.enums.AppointmentStatus
 import com.bortnik.chiron.domain.entities.enums.NotificationType
 import java.util.UUID
 
-// The parties of an appointment are the pet owner and the veterinarian's user. Confirmation and no-show concern
-// only the owner; the other events go to both parties. The user who made the change is never notified, and admins
-// are never a party, so they only appear as actors.
+// Appointment events go to the affected parties, excluding the user who made the change.
 object NotificationRules {
 
     // before is null when the appointment has just been created; previousVeterinarianUserId is the user of the
@@ -25,16 +23,28 @@ object NotificationRules {
         val targets = mutableListOf<NotificationTarget>()
 
         if (before == null) {
-            val type = if (after.followUpOf != null) {
-                NotificationType.FOLLOW_UP_SCHEDULED
-            } else {
-                NotificationType.APPOINTMENT_BOOKED
+            val type = when (after.status) {
+                AppointmentStatus.PENDING -> if (after.followUpOf != null) {
+                    NotificationType.FOLLOW_UP_SCHEDULED
+                } else {
+                    NotificationType.APPOINTMENT_BOOKED
+                }
+
+                AppointmentStatus.CONFIRMED -> if (after.followUpOf != null) {
+                    NotificationType.FOLLOW_UP_SCHEDULED
+                } else {
+                    NotificationType.APPOINTMENT_CONFIRMED
+                }
+
+                AppointmentStatus.CANCELLED -> NotificationType.APPOINTMENT_CANCELLED
+                AppointmentStatus.COMPLETED -> NotificationType.APPOINTMENT_COMPLETED
+                AppointmentStatus.NO_SHOW -> NotificationType.APPOINTMENT_NO_SHOW
             }
             targets += NotificationTarget(type, parties)
         } else {
             val rescheduled = before.veterinarianId != after.veterinarianId ||
-                before.startAt != after.startAt ||
-                before.endAt != after.endAt
+                    before.startAt != after.startAt ||
+                    before.endAt != after.endAt
             if (rescheduled) {
                 targets += NotificationTarget(
                     NotificationType.APPOINTMENT_RESCHEDULED,
@@ -45,12 +55,27 @@ object NotificationRules {
                 when (after.status) {
                     AppointmentStatus.CONFIRMED ->
                         targets += NotificationTarget(NotificationType.APPOINTMENT_CONFIRMED, setOf(ownerId))
+
                     AppointmentStatus.CANCELLED ->
                         targets += NotificationTarget(NotificationType.APPOINTMENT_CANCELLED, parties)
+
                     AppointmentStatus.NO_SHOW ->
                         targets += NotificationTarget(NotificationType.APPOINTMENT_NO_SHOW, setOf(ownerId))
-                    AppointmentStatus.PENDING, AppointmentStatus.COMPLETED -> Unit
+
+                    AppointmentStatus.COMPLETED ->
+                        targets += NotificationTarget(NotificationType.APPOINTMENT_COMPLETED, setOf(ownerId))
+
+                    AppointmentStatus.PENDING -> Unit
                 }
+            }
+        }
+
+        if (before != null) {
+            val notesRecipients = mutableSetOf<UUID>()
+            if (before.vetNotes != after.vetNotes) notesRecipients += ownerId
+            if (before.clientComment != after.clientComment) notesRecipients += veterinarianUserId
+            if (notesRecipients.isNotEmpty()) {
+                targets += NotificationTarget(NotificationType.APPOINTMENT_NOTES_UPDATED, notesRecipients)
             }
         }
 

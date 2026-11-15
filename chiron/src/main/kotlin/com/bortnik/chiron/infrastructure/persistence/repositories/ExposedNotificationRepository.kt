@@ -7,6 +7,7 @@ import com.bortnik.chiron.domain.dto.pagination.PageRequest
 import com.bortnik.chiron.domain.entities.Notification
 import com.bortnik.chiron.domain.repositories.NotificationRepository
 import com.bortnik.chiron.infrastructure.persistence.exposedSql
+import com.bortnik.chiron.infrastructure.persistence.mappers.toDbTimestamp
 import com.bortnik.chiron.infrastructure.persistence.mappers.toNotification
 import com.bortnik.chiron.infrastructure.persistence.models.ExposedNotificationTable
 import com.bortnik.chiron.infrastructure.persistence.toPage
@@ -87,6 +88,8 @@ class ExposedNotificationRepository : NotificationRepository {
             it[appointmentId] = dto.appointmentId
             it[petId] = dto.petId
             it[vaccinationId] = dto.vaccinationId
+            it[reminderStartAt] = dto.reminderStartAt?.toDbTimestamp()
+            it[reminderDueOn] = dto.reminderDueOn
         }.map { it.toNotification() }
 
     private fun unreadOf(recipientId: UUID): Op<Boolean> =
