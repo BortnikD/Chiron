@@ -2,11 +2,11 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
-import { useAuth } from '@/context/AuthContext';
+import { useAuth } from '@/providers';
 import { ApiError } from '@/shared/api';
 import type { UserRole } from '@/shared/types';
 import { formatApiError, getHomeByRole } from '@/shared/lib';
-import { isDevMode } from '@/utils/env';
+import { isDevMode } from '@/shared/lib';
 import type {
   AuthMode,
   RegisterField,

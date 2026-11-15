@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { useTheme } from '@/context/ThemeContext';
+import { useTheme } from '@/providers';
 import { Sun, Moon, Monitor } from 'lucide-react';
 
 export const ThemeToggle: React.FC = () => {
