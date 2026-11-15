@@ -4,6 +4,7 @@ import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useToast } from '@/shared/components';
 import { clientApi } from '@/modules/client/api';
 import { clinicApi } from '@/modules/clinic/api';
+import { useDictionaries } from '@/shared/hooks';
 import type { Pet, Vaccination, Appointment } from '@/modules/client/types';
 import type { Service, Species, Veterinarian } from '@/modules/clinic/types';
 import { formatApiError, toIdNameMap } from '@/shared/lib';
@@ -15,11 +16,29 @@ export function useClientPets(
   tabParam: string | null = null
 ) {
   const { toast } = useToast();
+  const {
+    species: dictSpecies,
+    services: dictServices,
+    veterinarians: dictVets,
+  } = useDictionaries();
+
   const [pets, setPets] = useState<Pet[]>([]);
-  const [speciesList, setSpeciesList] = useState<Species[]>([]);
-  const [services, setServices] = useState<Service[]>([]);
-  const [veterinarians, setVeterinarians] = useState<Veterinarian[]>([]);
+  const [speciesList, setSpeciesList] = useState<Species[]>(() => dictSpecies);
+  const [services, setServices] = useState<Service[]>(() => dictServices);
+  const [veterinarians, setVeterinarians] = useState<Veterinarian[]>(() => dictVets);
   const [vaccinations, setVaccinations] = useState<Vaccination[]>([]);
+
+  useEffect(() => {
+    if (dictSpecies.length > 0) setSpeciesList(dictSpecies);
+  }, [dictSpecies]);
+
+  useEffect(() => {
+    if (dictServices.length > 0) setServices(dictServices);
+  }, [dictServices]);
+
+  useEffect(() => {
+    if (dictVets.length > 0) setVeterinarians(dictVets);
+  }, [dictVets]);
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadingAppts, setLoadingAppts] = useState(false);
@@ -133,21 +152,15 @@ export function useClientPets(
       setError(null);
     }
     try {
-      const [petsData, speciesData, vacData, svcData, vetsData] = await Promise.all([
+      const [petsData, vacData] = await Promise.all([
         clientApi.getPets({ withSummary: true }),
-        clinicApi.getSpecies(),
         clientApi.getVaccinations().catch(() => [] as Vaccination[]),
-        clinicApi.getServices().catch(() => [] as Service[]),
-        clinicApi.getVeterinarians().catch(() => [] as Veterinarian[]),
       ]);
       if (!isMountedRef.current || isCancelled?.() || reqId !== requestIdRef.current) return;
 
       const safePets: Pet[] = Array.isArray(petsData) ? petsData : [];
       setPets(safePets);
-      setSpeciesList(Array.isArray(speciesData) ? speciesData : []);
       setVaccinations(Array.isArray(vacData) ? vacData : []);
-      setServices(Array.isArray(svcData) ? svcData : []);
-      setVeterinarians(Array.isArray(vetsData) ? vetsData : []);
 
       setSelectedPet((prev) => (prev ? safePets.find((p) => p.id === prev.id) ?? null : null));
     } catch (err: unknown) {

@@ -7,7 +7,7 @@ import { useVetPatients } from './_hooks/useVetPatients';
 import { VetPatientsFilters } from './_components/VetPatientsFilters';
 import { VetPatientsList } from './_components/VetPatientsList';
 import { VetPatientDetailIsland } from './_components/VetPatientDetailIsland';
-import { VetAddVaccinationModal } from './_components/VetAddVaccinationModal';
+import { VaccinationFormModal } from '@/components/vaccinations';
 
 function VetPatientsContent() {
   const searchParams = useSearchParams();
@@ -107,14 +107,19 @@ function VetPatientsContent() {
         </div>
       </div>
 
-      <VetAddVaccinationModal
+      <VaccinationFormModal
         isOpen={isVacModalOpen && !!selectedPatient}
-        mode={editingVac ? 'edit' : 'create'}
-        vaccination={editingVac}
-        patient={selectedPatient}
+        initialData={editingVac}
+        lockedPetId={selectedPatient?.id}
+        petName={selectedPatient?.name}
         onClose={closeVaccinationModal}
-        onSubmit={handleAddVaccination}
-        onUpdate={handleUpdateVaccination}
+        onSubmit={async (payload) => {
+          if (editingVac) {
+            await handleUpdateVaccination(editingVac.id, payload as any);
+          } else {
+            await handleAddVaccination(payload as any);
+          }
+        }}
       />
     </>
   );

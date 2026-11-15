@@ -38,11 +38,9 @@ export function ClientPetsCarousel({
             const spName = p.species?.name || p.speciesName || (speciesMap && speciesMap[p.speciesId]) || 'Питомец';
             const age = calculateAgeRu(p.birthDate, 'возраст не указан');
             const petApptStartAt =
-              p.summary != null
-                ? p.summary.nextAppointment?.startAt ?? null
-                : appointments.find(
-                    (a) => a.petId === p.id && (a.status === 'PENDING' || a.status === 'CONFIRMED')
-                  )?.startAt ?? null;
+              appointments.find(
+                (a) => a.petId === p.id && (a.status === 'PENDING' || a.status === 'CONFIRMED')
+              )?.startAt ?? p.summary?.nextAppointment?.startAt ?? null;
 
             return (
               <div key={p.id} className={`hm-pet tone-${tone}`}>

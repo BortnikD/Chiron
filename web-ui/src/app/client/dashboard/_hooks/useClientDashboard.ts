@@ -54,6 +54,7 @@ export function useClientDashboard() {
         clientApi.getPets({ isArchived: false, withSummary: true }),
         clientApi.getAppointments({
           status: ['PENDING', 'CONFIRMED'],
+          from: new Date(Date.now() - 30 * 60 * 1000).toISOString(),
           direction: 'ASC',
           page: 0,
           size: 30,
@@ -68,7 +69,21 @@ export function useClientDashboard() {
       if (!isMountedRef.current || isCancelled?.() || reqId !== requestIdRef.current) return;
 
       const safePets = Array.isArray(petsData) ? petsData : [];
-      const upcomingItems = upcomingRes?.items ?? (Array.isArray(upcomingRes) ? upcomingRes : []);
+      let upcomingItems = [
+        ...(upcomingRes?.items ?? (Array.isArray(upcomingRes) ? upcomingRes : [])),
+      ];
+
+      // Гарантируем наличие ближайшей записи из сводки
+      if (
+        summaryData?.nextAppointment &&
+        (summaryData.nextAppointment.status === 'PENDING' ||
+          summaryData.nextAppointment.status === 'CONFIRMED') &&
+        !upcomingItems.some((a) => a.id === summaryData.nextAppointment?.id)
+      ) {
+        upcomingItems.push(summaryData.nextAppointment);
+      }
+
+      upcomingItems.sort((a, b) => new Date(a.startAt).getTime() - new Date(b.startAt).getTime());
 
       setSummary(summaryData);
       setPets(safePets);

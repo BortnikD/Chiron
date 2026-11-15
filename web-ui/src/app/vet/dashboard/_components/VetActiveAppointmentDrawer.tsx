@@ -18,9 +18,9 @@ import {
 import { ConsultationPrintSheet } from '@/components/print/ConsultationPrintSheet';
 import { PetAvatar } from '@/components/ui/EntityAvatar';
 import { PatientQuickViewModal } from '@/components/patients/PatientQuickViewModal';
-import { useAuth } from '@/context/AuthContext';
-import { getDoctorDisplay } from '@/utils/doctorHelpers';
-import { VetAddVaccinationModal } from '../../patients/_components/VetAddVaccinationModal';
+import { useAuth } from '@/providers';
+import { getDoctorDisplay } from '@/shared/lib';
+import { VaccinationFormModal } from '@/components/vaccinations';
 import type { VetActiveAppointmentDrawerProps } from './types';
 import { getPetName } from './utils';
 import { VetDrawerNotesSection } from './VetDrawerNotesSection';
@@ -329,14 +329,16 @@ export const VetActiveAppointmentDrawer: React.FC<VetActiveAppointmentDrawerProp
         onSubmit={(payload) => onCreateFollowUp(appointment.id, payload)}
       />
 
-      <VetAddVaccinationModal
+      <VaccinationFormModal
         isOpen={isVaccOpen}
-        mode="create"
-        patient={pet}
-        appointment={appointment}
+        lockedPetId={pet?.id}
+        petName={pet?.name}
+        appointmentId={appointment.id}
         serviceName={serviceName}
         onClose={() => setIsVaccOpen(false)}
-        onSubmit={handleCreateVaccination}
+        onSubmit={async (payload) => {
+          await handleCreateVaccination(payload as any);
+        }}
       />
 
       <VetCancelAppointmentModal

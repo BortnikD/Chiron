@@ -7,9 +7,8 @@ import { ConfirmModal } from '@/shared/components';
 import { useAdminVaccinations } from './_hooks/useAdminVaccinations';
 import { VaccinationsStats } from './_components/VaccinationsStats';
 import { VaccinationsFilters } from './_components/VaccinationsFilters';
-import { VaccinationsTable } from './_components/VaccinationsTable';
 import { VaccinationDetailIsland } from './_components/VaccinationDetailIsland';
-import { AddVaccinationModal } from './_components/AddVaccinationModal';
+import { VaccinationFormModal, VaccinationsTable } from '@/components/vaccinations';
 
 function AdminVaccinationsContent() {
   const vm = useAdminVaccinations();
@@ -70,12 +69,12 @@ function AdminVaccinationsContent() {
             />
 
             <VaccinationsTable
-              vaccinations={vm.vaccinations}
+              data={vm.vaccinations}
               pets={vm.pets}
               speciesList={vm.speciesList}
-              selectedVaccination={vm.selectedVaccination}
+              selectedId={vm.selectedVaccination?.id ?? null}
               loading={vm.loading}
-              totalElements={vm.totalElements}
+              count={vm.totalElements}
               paginationProps={vm.paginationProps}
               onSelect={vm.setSelectedVaccination}
               onEdit={vm.handleOpenEdit}
@@ -96,14 +95,16 @@ function AdminVaccinationsContent() {
         </div>
       </div>
 
-      <AddVaccinationModal
+      <VaccinationFormModal
         isOpen={vm.isModalOpen}
-        vaccination={vm.editingVaccination}
+        initialData={vm.editingVaccination}
         pets={vm.pets}
         speciesList={vm.speciesList}
         users={vm.users}
         onClose={vm.closeFormModal}
-        onSave={vm.saveVaccination}
+        onSubmit={async (payload) => {
+          await vm.saveVaccination(payload as any);
+        }}
       />
 
       <ConfirmModal

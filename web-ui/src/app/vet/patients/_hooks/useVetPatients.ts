@@ -11,7 +11,7 @@ import type {
 import type { Service, Species } from '@/modules/clinic/types';
 import { useToast } from '@/shared/components';
 import { fetchAllPages, formatApiError, toIdNameMap } from '@/shared/lib';
-import { useResourceList } from '@/shared/hooks';
+import { useResourceList, useDictionaries } from '@/shared/hooks';
 
 const DEFAULT_PAGE_SIZE = 20;
 
@@ -23,10 +23,23 @@ export interface VetPatientsFiltersState {
 export function useVetPatients(initialSelId?: string | null) {
   const { toast } = useToast();
 
+  const {
+    species: dictSpecies,
+    servicesRecordMap: dictServicesMap,
+  } = useDictionaries();
+
   const [appointmentsByPet, setAppointmentsByPet] = useState<Record<string, Appointment[]>>({});
-  const [speciesList, setSpeciesList] = useState<Species[]>([]);
-  const [servicesMap, setServicesMap] = useState<Record<string, string>>({});
+  const [speciesList, setSpeciesList] = useState<Species[]>(() => dictSpecies);
+  const [servicesMap, setServicesMap] = useState<Record<string, string>>(() => dictServicesMap);
   const [viewMode, setViewMode] = useState<'table' | 'cards'>('table');
+
+  useEffect(() => {
+    if (dictSpecies.length > 0) setSpeciesList(dictSpecies);
+  }, [dictSpecies]);
+
+  useEffect(() => {
+    setServicesMap(dictServicesMap);
+  }, [dictServicesMap]);
 
   const [selectedPatient, setSelectedPatient] = useState<Pet | null>(null);
   const [patientVacs, setPatientVacs] = useState<Vaccination[]>([]);
@@ -101,17 +114,7 @@ export function useVetPatients(initialSelId?: string | null) {
   });
 
   const loadRefs = useCallback(async () => {
-    try {
-      const [speciesData, servicesData] = await Promise.all([
-        clinicApi.getSpecies().catch(() => [] as Species[]),
-        clinicApi.getServices().catch(() => [] as Service[]),
-      ]);
-      if (!isMountedRef.current) return;
-      setSpeciesList(Array.isArray(speciesData) ? speciesData : []);
-      setServicesMap(toIdNameMap(Array.isArray(servicesData) ? servicesData : []));
-    } catch {
-      // ignore
-    }
+    // Справочники синхронизируются из единого провайдера useDictionaries()
   }, []);
 
   useEffect(() => {

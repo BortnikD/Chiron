@@ -15,7 +15,7 @@ import type {
 import type { Service, Species, Veterinarian } from '@/modules/clinic/types';
 import { useToast } from '@/shared/components';
 import { formatApiError, mapWithConcurrency } from '@/shared/lib';
-import { useResourceList } from '@/shared/hooks';
+import { useResourceList, useDictionaries, useSelectionSync } from '@/shared/hooks';
 import type { User } from '@/shared/types';
 import type { GenderFilter, StatusFilter } from '../_components/types';
 
@@ -38,12 +38,29 @@ export function useAdminPets() {
   const initialSel = searchParams.get('sel');
   const initialOwner = searchParams.get('ownerId') || 'ALL';
 
-  const [speciesList, setSpeciesList] = useState<Species[]>([]);
-  const [users, setUsers] = useState<User[]>([]);
-  const [services, setServices] = useState<Service[]>([]);
-  const [veterinarians, setVeterinarians] = useState<Veterinarian[]>([]);
+  const {
+    species: dictSpecies,
+    services: dictServices,
+    veterinarians: dictVets,
+  } = useDictionaries();
 
-  const [selectedPet, setSelectedPet] = useState<Pet | null>(null);
+  const [speciesList, setSpeciesList] = useState<Species[]>(() => dictSpecies);
+  const [users, setUsers] = useState<User[]>([]);
+  const [services, setServices] = useState<Service[]>(() => dictServices);
+  const [veterinarians, setVeterinarians] = useState<Veterinarian[]>(() => dictVets);
+
+  useEffect(() => {
+    if (dictSpecies.length > 0) setSpeciesList(dictSpecies);
+  }, [dictSpecies]);
+
+  useEffect(() => {
+    if (dictServices.length > 0) setServices(dictServices);
+  }, [dictServices]);
+
+  useEffect(() => {
+    if (dictVets.length > 0) setVeterinarians(dictVets);
+  }, [dictVets]);
+
   const [petAppointments, setPetAppointments] = useState<Appointment[]>([]);
   const [petVaccinations, setPetVaccinations] = useState<Vaccination[]>([]);
   const [loadingDetails, setLoadingDetails] = useState(false);
@@ -59,7 +76,6 @@ export function useAdminPets() {
 
   const refsReqIdRef = useRef(0);
   const detailsReqIdRef = useRef(0);
-  const appliedSelRef = useRef<string | null>(null);
   const usersRef = useRef<User[]>(users);
   usersRef.current = users;
 
@@ -122,29 +138,20 @@ export function useAdminPets() {
           // ignore
         }
       }
-
-      if (initialSel && appliedSelRef.current !== initialSel) {
-        appliedSelRef.current = initialSel;
-        const found = items.find((p) => p.id === initialSel);
-        if (found) setSelectedPet(found);
-        else {
-          adminApi.getPetById(initialSel).then(setSelectedPet).catch(() => {});
-        }
-      } else {
-        setSelectedPet((prev) => (prev ? items.find((p) => p.id === prev.id) || prev : null));
-      }
     },
+  });
+
+  const [selectedPet, setSelectedPet] = useSelectionSync<Pet>({
+    items: resource.items,
+    storageKey: 'chiron-admin-pets-sel',
+    paramKey: 'sel',
+    fetchById: (id) => adminApi.getPetById(id),
   });
 
   const loadRefs = useCallback(async () => {
     const reqId = ++refsReqIdRef.current;
     try {
-      const [speciesRes, allClients, servicesRes, vetsRes] = await Promise.all([
-        clinicApi.getSpecies(),
-        adminApi.getUsers(0, 100, 'CLIENT').then((r) => r?.items || []),
-        adminApi.getServices(),
-        adminApi.getVeterinarians(),
-      ]);
+      const allClients = await adminApi.getUsers(0, 100, 'CLIENT').then((r) => r?.items || []);
       if (reqId !== refsReqIdRef.current) return;
       const safeUsers = Array.isArray(allClients) ? [...allClients] : [];
       if (initialOwner && initialOwner !== 'ALL' && !safeUsers.some((u) => u.id === initialOwner)) {
@@ -155,13 +162,9 @@ export function useAdminPets() {
           // ignore
         }
       }
-      setSpeciesList(Array.isArray(speciesRes) ? speciesRes : []);
       setUsers(safeUsers);
-      setServices(Array.isArray(servicesRes) ? servicesRes : []);
-      setVeterinarians(
-        (Array.isArray(vetsRes) ? vetsRes : []).map((v) =>
-          v.user ? v : { ...v, user: safeUsers.find((u) => u.id === v.userId) }
-        )
+      setVeterinarians((prev) =>
+        prev.map((v) => (v.user ? v : { ...v, user: safeUsers.find((u) => u.id === v.userId) }))
       );
     } catch {
       // ignore
@@ -211,8 +214,16 @@ export function useAdminPets() {
   }, [selectedPet?.id, loadPetDetails]);
 
   const createPet = useCallback(
-    async (payload: CreatePetRequest): Promise<Pet> => {
+    async (payload: CreatePetRequest, photoFile?: File | null): Promise<Pet> => {
       const created = await adminApi.createPet(payload);
+      if (photoFile) {
+        try {
+          const links = await adminApi.uploadPetPhoto(created.id, photoFile);
+          Object.assign(created, links);
+        } catch {
+          // photo upload failure shouldn't fail pet creation
+        }
+      }
       toast('Питомец добавлен', created.name);
       await resource.reload();
       setSelectedPet(created);
@@ -222,8 +233,16 @@ export function useAdminPets() {
   );
 
   const updatePet = useCallback(
-    async (id: string, payload: UpdatePetRequest) => {
+    async (id: string, payload: UpdatePetRequest, photoFile?: File | null) => {
       const updated = await adminApi.updatePet(id, payload);
+      if (photoFile) {
+        try {
+          const links = await adminApi.uploadPetPhoto(id, photoFile);
+          Object.assign(updated, links);
+        } catch {
+          // photo upload failure shouldn't fail pet update
+        }
+      }
       toast('Данные питомца обновлены');
       await resource.reload();
       return updated;
@@ -256,7 +275,9 @@ export function useAdminPets() {
     async (payload: CreateVaccinationRequest) => {
       const created = await adminApi.createVaccination(payload);
       toast('Прививка внесена', created.name);
-      await loadPetDetails(payload.petId);
+      if (payload.petId) {
+        await loadPetDetails(payload.petId);
+      }
       return created;
     },
     [loadPetDetails, toast]

@@ -23,7 +23,6 @@ export const VaccinationsStats: React.FC<VaccinationsStatsProps> = ({
         display: 'grid',
         gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
         gap: '12px',
-        marginBottom: '14px',
       }}
     >
       <div className="card" style={{ padding: '16px' }}>

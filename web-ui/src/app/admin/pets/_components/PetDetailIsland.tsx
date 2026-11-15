@@ -14,7 +14,7 @@ import {
   getSpeciesTone,
   getVaccinationDueInfo,
 } from '@/shared/lib';
-import { getDoctorDisplay } from '@/utils/doctorHelpers';
+import { getDoctorDisplay } from '@/shared/lib';
 import type { PetDetailIslandProps, PetDetailTab } from './types';
 
 function getVaccinationBadgeClass(nextDueOn?: string | null): string {
