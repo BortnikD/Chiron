@@ -169,11 +169,11 @@ export function PetsList({
                   <div className="tcard-stats">
                     <div>
                       <span>Возраст</span>
-                      <b>{age}</b>
+                      <b title={age}>{age}</b>
                     </div>
                     <div>
                       <span>Вес</span>
-                      <b>{formatWeightRu(p.weightKg)}</b>
+                      <b title={formatWeightRu(p.weightKg)}>{formatWeightRu(p.weightKg)}</b>
                     </div>
                     <div>
                       <span>Приёмов</span>

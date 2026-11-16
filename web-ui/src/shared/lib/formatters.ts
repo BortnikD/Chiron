@@ -216,10 +216,12 @@ export function toIdNameMap<T extends { id: string; name: string }>(
   return map;
 }
 
+export type SpeciesTone = 'dog' | 'cat' | 'rab' | 'par' | 'pig' | 'fer';
+
 export function getSpeciesTone(
   speciesIdOrName?: string | null,
   speciesMap?: Record<string, string> | ReadonlyArray<{ id: string; name: string }>
-): 'dog' | 'rab' | 'par' | 'cat' {
+): SpeciesTone {
   let resolved = speciesIdOrName || '';
   if (speciesIdOrName && speciesMap) {
     if (Array.isArray(speciesMap)) {
@@ -251,17 +253,26 @@ export function getSpeciesTone(
     return 'cat';
   }
   if (
-    norm === '5eed0001-0000-0000-0000-000000000003' ||
     norm === '5eed0001-0000-0000-0000-000000000004' ||
-    norm === '5eed0001-0000-0000-0000-000000000005' ||
-    norm.includes('крол') ||
-    norm.includes('rab') ||
     norm.includes('морск') ||
     norm.includes('свин') ||
     norm.includes('guinea') ||
+    norm.includes('cavy')
+  ) {
+    return 'pig';
+  }
+  if (
+    norm === '5eed0001-0000-0000-0000-000000000005' ||
     norm.includes('хорёк') ||
     norm.includes('хорек') ||
     norm.includes('ferret')
+  ) {
+    return 'fer';
+  }
+  if (
+    norm === '5eed0001-0000-0000-0000-000000000003' ||
+    norm.includes('крол') ||
+    norm.includes('rab')
   ) {
     return 'rab';
   }
@@ -274,9 +285,12 @@ export function getSpeciesTone(
   ) {
     return 'par';
   }
-  if (norm.includes('000000000002')) return 'dog';
+  if (norm.includes('000000000001')) return 'dog';
+  if (norm.includes('000000000002')) return 'cat';
   if (norm.includes('000000000003')) return 'rab';
-  if (norm.includes('000000000004')) return 'par';
+  if (norm.includes('000000000004')) return 'pig';
+  if (norm.includes('000000000005')) return 'fer';
+  if (norm.includes('000000000006')) return 'par';
   return 'cat';
 }
 

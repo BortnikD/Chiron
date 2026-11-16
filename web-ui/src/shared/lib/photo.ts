@@ -22,13 +22,8 @@ export function resolvePhotoUrl(
   const fallback = variant === 'thumb' ? entity.photoUrl : entity.photoThumbnailUrl;
   const url = (primary || fallback || '').trim();
   if (!url) return null;
-  if (
-    typeof window !== 'undefined' &&
-    window.location.hostname !== 'localhost' &&
-    window.location.hostname !== '127.0.0.1' &&
-    /^https?:\/\/(localhost|127\.0\.0\.1):3900\//i.test(url)
-  ) {
-    return url.replace(/^https?:\/\/(localhost|127\.0\.0\.1):3900\//i, '/media/');
+  if (/^https?:\/\/(localhost|127\.0\.0\.1|garage):390[0-9]\//i.test(url)) {
+    return url.replace(/^https?:\/\/(localhost|127\.0\.0\.1|garage):390[0-9]\//i, '/media/');
   }
   return url;
 }
