@@ -1,10 +1,10 @@
-import { ApiResponse, ApiErrorResponse } from '@/shared/types';
+import { ApiResponse, ApiErrorResponse, ApiViolation } from '@/shared/types';
 
 export class ApiError extends Error {
   constructor(
     public status: number,
     message: string,
-    public violations?: { field: string; message: string }[],
+    public violations?: ApiViolation[] | null,
     public rawError?: ApiErrorResponse | null
   ) {
     super(message);
@@ -85,7 +85,7 @@ export async function request<T>(
     throw new ApiError(response.status, message, errorDetails?.violations, errorDetails);
   }
 
-  return data.result;
+  return data.result as unknown as T;
 }
 
 export const api = {

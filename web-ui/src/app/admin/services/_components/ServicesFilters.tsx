@@ -51,7 +51,7 @@ export const ServicesFilters: React.FC<ServicesFiltersProps> = ({
 
   return (
     <section className="island filters" aria-label="Фильтры услуг">
-      <div className="field" style={{ minWidth: 185 }}>
+      <div className="field" style={{ minWidth: 165 }}>
         <label className="field-label" htmlFor="sv-spec">
           Специализация
         </label>
@@ -64,7 +64,7 @@ export const ServicesFilters: React.FC<ServicesFiltersProps> = ({
         />
       </div>
 
-      <div className="field" style={{ minWidth: 155 }}>
+      <div className="field" style={{ minWidth: 140 }}>
         <label className="field-label" htmlFor="sv-species">
           Для вида
         </label>
@@ -93,7 +93,7 @@ export const ServicesFilters: React.FC<ServicesFiltersProps> = ({
         </div>
       </div>
 
-      <div className="field" style={{ width: 185 }}>
+      <div className="field" style={{ width: 175 }}>
         <label className="field-label" htmlFor="sv-search">
           Поиск
         </label>

@@ -3,8 +3,8 @@
 import React, { Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { AlertCircle } from 'lucide-react';
-import { useAuth } from '@/context/AuthContext';
-import { useTheme } from '@/context/ThemeContext';
+import { useAuth } from '@/providers';
+import { useTheme } from '@/providers';
 import { PublicHeader } from '@/components/layout/PublicHeader';
 import { AppShell } from '@/components/layout/AppShell';
 import { useVeterinariansCatalog } from './_hooks/useVeterinariansCatalog';
@@ -20,6 +20,7 @@ function VeterinariansContent() {
   const specParam = searchParams.get('spec');
   const openParam = searchParams.get('open') || searchParams.get('sel');
   const speciesParam = searchParams.get('species');
+  const searchParam = searchParams.get('search') || searchParams.get('q');
 
   const {
     specializations,
@@ -44,63 +45,65 @@ function VeterinariansContent() {
     hasFilters,
     resetFilters,
     filteredVets,
-  } = useVeterinariansCatalog(specParam, openParam, speciesParam);
+  } = useVeterinariansCatalog(specParam, openParam, speciesParam, searchParam);
 
   const content = (
-    <div className="content-row">
-      <div className="content-col grow">
-        <VeterinariansFilters
-          specializations={specializations}
-          speciesList={speciesList}
-          selectedSpec={selectedSpec}
-          onSelectSpec={setSelectedSpec}
-          selectedSpecies={selectedSpecies}
-          onSelectSpecies={setSelectedSpecies}
-          searchQuery={searchQuery}
-          onSearchChange={setSearchQuery}
-          onResetFilters={resetFilters}
-          hasFilters={hasFilters}
-        />
+    <div className="content-col grow" style={{ minWidth: 0, gap: 'var(--gap)' }}>
+      <VeterinariansFilters
+        specializations={specializations}
+        speciesList={speciesList}
+        selectedSpec={selectedSpec}
+        onSelectSpec={setSelectedSpec}
+        selectedSpecies={selectedSpecies}
+        onSelectSpecies={setSelectedSpecies}
+        searchQuery={searchQuery}
+        onSearchChange={setSearchQuery}
+        onResetFilters={resetFilters}
+        hasFilters={hasFilters}
+      />
 
-        {error && (
-          <div className="alert" role="alert">
-            <AlertCircle className="ic" />
-            <div className="row between wrap grow" style={{ gap: '8px' }}>
-              <span>{error}</span>
-              <button type="button" className="btn btn-outline btn-sm" onClick={reload}>
-                Повторить
-              </button>
-            </div>
+      {error && (
+        <div className="alert" role="alert">
+          <AlertCircle className="ic" />
+          <div className="row between wrap grow" style={{ gap: '8px' }}>
+            <span>{error}</span>
+            <button type="button" className="btn btn-outline btn-sm" onClick={reload}>
+              Повторить
+            </button>
           </div>
-        )}
-
-        <VeterinariansGrid
-          vets={filteredVets}
-          selectedVet={selectedVet}
-          onSelectVet={setSelectedVet}
-          specsMap={specsMap}
-          speciesMap={speciesMap}
-          vetPermissions={vetPermissions}
-          loading={loading}
-          hasFilters={hasFilters}
-          onReset={resetFilters}
-        />
-      </div>
-
-      {selectedVet && (
-        <VeterinarianDetailIsland
-          vet={selectedVet}
-          specsMap={specsMap}
-          speciesMap={speciesMap}
-          services={services}
-          permissions={vetPermissions[selectedVet.id] || []}
-          schedules={vetSchedules}
-          exceptions={vetExceptions}
-          onClose={() => setSelectedVet(null)}
-          isAuthenticated={isAuthenticated}
-          role={role}
-        />
+        </div>
       )}
+
+      <div className="content-row grow" style={{ minWidth: 0 }}>
+        <div className="content-col grow" style={{ minWidth: 0 }}>
+          <VeterinariansGrid
+            vets={filteredVets}
+            selectedVet={selectedVet}
+            onSelectVet={setSelectedVet}
+            specsMap={specsMap}
+            speciesMap={speciesMap}
+            vetPermissions={vetPermissions}
+            loading={loading}
+            hasFilters={hasFilters}
+            onReset={resetFilters}
+          />
+        </div>
+
+        {selectedVet && (
+          <VeterinarianDetailIsland
+            vet={selectedVet}
+            specsMap={specsMap}
+            speciesMap={speciesMap}
+            services={services}
+            permissions={vetPermissions[selectedVet.id] || []}
+            schedules={vetSchedules}
+            exceptions={vetExceptions}
+            onClose={() => setSelectedVet(null)}
+            isAuthenticated={isAuthenticated}
+            role={role}
+          />
+        )}
+      </div>
     </div>
   );
 

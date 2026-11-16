@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { Client, type IMessage } from '@stomp/stompjs';
-import { useAuth } from '@/context/AuthContext';
+import { useAuth } from '@/providers';
 import type { AppNotification } from '@/shared/types';
 
 export interface UseNotificationSocketOptions {

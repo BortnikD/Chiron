@@ -3,10 +3,10 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { useAuth } from '@/context/AuthContext';
-import { useTheme } from '@/context/ThemeContext';
+import { useAuth } from '@/providers';
+import { useTheme } from '@/providers';
 import { vetApi } from '@/modules/vet/api';
-import { isDevMode } from '@/utils/env';
+import { isDevMode } from '@/shared/lib';
 import { getHomeByRole, getUserInitials, type PhotoEntity } from '@/shared/lib';
 import { CommandPaletteModal } from './CommandPaletteModal';
 import { AppSidebar } from './shell/AppSidebar';

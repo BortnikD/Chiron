@@ -4,7 +4,7 @@ import { vetApi } from '@/modules/vet/api';
 import { clinicApi } from '@/modules/clinic/api';
 import type { Veterinarian } from '@/modules/clinic/types';
 import { useToast } from '@/shared/components';
-import { formatApiError, toIdNameMap } from '@/shared/lib';
+import { buildPatchPayload, formatApiError, toIdNameMap } from '@/shared/lib';
 
 export interface VetPracticeForm {
   bio: string;
@@ -85,10 +85,16 @@ export function useVetProfile() {
 
       setSaving(true);
       try {
-        const updated = await vetApi.updateProfile({
+        const initial = {
+          bio: vetProfile?.bio || null,
+          experienceYears: vetProfile?.experienceYears ?? 0,
+        };
+        const current = {
           bio: trimmedBio || null,
           experienceYears: Math.trunc(rawExp),
-        });
+        };
+        const patch = buildPatchPayload(initial, current);
+        const updated = await vetApi.updateProfile(patch);
         if (!isMountedRef.current) return;
         setVetProfile(updated);
         setForm({

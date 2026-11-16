@@ -12,6 +12,16 @@ export function getMoscowTodayIso(offsetDays = 0): string {
 }
 
 /**
+ * Смещает дату в формате YYYY-MM-DD на указанное количество дней.
+ */
+export function addDaysIso(isoDate: string, days: number): string {
+  const [y, m, d] = isoDate.split('-').map(Number);
+  if (!y || !m || !d) return isoDate;
+  const shifted = new Date(Date.UTC(y, m - 1, d + days, 12, 0, 0));
+  return shifted.toISOString().slice(0, 10);
+}
+
+/**
  * Извлекает календарную дату YYYY-MM-DD в часовом поясе Europe/Moscow из ISO-строки или Date.
  */
 export function getMoscowDateKey(input?: string | Date | null): string {
@@ -206,10 +216,12 @@ export function toIdNameMap<T extends { id: string; name: string }>(
   return map;
 }
 
+export type SpeciesTone = 'dog' | 'cat' | 'rab' | 'par' | 'pig' | 'fer';
+
 export function getSpeciesTone(
   speciesIdOrName?: string | null,
   speciesMap?: Record<string, string> | ReadonlyArray<{ id: string; name: string }>
-): 'dog' | 'rab' | 'par' | 'cat' {
+): SpeciesTone {
   let resolved = speciesIdOrName || '';
   if (speciesIdOrName && speciesMap) {
     if (Array.isArray(speciesMap)) {
@@ -241,17 +253,26 @@ export function getSpeciesTone(
     return 'cat';
   }
   if (
-    norm === '5eed0001-0000-0000-0000-000000000003' ||
     norm === '5eed0001-0000-0000-0000-000000000004' ||
-    norm === '5eed0001-0000-0000-0000-000000000005' ||
-    norm.includes('крол') ||
-    norm.includes('rab') ||
     norm.includes('морск') ||
     norm.includes('свин') ||
     norm.includes('guinea') ||
+    norm.includes('cavy')
+  ) {
+    return 'pig';
+  }
+  if (
+    norm === '5eed0001-0000-0000-0000-000000000005' ||
     norm.includes('хорёк') ||
     norm.includes('хорек') ||
     norm.includes('ferret')
+  ) {
+    return 'fer';
+  }
+  if (
+    norm === '5eed0001-0000-0000-0000-000000000003' ||
+    norm.includes('крол') ||
+    norm.includes('rab')
   ) {
     return 'rab';
   }
@@ -264,9 +285,12 @@ export function getSpeciesTone(
   ) {
     return 'par';
   }
-  if (norm.includes('000000000002')) return 'dog';
+  if (norm.includes('000000000001')) return 'dog';
+  if (norm.includes('000000000002')) return 'cat';
   if (norm.includes('000000000003')) return 'rab';
-  if (norm.includes('000000000004')) return 'par';
+  if (norm.includes('000000000004')) return 'pig';
+  if (norm.includes('000000000005')) return 'fer';
+  if (norm.includes('000000000006')) return 'par';
   return 'cat';
 }
 
@@ -428,3 +452,193 @@ export function formatApiError(err: unknown, fallback = 'Произошла ош
 
   return msg || fallback;
 }
+
+/**
+ * Вычисляет конечное время слота по начальному времени и длительности в минутах.
+ * Поддерживает ISO-строки и формат "HH:mm".
+ */
+export function calculateEndTime(startTime: string, durationMin: number): string {
+  if (!startTime || !durationMin) return '';
+  if (startTime.includes('T')) {
+    const d = new Date(startTime);
+    if (Number.isNaN(d.getTime())) return '';
+    d.setMinutes(d.getMinutes() + durationMin);
+    return d.toISOString();
+  }
+  const [h, m] = startTime.split(':').map(Number);
+  if (Number.isNaN(h) || Number.isNaN(m)) return '';
+  const totalMins = h * 60 + m + durationMin;
+  const endH = Math.floor(totalMins / 60) % 24;
+  const endM = totalMins % 60;
+  return `${String(endH).padStart(2, '0')}:${String(endM).padStart(2, '0')}`;
+}
+
+/**
+ * Короткое название дня недели с заглавной буквы ("Пн", "Вт", ...).
+ */
+export function formatWeekdayShortRu(isoOrDate: string | Date): string {
+  if (!isoOrDate) return '';
+  const d =
+    typeof isoOrDate === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(isoOrDate)
+      ? new Date(`${isoOrDate}T12:00:00+03:00`)
+      : typeof isoOrDate === 'string'
+      ? new Date(isoOrDate)
+      : isoOrDate;
+  if (Number.isNaN(d.getTime())) return '';
+  const rawDow = d.toLocaleDateString('ru-RU', {
+    weekday: 'short',
+    timeZone: MOSCOW_TIMEZONE,
+  });
+  return rawDow.charAt(0).toUpperCase() + rawDow.slice(1);
+}
+
+/**
+ * Дата в формате "24 окт" по московскому времени.
+ */
+export function formatMoscowMonthDay(isoOrDate: string | Date): string {
+  if (!isoOrDate) return '';
+  const d =
+    typeof isoOrDate === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(isoOrDate)
+      ? new Date(`${isoOrDate}T12:00:00+03:00`)
+      : typeof isoOrDate === 'string'
+      ? new Date(isoOrDate)
+      : isoOrDate;
+  if (Number.isNaN(d.getTime())) return '';
+  return d
+    .toLocaleDateString('ru-RU', {
+      day: 'numeric',
+      month: 'short',
+      timeZone: MOSCOW_TIMEZONE,
+    })
+    .replace(/\.$/, '');
+}
+
+export type VaccinationDueStatus = 'OVERDUE' | 'TODAY' | 'SOON' | 'UPCOMING' | 'LATER' | 'NONE';
+
+export interface VaccinationDueInfo {
+  text: string;
+  label: string;
+  cls: string;
+  tone: 'danger' | 'warn' | 'normal';
+  status: VaccinationDueStatus;
+  diffDays: number | null;
+}
+
+export function getVaccinationDueInfo(nextDueOn?: string | null): VaccinationDueInfo {
+  if (!nextDueOn) {
+    return { text: 'не задана', label: '—', cls: 'due-none', tone: 'normal', status: 'NONE', diffDays: null };
+  }
+  const dueIso = getMoscowDateKey(nextDueOn) || nextDueOn.slice(0, 10);
+  const todayIso = getMoscowTodayIso();
+  const todayMs = Date.parse(`${todayIso}T00:00:00Z`);
+  const dueMs = Date.parse(`${dueIso}T00:00:00Z`);
+
+  if (Number.isNaN(dueMs)) {
+    return { text: 'не задана', label: '—', cls: 'due-none', tone: 'normal', status: 'NONE', diffDays: null };
+  }
+
+  const diffDays = Math.round((dueMs - todayMs) / 86400000);
+  const label = formatIsoDateDisplay(dueIso);
+
+  if (diffDays < 0) {
+    return { text: 'просрочена', label, cls: 'due-over', tone: 'danger', status: 'OVERDUE', diffDays };
+  }
+  if (diffDays === 0) {
+    return { text: 'сегодня', label, cls: 'due-soon', tone: 'warn', status: 'TODAY', diffDays: 0 };
+  }
+  if (diffDays <= 7) {
+    return {
+      text: `через ${diffDays} ${pluralRu(diffDays, 'день', 'дня', 'дней')}`,
+      label,
+      cls: 'due-soon',
+      tone: 'warn',
+      status: 'SOON',
+      diffDays,
+    };
+  }
+  if (diffDays <= 30) {
+    return {
+      text: `через ${diffDays} ${pluralRu(diffDays, 'день', 'дня', 'дней')}`,
+      label,
+      cls: 'badge-accent',
+      tone: 'normal',
+      status: 'UPCOMING',
+      diffDays,
+    };
+  }
+  const months = Math.max(1, Math.round(diffDays / 30));
+  return {
+    text: `через ${months} мес.`,
+    label,
+    cls: 'due-later',
+    tone: 'normal',
+    status: 'LATER',
+    diffDays,
+  };
+}
+
+/**
+ * Форматирует строку в вид +7 (XXX) XXX-XX-XX при вводе в форму.
+ */
+export function formatPhoneInput(val: string): string {
+  if (!val) return '';
+  const digits = val.replace(/\D/g, '');
+  if (!digits) return '';
+
+  let nationalDigits = digits;
+  if (digits.startsWith('7') || digits.startsWith('8')) {
+    nationalDigits = digits.slice(1);
+  }
+
+  if (nationalDigits.length === 0) {
+    if (!val.includes('7') && !val.includes('8')) return '';
+    return '+7';
+  }
+
+  let formatted = `+7 (${nationalDigits.slice(0, 3)}`;
+  if (nationalDigits.length > 3) {
+    formatted += `) ${nationalDigits.slice(3, 6)}`;
+  } else if (nationalDigits.length === 3) {
+    formatted += ')';
+  }
+  if (nationalDigits.length > 6) {
+    formatted += `-${nationalDigits.slice(6, 8)}`;
+  }
+  if (nationalDigits.length > 8) {
+    formatted += `-${nationalDigits.slice(8, 10)}`;
+  }
+  return formatted;
+}
+
+/**
+ * Нормализует телефон к формату E.164 (+7XXXXXXXXXX) для отправки на сервер.
+ */
+export function normalizePhone(val: string | null | undefined): string {
+  if (!val) return '';
+  const digits = val.replace(/\D/g, '');
+  if (!digits) return '';
+  if (digits.length === 11 && (digits.startsWith('7') || digits.startsWith('8'))) {
+    return `+7${digits.slice(1)}`;
+  }
+  if (digits.length === 10) {
+    return `+7${digits}`;
+  }
+  return `+${digits}`;
+}
+
+/**
+ * Красивое отображение телефона в интерфейсе (таблицы, карточки).
+ */
+export function formatPhoneDisplay(phone?: string | null, emptyLabel = '—'): string {
+  if (!phone) return emptyLabel;
+  const digits = phone.replace(/\D/g, '');
+  if (digits.length === 11 && (digits.startsWith('7') || digits.startsWith('8'))) {
+    const nat = digits.slice(1);
+    return `+7 (${nat.slice(0, 3)}) ${nat.slice(3, 6)}-${nat.slice(6, 8)}-${nat.slice(8, 10)}`;
+  }
+  if (digits.length === 10) {
+    return `+7 (${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6, 8)}-${digits.slice(8, 10)}`;
+  }
+  return phone;
+}
+

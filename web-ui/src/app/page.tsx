@@ -3,8 +3,8 @@
 import React from 'react';
 import { AlertCircle } from 'lucide-react';
 import { PublicHeader } from '@/components/layout/PublicHeader';
-import { useTheme } from '@/context/ThemeContext';
-import { useAuth } from '@/context/AuthContext';
+import { useTheme } from '@/providers';
+import { useAuth } from '@/providers';
 import { useLandingData } from './_hooks/useLandingData';
 import { LandingHeroSection } from './_components/LandingHeroSection';
 import { LandingServicesSection } from './_components/LandingServicesSection';

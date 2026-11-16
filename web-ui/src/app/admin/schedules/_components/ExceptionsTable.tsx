@@ -10,7 +10,7 @@ import {
   type SearchComboboxOption,
 } from '@/shared/components';
 import { formatIsoDateDisplay } from '@/shared/lib';
-import { getDoctorDisplay } from '@/utils/doctorHelpers';
+import { getDoctorDisplay } from '@/shared/lib';
 import { ExceptionsCalendarView } from './ExceptionsCalendarView';
 
 export interface ExceptionsTableProps {
@@ -20,6 +20,13 @@ export interface ExceptionsTableProps {
   loading: boolean;
   vetFilter: string;
   onVetFilterChange: (vetId: string) => void;
+  exTypeFilter?: string;
+  onExTypeFilterChange?: (type: string) => void;
+  exFromFilter?: string;
+  onExFromFilterChange?: (from: string) => void;
+  exToFilter?: string;
+  onExToFilterChange?: (to: string) => void;
+  onResetFilters?: () => void;
   onRefresh: () => void;
   onEdit: (exception: ScheduleException) => void;
   onDelete: (exception: ScheduleException) => void;
@@ -34,14 +41,41 @@ export const ExceptionsTable: React.FC<ExceptionsTableProps> = ({
   loading,
   vetFilter,
   onVetFilterChange,
+  exTypeFilter: propExTypeFilter,
+  onExTypeFilterChange,
+  exFromFilter: propExFromFilter,
+  onExFromFilterChange,
+  exToFilter: propExToFilter,
+  onExToFilterChange,
+  onResetFilters,
   onRefresh,
   onEdit,
   onDelete,
 }) => {
-  const [exTypeFilter, setExTypeFilter] = useState<string>('');
-  const [exFromFilter, setExFromFilter] = useState<string>('');
-  const [exToFilter, setExToFilter] = useState<string>('');
+  const [internalExTypeFilter, setInternalExTypeFilter] = useState<string>('');
+  const [internalExFromFilter, setInternalExFromFilter] = useState<string>('');
+  const [internalExToFilter, setInternalExToFilter] = useState<string>('');
   const [currentPage, setCurrentPage] = useState<number>(1);
+
+  const exTypeFilter = propExTypeFilter !== undefined ? propExTypeFilter : internalExTypeFilter;
+  const setExTypeFilter = onExTypeFilterChange ?? setInternalExTypeFilter;
+
+  const exFromFilter = propExFromFilter !== undefined ? propExFromFilter : internalExFromFilter;
+  const setExFromFilter = onExFromFilterChange ?? setInternalExFromFilter;
+
+  const exToFilter = propExToFilter !== undefined ? propExToFilter : internalExToFilter;
+  const setExToFilter = onExToFilterChange ?? setInternalExToFilter;
+
+  const handleReset = () => {
+    if (onResetFilters) {
+      onResetFilters();
+    } else {
+      onVetFilterChange('');
+      setExTypeFilter('');
+      setExFromFilter('');
+      setExToFilter('');
+    }
+  };
 
   useEffect(() => {
     setCurrentPage(1);
@@ -147,12 +181,7 @@ export const ExceptionsTable: React.FC<ExceptionsTableProps> = ({
             <button
               type="button"
               className="btn btn-ghost btn-sm"
-              onClick={() => {
-                onVetFilterChange('');
-                setExTypeFilter('');
-                setExFromFilter('');
-                setExToFilter('');
-              }}
+              onClick={handleReset}
             >
               <X className="ic" style={{ width: '13px', height: '13px' }} />
               <span>Сбросить</span>

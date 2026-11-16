@@ -3,7 +3,7 @@
 import React from 'react';
 import { getSpeciesTone } from '@/shared/lib';
 
-export type SpeciesIconType = 'cat' | 'dog' | 'rab' | 'par' | string;
+export type SpeciesIconType = 'cat' | 'dog' | 'rab' | 'par' | 'pig' | 'fer' | string;
 
 interface SpeciesIconProps extends React.SVGProps<SVGSVGElement> {
   species?: SpeciesIconType;
@@ -63,6 +63,57 @@ export const SpeciesIcon: React.FC<SpeciesIconProps> = ({
         <path d="M18 21h-8a4 4 0 0 1-4-4 7 7 0 0 1 7-7h.2L9.6 6.4a1 1 0 1 1 2.8-2.8L15.8 7h.2c3.3 0 6 2.7 6 6v1a2 2 0 0 1-2 2h-1a3 3 0 0 0-3 3" />
         <path d="M20 8.54V4a2 2 0 1 0-4 0v3" />
         <path d="M7.612 12.524a3 3 0 1 0-1.6 4.3" />
+      </svg>
+    );
+  }
+
+  if (tone === 'pig') {
+    return (
+      <svg
+        viewBox="0 0 24 24"
+        width={size}
+        height={size}
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.75"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        className={className}
+        style={style}
+        {...props}
+      >
+        <path d="M15 8a2 2 0 0 1 2-2 2 2 0 0 1 2 2" />
+        <path d="M17 11h.01" />
+        <path d="M21 13c0-3-2-5-5-5h-1c-3.5 0-6 1.8-8 4.5A5.5 5.5 0 0 0 5 16a3.5 3.5 0 0 0 3.5 3.5H18a3 3 0 0 0 3-3.5v-3z" />
+        <path d="M21 13.5h-1.5" />
+        <path d="M8.5 19.5v2" />
+        <path d="M15.5 19.5v2" />
+      </svg>
+    );
+  }
+
+  if (tone === 'fer') {
+    return (
+      <svg
+        viewBox="0 0 24 24"
+        width={size}
+        height={size}
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.75"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        className={className}
+        style={style}
+        {...props}
+      >
+        <path d="M18 7.5a1.5 1.5 0 0 0-2-1" />
+        <path d="M19 10h.01" />
+        <path d="M21.5 10.5c0-.8-.7-1.5-1.5-1.5h-2c-2 0-3.5-1.2-5.5-1.2-3 0-5 1.5-6.5 4" />
+        <path d="M6 11.8C4.5 13 3 14.5 3 16.5a2.5 2.5 0 0 0 2.5 2.5H18a3 3 0 0 0 3-3c0-1.2-.6-2.2-1.5-3" />
+        <path d="M3 16.5c-1-1-1-2.5 0-3.8 1-1.2 2.5-1 3.5 0" />
+        <path d="M8.5 19v2.5" />
+        <path d="M16.5 19v2.5" />
       </svg>
     );
   }

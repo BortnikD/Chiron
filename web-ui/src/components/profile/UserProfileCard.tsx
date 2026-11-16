@@ -4,6 +4,8 @@ import React from 'react';
 import Link from 'next/link';
 import type { User } from '@/shared/types';
 import { User as UserIcon, Check, AlertCircle } from 'lucide-react';
+import { PhoneInput } from '@/shared/components';
+import { formatPhoneDisplay } from '@/shared/lib';
 import { ProfileIdentityCard } from './ProfileIdentityCard';
 import { useUserProfile } from './useUserProfile';
 
@@ -51,8 +53,8 @@ export const UserProfileCard: React.FC<UserProfileCardProps> = ({ onProfileUpdat
         initials={initials}
         photo={vetPhoto}
         fullName={fullName}
-        email={formData.email || user?.email || '—'}
-        phone={formData.phone || user?.phone || '—'}
+        email={user?.email || '—'}
+        phone={formatPhoneDisplay(user?.phone)}
         roleBadgeLabel={roleBadgeLabel}
         secondaryBadge={vetSpecBadge}
         regDateLabel={regDateLabel}
@@ -152,10 +154,8 @@ export const UserProfileCard: React.FC<UserProfileCardProps> = ({ onProfileUpdat
                 <label className="field-label" htmlFor="pf-phone">
                   Телефон
                 </label>
-                <input
-                  className="input"
+                <PhoneInput
                   id="pf-phone"
-                  type="tel"
                   value={formData.phone}
                   onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
                 />

@@ -12,7 +12,7 @@ import {
   formatDateTimeCompact,
   getSpeciesTone,
 } from '@/shared/lib';
-import { getDoctorDisplay } from '@/utils/doctorHelpers';
+import { getDoctorDisplay } from '@/shared/lib';
 
 export interface UserRelationsTabsProps {
   activeTab: 'pets' | 'appointments';

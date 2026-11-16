@@ -13,9 +13,9 @@ import {
   getMoscowDateKey,
   getMoscowTodayIso,
   timeToMinutes,
+  VET_STATUS_COLORS,
 } from '@/shared/lib';
 import { getPetName } from '../../dashboard/_components/utils';
-import { VET_STATUS_COLORS } from '../../dashboard/_components/vetTimelineUtils';
 
 const PPM = 1.4;
 const CAL_HOUR_PX = `${60 * PPM}px`;

@@ -15,7 +15,7 @@ import type { Service, Veterinarian } from '@/modules/clinic/types';
 import { PetAvatar } from '@/components/ui/EntityAvatar';
 import { EntityPhotoControl } from '@/components/ui/EntityPhotoControl';
 import { SpeciesIcon } from '@/components/ui/SpeciesIcon';
-import { getDoctorDisplay } from '@/utils/doctorHelpers';
+import { getDoctorDisplay } from '@/shared/lib';
 import {
   APPOINTMENT_STATUS_META,
   calculateAgeRu,

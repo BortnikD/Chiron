@@ -16,7 +16,7 @@ import {
   getMoscowDateKey,
   timeToMinutes,
 } from '@/shared/lib';
-import { getDoctorDisplay } from '@/utils/doctorHelpers';
+import { getDoctorDisplay } from '@/shared/lib';
 import { buildUpdateAppointmentPayload, computeAppointmentEditRange } from './utils';
 
 export interface AdminEditAppointmentModalProps {

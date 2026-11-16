@@ -6,7 +6,7 @@ import { Calendar, ChevronRight } from 'lucide-react';
 import type { Appointment, Pet } from '@/modules/client/types';
 import type { Service, Veterinarian } from '@/modules/clinic/types';
 import { PetAvatar } from '@/components/ui/EntityAvatar';
-import { getDoctorDisplay } from '@/utils/doctorHelpers';
+import { getDoctorDisplay } from '@/shared/lib';
 import {
   APPOINTMENT_STATUS_META,
   formatCurrency,
@@ -33,18 +33,13 @@ export function ClientAppointmentsIsland({
   servicesMap = {},
   veterinariansMap = {},
   speciesMap = {},
-  nextAppointmentId,
 }: ClientAppointmentsIslandProps) {
   const upcomingAppts = useMemo(() => {
-    const sorted = appointments
+    return appointments
       .filter((a) => a && (a.status === 'PENDING' || a.status === 'CONFIRMED'))
-      .sort((a, b) => new Date(a.startAt).getTime() - new Date(b.startAt).getTime());
-    if (sorted.length > 1 && nextAppointmentId) {
-      const withoutNext = sorted.filter((a) => a.id !== nextAppointmentId);
-      if (withoutNext.length > 0) return withoutNext.slice(0, 6);
-    }
-    return sorted.slice(0, 6);
-  }, [appointments, nextAppointmentId]);
+      .sort((a, b) => new Date(a.startAt).getTime() - new Date(b.startAt).getTime())
+      .slice(0, 6);
+  }, [appointments]);
 
   const groupedUpcoming = useMemo(() => {
     const groups: { dateKey: string; dayLabel: string; countText: string; items: Appointment[] }[] = [];

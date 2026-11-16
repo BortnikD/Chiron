@@ -55,7 +55,7 @@ function AdminSchedulesContent() {
           </div>
         )}
 
-        <section className="island filters" style={{ padding: '8px 12px' }}>
+        <section className="island" style={{ padding: '8px 16px' }}>
           <div className="seg" role="tablist" aria-label="Разделы расписания">
             <button
               type="button"
@@ -90,7 +90,7 @@ function AdminSchedulesContent() {
             loadingVets={s.loadingVets}
             loadingSchedule={s.loadingSchedule}
             onSelectVet={s.setSelectedVetId}
-            onRefresh={() => s.selectedVetId && s.loadSchedule(s.selectedVetId)}
+            onRefresh={() => s.selectedVetId && s.loadSchedule(s.selectedVetId, true)}
             onAddDay={s.openAddDay}
             onEditDay={s.openEditDay}
             onDeleteDay={s.requestDeleteSchedule}
@@ -103,6 +103,13 @@ function AdminSchedulesContent() {
             loading={s.loadingExceptions}
             vetFilter={s.excVetFilter}
             onVetFilterChange={s.setExcVetFilter}
+            exTypeFilter={s.excTypeFilter}
+            onExTypeFilterChange={s.setExcTypeFilter}
+            exFromFilter={s.excFromFilter}
+            onExFromFilterChange={s.setExcFromFilter}
+            exToFilter={s.excToFilter}
+            onExToFilterChange={s.setExcToFilter}
+            onResetFilters={s.resetExcFilters}
             onRefresh={s.loadExceptions}
             onEdit={s.openEditException}
             onDelete={s.requestDeleteException}

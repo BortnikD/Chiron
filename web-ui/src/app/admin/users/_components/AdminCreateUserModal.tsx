@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { AlertCircle, X } from 'lucide-react';
 import type { User, UserRole } from '@/shared/types';
 import { formatApiError, getUtf8ByteLength } from '@/shared/lib';
+import { PhoneInput } from '@/shared/components';
 import type { CreateUserInput } from '../_hooks/useAdminUsers';
 
 export interface AdminCreateUserModalProps {
@@ -62,18 +63,19 @@ export const AdminCreateUserModal: React.FC<AdminCreateUserModalProps> = ({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const normalizedPhone = createForm.phone.replace(/[\s()-]/g, '').trim();
+    const phoneDigits = createForm.phone.replace(/\D/g, '');
     if (
       !createForm.firstName.trim() ||
       !createForm.lastName.trim() ||
       !createForm.email.trim() ||
-      !normalizedPhone ||
+      !createForm.phone.trim() ||
       !createForm.password
     ) {
       setCreateError('Заполните обязательные поля');
       return;
     }
-    if (!/^\+?\d{10,15}$/.test(normalizedPhone)) {
-      setCreateError('Телефон должен содержать от 10 до 15 цифр (например, +79001234567)');
+    if (phoneDigits.length !== 11) {
+      setCreateError('Номер телефона должен содержать 11 цифр (например, +7 (900) 123-45-67)');
       return;
     }
     if (createForm.password.length < 8) {
@@ -222,10 +224,8 @@ export const AdminCreateUserModal: React.FC<AdminCreateUserModalProps> = ({
                 <label className="field-label" htmlFor="cu-phone">
                   Телефон <span className="req">*</span>
                 </label>
-                <input
+                <PhoneInput
                   id="cu-phone"
-                  type="tel"
-                  className="input"
                   value={createForm.phone}
                   onChange={(e) => setCreateForm({ ...createForm, phone: e.target.value })}
                   required

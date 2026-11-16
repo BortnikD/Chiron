@@ -6,7 +6,7 @@ import { Clock, ChevronRight } from 'lucide-react';
 import type { Pet, Appointment } from '@/modules/client/types';
 import type { Service, Veterinarian } from '@/modules/clinic/types';
 import { PetAvatar } from '@/components/ui/EntityAvatar';
-import { getDoctorDisplay } from '@/utils/doctorHelpers';
+import { getDoctorDisplay } from '@/shared/lib';
 import {
   APPOINTMENT_STATUS_META,
   formatCurrency,

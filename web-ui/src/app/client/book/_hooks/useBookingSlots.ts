@@ -4,7 +4,14 @@ import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { clinicApi } from '@/modules/clinic/api';
 import type { Pet } from '@/modules/client/types';
 import type { Service, Veterinarian, AvailableSlotResponse } from '@/modules/clinic/types';
-import { formatApiError, getMoscowDateKey, getMoscowTodayIso, pluralRu } from '@/shared/lib';
+import {
+  formatApiError,
+  formatMoscowMonthDay,
+  formatWeekdayShortRu,
+  getMoscowDateKey,
+  getMoscowTodayIso,
+  pluralRu,
+} from '@/shared/lib';
 
 export interface GroupedDaySlots {
   dateKey: string;
@@ -43,19 +50,9 @@ function groupSlotsByDay(slots: AvailableSlotResponse[], todayStr: string): Grou
   });
 
   return Object.entries(groups).map(([dateKey, daySlots]) => {
-    const firstSlot = new Date(daySlots[0].startAt);
-    const rawDow = firstSlot.toLocaleDateString('ru-RU', {
-      weekday: 'short',
-      timeZone: 'Europe/Moscow',
-    });
-    const dow = rawDow.charAt(0).toUpperCase() + rawDow.slice(1);
-    const dateLabel = firstSlot
-      .toLocaleDateString('ru-RU', {
-        day: 'numeric',
-        month: 'short',
-        timeZone: 'Europe/Moscow',
-      })
-      .replace(/\.$/, '');
+    const firstSlot = daySlots[0].startAt;
+    const dow = formatWeekdayShortRu(firstSlot);
+    const dateLabel = formatMoscowMonthDay(firstSlot);
     const isToday = dateKey === todayStr;
     const slotsCountLabel = `${daySlots.length} ${pluralRu(daySlots.length, 'окно', 'окна', 'окон')}`;
 

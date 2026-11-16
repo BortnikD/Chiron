@@ -11,6 +11,14 @@ export const APPOINTMENT_STATUS_META: Record<
   NO_SHOW: { label: 'Неявка', short: 'Неявка', cls: 'badge-NO_SHOW' },
 };
 
+export const VET_STATUS_COLORS: Record<AppointmentStatus, string> = {
+  PENDING: 'var(--st-pending-fg)',
+  CONFIRMED: 'var(--st-confirmed-fg)',
+  COMPLETED: 'var(--st-completed-fg)',
+  CANCELLED: 'var(--st-cancelled-fg)',
+  NO_SHOW: 'var(--st-noshow-fg)',
+};
+
 export const APPOINTMENT_STATUS_LIST: AppointmentStatus[] = [
   'PENDING',
   'CONFIRMED',

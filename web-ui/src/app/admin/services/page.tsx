@@ -24,7 +24,7 @@ function AdminServicesContent() {
 
   return (
     <>
-      <section className="island filters" style={{ padding: '8px 12px', marginBottom: 'var(--gap)' }}>
+      <section className="island" style={{ padding: '8px 16px' }}>
         <div className="seg" role="tablist" aria-label="Справочники">
           {SERVICE_NAV_TABS.map((t) => (
             <button

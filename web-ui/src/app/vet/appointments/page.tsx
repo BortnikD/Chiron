@@ -61,6 +61,7 @@ function VetAppointmentsContent() {
     handleSaveNotes,
     handleCreateFollowUp,
     handleCreateVaccination,
+    paginationProps,
   } = useVetAppointments({ initialSelId, initialPetId });
 
   return (
@@ -119,6 +120,7 @@ function VetAppointmentsContent() {
               onClearDateFrom={() => setDateFrom('')}
               onClearDateTo={() => setDateTo('')}
               onResetAll={resetFilters}
+              paginationProps={paginationProps}
             />
           ) : (
             <VetAppointmentsCalendar

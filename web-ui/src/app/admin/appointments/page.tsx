@@ -5,7 +5,7 @@ import { AlertCircle, RefreshCw } from 'lucide-react';
 import { useShellHeader } from '@/components/layout/AppShell';
 import { ConfirmModal } from '@/shared/components';
 import { formatDateTimeCompact } from '@/shared/lib';
-import { getDoctorDisplay } from '@/utils/doctorHelpers';
+import { getDoctorDisplay } from '@/shared/lib';
 import { useAdminAppointments } from './_hooks/useAdminAppointments';
 import { CANCEL_REASONS, formatAppointmentCrumb } from './_components/utils';
 import { AdminAppointmentsFilters } from './_components/AdminAppointmentsFilters';
@@ -92,6 +92,7 @@ function AdminAppointmentsContent() {
             onEdit={vm.setEditAppt}
             onCancel={vm.openCancelModal}
             onDelete={vm.openDeleteModal}
+            paginationProps={vm.paginationProps}
           />
         </div>
 

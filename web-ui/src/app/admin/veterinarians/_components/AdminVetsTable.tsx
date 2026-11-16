@@ -5,9 +5,10 @@ import { Stethoscope } from 'lucide-react';
 import type { Veterinarian, Specialization, Species } from '@/modules/clinic/types';
 import type { User } from '@/shared/types';
 import { getSpecTone, getSpeciesTone, pluralRu, toIdNameMap } from '@/shared/lib';
+import { DataTable, type DataTableColumn } from '@/shared/components';
 import { SpeciesIcon } from '@/components/ui/SpeciesIcon';
 import { VetAvatar } from '@/components/ui/EntityAvatar';
-import { getDoctorDisplay } from '@/utils/doctorHelpers';
+import { getDoctorDisplay } from '@/shared/lib';
 
 export interface AdminVetsTableProps {
   vets: Veterinarian[];
@@ -36,103 +37,104 @@ export const AdminVetsTable: React.FC<AdminVetsTableProps> = ({
   );
   const specsMap = useMemo(() => toIdNameMap(specializations), [specializations]);
 
+  const columns = useMemo<DataTableColumn<Veterinarian>[]>(() => {
+    return [
+      {
+        key: 'doctor',
+        title: 'Врач',
+        width: '1.4fr',
+        render: (v) => {
+          const doc = getDoctorDisplay({ ...v, user: v.user || usersMap[v.userId] }, specsMap);
+          const tone = getSpecTone(v.specializationId);
+          return (
+            <span className="row" style={{ gap: 8, alignItems: 'center' }}>
+              <VetAvatar
+                vet={v}
+                initials={doc.initials}
+                tone={tone}
+                className={`t-ava sm round tone-${tone}`}
+                alt={doc.fullName}
+              />
+              <span className="cell-main">{doc.fullName}</span>
+            </span>
+          );
+        },
+      },
+      {
+        key: 'spec',
+        title: 'Специализация',
+        width: '1fr',
+        render: (v) => {
+          const doc = getDoctorDisplay({ ...v, user: v.user || usersMap[v.userId] }, specsMap);
+          const specName = v.specializationId ? doc.specName : 'Не указана';
+          const tone = getSpecTone(v.specializationId);
+          return <span className={`t-badge tone-${tone}`}>{specName}</span>;
+        },
+      },
+      {
+        key: 'experience',
+        title: 'Стаж',
+        width: '0.6fr',
+        align: 'right',
+        render: (v) => (
+          <span className="right tnum">
+            {v.experienceYears != null
+              ? `${v.experienceYears} ${pluralRu(v.experienceYears, 'год', 'года', 'лет')}`
+              : '—'}
+          </span>
+        ),
+      },
+      {
+        key: 'species',
+        title: 'Допуски к видам',
+        width: '1.6fr',
+        render: (v) => {
+          const perms = vetPermMap[v.id] || [];
+          const permittedSpecies = speciesList.filter((sp) => perms.includes(sp.id));
+          return (
+            <span className="chips">
+              {permittedSpecies.length > 0 ? (
+                permittedSpecies.map((sp) => {
+                  const tone = getSpeciesTone(sp.name);
+                  return (
+                    <span key={sp.id} className={`sp-chip tone-${tone}`}>
+                      <SpeciesIcon species={tone} size={14} className="ic" />
+                      {sp.name}
+                    </span>
+                  );
+                })
+              ) : (
+                <span className="small muted">Нет допусков</span>
+              )}
+            </span>
+          );
+        },
+      },
+      {
+        key: 'status',
+        title: 'Статус',
+        width: '0.8fr',
+        render: (v) => (
+          <span className={`badge ${v.isActive ? 'badge-accent' : 'badge-outline'}`}>
+            {v.isActive ? 'Активен' : 'Неактивен'}
+          </span>
+        ),
+      },
+    ];
+  }, [usersMap, specsMap, speciesList, vetPermMap]);
+
   return (
-    <section className="island grow">
-      <div className="island-head">
-        <span className="island-title">
-          <Stethoscope size={18} />
-          Врачи <span className="count">{vets.length} · включая неактивных</span>
-        </span>
-      </div>
-
-      <div className="table-wrap">
-        <div
-          className="dtable"
-          style={
-            {
-              '--cols': '1.4fr 1fr 0.6fr 1.6fr 0.8fr',
-              minWidth: '720px',
-            } as React.CSSProperties
-          }
-        >
-          <div className="thead">
-            <span>Врач</span>
-            <span>Специализация</span>
-            <span className="right">Стаж</span>
-            <span>Допуски к видам</span>
-            <span>Статус</span>
-          </div>
-
-          {vets.map((v) => {
-            const doc = getDoctorDisplay({ ...v, user: v.user || usersMap[v.userId] }, specsMap);
-            const specName = v.specializationId ? doc.specName : 'Не указана';
-            const isSelected = selectedVet?.id === v.id;
-            const perms = vetPermMap[v.id] || [];
-            const permittedSpecies = speciesList.filter((sp) => perms.includes(sp.id));
-
-            return (
-              <button
-                key={v.id}
-                type="button"
-                className={`trow ${isSelected ? 'sel' : ''}`}
-                onClick={() => onSelectVet(v)}
-              >
-                <span className="row" style={{ gap: 8 }}>
-                  <VetAvatar
-                    vet={v}
-                    initials={doc.initials}
-                    tone={getSpecTone(v.specializationId)}
-                    className={`t-ava sm round tone-${getSpecTone(v.specializationId)}`}
-                    alt={doc.fullName}
-                  />
-                  <span className="cell-main">{doc.fullName}</span>
-                </span>
-                <span>
-                  <span className={`t-badge tone-${getSpecTone(v.specializationId)}`}>{specName}</span>
-                </span>
-                <span className="right tnum">
-                  {v.experienceYears != null
-                    ? `${v.experienceYears} ${pluralRu(v.experienceYears, 'год', 'года', 'лет')}`
-                    : '—'}
-                </span>
-                <span className="chips">
-                  {permittedSpecies.length > 0 ? (
-                    permittedSpecies.map((sp) => {
-                      const tone = getSpeciesTone(sp.name);
-                      return (
-                        <span key={sp.id} className={`sp-chip tone-${tone}`}>
-                          <SpeciesIcon species={tone} size={14} className="ic" />
-                          {sp.name}
-                        </span>
-                      );
-                    })
-                  ) : (
-                    <span className="small muted">Нет допусков</span>
-                  )}
-                </span>
-                <span>
-                  <span className={`badge ${v.isActive ? 'badge-accent' : 'badge-outline'}`}>
-                    {v.isActive ? 'Активен' : 'Неактивен'}
-                  </span>
-                </span>
-              </button>
-            );
-          })}
-        </div>
-
-        {loading && vets.length === 0 && (
-          <div className="empty">
-            <span className="spinner" aria-hidden="true" />
-            <span className="muted">Загрузка врачей…</span>
-          </div>
-        )}
-
-        {vets.length === 0 && !loading && (
-          <div className="empty">
-            <span className="empty-title">Нет врачей по фильтру</span>
-          </div>
-        )}
-      </div>
-    </section>
+    <DataTable<Veterinarian>
+      title="Врачи"
+      icon={<Stethoscope size={18} />}
+      columns={columns}
+      data={vets}
+      selectedId={selectedVet?.id}
+      onRowClick={onSelectVet}
+      loading={loading}
+      emptyText="Нет врачей по фильтру"
+      minWidth="720px"
+      count={vets.length}
+    />
   );
 };

@@ -2,7 +2,7 @@
 
 import React, { useEffect, useMemo } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
-import { useAuth } from '@/context/AuthContext';
+import { useAuth } from '@/providers';
 import { tokenStorage } from '@/shared/api';
 import { getHomeByRole } from '@/shared/lib';
 import { UserRole } from '@/shared/types';

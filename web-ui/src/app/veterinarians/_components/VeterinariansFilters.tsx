@@ -3,7 +3,7 @@
 import React, { useMemo } from 'react';
 import { Search, X } from 'lucide-react';
 import { FilterDropdown, type FilterDropdownOption } from '@/shared/components';
-import { SPECIALIZATION_NAMES_RU } from '@/utils/doctorHelpers';
+import { SPECIALIZATION_NAMES_RU } from '@/shared/lib';
 import type { VeterinariansFiltersProps } from './types';
 
 export const VeterinariansFilters: React.FC<VeterinariansFiltersProps> = ({

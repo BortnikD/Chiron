@@ -5,6 +5,7 @@ import { ChevronLeft, ChevronRight } from 'lucide-react';
 import type { Appointment, Pet } from '@/modules/client/types';
 import type { ScheduleException, WorkSchedule } from '@/modules/clinic/types';
 import {
+  APPOINTMENT_STATUS_LIST,
   APPOINTMENT_STATUS_META,
   DOW_ORDER,
   DOW_SHORT,
@@ -13,10 +14,10 @@ import {
   formatSlotTime,
   getMoscowDateKey,
   timeToMinutes,
+  VET_STATUS_COLORS,
 } from '@/shared/lib';
 import type { CalendarMode } from '../_hooks/useVetAppointments';
 import { getPetName } from '../../dashboard/_components/utils';
-import { VET_STATUS_COLORS } from '../../dashboard/_components/vetTimelineUtils';
 
 const PPM = 1.4;
 const px = (n: number) => `${Math.round(n)}px`;
@@ -260,26 +261,12 @@ export const VetAppointmentsCalendar: React.FC<VetAppointmentsCalendarProps> = (
         )}
 
         <div className="legend" style={{ marginTop: '12px' }}>
-          <span>
-            <i style={{ background: 'var(--st-pending-fg)' }} />
-            Ожидает
-          </span>
-          <span>
-            <i style={{ background: 'var(--st-confirmed-fg)' }} />
-            Подтверждена
-          </span>
-          <span>
-            <i style={{ background: 'var(--st-completed-fg)' }} />
-            Завершена
-          </span>
-          <span>
-            <i style={{ background: 'var(--st-noshow-fg)' }} />
-            Неявка
-          </span>
-          <span>
-            <i style={{ background: 'var(--st-cancelled-fg)' }} />
-            Отменена
-          </span>
+          {APPOINTMENT_STATUS_LIST.map((status) => (
+            <span key={status}>
+              <i style={{ background: VET_STATUS_COLORS[status] }} />
+              {APPOINTMENT_STATUS_META[status].short}
+            </span>
+          ))}
         </div>
       </div>
     </section>

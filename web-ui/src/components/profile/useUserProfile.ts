@@ -6,20 +6,22 @@ import { adminApi } from '@/modules/admin/api';
 import { clientApi } from '@/modules/client/api';
 import { clinicApi } from '@/modules/clinic/api';
 import { vetApi } from '@/modules/vet/api';
-import { useAuth } from '@/context/AuthContext';
+import { useAuth } from '@/providers';
 import { useToast } from '@/shared/components';
 import {
+  buildPatchPayload,
   formatApiError,
   formatDateShort,
   getMoscowDateKey,
   getMoscowTodayIso,
   getSpecTone,
   getUserInitials,
+  normalizePhone,
   MOSCOW_TIMEZONE,
   toIdNameMap,
   type PhotoEntity,
 } from '@/shared/lib';
-import { SPECIALIZATION_NAMES_RU } from '@/utils/doctorHelpers';
+import { SPECIALIZATION_NAMES_RU } from '@/shared/lib';
 import type { Appointment } from '@/modules/client/types';
 import type { User } from '@/shared/types';
 import type { ProfileStats, SecondaryBadge } from './ProfileIdentityCard';
@@ -211,13 +213,14 @@ export function useUserProfile(onProfileUpdated?: (user: User) => void) {
 
   const handleProfileSubmit = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
-    const normalizedPhone = formData.phone.replace(/[\s()-]/g, '').trim();
+    const phoneDigits = formData.phone.replace(/\D/g, '');
+    const normalizedPhone = normalizePhone(formData.phone);
     if (!formData.firstName.trim() || !formData.lastName.trim() || !formData.email.trim()) {
       setSaveError('Заполните обязательные поля: имя, фамилия и email');
       return;
     }
-    if (normalizedPhone && !/^\+?\d{10,15}$/.test(normalizedPhone)) {
-      setSaveError('Телефон должен содержать от 10 до 15 цифр (например, +79001234567)');
+    if (phoneDigits.length > 0 && phoneDigits.length !== 11) {
+      setSaveError('Номер телефона должен содержать 11 цифр (например, +7 (900) 123-45-67)');
       return;
     }
 
@@ -226,13 +229,22 @@ export function useUserProfile(onProfileUpdated?: (user: User) => void) {
     setSaveError(null);
 
     try {
-      const updated = await userApi.updateMe({
+      const initial = {
+        firstName: user?.firstName || '',
+        middleName: user?.middleName || null,
+        lastName: user?.lastName || '',
+        email: user?.email || '',
+        phone: user?.phone || '',
+      };
+      const current = {
         firstName: formData.firstName.trim(),
         middleName: formData.middleName.trim() || null,
         lastName: formData.lastName.trim(),
         email: formData.email.trim(),
-        phone: normalizedPhone || undefined,
-      });
+        phone: phoneDigits.length === 11 ? normalizedPhone : '',
+      };
+      const patch = buildPatchPayload(initial, current);
+      const updated = await userApi.updateMe(patch);
       setUser(updated);
       await refreshUser();
       setSaveSuccess(true);
@@ -259,13 +271,16 @@ export function useUserProfile(onProfileUpdated?: (user: User) => void) {
       : 'Клиент';
 
   const initials = getUserInitials({
-    firstName: formData.firstName || user?.firstName,
-    lastName: formData.lastName || user?.lastName,
+    firstName: user?.firstName,
+    lastName: user?.lastName,
     fullName: user?.fullName,
   });
 
   const fullName =
-    `${formData.firstName} ${formData.lastName}`.trim() || user?.fullName || 'Пользователь';
+    (user?.firstName && user?.lastName
+      ? `${user.firstName} ${user.lastName}`
+      : user?.fullName) || 'Пользователь';
+
   const fInitial = formData.firstName ? `${formData.firstName.charAt(0)}.` : '';
   const mInitial = formData.middleName ? ` ${formData.middleName.charAt(0)}.` : '';
   const lPart = formData.lastName ? ` ${formData.lastName}` : '';

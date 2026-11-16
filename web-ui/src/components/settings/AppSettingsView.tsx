@@ -2,8 +2,8 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
-import { useTheme, Theme } from '@/context/ThemeContext';
-import { useAuth } from '@/context/AuthContext';
+import { useTheme, Theme } from '@/providers';
+import { useAuth } from '@/providers';
 import { useRouter } from 'next/navigation';
 import { userApi } from '@/shared/api';
 import { formatApiError, getUtf8ByteLength } from '@/shared/lib';

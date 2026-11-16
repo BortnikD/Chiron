@@ -1,7 +1,7 @@
 import React from 'react';
 import Link from 'next/link';
 import { CalendarCheck } from 'lucide-react';
-import { formatDateShort, formatSlotTime } from '@/shared/lib';
+import { APPOINTMENT_STATUS_META, formatDateShort, formatSlotTime } from '@/shared/lib';
 
 export interface BookingSuccessViewProps {
   petName?: string;
@@ -51,7 +51,9 @@ export const BookingSuccessView: React.FC<BookingSuccessViewProps> = ({
       </div>
       <span className="empty-title">Вы записаны</span>
       <span>{summaryLine}</span>
-      <span className="badge st badge-PENDING">Ожидает подтверждения</span>
+      <span className={`badge st ${APPOINTMENT_STATUS_META.PENDING.cls}`}>
+        {APPOINTMENT_STATUS_META.PENDING.label}
+      </span>
       <div className="row wrap" style={{ justifyContent: 'center' }}>
         <Link href={openHref} className="btn btn-outline">
           Открыть запись

@@ -4,7 +4,13 @@ import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { clientApi } from '@/modules/client/api';
 import { clinicApi } from '@/modules/clinic/api';
 import type { Pet, Vaccination } from '@/modules/client/types';
-import { formatApiError, getMoscowDateKey, getMoscowTodayIso, toIdNameMap } from '@/shared/lib';
+import {
+  formatApiError,
+  getMoscowDateKey,
+  getMoscowTodayIso,
+  getVaccinationDueInfo,
+  toIdNameMap,
+} from '@/shared/lib';
 
 export interface PetVaccines {
   pet: Pet;
@@ -19,44 +25,17 @@ export interface VaccinationStatusInfo {
 }
 
 export function getVaccinationStatus(nextDueStr?: string | null): VaccinationStatusInfo {
-  if (!nextDueStr) {
-    return { label: 'По показаниям', cls: 'due-none', tone: 'normal' };
-  }
+  const info = getVaccinationDueInfo(nextDueStr);
+  let label = info.text;
+  if (info.status === 'OVERDUE') label = 'Просрочена';
+  else if (info.status === 'TODAY') label = 'Сегодня';
+  else if (info.status === 'SOON' || info.status === 'UPCOMING') label = `Через ${info.diffDays} дн.`;
+  else if (info.status === 'NONE') label = 'По показаниям';
 
-  const [ty, tm, td] = getMoscowTodayIso().split('-').map(Number);
-  const todayMs = Date.UTC(ty, tm - 1, td);
-
-  const dueKey = getMoscowDateKey(nextDueStr) || nextDueStr.slice(0, 10);
-  const [y, m, d] = dueKey.split('-').map(Number);
-  const dueMs = y && m && d ? Date.UTC(y, m - 1, d) : NaN;
-  if (Number.isNaN(dueMs)) {
-    return { label: 'По показаниям', cls: 'due-none', tone: 'normal' };
-  }
-
-  const diffDays = Math.ceil((dueMs - todayMs) / 86400000);
-
-  if (diffDays < 0) {
-    return { label: 'Просрочена', cls: 'due-over', tone: 'danger' };
-  }
-  if (diffDays <= 7) {
-    return {
-      label: diffDays === 0 ? 'Сегодня' : `Через ${diffDays} дн.`,
-      cls: 'due-soon',
-      tone: 'warn',
-    };
-  }
-  if (diffDays <= 30) {
-    return {
-      label: `Через ${diffDays} дн.`,
-      cls: 'badge-accent',
-      tone: 'normal',
-    };
-  }
-  const months = Math.max(1, Math.round(diffDays / 30));
   return {
-    label: `Через ${months} мес.`,
-    cls: 'due-later',
-    tone: 'normal',
+    label,
+    cls: info.cls as VaccinationStatusInfo['cls'],
+    tone: info.tone,
   };
 }
 
@@ -64,11 +43,16 @@ export function useClientVaccinations(
   initialPetId?: string | null,
   initialSelectedVacId?: string | null
 ) {
+  const initialPet =
+    (typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('petId') : null) ||
+    initialPetId ||
+    'all';
   const [pets, setPets] = useState<Pet[]>([]);
   const [petVaccines, setPetVaccines] = useState<PetVaccines[]>([]);
   const [speciesMap, setSpeciesMap] = useState<Record<string, string>>({});
-  const [selectedPetId, setSelectedPetIdState] = useState<string>('all');
+  const [selectedPetId, setSelectedPetIdState] = useState<string>(initialPet);
   const [selectedVac, setSelectedVac] = useState<Vaccination | null>(null);
+
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -83,9 +67,19 @@ export function useClientVaccinations(
     };
   }, []);
 
-  const setSelectedPetId = useCallback((petId: string) => {
-    setSelectedPetIdState(petId);
-    setSelectedVac((prev) => (prev && petId !== 'all' && prev.petId !== petId ? null : prev));
+  const setSelectedPetId = useCallback((id: string) => {
+    setSelectedPetIdState(id);
+    setSelectedVac((prev) => (prev && id !== 'all' && prev.petId !== id ? null : prev));
+    if (typeof window !== 'undefined') {
+      const url = new URL(window.location.href);
+      if (id && id !== 'all') url.searchParams.set('petId', id);
+      else url.searchParams.delete('petId');
+      const nextSearch = url.searchParams.toString();
+      const currentSearch = window.location.search.replace(/^\?/, '');
+      if (nextSearch !== currentSearch) {
+        window.history.replaceState(null, '', url.pathname + (nextSearch ? `?${nextSearch}` : '') + url.hash);
+      }
+    }
   }, []);
 
   const loadAll = useCallback(

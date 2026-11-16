@@ -54,7 +54,7 @@ export const ServiceModal: React.FC<ServiceModalProps> = ({
         basePrice: service.basePrice,
         baseDurationMin: service.baseDurationMin,
         bufferAfterMin: service.bufferAfterMin,
-        isActive: service.isActive,
+        isActive: service.isActive ?? service.active ?? true,
       });
     } else {
       setForm({

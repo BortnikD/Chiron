@@ -6,6 +6,7 @@ import { clinicApi } from '@/modules/clinic/api';
 import type { Pet } from '@/modules/client/types';
 import type { Service, Veterinarian, Specialization, Species } from '@/modules/clinic/types';
 import { formatApiError, toIdNameMap } from '@/shared/lib';
+import { useDictionaries } from '@/shared/hooks';
 
 const VACCINATION_SERVICE_ID = '5eed0003-0000-0000-0000-000000000002';
 
@@ -36,6 +37,12 @@ export function useBookingData(
   initialSlot?: string | null,
   initialIntent?: string | null
 ) {
+  const {
+    veterinarians: dictVets,
+    specializations: dictSpecializations,
+    species: dictSpecies,
+  } = useDictionaries();
+
   const [pets, setPets] = useState<Pet[]>([]);
   const [services, setServices] = useState<Service[]>([]);
   const [veterinarians, setVeterinarians] = useState<Veterinarian[]>([]);
@@ -78,14 +85,12 @@ export function useBookingData(
     setDataError(null);
     const isFreshInit = lastInitKeyRef.current !== initKey;
 
-    Promise.all([
-      clientApi.getPets(),
-      clinicApi.getVeterinarians(),
-      clinicApi.getSpecializations(),
-      clinicApi.getSpecies(),
-    ])
-      .then(async ([petsData, vetsData, specData, spData]) => {
+    clientApi.getPets()
+      .then(async (petsData) => {
         if (cancelled) return;
+        const vetsData = dictVets.length > 0 ? dictVets : await clinicApi.getVeterinarians();
+        const specData = dictSpecializations.length > 0 ? dictSpecializations : await clinicApi.getSpecializations();
+        const spData = dictSpecies.length > 0 ? dictSpecies : await clinicApi.getSpecies();
         const rawPets = Array.isArray(petsData) ? petsData : [];
         const safePets = rawPets.slice().sort((a, b) => Number(a.isArchived) - Number(b.isArchived));
         const activePets = safePets.filter((p) => !p.isArchived);

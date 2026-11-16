@@ -8,7 +8,7 @@ import type {
   Species,
   ServiceSpecies,
 } from '@/modules/clinic/types';
-import { formatApiError, toIdNameMap } from '@/shared/lib';
+import { buildPatchPayload, formatApiError, toIdNameMap } from '@/shared/lib';
 import type { SaveServiceInput, ServiceEditFormState } from './constants';
 import { ServiceMainEditForm } from './ServiceMainEditForm';
 import { ServiceSpeciesOverridesSection } from './ServiceSpeciesOverridesSection';
@@ -50,7 +50,7 @@ export const ServiceDetailIsland: React.FC<ServiceDetailIslandProps> = ({
     basePrice: service.basePrice,
     baseDurationMin: service.baseDurationMin,
     bufferAfterMin: service.bufferAfterMin,
-    isActive: service.isActive,
+    isActive: service.isActive ?? service.active ?? true,
   });
 
   const [serviceLinks, setServiceLinks] = useState<ServiceSpecies[]>(
@@ -78,7 +78,7 @@ export const ServiceDetailIsland: React.FC<ServiceDetailIslandProps> = ({
       basePrice: service.basePrice,
       baseDurationMin: service.baseDurationMin,
       bufferAfterMin: service.bufferAfterMin,
-      isActive: service.isActive,
+      isActive: service.isActive ?? service.active ?? true,
     });
     setSaveSuccess(false);
     setSaveError(null);
@@ -128,18 +128,26 @@ export const ServiceDetailIsland: React.FC<ServiceDetailIslandProps> = ({
     setSaveError(null);
     setSaveSuccess(false);
     try {
-      await onSaveService(
-        {
-          name: editForm.name.trim(),
-          specializationId: editForm.specializationId,
-          description: editForm.description.trim(),
-          basePrice: Number(editForm.basePrice) || 0,
-          baseDurationMin: dur,
-          bufferAfterMin: buf,
-          isActive: editForm.isActive,
-        },
-        service.id
-      );
+      const initial = {
+        name: service.name || '',
+        specializationId: service.specializationId || '',
+        description: service.description || '',
+        basePrice: service.basePrice ?? 0,
+        baseDurationMin: service.baseDurationMin ?? 30,
+        bufferAfterMin: service.bufferAfterMin ?? 0,
+        isActive: service.isActive ?? service.active ?? true,
+      };
+      const current = {
+        name: editForm.name.trim(),
+        specializationId: editForm.specializationId,
+        description: editForm.description.trim(),
+        basePrice: Number(editForm.basePrice) || 0,
+        baseDurationMin: dur,
+        bufferAfterMin: buf,
+        isActive: editForm.isActive,
+      };
+      const patch = buildPatchPayload(initial, current);
+      await onSaveService(patch as SaveServiceInput, service.id);
       setSaveSuccess(true);
       if (saveTimerRef.current !== null) window.clearTimeout(saveTimerRef.current);
       saveTimerRef.current = window.setTimeout(() => setSaveSuccess(false), 2500);

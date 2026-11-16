@@ -3,7 +3,8 @@
 import React, { useState, useEffect } from 'react';
 import { AlertCircle, X } from 'lucide-react';
 import type { User } from '@/shared/types';
-import { formatApiError } from '@/shared/lib';
+import { buildPatchPayload, formatApiError, normalizePhone } from '@/shared/lib';
+import { PhoneInput } from '@/shared/components';
 
 export interface AdminEditUserModalProps {
   isOpen: boolean;
@@ -58,25 +59,35 @@ export const AdminEditUserModal: React.FC<AdminEditUserModalProps> = ({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const normalizedPhone = editForm.phone.replace(/[\s()-]/g, '').trim();
+    const phoneDigits = editForm.phone.replace(/\D/g, '');
+    const normalizedPhone = phoneDigits ? normalizePhone(editForm.phone) : '';
     if (!editForm.firstName.trim() || !editForm.lastName.trim() || !editForm.email.trim()) {
       setError('Заполните обязательные поля');
       return;
     }
-    if (normalizedPhone && !/^\+?\d{10,15}$/.test(normalizedPhone)) {
-      setError('Телефон должен содержать от 10 до 15 цифр (например, +79001234567)');
+    if (phoneDigits && phoneDigits.length !== 11) {
+      setError('Номер телефона должен содержать 11 цифр (например, +7 (900) 123-45-67)');
       return;
     }
     setSaving(true);
     setError(null);
     try {
-      await onUpdateUser(user.id, {
+      const initial = {
+        firstName: user.firstName,
+        middleName: user.middleName || null,
+        lastName: user.lastName,
+        email: user.email,
+        phone: user.phone,
+      };
+      const current = {
         firstName: editForm.firstName.trim(),
         middleName: editForm.middleName.trim() || null,
         lastName: editForm.lastName.trim(),
         email: editForm.email.trim(),
         phone: normalizedPhone,
-      });
+      };
+      const patch = buildPatchPayload(initial, current);
+      await onUpdateUser(user.id, patch);
       onClose();
     } catch (err: unknown) {
       setError(formatApiError(err, 'Ошибка обновления пользователя'));
@@ -178,10 +189,8 @@ export const AdminEditUserModal: React.FC<AdminEditUserModalProps> = ({
                 <label className="field-label" htmlFor="me-phone">
                   Телефон
                 </label>
-                <input
+                <PhoneInput
                   id="me-phone"
-                  type="tel"
-                  className="input"
                   value={editForm.phone}
                   onChange={(e) => setEditForm({ ...editForm, phone: e.target.value })}
                 />

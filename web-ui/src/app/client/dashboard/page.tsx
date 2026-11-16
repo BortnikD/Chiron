@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { AlertCircle } from 'lucide-react';
-import { useAuth } from '@/context/AuthContext';
+import { useAuth } from '@/providers';
 import { useShellHeader } from '@/components/layout/AppShell';
 import { useClientDashboard } from './_hooks/useClientDashboard';
 import { NextAppointmentBanner } from './_components/NextAppointmentBanner';
@@ -89,7 +89,6 @@ export default function ClientDashboardPage() {
             servicesMap={servicesMap}
             veterinariansMap={vetsMap}
             speciesMap={speciesMap}
-            nextAppointmentId={nextAppt?.id}
           />
 
           <div className="col hm-side" style={{ gap: '8px', minWidth: 0 }}>

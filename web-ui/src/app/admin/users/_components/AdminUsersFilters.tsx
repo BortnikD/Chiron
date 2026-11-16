@@ -83,30 +83,32 @@ export const AdminUsersFilters: React.FC<AdminUsersFiltersProps> = ({
         </div>
       </div>
 
-      <div className="field" style={{ width: 150 }}>
-        <label className="field-label" htmlFor="us-from">
-          Регистрация с
-        </label>
-        <DatePicker
-          id="us-from"
-          value={createdFrom}
-          max={createdTo || undefined}
-          onChange={onCreatedFromChange}
-          ariaLabel="Регистрация с"
-        />
-      </div>
+      <div className="row" style={{ gap: 8, alignItems: 'flex-end', flexWrap: 'nowrap' }}>
+        <div className="field" style={{ width: 140 }}>
+          <label className="field-label" htmlFor="us-from">
+            Регистрация с
+          </label>
+          <DatePicker
+            id="us-from"
+            value={createdFrom}
+            max={createdTo || undefined}
+            onChange={onCreatedFromChange}
+            ariaLabel="Регистрация с"
+          />
+        </div>
 
-      <div className="field" style={{ width: 150 }}>
-        <label className="field-label" htmlFor="us-to">
-          по
-        </label>
-        <DatePicker
-          id="us-to"
-          value={createdTo}
-          min={createdFrom || undefined}
-          onChange={onCreatedToChange}
-          ariaLabel="Регистрация по"
-        />
+        <div className="field" style={{ width: 140 }}>
+          <label className="field-label" htmlFor="us-to">
+            по
+          </label>
+          <DatePicker
+            id="us-to"
+            value={createdTo}
+            min={createdFrom || undefined}
+            onChange={onCreatedToChange}
+            ariaLabel="Регистрация по"
+          />
+        </div>
       </div>
 
       <div className="spacer" />

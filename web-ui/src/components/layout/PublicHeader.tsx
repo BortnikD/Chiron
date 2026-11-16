@@ -3,11 +3,11 @@
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { useAuth } from '@/context/AuthContext';
+import { useAuth } from '@/providers';
 import { ChironLogo } from '@/components/ui/ChironLogo';
 import { ThemeToggle } from '@/components/ui/ThemeToggle';
 import { getHomeByRole } from '@/shared/lib';
-import { isDevMode } from '@/utils/env';
+import { isDevMode } from '@/shared/lib';
 import { Info, ClipboardList, Stethoscope, LogIn, ChevronLeft } from 'lucide-react';
 
 export const PublicHeader: React.FC = () => {

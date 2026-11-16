@@ -47,11 +47,45 @@ function getPeriodRange(p: 'week' | 'month' | 'quarter'): { from: string; to: st
 }
 
 export function useAdminDashboard() {
-  const [period, setPeriod] = useState<DashboardPeriod>('month');
-  const [stFrom, setStFrom] = useState<string>(() => getPeriodRange('month').from);
-  const [stTo, setStTo] = useState<string>(() => getPeriodRange('month').to);
-  const [metric, setMetric] = useState<'count' | 'rev'>('count');
-  const [gran, setGran] = useState<StatisticsGranularity>('DAY');
+  const [period, setPeriod] = useState<DashboardPeriod>(() => {
+    if (typeof window === 'undefined') return 'month';
+    const p = new URLSearchParams(window.location.search).get('period');
+    if (p === 'week' || p === 'month' || p === 'quarter' || p === 'custom') return p;
+    return 'month';
+  });
+
+  const [stFrom, setStFrom] = useState<string>(() => {
+    if (typeof window === 'undefined') return getPeriodRange('month').from;
+    const sp = new URLSearchParams(window.location.search);
+    const fromParam = sp.get('from');
+    if (fromParam) return fromParam;
+    const p = sp.get('period');
+    if (p === 'week' || p === 'quarter') return getPeriodRange(p).from;
+    return getPeriodRange('month').from;
+  });
+
+  const [stTo, setStTo] = useState<string>(() => {
+    if (typeof window === 'undefined') return getPeriodRange('month').to;
+    const sp = new URLSearchParams(window.location.search);
+    const toParam = sp.get('to');
+    if (toParam) return toParam;
+    const p = sp.get('period');
+    if (p === 'week' || p === 'quarter') return getPeriodRange(p).to;
+    return getPeriodRange('month').to;
+  });
+
+  const [metric, setMetric] = useState<'count' | 'rev'>(() => {
+    if (typeof window === 'undefined') return 'count';
+    const m = new URLSearchParams(window.location.search).get('metric');
+    return m === 'rev' ? 'rev' : 'count';
+  });
+
+  const [gran, setGran] = useState<StatisticsGranularity>(() => {
+    if (typeof window === 'undefined') return 'DAY';
+    const g = new URLSearchParams(window.location.search).get('gran');
+    if (g === 'DAY' || g === 'WEEK' || g === 'MONTH') return g;
+    return 'DAY';
+  });
 
   const [overview, setOverview] = useState<OverviewStatistics | null>(null);
   const [timeline, setTimeline] = useState<TimelinePoint[]>([]);
@@ -64,6 +98,34 @@ export function useAdminDashboard() {
   const [error, setError] = useState<string | null>(null);
 
   const requestIdRef = useRef(0);
+
+  // Sync state to URL
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const url = new URL(window.location.href);
+    const params = url.searchParams;
+
+    if (period !== 'month') params.set('period', period);
+    else params.delete('period');
+
+    const defRange = getPeriodRange(period === 'week' || period === 'quarter' ? period : 'month');
+    if (stFrom && stFrom !== defRange.from) params.set('from', stFrom);
+    else params.delete('from');
+
+    if (stTo && stTo !== defRange.to) params.set('to', stTo);
+    else params.delete('to');
+
+    if (metric !== 'count') params.set('metric', metric);
+    else params.delete('metric');
+
+    if (gran !== 'DAY') params.set('gran', gran);
+    else params.delete('gran');
+
+    const newSearch = params.toString() ? `?${params.toString()}` : '';
+    if (newSearch !== window.location.search) {
+      window.history.replaceState(null, '', `${url.pathname}${newSearch}`);
+    }
+  }, [period, stFrom, stTo, metric, gran]);
 
   const loadData = useCallback(async (from: string, to: string, g: StatisticsGranularity) => {
     const reqId = ++requestIdRef.current;

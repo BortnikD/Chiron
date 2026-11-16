@@ -3,11 +3,10 @@
 import { Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { AlertCircle } from 'lucide-react';
-import { VetAddVaccinationModal } from '../patients/_components/VetAddVaccinationModal';
-import { useVetVaccinations } from './_hooks/useVetVaccinations';
 import { VetVaccinationsFilters } from './_components/VetVaccinationsFilters';
-import { VetVaccinationsTable } from './_components/VetVaccinationsTable';
 import { VetVaccinationDetailIsland } from './_components/VetVaccinationDetailIsland';
+import { VaccinationFormModal, VaccinationsTable } from '@/components/vaccinations';
+import { useVetVaccinations } from './_hooks/useVetVaccinations';
 
 function VetVaccinationsContent() {
   const searchParams = useSearchParams();
@@ -46,6 +45,7 @@ function VetVaccinationsContent() {
     closeModal,
     handleCreateVaccination,
     handleUpdateVaccination,
+    paginationProps,
   } = useVetVaccinations({ initialPetId, initialSelId });
 
   const hasActiveFilters = Boolean(
@@ -84,20 +84,17 @@ function VetVaccinationsContent() {
               onAddClick={openCreateModal}
             />
 
-            <VetVaccinationsTable
-              vaccinations={vaccinations}
-              totalElements={totalElements}
-              page={page}
-              totalPages={totalPages}
+            <VaccinationsTable
+              data={vaccinations}
+              count={totalElements}
               loading={loading}
-              hasDateBounds={Boolean(nextDueFrom || nextDueTo)}
-              hasActiveFilters={hasActiveFilters}
-              selectedVac={selectedVac}
+              selectedId={selectedVac?.id ?? null}
               petsMap={petsMap}
               speciesMap={speciesMap}
-              onSelectVac={setSelectedVac}
-              onPageChange={setPage}
-              onResetFilters={resetFilters}
+              onSelect={setSelectedVac}
+              paginationProps={paginationProps}
+              emptyTitle={hasActiveFilters ? 'Вакцинации не найдены' : 'Список вакцинаций пуст'}
+              emptyDescription={hasActiveFilters ? 'Попробуйте изменить параметры поиска' : 'Добавьте первую вакцинацию для пациентов'}
             />
           </div>
 
@@ -113,21 +110,30 @@ function VetVaccinationsContent() {
         </div>
       </div>
 
-      <VetAddVaccinationModal
+      <VaccinationFormModal
         isOpen={modalOpen}
-        mode={editingVac ? 'edit' : 'create'}
-        vaccination={editingVac}
-        patient={
+        initialData={editingVac}
+        lockedPetId={
           editingVac
-            ? petsMap[editingVac.petId] || null
-            : petFilter
-              ? petsMap[petFilter] || null
-              : null
+            ? editingVac.petId
+            : petFilter || undefined
         }
-        patients={patients}
+        petName={
+          editingVac
+            ? petsMap[editingVac.petId]?.name
+            : petFilter
+              ? petsMap[petFilter]?.name
+              : undefined
+        }
+        pets={patients}
         onClose={closeModal}
-        onSubmit={handleCreateVaccination}
-        onUpdate={handleUpdateVaccination}
+        onSubmit={async (payload) => {
+          if (editingVac) {
+            await handleUpdateVaccination(editingVac.id, payload as any);
+          } else {
+            await handleCreateVaccination(payload as any);
+          }
+        }}
       />
     </>
   );

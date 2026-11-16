@@ -1,5 +1,5 @@
 import { api, tokenStorage } from '@/shared/api/client';
-import { fetchAllPages, isPhotoUrlFresh, mapWithConcurrency } from '@/shared/lib';
+import { fetchAllPages, isPhotoUrlFresh, mapWithConcurrency, petCache } from '@/shared/lib';
 import type { AppointmentStatus, Gender, PageResponse, PhotoLinks } from '@/shared/types';
 import type { Veterinarian } from '@/modules/clinic/types';
 import type {
@@ -241,10 +241,13 @@ export const vetApi = {
         cachedEntry && Date.now() - cachedEntry.ts < PATIENTS_CACHE_TTL_MS
           ? cachedEntry.pet
           : undefined;
+      const globalCached = petCache.get(id);
       if (existing && isPhotoUrlFresh(existing)) {
         out[id] = existing;
       } else if (cached && isPhotoUrlFresh(cached)) {
         out[id] = cached;
+      } else if (globalCached && isPhotoUrlFresh(globalCached)) {
+        out[id] = globalCached;
       } else {
         missing.push(id);
       }
@@ -286,7 +289,10 @@ export const vetApi = {
     if (Array.isArray(res?.items)) {
       const now = Date.now();
       for (const pet of res.items) {
-        if (pet?.id) cachedPetsById.set(pet.id, { ts: now, pet });
+        if (pet?.id) {
+          cachedPetsById.set(pet.id, { ts: now, pet });
+          petCache.set(pet);
+        }
       }
     }
     return res;

@@ -1,10 +1,14 @@
-export interface CreateFollowUpRequest {
-  serviceId?: string;
-  startAt: string;
-  endAt: string;
-}
+/**
+ * Типы для кабинета ветеринарного врача.
+ * Синхронизированы с OpenAPI схемой через @/shared/types.
+ */
 
-export interface UpdateVetProfileRequest {
-  bio?: string | null;
-  experienceYears?: number;
-}
+import type {
+  VeterinarianCreateFollowUpRequest,
+  VeterinarianUpdateProfileRequest,
+  VeterinarianUpdateAppointmentRequest,
+} from '@/shared/types';
+
+export type CreateFollowUpRequest = VeterinarianCreateFollowUpRequest;
+export type UpdateVetProfileRequest = VeterinarianUpdateProfileRequest;
+export type UpdateVetAppointmentRequest = VeterinarianUpdateAppointmentRequest;

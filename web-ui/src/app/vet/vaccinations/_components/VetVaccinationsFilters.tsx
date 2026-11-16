@@ -80,28 +80,30 @@ export const VetVaccinationsFilters: React.FC<VetVaccinationsFiltersProps> = ({
         </div>
       </div>
 
-      <div className="field" style={{ width: '150px' }}>
-        <label className="field-label" htmlFor="vx-from">
-          Ревакцинация с
-        </label>
-        <DatePicker
-          id="vx-from"
-          value={nextDueFrom}
-          max={nextDueTo || undefined}
-          onChange={onNextDueFromChange}
-        />
-      </div>
+      <div className="row" style={{ gap: 8, alignItems: 'flex-end', flexWrap: 'nowrap' }}>
+        <div className="field" style={{ width: '140px' }}>
+          <label className="field-label" htmlFor="vx-from">
+            Ревакцинация с
+          </label>
+          <DatePicker
+            id="vx-from"
+            value={nextDueFrom}
+            max={nextDueTo || undefined}
+            onChange={onNextDueFromChange}
+          />
+        </div>
 
-      <div className="field" style={{ width: '150px' }}>
-        <label className="field-label" htmlFor="vx-to">
-          по
-        </label>
-        <DatePicker
-          id="vx-to"
-          value={nextDueTo}
-          min={nextDueFrom || undefined}
-          onChange={onNextDueToChange}
-        />
+        <div className="field" style={{ width: '140px' }}>
+          <label className="field-label" htmlFor="vx-to">
+            по
+          </label>
+          <DatePicker
+            id="vx-to"
+            value={nextDueTo}
+            min={nextDueFrom || undefined}
+            onChange={onNextDueToChange}
+          />
+        </div>
       </div>
 
       <div className="field" style={{ width: '155px' }}>

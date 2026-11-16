@@ -2,8 +2,8 @@ import type { AdminUpdateAppointmentRequest } from '@/modules/admin/types';
 import type { Appointment, Pet } from '@/modules/client/types';
 import type { Service, Veterinarian } from '@/modules/clinic/types';
 import type { AppointmentStatus, User } from '@/shared/types';
-import { APPOINTMENT_STATUS_META, formatIsoDateDisplay } from '@/shared/lib';
-import { getDoctorDisplay } from '@/utils/doctorHelpers';
+import { APPOINTMENT_STATUS_META, formatIsoDateDisplay, buildPatchPayload } from '@/shared/lib';
+import { getDoctorDisplay } from '@/shared/lib';
 
 export const CANCEL_REASONS = [
   'По просьбе клиента',
@@ -79,7 +79,17 @@ export function buildUpdateAppointmentPayload(
       ? computeAppointmentEditRange(appointment, services, form.date, form.start, form.end)
       : { startAt: appointment.startAt, endAt: appointment.endAt };
 
-  return {
+  const initial = {
+    veterinarianId: appointment.veterinarianId,
+    startAt: appointment.startAt,
+    endAt: appointment.endAt,
+    status: appointment.status,
+    clientComment: appointment.clientComment || null,
+    vetNotes: appointment.vetNotes || appointment.notes || null,
+    cancelReason: appointment.cancelReason || appointment.cancellationReason || null,
+  };
+
+  const current = {
     veterinarianId: form.veterinarianId,
     startAt: range.startAt,
     endAt: range.endAt,
@@ -89,6 +99,8 @@ export function buildUpdateAppointmentPayload(
     cancelReason:
       form.status === 'CANCELLED' ? form.cancelReason.trim() || 'Отменено администратором' : null,
   };
+
+  return buildPatchPayload(initial, current);
 }
 
 export function buildActiveFilterChips(params: {

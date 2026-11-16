@@ -7,7 +7,7 @@ import {
   formatIsoDateDisplay,
   formatSlotTime,
 } from '@/shared/lib';
-import { getDoctorDisplay } from '@/utils/doctorHelpers';
+import { getDoctorDisplay } from '@/shared/lib';
 
 export type AppointmentsFilterTab = 'UPCOMING' | 'HISTORY' | 'ALL';
 

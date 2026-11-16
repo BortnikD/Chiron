@@ -9,7 +9,7 @@ import { useClientPets } from './_hooks/useClientPets';
 import { PetsFilters } from './_components/PetsFilters';
 import { PetsList } from './_components/PetsList';
 import { PetDetailIsland } from './_components/PetDetailIsland';
-import { PetModal } from './_components/PetModal';
+import { PetFormModal } from '@/components/pets';
 
 function PetsContent() {
   const searchParams = useSearchParams();
@@ -84,16 +84,15 @@ function PetsContent() {
         )}
       </div>
 
-      <PetModal
+      <PetFormModal
         isOpen={state.isPetModalOpen}
+        mode="client"
         pet={state.editingPet}
         speciesList={state.speciesList}
-        onSave={state.handleSavePet}
+        onSubmit={state.handleSavePet}
         onUploadPhoto={state.uploadPetPhoto}
         onDeletePhoto={state.deletePetPhoto}
         onClose={state.closePetModal}
-        saving={state.modalSaving}
-        error={state.modalError}
       />
 
       <ConfirmModal

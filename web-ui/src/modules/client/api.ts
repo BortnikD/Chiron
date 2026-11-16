@@ -1,4 +1,5 @@
 import { api } from '@/shared/api/client';
+import { petCache } from '@/shared/lib';
 import type { AppointmentStatus, PageResponse, PhotoLinks } from '@/shared/types';
 import type {
   Pet,
@@ -34,7 +35,7 @@ export interface ClientVaccinationsQuery {
 // ─── Клиентские операции ──────────────────────────────────
 
 export const clientApi = {
-  getPets: (arg?: boolean | ClientPetsQuery) => {
+  getPets: async (arg?: boolean | ClientPetsQuery) => {
     const params = new URLSearchParams();
     if (typeof arg === 'boolean') {
       params.append('isArchived', String(arg));
@@ -43,18 +44,29 @@ export const clientApi = {
       if (arg.withSummary !== undefined) params.append('withSummary', String(arg.withSummary));
     }
     const query = params.toString() ? `?${params.toString()}` : '';
-    return api.get<Pet[]>(`/api/v1/client/pets${query}`);
+    const res = await api.get<Pet[]>(`/api/v1/client/pets${query}`);
+    if (Array.isArray(res)) {
+      petCache.setMany(res);
+    }
+    return res;
   },
 
   getPetById: (id: string, withSummary?: boolean) => {
     const query = withSummary ? '?withSummary=true' : '';
-    return api.get<Pet>(`/api/v1/client/pets/${id}${query}`);
+    return petCache.fetchWithCache(id, () => api.get<Pet>(`/api/v1/client/pets/${id}${query}`));
   },
 
-  createPet: (data: CreatePetRequest) => api.post<Pet>('/api/v1/client/pets', data),
+  createPet: async (data: CreatePetRequest) => {
+    const res = await api.post<Pet>('/api/v1/client/pets', data);
+    if (res) petCache.set(res);
+    return res;
+  },
 
-  updatePet: (id: string, data: UpdatePetRequest) =>
-    api.patch<Pet>(`/api/v1/client/pets/${id}`, data),
+  updatePet: async (id: string, data: UpdatePetRequest) => {
+    const res = await api.patch<Pet>(`/api/v1/client/pets/${id}`, data);
+    if (res) petCache.set(res);
+    return res;
+  },
 
   uploadPetPhoto: (id: string, file: File) => {
     const formData = new FormData();
@@ -62,7 +74,10 @@ export const clientApi = {
     return api.putForm<PhotoLinks>(`/api/v1/client/pets/${id}/photo`, formData);
   },
 
-  deletePetPhoto: (id: string) => api.delete<void>(`/api/v1/client/pets/${id}/photo`),
+  deletePetPhoto: (id: string) => {
+    petCache.invalidate(id);
+    return api.delete<void>(`/api/v1/client/pets/${id}/photo`);
+  },
 
   deletePet: (id: string) => api.delete<void>(`/api/v1/client/pets/${id}`),
 

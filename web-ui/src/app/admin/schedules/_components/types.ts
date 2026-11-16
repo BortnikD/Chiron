@@ -9,7 +9,7 @@ import type {
 import type { Specialization, Veterinarian } from '@/modules/clinic/types';
 import { DOW_ORDER, formatIsoDateDisplay } from '@/shared/lib';
 import type { DayOfWeek, ScheduleExceptionType } from '@/shared/types';
-import { getDoctorDisplay } from '@/utils/doctorHelpers';
+import { getDoctorDisplay } from '@/shared/lib';
 
 export interface WorkScheduleSavePayload {
   scheduleId?: string;

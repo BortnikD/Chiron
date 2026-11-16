@@ -57,7 +57,6 @@ export const VaccinationsFilters: React.FC<VaccinationsFiltersProps> = ({
   return (
     <section
       className="island filters"
-      style={{ marginBottom: '14px' }}
       aria-label="Фильтры прививок"
     >
       <div className="field" style={{ minWidth: '185px' }}>
@@ -89,30 +88,32 @@ export const VaccinationsFilters: React.FC<VaccinationsFiltersProps> = ({
         </div>
       </div>
 
-      <div className="field" style={{ width: '150px' }}>
-        <label className="field-label" htmlFor="vx-from">
-          Ревакцинация с
-        </label>
-        <DatePicker
-          id="vx-from"
-          value={nextDueFrom}
-          max={nextDueTo || undefined}
-          onChange={onNextDueFromChange}
-          ariaLabel="Ревакцинация с"
-        />
-      </div>
+      <div className="row" style={{ gap: 8, alignItems: 'flex-end', flexWrap: 'nowrap' }}>
+        <div className="field" style={{ width: '140px' }}>
+          <label className="field-label" htmlFor="vx-from">
+            Ревакцинация с
+          </label>
+          <DatePicker
+            id="vx-from"
+            value={nextDueFrom}
+            max={nextDueTo || undefined}
+            onChange={onNextDueFromChange}
+            ariaLabel="Ревакцинация с"
+          />
+        </div>
 
-      <div className="field" style={{ width: '150px' }}>
-        <label className="field-label" htmlFor="vx-to">
-          по
-        </label>
-        <DatePicker
-          id="vx-to"
-          value={nextDueTo}
-          min={nextDueFrom || undefined}
-          onChange={onNextDueToChange}
-          ariaLabel="Ревакцинация по"
-        />
+        <div className="field" style={{ width: '140px' }}>
+          <label className="field-label" htmlFor="vx-to">
+            по
+          </label>
+          <DatePicker
+            id="vx-to"
+            value={nextDueTo}
+            min={nextDueFrom || undefined}
+            onChange={onNextDueToChange}
+            ariaLabel="Ревакцинация по"
+          />
+        </div>
       </div>
 
       <div className="field" style={{ width: 'auto' }}>

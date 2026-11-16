@@ -4,6 +4,7 @@ import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { adminApi } from '@/modules/admin/api';
 import { clinicApi } from '@/modules/clinic/api';
+import { useDictionaries } from '@/shared/hooks';
 import type { WorkSchedule, ScheduleException } from '@/modules/admin/types';
 import type { Specialization, Veterinarian } from '@/modules/clinic/types';
 import { useToast } from '@/shared/components';
@@ -24,6 +25,35 @@ import {
 
 export type { WorkScheduleSavePayload, ScheduleExceptionSavePayload, DeleteScheduleTarget };
 
+const SCHEDULE_VET_STORAGE_KEY = 'chiron-admin-schedule-vetId';
+const EXC_TYPE_STORAGE_KEY = 'chiron-admin-schedule-excType';
+const EXC_FROM_STORAGE_KEY = 'chiron-admin-schedule-excFrom';
+const EXC_TO_STORAGE_KEY = 'chiron-admin-schedule-excTo';
+
+function getStoredValue(key: string): string {
+  if (typeof window === 'undefined') return '';
+  try {
+    return sessionStorage.getItem(key) || localStorage.getItem(key) || '';
+  } catch {
+    return '';
+  }
+}
+
+function persistValue(key: string, val: string): void {
+  if (typeof window === 'undefined') return;
+  try {
+    if (val && val !== 'ALL') {
+      sessionStorage.setItem(key, val);
+      localStorage.setItem(key, val);
+    } else {
+      sessionStorage.removeItem(key);
+      localStorage.removeItem(key);
+    }
+  } catch {
+    // ignore
+  }
+}
+
 export function useAdminSchedules() {
   const searchParams = useSearchParams();
   const router = useRouter();
@@ -31,15 +61,138 @@ export function useAdminSchedules() {
 
   const tabParam = searchParams.get('tab');
   const vetParam = searchParams.get('vetId') || searchParams.get('vet') || '';
+  const typeParam = searchParams.get('type') || searchParams.get('excType') || '';
+  const fromParam = searchParams.get('from') || searchParams.get('excFrom') || '';
+  const toParam = searchParams.get('to') || searchParams.get('excTo') || '';
 
-  const [activeTab, setActiveTab] = useState<'sched' | 'exc'>(() => resolveScheduleTab(tabParam));
-  const [vets, setVets] = useState<Veterinarian[]>([]);
-  const [specializations, setSpecializations] = useState<Specialization[]>([]);
+  const {
+    veterinarians: dictVets,
+    specializations: dictSpecializations,
+  } = useDictionaries();
+
+  const [activeTab, setActiveTabState] = useState<'sched' | 'exc'>(() => resolveScheduleTab(tabParam));
+  const [vets, setVets] = useState<Veterinarian[]>(() => dictVets);
+  const [specializations, setSpecializations] = useState<Specialization[]>(() => dictSpecializations);
   const [loadingVets, setLoadingVets] = useState(true);
   const [vetsError, setVetsError] = useState<string | null>(null);
 
-  const [selectedVetId, setSelectedVetId] = useState<string>('');
-  const [excVetFilter, setExcVetFilter] = useState<string>(vetParam);
+  useEffect(() => {
+    if (dictSpecializations.length > 0) setSpecializations(dictSpecializations);
+  }, [dictSpecializations]);
+
+  const [selectedVetId, setSelectedVetIdState] = useState<string>(() => vetParam || getStoredValue(SCHEDULE_VET_STORAGE_KEY));
+  const [excVetFilter, setExcVetFilterState] = useState<string>(() => vetParam || getStoredValue(SCHEDULE_VET_STORAGE_KEY));
+  const [excTypeFilter, setExcTypeFilterState] = useState<string>(() => typeParam || getStoredValue(EXC_TYPE_STORAGE_KEY));
+  const [excFromFilter, setExcFromFilterState] = useState<string>(() => fromParam || getStoredValue(EXC_FROM_STORAGE_KEY));
+  const [excToFilter, setExcToFilterState] = useState<string>(() => toParam || getStoredValue(EXC_TO_STORAGE_KEY));
+
+  const syncSchedulesToUrl = useCallback(
+    (
+      tab: string,
+      vetId: string,
+      typeFilter?: string,
+      fromFilter?: string,
+      toFilter?: string
+    ) => {
+      if (typeof window === 'undefined') return;
+      const url = new URL(window.location.href);
+
+      if (tab && tab !== 'sched' && tab !== 'schedules') url.searchParams.set('tab', tab);
+      else url.searchParams.delete('tab');
+
+      if (vetId && vetId !== 'ALL') url.searchParams.set('vetId', vetId);
+      else url.searchParams.delete('vetId');
+
+      if (tab === 'exc') {
+        if (typeFilter) url.searchParams.set('type', typeFilter);
+        else url.searchParams.delete('type');
+
+        if (fromFilter) url.searchParams.set('from', fromFilter);
+        else url.searchParams.delete('from');
+
+        if (toFilter) url.searchParams.set('to', toFilter);
+        else url.searchParams.delete('to');
+      } else {
+        url.searchParams.delete('type');
+        url.searchParams.delete('from');
+        url.searchParams.delete('to');
+      }
+
+      const nextSearch = url.searchParams.toString();
+      const currentSearch = window.location.search.replace(/^\?/, '');
+      if (nextSearch !== currentSearch) {
+        window.history.replaceState(null, '', url.pathname + (nextSearch ? `?${nextSearch}` : '') + url.hash);
+      }
+    },
+    []
+  );
+
+  const setSelectedVetId = useCallback(
+    (vetId: string) => {
+      setSelectedVetIdState(vetId);
+      persistValue(SCHEDULE_VET_STORAGE_KEY, vetId);
+      syncSchedulesToUrl(activeTab, vetId, excTypeFilter, excFromFilter, excToFilter);
+    },
+    [activeTab, excTypeFilter, excFromFilter, excToFilter, syncSchedulesToUrl]
+  );
+
+  const setActiveTab = useCallback(
+    (tab: 'sched' | 'exc') => {
+      setActiveTabState(tab);
+      const vetToSync = tab === 'sched' ? selectedVetId : (excVetFilter || selectedVetId);
+      syncSchedulesToUrl(tab, vetToSync, excTypeFilter, excFromFilter, excToFilter);
+    },
+    [selectedVetId, excVetFilter, excTypeFilter, excFromFilter, excToFilter, syncSchedulesToUrl]
+  );
+
+  const setExcVetFilter = useCallback(
+    (vetId: string) => {
+      const cleanVetId = vetId === 'ALL' ? '' : vetId;
+      setExcVetFilterState(cleanVetId);
+      persistValue(SCHEDULE_VET_STORAGE_KEY, cleanVetId);
+      syncSchedulesToUrl(activeTab, cleanVetId, excTypeFilter, excFromFilter, excToFilter);
+    },
+    [activeTab, excTypeFilter, excFromFilter, excToFilter, syncSchedulesToUrl]
+  );
+
+  const setExcTypeFilter = useCallback(
+    (type: string) => {
+      setExcTypeFilterState(type);
+      persistValue(EXC_TYPE_STORAGE_KEY, type);
+      syncSchedulesToUrl(activeTab, excVetFilter, type, excFromFilter, excToFilter);
+    },
+    [activeTab, excVetFilter, excFromFilter, excToFilter, syncSchedulesToUrl]
+  );
+
+  const setExcFromFilter = useCallback(
+    (from: string) => {
+      setExcFromFilterState(from);
+      persistValue(EXC_FROM_STORAGE_KEY, from);
+      syncSchedulesToUrl(activeTab, excVetFilter, excTypeFilter, from, excToFilter);
+    },
+    [activeTab, excVetFilter, excTypeFilter, excToFilter, syncSchedulesToUrl]
+  );
+
+  const setExcToFilter = useCallback(
+    (to: string) => {
+      setExcToFilterState(to);
+      persistValue(EXC_TO_STORAGE_KEY, to);
+      syncSchedulesToUrl(activeTab, excVetFilter, excTypeFilter, excFromFilter, to);
+    },
+    [activeTab, excVetFilter, excTypeFilter, excFromFilter, syncSchedulesToUrl]
+  );
+
+  const resetExcFilters = useCallback(() => {
+    setExcVetFilterState('');
+    setExcTypeFilterState('');
+    setExcFromFilterState('');
+    setExcToFilterState('');
+    persistValue(SCHEDULE_VET_STORAGE_KEY, '');
+    persistValue(EXC_TYPE_STORAGE_KEY, '');
+    persistValue(EXC_FROM_STORAGE_KEY, '');
+    persistValue(EXC_TO_STORAGE_KEY, '');
+    syncSchedulesToUrl(activeTab, '', '', '', '');
+  }, [activeTab, syncSchedulesToUrl]);
   const [schedules, setSchedules] = useState<WorkSchedule[]>([]);
   const [loadingSchedule, setLoadingSchedule] = useState(false);
   const [scheduleError, setScheduleError] = useState<string | null>(null);
@@ -73,30 +226,72 @@ export function useAdminSchedules() {
 
   useEffect(() => {
     if (vetParam) {
-      setExcVetFilter(vetParam);
+      setSelectedVetIdState(vetParam);
+      setExcVetFilterState(vetParam);
+      persistValue(SCHEDULE_VET_STORAGE_KEY, vetParam);
     }
   }, [vetParam]);
+
+  useEffect(() => {
+    if (typeParam !== null && typeParam !== undefined && typeParam !== excTypeFilter) {
+      setExcTypeFilterState(typeParam);
+    }
+  }, [typeParam, excTypeFilter]);
+
+  useEffect(() => {
+    if (fromParam !== null && fromParam !== undefined && fromParam !== excFromFilter) {
+      setExcFromFilterState(fromParam);
+    }
+  }, [fromParam, excFromFilter]);
+
+  useEffect(() => {
+    if (toParam !== null && toParam !== undefined && toParam !== excToFilter) {
+      setExcToFilterState(toParam);
+    }
+  }, [toParam, excToFilter]);
 
   const loadVets = useCallback(async () => {
     const reqId = ++vetsReqIdRef.current;
     setLoadingVets(true);
     setVetsError(null);
     try {
-      const [res, vetUsers, specsRes] = await Promise.all([
-        adminApi.getVeterinarians(),
-        fetchAllPages((p, s) => adminApi.getUsers(p, s, 'VETERINARIAN'), { pageSize: 100, maxPages: 20, concurrency: 4 }),
-        clinicApi.getSpecializations(),
-      ]);
+      const vetUsers = await fetchAllPages(
+        (p, s) => adminApi.getUsers(p, s, 'VETERINARIAN'),
+        { pageSize: 100, maxPages: 20, concurrency: 4 }
+      );
       if (reqId !== vetsReqIdRef.current) return;
-      const list = (Array.isArray(res) ? res : []).map((v) =>
+      const baseVets = dictVets.length > 0 ? dictVets : await adminApi.getVeterinarians();
+      const list = (Array.isArray(baseVets) ? baseVets : []).map((v) =>
         v.user ? v : { ...v, user: vetUsers.find((u) => u.id === v.userId) }
       );
       setVets(list);
-      setSpecializations(Array.isArray(specsRes) ? specsRes : []);
       if (list.length > 0) {
-        setSelectedVetId((prev) => {
-          if (vetParam && list.some((v) => v.id === vetParam)) return vetParam;
-          return prev && list.some((v) => v.id === prev) ? prev : list[0].id;
+        setSelectedVetIdState((prev) => {
+          const stored = getStoredValue(SCHEDULE_VET_STORAGE_KEY);
+          const candidate =
+            vetParam && list.some((v) => v.id === vetParam)
+              ? vetParam
+              : prev && list.some((v) => v.id === prev)
+              ? prev
+              : stored && list.some((v) => v.id === stored)
+              ? stored
+              : list[0].id;
+          persistValue(SCHEDULE_VET_STORAGE_KEY, candidate);
+          syncSchedulesToUrl(activeTab, candidate, excTypeFilter, excFromFilter, excToFilter);
+          return candidate;
+        });
+
+        setExcVetFilterState((prev) => {
+          const stored = getStoredValue(SCHEDULE_VET_STORAGE_KEY);
+          const candidate =
+            vetParam && list.some((v) => v.id === vetParam)
+              ? vetParam
+              : prev && list.some((v) => v.id === prev)
+              ? prev
+              : stored && list.some((v) => v.id === stored)
+              ? stored
+              : '';
+          return candidate;
         });
       }
     } catch (err: unknown) {
@@ -105,15 +300,15 @@ export function useAdminSchedules() {
     } finally {
       if (reqId === vetsReqIdRef.current) setLoadingVets(false);
     }
-  }, [vetParam]);
+  }, [vetParam, dictVets, activeTab, excTypeFilter, excFromFilter, excToFilter, syncSchedulesToUrl]);
 
-  const loadSchedule = useCallback(async (vetId: string) => {
+  const loadSchedule = useCallback(async (vetId: string, forceFresh = false) => {
     if (!vetId) return;
     const reqId = ++schedReqIdRef.current;
     setLoadingSchedule(true);
     setScheduleError(null);
     try {
-      const res = await clinicApi.getWorkSchedules(vetId);
+      const res = await clinicApi.getWorkSchedules(vetId, forceFresh);
       if (reqId !== schedReqIdRef.current) return;
       setSchedules(Array.isArray(res) ? res : []);
     } catch (err: unknown) {
@@ -186,11 +381,8 @@ export function useAdminSchedules() {
   const switchTab = useCallback(
     (tab: 'sched' | 'exc') => {
       setActiveTab(tab);
-      router.replace(
-        tab === 'exc' ? '/admin/schedules?tab=exc' : '/admin/schedules?tab=schedules'
-      );
     },
-    [router]
+    [setActiveTab]
   );
 
   const openAddDay = useCallback(
@@ -212,19 +404,31 @@ export function useAdminSchedules() {
 
   const saveWorkSchedule = useCallback(
     async (data: WorkScheduleSavePayload) => {
+      let saved: WorkSchedule | null = null;
       if (data.scheduleId) {
-        await adminApi.updateWorkSchedule(data.scheduleId, buildWorkScheduleUpdatePayload(data));
+        saved = await adminApi.updateWorkSchedule(data.scheduleId, buildWorkScheduleUpdatePayload(data));
       } else {
-        await adminApi.createWorkSchedule(buildWorkScheduleCreatePayload(data));
+        saved = await adminApi.createWorkSchedule(buildWorkScheduleCreatePayload(data));
       }
       if (data.veterinarianId !== selectedVetId) {
         setSelectedVetId(data.veterinarianId);
       } else if (selectedVetId) {
-        await loadSchedule(selectedVetId);
+        if (saved && saved.id) {
+          setSchedules((prev) => {
+            const idx = prev.findIndex((s) => s.id === saved!.id || s.dayOfWeek === saved!.dayOfWeek);
+            if (idx >= 0) {
+              const next = [...prev];
+              next[idx] = saved!;
+              return next;
+            }
+            return [...prev, saved!];
+          });
+        }
+        await loadSchedule(selectedVetId, true);
       }
       toast('Расписание сохранено', findVetDisplayName(vets, data.veterinarianId, specsMap));
     },
-    [selectedVetId, loadSchedule, vets, specsMap, toast]
+    [selectedVetId, loadSchedule, vets, specsMap, toast, setSelectedVetId]
   );
 
   const openAddException = useCallback(() => setExceptionModal({ open: true, exception: null }), []);
@@ -271,7 +475,8 @@ export function useAdminSchedules() {
     try {
       if (deleteTarget.type === 'schedule') {
         await adminApi.deleteWorkSchedule(deleteTarget.id);
-        await loadSchedule(selectedVetId);
+        setSchedules((prev) => prev.filter((s) => s.id !== deleteTarget.id));
+        await loadSchedule(selectedVetId, true);
         toast('День удалён из графика');
       } else {
         await adminApi.deleteScheduleException(deleteTarget.exception.id);
@@ -300,6 +505,13 @@ export function useAdminSchedules() {
     selectedVetName,
     excVetFilter,
     setExcVetFilter,
+    excTypeFilter,
+    setExcTypeFilter,
+    excFromFilter,
+    setExcFromFilter,
+    excToFilter,
+    setExcToFilter,
+    resetExcFilters,
     excVetName,
     schedules,
     loadingSchedule,

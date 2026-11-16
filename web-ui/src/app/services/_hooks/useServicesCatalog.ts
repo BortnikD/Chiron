@@ -16,21 +16,25 @@ import {
   getSpeciesTone,
   toIdNameMap,
 } from '@/shared/lib';
-import { SPECIALIZATION_NAMES_RU } from '@/utils/doctorHelpers';
+import { SPECIALIZATION_NAMES_RU } from '@/shared/lib';
 import type { ServiceSortOption } from '../_components/types';
 
 export function useServicesCatalog(
-  openParam: string | null,
+  openParam: string | null = null,
   specParam: string | null = null,
-  speciesParam: string | null = null
+  speciesParam: string | null = null,
+  searchParam: string | null = null,
+  sortParam: string | null = null
 ) {
   const [services, setServices] = useState<Service[]>([]);
   const [specializations, setSpecializations] = useState<Specialization[]>([]);
   const [speciesList, setSpeciesList] = useState<Species[]>([]);
-  const [selectedSpec, setSelectedSpec] = useState('ALL');
-  const [selectedSpecies, setSelectedSpecies] = useState('ALL');
-  const [searchQuery, setSearchQuery] = useState('');
-  const [sortBy, setSortBy] = useState<ServiceSortOption>('default');
+  const [selectedSpec, setSelectedSpec] = useState(specParam || 'ALL');
+  const [selectedSpecies, setSelectedSpecies] = useState(speciesParam || 'ALL');
+  const [searchQuery, setSearchQuery] = useState(searchParam || '');
+  const [sortBy, setSortBy] = useState<ServiceSortOption>(
+    (sortParam as ServiceSortOption) || 'default'
+  );
   const [selectedService, setSelectedService] = useState<Service | null>(null);
   const [serviceSpeciesList, setServiceSpeciesList] = useState<ServiceSpecies[]>([]);
   const [activeSpeciesTab, setActiveSpeciesTab] = useState('');
@@ -43,6 +47,7 @@ export function useServicesCatalog(
   const appliedOpenRef = useRef<string | null>(null);
   const appliedSpecRef = useRef<string | null>(null);
   const appliedSpeciesRef = useRef<string | null>(null);
+  const isInitialSyncRef = useRef(true);
 
   const reload = useCallback(() => {
     setReloadTick((tick) => tick + 1);
@@ -239,12 +244,105 @@ export function useServicesCatalog(
     searchQuery.trim() !== '' ||
     sortBy !== 'default';
 
-  const resetFilters = () => {
+  const syncToUrl = useCallback(
+    (spec: string, species: string, q: string, sort: ServiceSortOption, openId: string | null) => {
+      if (typeof window === 'undefined') return;
+      const url = new URL(window.location.href);
+
+      if (spec && spec !== 'ALL') {
+        url.searchParams.set('spec', spec);
+      } else {
+        url.searchParams.delete('spec');
+      }
+
+      if (species && species !== 'ALL') {
+        url.searchParams.set('species', species);
+      } else {
+        url.searchParams.delete('species');
+      }
+
+      const trimmedQ = q.trim();
+      if (trimmedQ) {
+        url.searchParams.set('q', trimmedQ);
+        url.searchParams.delete('search');
+      } else {
+        url.searchParams.delete('q');
+        url.searchParams.delete('search');
+      }
+
+      if (sort && sort !== 'default') {
+        url.searchParams.set('sort', sort);
+        url.searchParams.delete('sortBy');
+      } else {
+        url.searchParams.delete('sort');
+        url.searchParams.delete('sortBy');
+      }
+
+      if (openId) {
+        url.searchParams.set('open', openId);
+        url.searchParams.delete('sel');
+      } else {
+        url.searchParams.delete('open');
+        url.searchParams.delete('sel');
+      }
+
+      const nextSearch = url.searchParams.toString();
+      const currentSearch = window.location.search.replace(/^\?/, '');
+      if (nextSearch !== currentSearch) {
+        window.history.replaceState(
+          null,
+          '',
+          url.pathname + (nextSearch ? `?${nextSearch}` : '') + url.hash
+        );
+      }
+    },
+    []
+  );
+
+  useEffect(() => {
+    if (isInitialSyncRef.current) {
+      isInitialSyncRef.current = false;
+      return;
+    }
+    const timer = setTimeout(() => {
+      syncToUrl(selectedSpec, selectedSpecies, searchQuery, sortBy, selectedService?.id ?? null);
+    }, 150);
+    return () => clearTimeout(timer);
+  }, [selectedSpec, selectedSpecies, searchQuery, sortBy, selectedService?.id, syncToUrl]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const handlePopState = () => {
+      const params = new URLSearchParams(window.location.search);
+      const s = params.get('spec') || 'ALL';
+      const sp = params.get('species') || 'ALL';
+      const q = params.get('q') || params.get('search') || '';
+      const sort = (params.get('sort') || params.get('sortBy') || 'default') as ServiceSortOption;
+      const openId = params.get('open') || params.get('sel') || null;
+
+      setSelectedSpec(s);
+      setSelectedSpecies(sp);
+      setSearchQuery(q);
+      setSortBy(sort);
+      if (!openId) {
+        setSelectedService(null);
+      } else {
+        setSelectedService(
+          (prev) => (prev?.id === openId ? prev : services.find((item) => item.id === openId) ?? null)
+        );
+      }
+    };
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, [services]);
+
+  const resetFilters = useCallback(() => {
     setSelectedSpec('ALL');
     setSelectedSpecies('ALL');
     setSearchQuery('');
     setSortBy('default');
-  };
+    syncToUrl('ALL', 'ALL', '', 'default', selectedService?.id ?? null);
+  }, [selectedService?.id, syncToUrl]);
 
   const filteredServices = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();

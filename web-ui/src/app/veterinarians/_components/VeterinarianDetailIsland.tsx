@@ -3,9 +3,18 @@
 import React from 'react';
 import Link from 'next/link';
 import { X, CalendarPlus } from 'lucide-react';
-import { getDoctorDisplay } from '@/utils/doctorHelpers';
+import { getDoctorDisplay } from '@/shared/lib';
 import { VetAvatar } from '@/components/ui/EntityAvatar';
-import { DOW_ORDER, DOW_LABELS, formatIsoDateDisplay, formatTime, getSpecTone, pluralRu } from '@/shared/lib';
+import { SpeciesIcon } from '@/components/ui/SpeciesIcon';
+import {
+  DOW_ORDER,
+  DOW_LABELS,
+  formatIsoDateDisplay,
+  formatTime,
+  getSpecTone,
+  getSpeciesTone,
+  pluralRu,
+} from '@/shared/lib';
 import type { VeterinarianDetailIslandProps } from './types';
 
 export const VeterinarianDetailIsland: React.FC<VeterinarianDetailIslandProps> = ({
@@ -29,7 +38,6 @@ export const VeterinarianDetailIsland: React.FC<VeterinarianDetailIslandProps> =
   return (
     <section
       className="island detail-island"
-      style={{ width: '460px' }}
       aria-label="Профиль врача"
     >
       <div className="island-head">
@@ -80,11 +88,16 @@ export const VeterinarianDetailIsland: React.FC<VeterinarianDetailIslandProps> =
             <span className="section-title">Лечит</span>
             <div className="chips">
               {permissions.length > 0 ? (
-                permissions.map((spId) => (
-                  <span key={spId} className="badge badge-outline">
-                    {speciesMap[spId] || 'Животное'}
-                  </span>
-                ))
+                permissions.map((spId) => {
+                  const spName = speciesMap[spId] || 'Животное';
+                  const spTone = getSpeciesTone(spName);
+                  return (
+                    <span key={spId} className={`sp-chip tone-${spTone}`}>
+                      <SpeciesIcon species={spTone} size={14} />
+                      {spName}
+                    </span>
+                  );
+                })
               ) : (
                 <span className="small muted">Виды не указаны</span>
               )}

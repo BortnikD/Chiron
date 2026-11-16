@@ -6,7 +6,7 @@ import type { WorkSchedule } from '@/modules/admin/types';
 import type { Veterinarian } from '@/modules/clinic/types';
 import { FilterDropdown, type FilterDropdownOption } from '@/shared/components';
 import { DOW_FULL, DOW_ORDER, DOW_TO_INDEX, formatApiError, timeToMinutes } from '@/shared/lib';
-import { getDoctorDisplay } from '@/utils/doctorHelpers';
+import { getDoctorDisplay } from '@/shared/lib';
 import type { WorkScheduleSavePayload } from './types';
 
 export interface WorkScheduleModalProps {

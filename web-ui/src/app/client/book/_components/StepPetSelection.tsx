@@ -147,18 +147,24 @@ export const StepPetSelection: React.FC<StepPetSelectionProps> = ({
               >
                 <div className="tcard-head">
                   <PetAvatar pet={p} tone={spTone} species={spTone} iconSize={26} className="t-ava lg" />
-                  <span className="col grow" style={{ gap: '1px', minWidth: 0 }}>
+                  <span className="col grow" style={{ gap: '2px', minWidth: 0 }}>
                     <span className="tcard-title">{p.name}</span>
                     <span className="cell-sub">
                       {spName}
                       {ageLabel !== '—' ? ` · ${ageLabel}` : ''}
                     </span>
+                    {p.isArchived ? (
+                      <span className="row" style={{ marginTop: '2px' }}>
+                        <span className="badge">Архив</span>
+                      </span>
+                    ) : (
+                      !isSpeciesAllowed && (
+                        <span className="row" style={{ marginTop: '2px' }}>
+                          <span className="badge">Не принимает</span>
+                        </span>
+                      )
+                    )}
                   </span>
-                  {p.isArchived ? (
-                    <span className="badge">Архив</span>
-                  ) : (
-                    !isSpeciesAllowed && <span className="badge">Не принимает</span>
-                  )}
                   {isSel && (
                     <span className="tcard-check">
                       <Check className="ic" />

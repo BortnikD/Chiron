@@ -8,9 +8,8 @@ import { useAdminPets } from './_hooks/useAdminPets';
 import { PetsFilters } from './_components/PetsFilters';
 import { PetsTable } from './_components/PetsTable';
 import { PetDetailIsland } from './_components/PetDetailIsland';
-import { CreatePetModal } from './_components/CreatePetModal';
-import { EditPetModal } from './_components/EditPetModal';
-import { AddVaccinationModal } from './_components/AddVaccinationModal';
+import { PetFormModal } from '@/components/pets';
+import { VaccinationFormModal } from '@/components/vaccinations';
 
 function AdminPetsContent() {
   const vm = useAdminPets();
@@ -106,19 +105,28 @@ function AdminPetsContent() {
         )}
       </div>
 
-      <CreatePetModal
+      <PetFormModal
         isOpen={vm.isCreateOpen}
-        onClose={() => vm.setIsCreateOpen(false)}
-        onCreate={vm.createPet}
+        mode="admin"
+        pet={null}
         speciesList={vm.speciesList}
         users={vm.users}
+        onClose={() => vm.setIsCreateOpen(false)}
+        onSubmit={async (data, photoFile) => {
+          await vm.createPet(data as any, photoFile);
+        }}
       />
-      <EditPetModal
+      <PetFormModal
         isOpen={vm.isEditOpen}
+        mode="admin"
         pet={vm.selectedPet}
         speciesList={vm.speciesList}
+        users={vm.users}
         onClose={() => vm.setIsEditOpen(false)}
-        onUpdate={vm.updatePet}
+        onSubmit={async (data, photoFile) => {
+          if (!vm.selectedPet) return;
+          await vm.updatePet(vm.selectedPet.id, data as any, photoFile);
+        }}
         onUploadPhoto={vm.uploadPetPhoto}
         onDeletePhoto={vm.deletePetPhoto}
       />
@@ -134,11 +142,14 @@ function AdminPetsContent() {
         onClose={vm.closeDeleteConfirm}
         onConfirm={vm.handleDeletePet}
       />
-      <AddVaccinationModal
+      <VaccinationFormModal
         isOpen={vm.isAddVacOpen}
-        pet={vm.selectedPet}
+        lockedPetId={vm.selectedPet?.id}
+        petName={vm.selectedPet?.name}
         onClose={() => vm.setIsAddVacOpen(false)}
-        onCreate={vm.createVaccination}
+        onSubmit={async (payload) => {
+          await vm.createVaccination(payload as any);
+        }}
       />
     </>
   );

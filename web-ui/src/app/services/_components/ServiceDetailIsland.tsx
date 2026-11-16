@@ -69,7 +69,7 @@ export function ServiceDetailIsland({
   const baseBuffer = service.bufferAfterMin ?? 10;
 
   return (
-    <section className="island detail-island" style={{ width: '460px' }} aria-label="Услуга">
+    <section className="island detail-island" aria-label="Услуга">
       <div className="island-head">
         <div className="col" style={{ gap: '2px', minWidth: 0 }}>
           <span className="h2" style={{ wordBreak: 'break-word' }}>

@@ -12,7 +12,7 @@ import { formatApiError } from '@/shared/lib';
 export function useAppointmentCancel(params: {
   selectedAppt: Appointment | null;
   setSelectedAppt: React.Dispatch<React.SetStateAction<Appointment | null>>;
-  loadAppointments: () => Promise<Appointment[] | null>;
+  loadAppointments: () => Promise<Appointment[] | null | void>;
   isMountedRef: MutableRefObject<boolean>;
 }) {
   const { selectedAppt, setSelectedAppt, loadAppointments, isMountedRef } = params;

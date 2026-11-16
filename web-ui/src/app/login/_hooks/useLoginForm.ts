@@ -2,11 +2,11 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
-import { useAuth } from '@/context/AuthContext';
+import { useAuth } from '@/providers';
 import { ApiError } from '@/shared/api';
 import type { UserRole } from '@/shared/types';
 import { formatApiError, getHomeByRole } from '@/shared/lib';
-import { isDevMode } from '@/utils/env';
+import { isDevMode } from '@/shared/lib';
 import type {
   AuthMode,
   RegisterField,
@@ -28,7 +28,7 @@ function translateViolationMessage(raw: string): string {
   const lower = trimmed.toLowerCase();
   if (lower === 'must not be blank') return 'Обязательное поле';
   if (lower.includes('valid email')) return 'Некорректный email';
-  if (lower.includes('international format')) return 'Формат +7…, от 10 до 15 цифр';
+  if (lower.includes('international format')) return 'Номер должен содержать 11 цифр (+7 (XXX) XXX-XX-XX)';
   if (lower.includes('at least 8')) return 'Пароль должен содержать не менее 8 символов';
   if (lower.includes('72 bytes')) return 'Пароль не должен превышать 72 байта';
   return trimmed;

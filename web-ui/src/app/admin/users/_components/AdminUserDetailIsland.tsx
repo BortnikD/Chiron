@@ -13,7 +13,8 @@ import {
 import type { Pet, Appointment } from '@/modules/client/types';
 import type { Service, Species, Veterinarian } from '@/modules/clinic/types';
 import type { User } from '@/shared/types';
-import { USER_ROLE_META, formatApiError, formatDateShort, getUserInitials } from '@/shared/lib';
+import { USER_ROLE_META, formatApiError, formatDateShort, getUserInitials, normalizePhone } from '@/shared/lib';
+import { PhoneInput } from '@/shared/components';
 import { UserRelationsTabs } from './UserRelationsTabs';
 
 export interface AdminUserDetailIslandProps {
@@ -81,14 +82,15 @@ export const AdminUserDetailIsland: React.FC<AdminUserDetailIslandProps> = ({
   }, [user]);
 
   const handleSaveProfile = async () => {
-    const normalizedPhone = editForm.phone.replace(/[\s()-]/g, '').trim();
+    const phoneDigits = editForm.phone.replace(/\D/g, '');
+    const normalizedPhone = phoneDigits ? normalizePhone(editForm.phone) : '';
     if (!editForm.firstName.trim() || !editForm.lastName.trim() || !editForm.email.trim()) {
       setErrorMessage('Заполните обязательные поля: имя, фамилия и email');
       setActiveTab('profile');
       return;
     }
-    if (normalizedPhone && !/^\+?\d{10,15}$/.test(normalizedPhone)) {
-      setErrorMessage('Телефон должен содержать от 10 до 15 цифр (например, +79001234567)');
+    if (phoneDigits && phoneDigits.length !== 11) {
+      setErrorMessage('Номер телефона должен содержать 11 цифр (например, +7 (900) 123-45-67)');
       setActiveTab('profile');
       return;
     }
@@ -234,10 +236,8 @@ export const AdminUserDetailIsland: React.FC<AdminUserDetailIslandProps> = ({
                 <label className="field-label" htmlFor="ud-phone">
                   Телефон
                 </label>
-                <input
+                <PhoneInput
                   id="ud-phone"
-                  type="tel"
-                  className="input"
                   value={editForm.phone}
                   onChange={(e) => setEditForm({ ...editForm, phone: e.target.value })}
                 />

@@ -3,6 +3,7 @@ import {
   formatIsoDateDisplay,
   getMoscowDateKey,
   getMoscowTodayIso,
+  getVaccinationDueInfo,
   pluralRu,
 } from '@/shared/lib';
 
@@ -20,39 +21,7 @@ export function isVaccinationDueSoonOrOverdue(dateStr?: string | null): boolean 
 }
 
 export function getDueInfo(dateStr?: string | null): { text: string; cls: string; label: string } {
-  if (!dateStr) return { text: 'не задана', cls: 'due-none', label: '—' };
-  const dueIso = getMoscowDateKey(dateStr);
-  if (!dueIso) return { text: 'не задана', cls: 'due-none', label: '—' };
-
-  const todayIso = getMoscowTodayIso();
-  const label = formatIsoDateDisplay(dueIso);
-  const diffDays = diffMoscowDays(dueIso, todayIso);
-
-  if (diffDays < 0) {
-    return { text: 'просрочена', cls: 'due-over', label };
-  }
-
-  if (diffDays <= 7) {
-    return {
-      text:
-        diffDays === 0
-          ? 'сегодня'
-          : `через ${diffDays} ${pluralRu(diffDays, 'день', 'дня', 'дней')}`,
-      cls: 'due-soon',
-      label,
-    };
-  }
-
-  if (diffDays <= 30) {
-    return {
-      text: `через ${diffDays} ${pluralRu(diffDays, 'день', 'дня', 'дней')}`,
-      cls: 'badge-accent',
-      label,
-    };
-  }
-
-  const months = Math.max(1, Math.round(diffDays / 30));
-  return { text: `через ${months} мес.`, cls: 'due-later', label };
+  return getVaccinationDueInfo(dateStr);
 }
 
 export function formatMoscowDayHeading(isoStr: string): string {

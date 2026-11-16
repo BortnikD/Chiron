@@ -188,7 +188,7 @@ export const VetFollowUpModal: React.FC<VetFollowUpModalProps> = ({
     setSubmitError(null);
     try {
       await onSubmit({
-        serviceId: selectedServiceId || undefined,
+        serviceId: selectedServiceId || null,
         startAt: selectedSlot.startAt,
         endAt: selectedSlot.endAt,
       });

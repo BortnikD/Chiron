@@ -1,61 +1,38 @@
 /**
  * Базовые общесистемные типы и DTO системы Chiron.
+ * Автогенерированные типы импортируются из OpenAPI-схемы (schema.d.ts).
  */
 
-export type UserRole = 'CLIENT' | 'VETERINARIAN' | 'ADMIN';
+import type { components, paths } from '@/shared/api/schema';
 
-export type Gender = 'MALE' | 'FEMALE';
+export type Schemas = components['schemas'];
+export type Paths = paths;
 
-export type AppointmentStatus =
-  | 'PENDING'
-  | 'CONFIRMED'
-  | 'COMPLETED'
-  | 'CANCELLED'
-  | 'NO_SHOW';
+// ─── Enums & Literals ──────────────────────────────────────────────
 
-export type DayOfWeek =
-  | 'MONDAY'
-  | 'TUESDAY'
-  | 'WEDNESDAY'
-  | 'THURSDAY'
-  | 'FRIDAY'
-  | 'SATURDAY'
-  | 'SUNDAY';
-
-export type ScheduleExceptionType = 'ABSENCE' | 'CUSTOM_HOURS';
-
+export type UserRole = NonNullable<Schemas['UserResponse']['role']>; // 'CLIENT' | 'VETERINARIAN' | 'ADMIN'
+export type Gender = NonNullable<Schemas['PetResponse']['gender']>; // 'MALE' | 'FEMALE'
+export type AppointmentStatus = NonNullable<Schemas['AppointmentResponse']['status']>; // 'PENDING' | 'CONFIRMED' | 'COMPLETED' | 'CANCELLED' | 'NO_SHOW'
+export type DayOfWeek = NonNullable<Schemas['WorkScheduleResponse']['dayOfWeek']>;
+export type ScheduleExceptionType = NonNullable<Schemas['ScheduleExceptionResponse']['type']>;
+export type NotificationType = NonNullable<Schemas['NotificationResponse']['type']>;
 export type StatisticsGranularity = 'DAY' | 'WEEK' | 'MONTH';
 
-export type NotificationType =
-  | 'APPOINTMENT_BOOKED'
-  | 'APPOINTMENT_CONFIRMED'
-  | 'APPOINTMENT_CANCELLED'
-  | 'APPOINTMENT_RESCHEDULED'
-  | 'APPOINTMENT_NO_SHOW'
-  | 'FOLLOW_UP_SCHEDULED'
-  | 'APPOINTMENT_REMINDER'
-  | 'VACCINATION_DUE';
+// ─── API Wrapper & Error types ─────────────────────────────────────
 
 export interface ApiResponse<T> {
   success: boolean;
-  result: T;
-  error: ApiErrorResponse | null;
+  result: T | null;
+  error: ApiError | null;
   timestamp: string;
 }
 
-export interface ApiErrorResponse {
-  exception?: string;
-  name?: string;
-  message: string;
-  status: number | string;
-  path: string;
-  violations?: FieldViolation[];
-}
+export type ApiError = Schemas['ApiError'];
+export type ApiViolation = Schemas['ApiViolation'];
 
-export interface FieldViolation {
-  field: string;
-  message: string;
-}
+// Алиасы для обратной совместимости
+export type ApiErrorResponse = ApiError;
+export type FieldViolation = ApiViolation;
 
 export interface PageResponse<T> {
   items: T[];
@@ -65,39 +42,156 @@ export interface PageResponse<T> {
   totalPages: number;
 }
 
-export interface User {
-  id: string;
-  email: string;
-  firstName: string;
-  middleName?: string | null;
-  lastName: string;
-  fullName: string;
-  phone: string;
-  role: UserRole;
-  createdAt: string;
-  updatedAt: string;
-}
+// ─── OpenAPI DTOs: Responses ───────────────────────────────────────
+
+export type AppointmentResponse = Schemas['AppointmentResponse'];
+export type PetResponse = Schemas['PetResponse'] & {
+  /** Алиас для обратной совместимости со свойством archived */
+  isArchived?: boolean;
+  breed?: string | null;
+  chipNumber?: string | null;
+  speciesName?: string;
+  species?: SpeciesResponse;
+  ownerName?: string | null;
+  ownerPhone?: string | null;
+  ownerEmail?: string | null;
+  summary?: PetSummaryResponse | null;
+};
+export type ClientPetResponse = Omit<Schemas['ClientPetResponse'], 'summary'> & {
+  /** Алиас для обратной совместимости со свойством archived */
+  isArchived?: boolean;
+  breed?: string | null;
+  chipNumber?: string | null;
+  ownerName?: string | null;
+  ownerPhone?: string | null;
+  ownerEmail?: string | null;
+  speciesName?: string;
+  species?: SpeciesResponse;
+  summary?: PetSummaryResponse | null;
+};
+export type PetSummaryResponse = Schemas['PetSummaryResponse'];
+export type PetNextAppointmentResponse = Schemas['PetNextAppointmentResponse'];
+export type VaccinationResponse = Schemas['VaccinationResponse'] & {
+  vaccineName?: string;
+  administeredAt?: string;
+  validUntil?: string;
+  batchNumber?: string | null;
+  notes?: string | null;
+};
+export type VeterinarianResponse = Schemas['VeterinarianResponse'] & {
+  /** Алиас для обратной совместимости со свойством active */
+  isActive?: boolean;
+  specialization?: SpecializationResponse;
+  user?: UserResponse;
+};
+export type ServiceResponse = Schemas['ServiceResponse'] & {
+  /** Алиас для обратной совместимости со свойством active */
+  isActive?: boolean;
+  price?: number;
+  durationMin?: number;
+};
+export type ServiceSpeciesResponse = Schemas['ServiceSpeciesResponse'];
+export type SpeciesResponse = Schemas['SpeciesResponse'];
+export type SpecializationResponse = Schemas['SpecializationResponse'];
+export type UserResponse = Schemas['UserResponse'];
+export type NotificationResponse = Schemas['NotificationResponse'];
+export type WorkScheduleResponse = Schemas['WorkScheduleResponse'];
+export type ScheduleExceptionResponse = Schemas['ScheduleExceptionResponse'];
+export type VeterinarianSpeciesPermissionResponse = Schemas['VeterinarianSpeciesPermissionResponse'];
+export type AvailableSlotResponse = Schemas['AvailableSlotResponse'];
+export type AuthResponse = Schemas['AuthResponse'];
+export type PhotoLinks = Schemas['PhotoLinks'];
+export type ClientSummaryResponse = Schemas['ClientSummaryResponse'];
+export type OverviewStatisticsResponse = Schemas['OverviewStatisticsResponse'];
+export type TimelinePointResponse = Schemas['TimelinePointResponse'];
+export type VeterinarianStatisticsResponse = Schemas['VeterinarianStatisticsResponse'];
+export type ServiceStatisticsResponse = Schemas['ServiceStatisticsResponse'];
+export type SpeciesStatisticsResponse = Schemas['SpeciesStatisticsResponse'];
+
+// PageResponses
+export type PageResponseVaccinationResponse = Schemas['PageResponseVaccinationResponse'];
+export type PageResponsePetResponse = Schemas['PageResponsePetResponse'];
+export type PageResponseAppointmentResponse = Schemas['PageResponseAppointmentResponse'];
+export type PageResponseNotificationResponse = Schemas['PageResponseNotificationResponse'];
+export type PageResponseUserResponse = Schemas['PageResponseUserResponse'];
+export type PageResponseScheduleExceptionResponse = Schemas['PageResponseScheduleExceptionResponse'];
+
+// ─── OpenAPI DTOs: Requests ────────────────────────────────────────
+
+export type CreateVaccinationRequest = Schemas['CreateVaccinationRequest'];
+export type UpdateVaccinationRequest = Partial<Schemas['UpdateVaccinationRequest']>;
+export type CreateAppointmentRequest = Schemas['CreateAppointmentRequest'];
+export type UpdateAppointmentRequest = Partial<Schemas['UpdateAppointmentRequest']>;
+export type ClientCreateAppointmentRequest = Schemas['ClientCreateAppointmentRequest'];
+export type CancelAppointmentRequest = Schemas['CancelAppointmentRequest'];
+export type VeterinarianCreateFollowUpRequest = Schemas['VeterinarianCreateFollowUpRequest'];
+export type VeterinarianUpdateAppointmentRequest = Partial<Schemas['VeterinarianUpdateAppointmentRequest']>;
+export type VeterinarianUpdateProfileRequest = Partial<Schemas['VeterinarianUpdateProfileRequest']>;
+export type CreatePetRequest = Schemas['CreatePetRequest'];
+export type ClientCreatePetRequest = Schemas['ClientCreatePetRequest'];
+export type UpdatePetRequest = Partial<Schemas['UpdatePetRequest']> & {
+  isArchived?: boolean;
+};
+export type CreateUserRequest = Schemas['CreateUserRequest'];
+export type UpdateUserRequest = Partial<Schemas['UpdateUserRequest']>;
+export type CreateVeterinarianRequest = Schemas['CreateVeterinarianRequest'];
+export type UpdateVeterinarianRequest = Partial<Schemas['UpdateVeterinarianRequest']> & {
+  isActive?: boolean;
+};
+export type CreateWorkScheduleRequest = Schemas['CreateWorkScheduleRequest'];
+export type UpdateWorkScheduleRequest = Partial<Schemas['UpdateWorkScheduleRequest']>;
+export type CreateScheduleExceptionRequest = Schemas['CreateScheduleExceptionRequest'];
+export type UpdateScheduleExceptionRequest = Partial<Schemas['UpdateScheduleExceptionRequest']>;
+export type CreateServiceRequest = Schemas['CreateServiceRequest'];
+export type UpdateServiceRequest = Partial<Schemas['UpdateServiceRequest']> & {
+  isActive?: boolean;
+};
+export type CreateServiceSpeciesRequest = Schemas['CreateServiceSpeciesRequest'];
+export type UpdateServiceSpeciesRequest = Partial<Schemas['UpdateServiceSpeciesRequest']>;
+export type CreateSpeciesRequest = Schemas['CreateSpeciesRequest'];
+export type UpdateSpeciesRequest = Partial<Schemas['UpdateSpeciesRequest']>;
+export type CreateSpecializationRequest = Schemas['CreateSpecializationRequest'];
+export type UpdateSpecializationRequest = Partial<Schemas['UpdateSpecializationRequest']>;
+export type LoginRequest = Schemas['LoginRequest'];
+export type RegisterRequest = Schemas['RegisterRequest'];
+export type ChangePasswordRequest = Schemas['ChangePasswordRequest'];
+
+// ─── Доменные сущности (алиасы для совместимости UI) ───────────────
+
+export type User = UserResponse;
+export type AppNotification = NotificationResponse;
 
 export interface AuthResult {
   accessToken: string;
-  user: User;
+  user: UserResponse;
 }
 
-export interface PhotoLinks {
-  photoUrl: string;
-  photoThumbnailUrl: string;
-  photoUrlExpiresAt: string;
-}
+export type BasePet = PetResponse;
+export type BaseAppointment = AppointmentResponse;
+export type BaseVeterinarian = VeterinarianResponse;
+export type BaseVaccination = VaccinationResponse;
 
-export interface AppNotification {
-  id: string;
-  type: NotificationType;
-  title: string;
-  body: string;
-  actorId?: string | null;
-  appointmentId?: string | null;
-  petId?: string | null;
-  vaccinationId?: string | null;
-  readAt?: string | null;
-  createdAt: string;
-}
+export type Pet = ClientPetResponse;
+export type Appointment = AppointmentResponse & {
+  veterinarianName?: string;
+  veterinarian?: VeterinarianResponse;
+  petName?: string;
+  pet?: PetResponse;
+  serviceName?: string;
+  service?: ServiceResponse;
+  price?: number;
+  notes?: string | null;
+  cancellationReason?: string | null;
+};
+export type Vaccination = VaccinationResponse;
+export type Veterinarian = VeterinarianResponse;
+export type Service = ServiceResponse;
+export type Species = SpeciesResponse;
+export type Specialization = SpecializationResponse;
+export type WorkSchedule = WorkScheduleResponse;
+export type ScheduleException = ScheduleExceptionResponse;
+export type ServiceSpecies = ServiceSpeciesResponse;
+export type VeterinarianSpeciesPermission = VeterinarianSpeciesPermissionResponse;
+export type ClientSummary = ClientSummaryResponse;
+export type PetSummary = PetSummaryResponse;
+export type PetNextAppointmentSummary = PetNextAppointmentResponse;

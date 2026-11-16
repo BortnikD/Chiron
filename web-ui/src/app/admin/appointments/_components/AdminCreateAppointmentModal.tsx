@@ -7,7 +7,7 @@ import type { Appointment, Pet } from '@/modules/client/types';
 import { clinicApi } from '@/modules/clinic/api';
 import type { Veterinarian, Service, ServiceSpecies } from '@/modules/clinic/types';
 import type { User } from '@/shared/types';
-import { formatApiError, getMoscowTodayIso, timeToMinutes } from '@/shared/lib';
+import { formatApiError, getMoscowTodayIso, timeToMinutes, calculateEndTime } from '@/shared/lib';
 import {
   CreateAppointmentFields,
   type CreateAppointmentFormState,
@@ -29,13 +29,6 @@ export interface AdminCreateAppointmentModalProps {
   appointments: Appointment[];
 }
 
-function calculateEndTime(startTime: string, durationMin: number): string {
-  const [h, m] = startTime.split(':').map(Number);
-  const totalMin = (h || 0) * 60 + (m || 0) + durationMin;
-  const endH = Math.floor(totalMin / 60) % 24;
-  const endM = totalMin % 60;
-  return `${String(endH).padStart(2, '0')}:${String(endM).padStart(2, '0')}`;
-}
 
 export const AdminCreateAppointmentModal: React.FC<AdminCreateAppointmentModalProps> = ({
   isOpen,

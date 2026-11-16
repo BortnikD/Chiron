@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
-import { useAuth } from '@/context/AuthContext';
+import { useAuth } from '@/providers';
 import { clinicApi } from '@/modules/clinic/api';
 import { vetApi } from '@/modules/vet/api';
 import type {

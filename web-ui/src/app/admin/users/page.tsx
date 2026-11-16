@@ -67,6 +67,7 @@ function AdminUsersContent() {
             onPageChange={vm.setPage}
             onPageSizeChange={vm.setPageSize}
             onSelectUser={vm.setSelectedUser}
+            paginationProps={vm.paginationProps}
           />
         </div>
 
