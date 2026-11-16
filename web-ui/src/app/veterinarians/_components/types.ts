@@ -28,6 +28,8 @@ export interface VeterinariansGridProps {
   specsMap: Record<string, string>;
   speciesMap: Record<string, string>;
   vetPermissions: Record<string, string[]>;
+  speciesList?: Species[];
+  specializations?: Specialization[];
   loading?: boolean;
   hasFilters?: boolean;
   onReset?: () => void;
@@ -37,6 +39,8 @@ export interface VeterinarianDetailIslandProps {
   vet: Veterinarian;
   specsMap: Record<string, string>;
   speciesMap: Record<string, string>;
+  speciesList?: Species[];
+  specializations?: Specialization[];
   services?: Service[];
   permissions: string[];
   schedules: WorkSchedule[];

@@ -142,6 +142,7 @@ export function PetsList({
                   key={p.id}
                   type="button"
                   className={`tcard tone-${tone} ${isSel ? 'sel' : ''}`}
+                  style={p.species?.color ? ({ '--tone': p.species.color } as React.CSSProperties) : undefined}
                   onClick={() => onSelectPet(p)}
                 >
                   <div className="tcard-head">
@@ -150,12 +151,14 @@ export function PetsList({
                       tone={tone}
                       iconSize={26}
                       className="t-ava lg"
+                      style={p.species?.color ? ({ '--tone': p.species.color } as React.CSSProperties) : undefined}
                       alt={p.name}
                     />
                     <span className="col grow" style={{ gap: '1px', minWidth: 0 }}>
                       <span className="tcard-title">{p.name}</span>
                       <span className="cell-sub">
                         {spName} · {p.gender === 'MALE' ? 'Самец' : 'Самка'}
+                        {p.breed ? ` · ${p.breed}` : ''}
                       </span>
                     </span>
                     {p.isArchived && (

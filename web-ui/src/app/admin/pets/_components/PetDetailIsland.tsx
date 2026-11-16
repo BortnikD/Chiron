@@ -61,12 +61,20 @@ export const PetDetailIsland: React.FC<PetDetailIslandProps> = ({
             species={tone}
             iconSize={20}
             className={`pet-ava tone-${tone} detail-head-ava`}
+            style={
+              pet.species?.color
+                ? ({
+                    '--tone': pet.species.color,
+                  } as React.CSSProperties)
+                : undefined
+            }
             variant="full"
           />
           <div className="col" style={{ gap: 0 }}>
             <span className="h2">{pet.name}</span>
             <span className="cell-sub">
-              {speciesName} ·{' '}
+              {speciesName}
+              {pet.breed ? ` (${pet.breed})` : ''} ·{' '}
               {pet.gender === 'MALE' ? 'Самец' : 'Самка'} ·{' '}
               {calculateAgeRu(pet.birthDate)}
             </span>
@@ -159,6 +167,12 @@ export const PetDetailIsland: React.FC<PetDetailIslandProps> = ({
               </dd>
               <dt>Вид</dt>
               <dd>{speciesName}</dd>
+              {pet.breed && (
+                <>
+                  <dt>Порода</dt>
+                  <dd>{pet.breed}</dd>
+                </>
+              )}
               <dt>Пол</dt>
               <dd>{pet.gender === 'MALE' ? 'Самец' : 'Самка'}</dd>
               <dt>Дата рождения</dt>

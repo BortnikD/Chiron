@@ -151,6 +151,7 @@ export const StepPetSelection: React.FC<StepPetSelectionProps> = ({
                     <span className="tcard-title">{p.name}</span>
                     <span className="cell-sub">
                       {spName}
+                      {p.breed ? ` (${p.breed})` : ''}
                       {ageLabel !== '—' ? ` · ${ageLabel}` : ''}
                     </span>
                     {p.isArchived ? (

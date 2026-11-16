@@ -123,7 +123,8 @@ export function VetPatientsList({
                   <div className="col" style={{ gap: '2px', minWidth: 0 }}>
                     <span className="tcard-title">{p.name}</span>
                     <span className="cell-sub">
-                      {speciesName} · {age}
+                      {speciesName}
+                      {p.breed ? ` (${p.breed})` : ''} · {age}
                     </span>
                   </div>
                   {p.isArchived && (
@@ -227,7 +228,10 @@ export function VetPatientsList({
                       variant="thumb"
                       className={`t-ava sm tone-${tone}`}
                     />
-                    <span className="cell-main">{p.name}</span>
+                    <span className="col" style={{ gap: 0, textAlign: 'left', minWidth: 0 }}>
+                      <span className="cell-main">{p.name}</span>
+                      {p.breed && <span className="cell-sub">{p.breed}</span>}
+                    </span>
                     {p.isArchived && <span className="badge">Архив</span>}
                   </span>
                   <span>{speciesName}</span>

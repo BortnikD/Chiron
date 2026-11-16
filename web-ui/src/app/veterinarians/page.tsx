@@ -83,6 +83,8 @@ function VeterinariansContent() {
             specsMap={specsMap}
             speciesMap={speciesMap}
             vetPermissions={vetPermissions}
+            speciesList={speciesList}
+            specializations={specializations}
             loading={loading}
             hasFilters={hasFilters}
             onReset={resetFilters}
@@ -94,6 +96,8 @@ function VeterinariansContent() {
             vet={selectedVet}
             specsMap={specsMap}
             speciesMap={speciesMap}
+            speciesList={speciesList}
+            specializations={specializations}
             services={services}
             permissions={vetPermissions[selectedVet.id] || []}
             schedules={vetSchedules}

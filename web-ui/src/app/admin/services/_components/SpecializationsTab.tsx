@@ -10,7 +10,10 @@ export interface SpecializationsTabProps {
   specializations: Specialization[];
   services: Service[];
   veterinarians: Veterinarian[];
-  onSaveSpecialization: (data: { name: string; description: string }, id?: string) => Promise<void>;
+  onSaveSpecialization: (
+    data: { name: string; description: string; color?: string | null },
+    id?: string
+  ) => Promise<void>;
   onDeleteSpecialization: (id: string) => Promise<void>;
 }
 
@@ -22,7 +25,7 @@ export const SpecializationsTab: React.FC<SpecializationsTabProps> = ({
   onDeleteSpecialization,
 }) => {
   const [isSpecModalOpen, setIsSpecModalOpen] = useState(false);
-  const [specForm, setSpecForm] = useState({ id: '', name: '', description: '' });
+  const [specForm, setSpecForm] = useState({ id: '', name: '', description: '', color: '' });
   const [savingSpec, setSavingSpec] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
 
@@ -62,6 +65,11 @@ export const SpecializationsTab: React.FC<SpecializationsTabProps> = ({
       setSaveError('Введите название специализации');
       return;
     }
+    const trimmedColor = specForm.color.trim();
+    if (trimmedColor && !/^#[0-9A-Fa-f]{6}$/.test(trimmedColor)) {
+      setSaveError('Цвет должен быть в формате HEX (#RRGGBB)');
+      return;
+    }
     if (
       specializations.some(
         (z) => z.id !== specForm.id && z.name.toLowerCase() === trimmedName.toLowerCase()
@@ -77,11 +85,12 @@ export const SpecializationsTab: React.FC<SpecializationsTabProps> = ({
         {
           name: trimmedName,
           description: specForm.description.trim(),
+          color: trimmedColor || null,
         },
         specForm.id || undefined
       );
       setIsSpecModalOpen(false);
-      setSpecForm({ id: '', name: '', description: '' });
+      setSpecForm({ id: '', name: '', description: '', color: '' });
     } catch (err: unknown) {
       setSaveError(formatApiError(err, 'Ошибка сохранения специализации'));
     } finally {
@@ -115,7 +124,7 @@ export const SpecializationsTab: React.FC<SpecializationsTabProps> = ({
             type="button"
             className="btn btn-primary btn-sm"
             onClick={() => {
-              setSpecForm({ id: '', name: '', description: '' });
+              setSpecForm({ id: '', name: '', description: '', color: '' });
               setSaveError(null);
               setIsSpecModalOpen(true);
             }}
@@ -140,7 +149,23 @@ export const SpecializationsTab: React.FC<SpecializationsTabProps> = ({
 
             {specializations.map((sp) => (
               <div key={sp.id} className="trow static">
-                <span className="cell-main">{sp.name}</span>
+                <span className="row" style={{ gap: 8, alignItems: 'center' }}>
+                  <span className="cell-main">{sp.name}</span>
+                  {sp.color && (
+                    <span className="small muted row" style={{ gap: 4, alignItems: 'center' }}>
+                      <span
+                        style={{
+                          width: 10,
+                          height: 10,
+                          borderRadius: '50%',
+                          backgroundColor: sp.color,
+                          display: 'inline-block',
+                        }}
+                      />
+                      <span className="tnum">{sp.color.toUpperCase()}</span>
+                    </span>
+                  )}
+                </span>
                 <span className="muted small">{sp.description || '—'}</span>
                 <span className="right tnum">{vetCounts[sp.id] || 0}</span>
                 <span className="right tnum">{serviceCounts[sp.id] || 0}</span>
@@ -151,7 +176,12 @@ export const SpecializationsTab: React.FC<SpecializationsTabProps> = ({
                     aria-label={`Изменить специализацию «${sp.name}»`}
                     title="Изменить"
                     onClick={() => {
-                      setSpecForm({ id: sp.id, name: sp.name, description: sp.description || '' });
+                      setSpecForm({
+                        id: sp.id,
+                        name: sp.name,
+                        description: sp.description || '',
+                        color: sp.color || '',
+                      });
                       setSaveError(null);
                       setIsSpecModalOpen(true);
                     }}
@@ -238,6 +268,41 @@ export const SpecializationsTab: React.FC<SpecializationsTabProps> = ({
                     }
                   />
                   <span className="field-hint">{specForm.description.length} / 2000</span>
+                </div>
+
+                <div className="field">
+                  <label className="field-label" htmlFor="spec-color-input">
+                    Цвет (HEX) <span className="small muted">(необязательно)</span>
+                  </label>
+                  <div className="row" style={{ gap: 6, alignItems: 'center' }}>
+                    <input
+                      type="color"
+                      value={
+                        specForm.color && /^#[0-9A-Fa-f]{6}$/.test(specForm.color)
+                          ? specForm.color
+                          : '#10B981'
+                      }
+                      onChange={(e) =>
+                        setSpecForm({ ...specForm, color: e.target.value.toUpperCase() })
+                      }
+                      style={{
+                        width: 36,
+                        height: 36,
+                        padding: 2,
+                        border: '1px solid var(--border)',
+                        borderRadius: 6,
+                        cursor: 'pointer',
+                      }}
+                    />
+                    <input
+                      id="spec-color-input"
+                      className="input"
+                      maxLength={7}
+                      placeholder="#10B981"
+                      value={specForm.color}
+                      onChange={(e) => setSpecForm({ ...specForm, color: e.target.value })}
+                    />
+                  </div>
                 </div>
 
                 {saveError && (

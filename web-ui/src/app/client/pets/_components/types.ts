@@ -12,6 +12,7 @@ export interface PetFormData {
   birthDate?: string | null;
   weightKg?: number | null;
   notes?: string | null;
+  breed?: string | null;
   isArchived?: boolean;
   photoFile?: File | null;
 }

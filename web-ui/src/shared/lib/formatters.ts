@@ -220,15 +220,21 @@ export type SpeciesTone = 'dog' | 'cat' | 'rab' | 'par' | 'pig' | 'fer';
 
 export function getSpeciesTone(
   speciesIdOrName?: string | null,
-  speciesMap?: Record<string, string> | ReadonlyArray<{ id: string; name: string }>
+  speciesMap?:
+    | Record<string, string>
+    | ReadonlyArray<{ id: string; name: string; iconKey?: string | null; color?: string | null }>
 ): SpeciesTone {
   let resolved = speciesIdOrName || '';
   if (speciesIdOrName && speciesMap) {
     if (Array.isArray(speciesMap)) {
-      const match = (speciesMap as ReadonlyArray<{ id: string; name: string }>).find(
-        (s) => s.id === speciesIdOrName
+      const match = speciesMap.find(
+        (s) => s.id === speciesIdOrName || s.name.toLowerCase() === speciesIdOrName.toLowerCase()
       );
-      resolved = match?.name || resolved;
+      if (match?.iconKey) {
+        resolved = match.iconKey;
+      } else {
+        resolved = match?.name || resolved;
+      }
     } else {
       const recordMap = speciesMap as Record<string, string>;
       if (recordMap[speciesIdOrName]) {
@@ -236,9 +242,11 @@ export function getSpeciesTone(
       }
     }
   }
-  const norm = resolved.toLowerCase();
+  const norm = resolved.toLowerCase().trim();
   if (
     norm === '5eed0001-0000-0000-0000-000000000001' ||
+    norm === 'dog' ||
+    norm === 'canine' ||
     norm.includes('соб') ||
     norm.includes('dog')
   ) {
@@ -246,6 +254,8 @@ export function getSpeciesTone(
   }
   if (
     norm === '5eed0001-0000-0000-0000-000000000002' ||
+    norm === 'cat' ||
+    norm === 'feline' ||
     norm.includes('кош') ||
     norm.includes('кот') ||
     norm.includes('cat')
@@ -254,6 +264,10 @@ export function getSpeciesTone(
   }
   if (
     norm === '5eed0001-0000-0000-0000-000000000004' ||
+    norm === 'pig' ||
+    norm === 'cavy' ||
+    norm === 'guinea_pig' ||
+    norm === 'guinea-pig' ||
     norm.includes('морск') ||
     norm.includes('свин') ||
     norm.includes('guinea') ||
@@ -263,6 +277,8 @@ export function getSpeciesTone(
   }
   if (
     norm === '5eed0001-0000-0000-0000-000000000005' ||
+    norm === 'fer' ||
+    norm === 'ferret' ||
     norm.includes('хорёк') ||
     norm.includes('хорек') ||
     norm.includes('ferret')
@@ -271,6 +287,8 @@ export function getSpeciesTone(
   }
   if (
     norm === '5eed0001-0000-0000-0000-000000000003' ||
+    norm === 'rab' ||
+    norm === 'rabbit' ||
     norm.includes('крол') ||
     norm.includes('rab')
   ) {
@@ -278,6 +296,9 @@ export function getSpeciesTone(
   }
   if (
     norm === '5eed0001-0000-0000-0000-000000000006' ||
+    norm === 'par' ||
+    norm === 'bird' ||
+    norm === 'parrot' ||
     norm.includes('попуг') ||
     norm.includes('птиц') ||
     norm.includes('bird') ||

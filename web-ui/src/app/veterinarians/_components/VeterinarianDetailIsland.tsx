@@ -21,6 +21,8 @@ export const VeterinarianDetailIsland: React.FC<VeterinarianDetailIslandProps> =
   vet,
   specsMap,
   speciesMap,
+  speciesList,
+  specializations,
   services = [],
   permissions,
   schedules,
@@ -90,10 +92,23 @@ export const VeterinarianDetailIsland: React.FC<VeterinarianDetailIslandProps> =
               {permissions.length > 0 ? (
                 permissions.map((spId) => {
                   const spName = speciesMap[spId] || 'Животное';
-                  const spTone = getSpeciesTone(spName);
+                  const sp = speciesList?.find((s) => s.id === spId);
+                  const spTone = getSpeciesTone(sp?.iconKey || spName);
+                  const customColor = sp?.color;
                   return (
-                    <span key={spId} className={`sp-chip tone-${spTone}`}>
-                      <SpeciesIcon species={spTone} size={14} />
+                    <span
+                      key={spId}
+                      className={`sp-chip tone-${spTone}`}
+                      style={
+                        customColor
+                          ? ({
+                              '--tone': customColor,
+                              borderColor: customColor,
+                            } as React.CSSProperties)
+                          : undefined
+                      }
+                    >
+                      <SpeciesIcon species={sp?.iconKey || spTone} size={14} />
                       {spName}
                     </span>
                   );

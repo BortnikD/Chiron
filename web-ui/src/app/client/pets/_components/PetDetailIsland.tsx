@@ -90,13 +90,22 @@ export function PetDetailIsland({
             tone={tone}
             iconSize={20}
             className={`pet-ava tone-${tone} detail-head-ava`}
-            style={{ color: 'var(--tone)', background: 'color-mix(in srgb, var(--tone, var(--muted-foreground)) 16%, transparent)' }}
+            style={
+              pet.species?.color
+                ? ({
+                    '--tone': pet.species.color,
+                    color: 'var(--tone)',
+                    background: 'color-mix(in srgb, var(--tone, var(--muted-foreground)) 16%, transparent)',
+                  } as React.CSSProperties)
+                : { color: 'var(--tone)', background: 'color-mix(in srgb, var(--tone, var(--muted-foreground)) 16%, transparent)' }
+            }
             alt={pet.name}
           />
           <div className="col" style={{ gap: 0, minWidth: 0 }}>
             <span className="h2">{pet.name}</span>
             <span className="cell-sub">
-              {spName} · {age}
+              {spName}
+              {pet.breed ? ` (${pet.breed})` : ''} · {age}
             </span>
           </div>
         </div>
@@ -202,6 +211,12 @@ export function PetDetailIsland({
             <dl className="kv" style={{ margin: 0 }}>
               <dt>Вид</dt>
               <dd>{spName}</dd>
+              {pet.breed && (
+                <>
+                  <dt>Порода</dt>
+                  <dd>{pet.breed}</dd>
+                </>
+              )}
               <dt>Пол</dt>
               <dd>{pet.gender === 'MALE' ? 'Самец' : 'Самка'}</dd>
               <dt>Дата рождения</dt>

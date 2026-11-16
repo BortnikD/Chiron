@@ -335,15 +335,23 @@ export const adminApi = {
   deleteService: (id: string) =>
     api.delete<void>(`/api/v1/admin/services/${id}`),
 
-  createSpecies: (name: string) => api.post<Species>('/api/v1/admin/species', { name }),
+  createSpecies: (data: { name: string; color?: string | null; iconKey?: string | null } | string) => {
+    const payload = typeof data === 'string' ? { name: data } : data;
+    return api.post<Species>('/api/v1/admin/species', payload);
+  },
 
-  updateSpecies: (id: string, name: string) =>
-    api.patch<Species>(`/api/v1/admin/species/${id}`, { name }),
+  updateSpecies: (
+    id: string,
+    data: { name?: string; color?: string | null; iconKey?: string | null } | string
+  ) => {
+    const payload = typeof data === 'string' ? { name: data } : data;
+    return api.patch<Species>(`/api/v1/admin/species/${id}`, payload);
+  },
 
   deleteSpecies: (id: string) =>
     api.delete<void>(`/api/v1/admin/species/${id}`),
 
-  createSpecialization: (data: { name: string; description: string }) =>
+  createSpecialization: (data: { name: string; description?: string; color?: string | null }) =>
     api.post<Specialization>('/api/v1/admin/specializations', data),
 
   updateSpecialization: (id: string, data: Partial<Specialization>) =>

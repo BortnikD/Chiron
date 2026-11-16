@@ -11,8 +11,8 @@ export interface SpeciesTabProps {
   speciesList: Species[];
   services: Service[];
   serviceSpeciesMap: Record<string, ServiceSpecies[]>;
-  onCreateSpecies: (name: string) => Promise<void>;
-  onUpdateSpecies: (id: string, name: string) => Promise<void>;
+  onCreateSpecies: (data: { name: string; color?: string | null; iconKey?: string | null } | string) => Promise<void>;
+  onUpdateSpecies: (id: string, data: { name?: string; color?: string | null; iconKey?: string | null } | string) => Promise<void>;
   onDeleteSpecies: (id: string) => Promise<void>;
 }
 
@@ -25,7 +25,12 @@ export const SpeciesTab: React.FC<SpeciesTabProps> = ({
   onDeleteSpecies,
 }) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [speciesForm, setSpeciesForm] = useState<{ id: string; name: string }>({ id: '', name: '' });
+  const [speciesForm, setSpeciesForm] = useState<{
+    id: string;
+    name: string;
+    color: string;
+    iconKey: string;
+  }>({ id: '', name: '', color: '', iconKey: '' });
   const [savingSpecies, setSavingSpecies] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
 
@@ -59,6 +64,11 @@ export const SpeciesTab: React.FC<SpeciesTabProps> = ({
       setSaveError('Введите название вида');
       return;
     }
+    const trimmedColor = speciesForm.color.trim();
+    if (trimmedColor && !/^#[0-9A-Fa-f]{6}$/.test(trimmedColor)) {
+      setSaveError('Цвет должен быть в формате HEX (#RRGGBB)');
+      return;
+    }
     if (
       speciesList.some(
         (sp) => sp.id !== speciesForm.id && sp.name.toLowerCase() === trimmed.toLowerCase()
@@ -71,13 +81,18 @@ export const SpeciesTab: React.FC<SpeciesTabProps> = ({
     setSavingSpecies(true);
     setSaveError(null);
     try {
+      const payload = {
+        name: trimmed,
+        color: trimmedColor || null,
+        iconKey: speciesForm.iconKey.trim() || null,
+      };
       if (speciesForm.id) {
-        await onUpdateSpecies(speciesForm.id, trimmed);
+        await onUpdateSpecies(speciesForm.id, payload);
       } else {
-        await onCreateSpecies(trimmed);
+        await onCreateSpecies(payload);
       }
       setIsModalOpen(false);
-      setSpeciesForm({ id: '', name: '' });
+      setSpeciesForm({ id: '', name: '', color: '', iconKey: '' });
     } catch (err: unknown) {
       setSaveError(formatApiError(err, 'Ошибка сохранения вида животных'));
     } finally {
@@ -111,7 +126,7 @@ export const SpeciesTab: React.FC<SpeciesTabProps> = ({
             type="button"
             className="btn btn-primary btn-sm"
             onClick={() => {
-              setSpeciesForm({ id: '', name: '' });
+              setSpeciesForm({ id: '', name: '', color: '', iconKey: '' });
               setSaveError(null);
               setIsModalOpen(true);
             }}
@@ -134,14 +149,39 @@ export const SpeciesTab: React.FC<SpeciesTabProps> = ({
             </div>
 
             {speciesList.map((sp) => {
-              const tone = getSpeciesTone(sp.name);
+              const tone = getSpeciesTone(sp.iconKey || sp.name);
+              const customColor = sp.color;
               return (
                 <div key={sp.id} className="trow static">
-                  <span className="row" style={{ gap: 8 }}>
-                    <span className={`sp-chip tone-${tone}`}>
-                      <SpeciesIcon species={tone} size={14} className="ic" />
+                  <span className="row" style={{ gap: 8, alignItems: 'center' }}>
+                    <span
+                      className={`sp-chip tone-${tone}`}
+                      style={
+                        customColor
+                          ? ({
+                              '--tone': customColor,
+                              borderColor: customColor,
+                            } as React.CSSProperties)
+                          : undefined
+                      }
+                    >
+                      <SpeciesIcon species={sp.iconKey || tone} size={14} className="ic" />
                       {sp.name}
                     </span>
+                    {customColor && (
+                      <span className="small muted row" style={{ gap: 4, alignItems: 'center' }}>
+                        <span
+                          style={{
+                            width: 10,
+                            height: 10,
+                            borderRadius: '50%',
+                            backgroundColor: customColor,
+                            display: 'inline-block',
+                          }}
+                        />
+                        <span className="tnum">{customColor.toUpperCase()}</span>
+                      </span>
+                    )}
                   </span>
                   <span className="right tnum">{serviceCountsBySpecies[sp.id] || 0}</span>
                   <span className="tnum muted small" style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>
@@ -154,7 +194,12 @@ export const SpeciesTab: React.FC<SpeciesTabProps> = ({
                       aria-label={`Изменить вид «${sp.name}»`}
                       title="Изменить"
                       onClick={() => {
-                        setSpeciesForm({ id: sp.id, name: sp.name });
+                        setSpeciesForm({
+                          id: sp.id,
+                          name: sp.name,
+                          color: sp.color || '',
+                          iconKey: sp.iconKey || '',
+                        });
                         setSaveError(null);
                         setIsModalOpen(true);
                       }}
@@ -231,6 +276,67 @@ export const SpeciesTab: React.FC<SpeciesTabProps> = ({
                     onChange={(e) => setSpeciesForm({ ...speciesForm, name: e.target.value })}
                     required
                   />
+                </div>
+
+                <div className="form-grid" style={{ gridTemplateColumns: '1fr 1fr' }}>
+                  <div className="field">
+                    <label className="field-label" htmlFor="species-color-input">
+                      Цвет (HEX) <span className="small muted">(необязательно)</span>
+                    </label>
+                    <div className="row" style={{ gap: 6, alignItems: 'center' }}>
+                      <input
+                        type="color"
+                        value={
+                          speciesForm.color && /^#[0-9A-Fa-f]{6}$/.test(speciesForm.color)
+                            ? speciesForm.color
+                            : '#3B82F6'
+                        }
+                        onChange={(e) =>
+                          setSpeciesForm({ ...speciesForm, color: e.target.value.toUpperCase() })
+                        }
+                        style={{
+                          width: 36,
+                          height: 36,
+                          padding: 2,
+                          border: '1px solid var(--border)',
+                          borderRadius: 6,
+                          cursor: 'pointer',
+                        }}
+                      />
+                      <input
+                        id="species-color-input"
+                        className="input"
+                        maxLength={7}
+                        placeholder="#3B82F6"
+                        value={speciesForm.color}
+                        onChange={(e) =>
+                          setSpeciesForm({ ...speciesForm, color: e.target.value })
+                        }
+                      />
+                    </div>
+                  </div>
+
+                  <div className="field">
+                    <label className="field-label" htmlFor="species-icon-input">
+                      Иконка <span className="small muted">(необязательно)</span>
+                    </label>
+                    <select
+                      id="species-icon-input"
+                      className="input"
+                      value={speciesForm.iconKey}
+                      onChange={(e) =>
+                        setSpeciesForm({ ...speciesForm, iconKey: e.target.value })
+                      }
+                    >
+                      <option value="">По умолчанию</option>
+                      <option value="cat">Кошка (cat)</option>
+                      <option value="dog">Собака (dog)</option>
+                      <option value="pig">Морская свинка (pig)</option>
+                      <option value="fer">Хорёк (fer)</option>
+                      <option value="rab">Кролик (rab)</option>
+                      <option value="par">Попугай (par)</option>
+                    </select>
+                  </div>
                 </div>
 
                 {saveError && (
