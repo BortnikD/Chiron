@@ -185,14 +185,27 @@ export const AdminAppointmentDetailIsland: React.FC<AdminAppointmentDetailIsland
       </div>
 
       <div className="island-foot">
-        <button
-          type="button"
-          className="btn btn-destructive-outline btn-sm"
-          onClick={() => onDelete(appointment)}
-        >
-          <Trash2 size={14} />
-          Удалить
-        </button>
+        {appointment.status === 'CANCELLED' ? (
+          <button
+            type="button"
+            className="btn btn-destructive-outline btn-sm"
+            onClick={() => onDelete(appointment)}
+          >
+            <Trash2 size={14} />
+            Удалить
+          </button>
+        ) : (
+          <button
+            type="button"
+            className="btn btn-ghost btn-sm"
+            disabled
+            style={{ opacity: 0.45, cursor: 'not-allowed' }}
+            title="Удалить можно только предварительно отменённую запись"
+          >
+            <Trash2 size={14} />
+            Удалить
+          </button>
+        )}
         {appointment.status !== 'CANCELLED' &&
           canTransitionAppointmentStatus(appointment.status, 'CANCELLED') && (
             <button

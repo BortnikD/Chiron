@@ -10,8 +10,8 @@ import {
   type SearchComboboxOption,
 } from '@/shared/components';
 import type { ScheduleExceptionType } from '@/shared/types';
-import { formatApiError, getMoscowTodayIso, timeToMinutes } from '@/shared/lib';
-import { getDoctorDisplay } from '@/shared/lib';
+import { formatApiError, getMoscowTodayIso, timeToMinutes, getDoctorDisplay, getSpecStyle, getSpecTone } from '@/shared/lib';
+import { VetAvatar } from '@/components/ui/EntityAvatar';
 import type { ScheduleExceptionSavePayload } from './types';
 
 export interface ScheduleExceptionModalProps {
@@ -49,7 +49,22 @@ export const ScheduleExceptionModal: React.FC<ScheduleExceptionModalProps> = ({
     () =>
       vets.map((v) => {
         const doc = getDoctorDisplay(v, specsMap);
-        return { value: v.id, label: doc.fullName, hint: doc.specName };
+        return {
+          value: v.id,
+          label: doc.fullName,
+          hint: doc.specName,
+          avatar: (
+            <VetAvatar
+              vet={v}
+              initials={doc.initials}
+              tone={getSpecTone(v.specializationId)}
+              style={getSpecStyle(v.specializationId)}
+              variant="thumb"
+              className="t-ava xs round"
+              alt={doc.fullName}
+            />
+          ),
+        };
       }),
     [vets, specsMap]
   );

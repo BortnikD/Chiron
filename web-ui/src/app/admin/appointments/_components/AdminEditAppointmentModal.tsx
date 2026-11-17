@@ -7,6 +7,7 @@ import type { Appointment, Pet } from '@/modules/client/types';
 import type { Veterinarian, Service } from '@/modules/clinic/types';
 import type { AppointmentStatus } from '@/shared/types';
 import { DatePicker, SearchCombobox, type SearchComboboxOption } from '@/shared/components';
+import { VetAvatar } from '@/components/ui/EntityAvatar';
 import {
   APPOINTMENT_STATUS_LIST,
   APPOINTMENT_STATUS_META,
@@ -15,8 +16,10 @@ import {
   formatSlotTime,
   getMoscowDateKey,
   timeToMinutes,
+  getDoctorDisplay,
+  getSpecStyle,
+  getSpecTone,
 } from '@/shared/lib';
-import { getDoctorDisplay } from '@/shared/lib';
 import { buildUpdateAppointmentPayload, computeAppointmentEditRange } from './utils';
 
 export interface AdminEditAppointmentModalProps {
@@ -92,7 +95,23 @@ export const AdminEditAppointmentModal: React.FC<AdminEditAppointmentModalProps>
     () =>
       veterinarians.map((v) => {
         const d = getDoctorDisplay(v);
-        return { value: v.id, label: d.fullName, hint: d.specName, disabled: !v.isActive };
+        return {
+          value: v.id,
+          label: d.fullName,
+          hint: d.specName,
+          disabled: !v.isActive,
+          avatar: (
+            <VetAvatar
+              vet={v}
+              initials={d.initials}
+              tone={getSpecTone(v.specializationId)}
+              style={getSpecStyle(v.specializationId)}
+              variant="thumb"
+              className="t-ava xs round"
+              alt={d.fullName}
+            />
+          ),
+        };
       }),
     [veterinarians]
   );

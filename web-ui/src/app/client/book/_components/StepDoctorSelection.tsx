@@ -4,6 +4,7 @@ import type { Veterinarian } from '@/modules/clinic/types';
 import { VetAvatar } from '@/components/ui/EntityAvatar';
 import { getDoctorDisplay } from '@/shared/lib';
 import { getSpecTone, pluralRu } from '@/shared/lib';
+import { useDictionaries } from '@/shared/hooks';
 
 export interface StepDoctorSelectionProps {
   veterinarians: Veterinarian[];
@@ -33,6 +34,8 @@ export const StepDoctorSelection: React.FC<StepDoctorSelectionProps> = ({
   lockedServiceName,
   onResetServiceFilter,
 }) => {
+  const { specializationsMap } = useDictionaries();
+
   const filteredVeterinarians = useMemo(() => {
     const hasAnySpeciesIds = veterinarians.some(
       (v) => Array.isArray(v.speciesIds) && v.speciesIds.length > 0
@@ -101,6 +104,8 @@ export const StepDoctorSelection: React.FC<StepDoctorSelectionProps> = ({
         {filteredVeterinarians.map((v) => {
           const isSel = !isAnyVet && selectedVet?.id === v.id;
           const tone = getSpecTone(v.specializationId);
+          const spec = v.specialization || (v.specializationId ? specializationsMap.get(v.specializationId) : undefined);
+          const specColor = spec?.color;
           const { name, initials, specName } = getDoctorDisplay(v, specsMap);
 
           return (
@@ -108,6 +113,7 @@ export const StepDoctorSelection: React.FC<StepDoctorSelectionProps> = ({
               key={v.id}
               type="button"
               className={`tcard tone-${tone} ${isSel ? 'sel' : ''}`}
+              style={specColor ? ({ '--tone': specColor } as React.CSSProperties) : undefined}
               onClick={() => onSelectVet(v)}
             >
               <div className="tcard-head">
@@ -121,7 +127,20 @@ export const StepDoctorSelection: React.FC<StepDoctorSelectionProps> = ({
                 <span className="col grow" style={{ gap: '3px', minWidth: 0 }}>
                   <span className="tcard-title">{name}</span>
                   <span className="row" style={{ gap: '6px' }}>
-                    <span className="t-badge">{specName}</span>
+                    <span
+                      className="t-badge"
+                      style={
+                        specColor
+                          ? {
+                              backgroundColor: `color-mix(in srgb, ${specColor} 15%, transparent)`,
+                              color: specColor,
+                              borderColor: `color-mix(in srgb, ${specColor} 40%, transparent)`,
+                            }
+                          : undefined
+                      }
+                    >
+                      {specName}
+                    </span>
                     <span className="cell-sub">
                       стаж {v.experienceYears} {pluralRu(v.experienceYears, 'год', 'года', 'лет')}
                     </span>

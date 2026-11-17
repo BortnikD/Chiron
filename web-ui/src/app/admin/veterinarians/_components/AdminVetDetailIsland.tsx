@@ -9,7 +9,7 @@ import type { User } from '@/shared/types';
 import { SearchCombobox, type SearchComboboxOption } from '@/shared/components';
 import { VetAvatar } from '@/components/ui/EntityAvatar';
 import { EntityPhotoControl } from '@/components/ui/EntityPhotoControl';
-import { formatApiError, toIdNameMap } from '@/shared/lib';
+import { formatApiError, getSpecStyle, getSpecTone, toIdNameMap } from '@/shared/lib';
 import { getDoctorDisplay } from '@/shared/lib';
 import { VetDetailTabsSection } from './VetDetailTabsSection';
 
@@ -129,18 +129,30 @@ export const AdminVetDetailIsland: React.FC<AdminVetDetailIslandProps> = ({
   return (
     <section className="island detail-island" style={{ width: 460 }} aria-label="Врач">
       <div className="island-head">
-        <div className="row">
+        <div className="row" style={{ alignItems: 'center', gap: 12 }}>
           <VetAvatar
             vet={selectedVet}
             initials={doc.initials}
+            tone={getSpecTone(selectedVet.specializationId)}
+            style={getSpecStyle(selectedVet.specializationId, specializations)}
             className="avatar avatar-lg detail-head-ava"
             alt={doc.fullName}
           />
-          <div className="col" style={{ gap: 2 }}>
+          <div className="col" style={{ gap: 4, minWidth: 0 }}>
             <span className="h2">{doc.fullName}</span>
-            <span className="cell-sub">
-              {selectedVet.specializationId ? doc.specName : 'Не указана'} · {user?.email || '—'}
-            </span>
+            <div className="row" style={{ gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
+              {selectedVet.specializationId ? (
+                <span
+                  className={`t-badge tone-${getSpecTone(selectedVet.specializationId)}`}
+                  style={{ ...getSpecStyle(selectedVet.specializationId, specializations), height: '20px', fontSize: '11px' }}
+                >
+                  {doc.specName}
+                </span>
+              ) : (
+                <span className="cell-sub">Специализация не указана</span>
+              )}
+              <span className="cell-sub">· {user?.email || '—'}</span>
+            </div>
           </div>
         </div>
         <button

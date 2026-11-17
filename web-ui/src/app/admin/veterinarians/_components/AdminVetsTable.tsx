@@ -4,7 +4,7 @@ import React, { useMemo } from 'react';
 import { Stethoscope } from 'lucide-react';
 import type { Veterinarian, Specialization, Species } from '@/modules/clinic/types';
 import type { User } from '@/shared/types';
-import { getSpecTone, getSpeciesTone, pluralRu, toIdNameMap } from '@/shared/lib';
+import { getSpecTone, getSpecStyle, getSpeciesTone, pluralRu, toIdNameMap } from '@/shared/lib';
 import { DataTable, type DataTableColumn } from '@/shared/components';
 import { SpeciesIcon } from '@/components/ui/SpeciesIcon';
 import { VetAvatar } from '@/components/ui/EntityAvatar';
@@ -46,12 +46,14 @@ export const AdminVetsTable: React.FC<AdminVetsTableProps> = ({
         render: (v) => {
           const doc = getDoctorDisplay({ ...v, user: v.user || usersMap[v.userId] }, specsMap);
           const tone = getSpecTone(v.specializationId);
+          const specStyle = getSpecStyle(v.specializationId, specializations);
           return (
             <span className="row" style={{ gap: 8, alignItems: 'center' }}>
               <VetAvatar
                 vet={v}
                 initials={doc.initials}
                 tone={tone}
+                style={specStyle}
                 className={`t-ava sm round tone-${tone}`}
                 alt={doc.fullName}
               />
@@ -68,7 +70,12 @@ export const AdminVetsTable: React.FC<AdminVetsTableProps> = ({
           const doc = getDoctorDisplay({ ...v, user: v.user || usersMap[v.userId] }, specsMap);
           const specName = v.specializationId ? doc.specName : 'Не указана';
           const tone = getSpecTone(v.specializationId);
-          return <span className={`t-badge tone-${tone}`}>{specName}</span>;
+          const specStyle = getSpecStyle(v.specializationId, specializations);
+          return (
+            <span className={`t-badge tone-${tone}`} style={specStyle}>
+              {specName}
+            </span>
+          );
         },
       },
       {
@@ -121,7 +128,7 @@ export const AdminVetsTable: React.FC<AdminVetsTableProps> = ({
         ),
       },
     ];
-  }, [usersMap, specsMap, speciesList, vetPermMap]);
+  }, [usersMap, specsMap, specializations, speciesList, vetPermMap]);
 
   return (
     <DataTable<Veterinarian>

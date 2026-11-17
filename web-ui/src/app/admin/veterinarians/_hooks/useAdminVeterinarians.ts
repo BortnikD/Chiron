@@ -8,7 +8,7 @@ import type { WorkSchedule, ScheduleException } from '@/modules/admin/types';
 import type { Veterinarian, Specialization, Species } from '@/modules/clinic/types';
 import type { User } from '@/shared/types';
 import { useToast } from '@/shared/components';
-import { fetchAllPages, formatApiError, toIdNameMap } from '@/shared/lib';
+import { fetchAllPages, formatApiError, registerSpecializationColors, toIdNameMap } from '@/shared/lib';
 import { getDoctorDisplay } from '@/shared/lib';
 
 export type VetActiveFilter = 'ALL' | 'ACTIVE' | 'INACTIVE';
@@ -132,7 +132,9 @@ export function useAdminVeterinarians() {
 
       setVeterinarians(vets);
       setUsers(vetUsers);
-      setSpecializations(Array.isArray(specsData) ? specsData : []);
+      const safeSpecs = Array.isArray(specsData) ? specsData : [];
+      registerSpecializationColors(safeSpecs);
+      setSpecializations(safeSpecs);
       setSpeciesList(Array.isArray(speciesData) ? speciesData : []);
       setVetPermMap(Object.fromEntries(permEntries));
 

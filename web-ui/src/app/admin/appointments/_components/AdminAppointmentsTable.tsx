@@ -202,15 +202,28 @@ export const AdminAppointmentsTable: React.FC<AdminAppointmentsTableProps> = ({
                 <XCircle size={13} />
               </button>
             )}
-            <button
-              type="button"
-              className="btn btn-ghost btn-icon btn-xs text-destructive"
-              title="Удалить запись"
-              aria-label="Удалить"
-              onClick={() => onDelete(a)}
-            >
-              <Trash2 size={13} />
-            </button>
+            {a.status === 'CANCELLED' ? (
+              <button
+                type="button"
+                className="btn btn-ghost btn-icon btn-xs text-destructive"
+                title="Удалить запись"
+                aria-label="Удалить"
+                onClick={() => onDelete(a)}
+              >
+                <Trash2 size={13} />
+              </button>
+            ) : (
+              <button
+                type="button"
+                className="btn btn-ghost btn-icon btn-xs text-muted"
+                disabled
+                style={{ opacity: 0.35, cursor: 'not-allowed' }}
+                title="Удалить можно только предварительно отменённую запись"
+                aria-label="Удалить невозможно"
+              >
+                <Trash2 size={13} />
+              </button>
+            )}
           </span>
         ),
       },

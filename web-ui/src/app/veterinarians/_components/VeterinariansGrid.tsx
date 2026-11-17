@@ -3,7 +3,7 @@
 import React from 'react';
 import { Stethoscope } from 'lucide-react';
 import { getDoctorDisplay } from '@/shared/lib';
-import { getSpecTone, getSpeciesTone, pluralRu } from '@/shared/lib';
+import { getSpecTone, getSpecStyle, getSpeciesTone, pluralRu } from '@/shared/lib';
 import { SpeciesIcon } from '@/components/ui/SpeciesIcon';
 import { VetAvatar } from '@/components/ui/EntityAvatar';
 import type { VeterinariansGridProps } from './types';
@@ -54,6 +54,7 @@ export const VeterinariansGrid: React.FC<VeterinariansGridProps> = ({
             {vets.map((v) => {
               const isSel = selectedVet?.id === v.id;
               const tone = getSpecTone(v.specializationId);
+              const specStyle = getSpecStyle(v.specializationId, specializations);
               const { name, fullName, initials, specName } = getDoctorDisplay(v, specsMap);
               const perms = vetPermissions[v.id] || [];
 
@@ -62,6 +63,7 @@ export const VeterinariansGrid: React.FC<VeterinariansGridProps> = ({
                   key={v.id}
                   type="button"
                   className={`tcard tone-${tone} ${isSel ? 'sel' : ''}`}
+                  style={specStyle}
                   onClick={() => onSelectVet(v)}
                 >
                   <div className="tcard-head">
@@ -69,6 +71,7 @@ export const VeterinariansGrid: React.FC<VeterinariansGridProps> = ({
                       vet={v}
                       initials={initials}
                       tone={tone}
+                      style={specStyle}
                       className="t-ava lg round"
                       alt={fullName}
                     />

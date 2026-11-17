@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { ClipboardList, Clock } from 'lucide-react';
-import { formatCurrency, getSpecTone } from '@/shared/lib';
+import { formatCurrency, getSpecStyle, getSpecTone } from '@/shared/lib';
 import type { ServicesGridProps } from './types';
 
 export function ServicesGrid({
@@ -55,14 +55,17 @@ export function ServicesGrid({
                 svc.effectiveDurationMin ?? svc.baseDurationMin ?? svc.durationMin ?? 30;
               const price = svc.effectivePrice ?? svc.basePrice;
 
+              const specStyle = getSpecStyle(svc.specializationId);
+
               return (
                 <button
                   key={svc.id}
                   type="button"
                   className={`tcard tone-${tone} ${isSel ? 'sel' : ''}`}
+                  style={specStyle}
                   onClick={() => onSelectService(svc)}
                 >
-                  <span className="t-badge" style={{ alignSelf: 'flex-start' }}>
+                  <span className={`t-badge tone-${tone}`} style={{ alignSelf: 'flex-start', ...specStyle }}>
                     {specName}
                   </span>
                   <span className="col" style={{ gap: '4px' }}>
