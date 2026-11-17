@@ -1,7 +1,7 @@
 'use client';
 
-import React, { useState, useEffect, useMemo } from 'react';
-import { Shapes, Plus, Edit2, Trash2, AlertCircle, X } from 'lucide-react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
+import { Shapes, Plus, Edit2, Trash2, AlertCircle, X, ChevronDown, Check } from 'lucide-react';
 import type { Service, ServiceSpecies, Species } from '@/modules/clinic/types';
 import { SpeciesIcon } from '@/components/ui/SpeciesIcon';
 import { ConfirmModal } from '@/shared/components';
@@ -15,6 +15,155 @@ export interface SpeciesTabProps {
   onUpdateSpecies: (id: string, data: { name?: string; color?: string | null; iconKey?: string | null } | string) => Promise<void>;
   onDeleteSpecies: (id: string) => Promise<void>;
 }
+
+const SPECIES_ICON_OPTIONS = [
+  { key: '', label: 'По умолчанию', icon: null },
+  { key: 'cat', label: 'Кошка (cat)', icon: 'cat' },
+  { key: 'dog', label: 'Собака (dog)', icon: 'dog' },
+  { key: 'pig', label: 'Морская свинка (pig)', icon: 'pig' },
+  { key: 'fer', label: 'Хорёк (fer)', icon: 'fer' },
+  { key: 'rab', label: 'Кролик (rab)', icon: 'rab' },
+  { key: 'par', label: 'Попугай (par)', icon: 'par' },
+];
+
+interface SpeciesIconSelectProps {
+  value: string;
+  onChange: (key: string) => void;
+  disabled?: boolean;
+}
+
+const SpeciesIconSelect: React.FC<SpeciesIconSelectProps> = ({ value, onChange, disabled }) => {
+  const [open, setOpen] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const handleDown = (e: MouseEvent) => {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    };
+    const handleKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setOpen(false);
+    };
+    document.addEventListener('mousedown', handleDown);
+    window.addEventListener('keydown', handleKey);
+    return () => {
+      document.removeEventListener('mousedown', handleDown);
+      window.removeEventListener('keydown', handleKey);
+    };
+  }, [open]);
+
+  const selectedOpt = SPECIES_ICON_OPTIONS.find((o) => o.key === value) || SPECIES_ICON_OPTIONS[0];
+
+  return (
+    <div ref={containerRef} style={{ position: 'relative', width: '100%' }}>
+      <button
+        type="button"
+        id="species-icon-input"
+        className="input"
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          width: '100%',
+          padding: '0 12px',
+          height: '36px',
+          cursor: disabled ? 'not-allowed' : 'pointer',
+          textAlign: 'left',
+        }}
+        onClick={() => !disabled && setOpen((prev) => !prev)}
+        aria-haspopup="listbox"
+        aria-expanded={open}
+      >
+        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+          {selectedOpt.icon ? (
+            <SpeciesIcon species={selectedOpt.icon} size={18} className="text-primary" />
+          ) : (
+            <span className="small muted">—</span>
+          )}
+          <span style={{ fontSize: '13px' }}>{selectedOpt.label}</span>
+        </span>
+        <ChevronDown
+          size={15}
+          className="muted"
+          style={{ transform: open ? 'rotate(180deg)' : undefined, transition: 'transform 0.15s' }}
+        />
+      </button>
+
+      {open && (
+        <div
+          role="listbox"
+          style={{
+            position: 'absolute',
+            top: 'calc(100% + 4px)',
+            left: 0,
+            right: 0,
+            zIndex: 100,
+            background: 'var(--card)',
+            border: '1px solid var(--border)',
+            borderRadius: 'var(--radius)',
+            boxShadow: '0 8px 24px rgba(0,0,0,0.3)',
+            padding: '4px',
+            maxHeight: '220px',
+            overflowY: 'auto',
+          }}
+        >
+          {SPECIES_ICON_OPTIONS.map((opt) => {
+            const isSelected = opt.key === value;
+            return (
+              <button
+                key={opt.key}
+                type="button"
+                role="option"
+                aria-selected={isSelected}
+                style={{
+                  all: 'unset',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 10,
+                  width: '100%',
+                  boxSizing: 'border-box',
+                  padding: '7px 10px',
+                  borderRadius: '6px',
+                  cursor: 'pointer',
+                  fontSize: '13px',
+                  background: isSelected ? 'color-mix(in srgb, var(--primary) 12%, transparent)' : undefined,
+                  color: isSelected ? 'var(--primary)' : 'var(--foreground)',
+                }}
+                onMouseEnter={(e) => {
+                  if (!isSelected) e.currentTarget.style.background = 'var(--muted)';
+                }}
+                onMouseLeave={(e) => {
+                  if (!isSelected) e.currentTarget.style.background = 'transparent';
+                }}
+                onClick={() => {
+                  onChange(opt.key);
+                  setOpen(false);
+                }}
+              >
+                <div
+                  style={{
+                    width: 22,
+                    height: 22,
+                    display: 'grid',
+                    placeItems: 'center',
+                    flexShrink: 0,
+                    color: opt.key ? 'var(--primary)' : 'var(--muted-foreground)',
+                  }}
+                >
+                  {opt.icon ? <SpeciesIcon species={opt.icon} size={18} /> : <span>—</span>}
+                </div>
+                <span style={{ flex: 1, fontWeight: isSelected ? 600 : 400 }}>{opt.label}</span>
+                {isSelected && <Check size={14} className="text-primary" />}
+              </button>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+};
 
 export const SpeciesTab: React.FC<SpeciesTabProps> = ({
   speciesList,
@@ -160,28 +309,20 @@ export const SpeciesTab: React.FC<SpeciesTabProps> = ({
                         customColor
                           ? ({
                               '--tone': customColor,
-                              borderColor: customColor,
+                              borderColor: `color-mix(in srgb, ${customColor} 45%, transparent)`,
+                              backgroundColor: `color-mix(in srgb, ${customColor} 14%, transparent)`,
                             } as React.CSSProperties)
                           : undefined
                       }
                     >
-                      <SpeciesIcon species={sp.iconKey || tone} size={14} className="ic" />
-                      {sp.name}
+                      <SpeciesIcon
+                        species={sp.iconKey || tone}
+                        size={14}
+                        className="ic"
+                        style={customColor ? { color: customColor } : undefined}
+                      />
+                      <span>{sp.name}</span>
                     </span>
-                    {customColor && (
-                      <span className="small muted row" style={{ gap: 4, alignItems: 'center' }}>
-                        <span
-                          style={{
-                            width: 10,
-                            height: 10,
-                            borderRadius: '50%',
-                            backgroundColor: customColor,
-                            display: 'inline-block',
-                          }}
-                        />
-                        <span className="tnum">{customColor.toUpperCase()}</span>
-                      </span>
-                    )}
                   </span>
                   <span className="right tnum">{serviceCountsBySpecies[sp.id] || 0}</span>
                   <span className="tnum muted small" style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>
@@ -240,7 +381,7 @@ export const SpeciesTab: React.FC<SpeciesTabProps> = ({
           aria-labelledby="species-modal-title"
           onClick={() => !savingSpecies && setIsModalOpen(false)}
         >
-          <div className="dialog dialog-sm" onClick={(e) => e.stopPropagation()}>
+          <div className="dialog dialog-sm" style={{ overflow: 'visible' }} onClick={(e) => e.stopPropagation()}>
             <div
               className="dialog-head"
               style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}
@@ -260,9 +401,9 @@ export const SpeciesTab: React.FC<SpeciesTabProps> = ({
 
             <form
               onSubmit={handleSaveSpecies}
-              style={{ display: 'flex', flexDirection: 'column', minHeight: 0, flex: 1 }}
+              style={{ display: 'flex', flexDirection: 'column', minHeight: 0, flex: 1, overflow: 'visible' }}
             >
-              <div className="dialog-body">
+              <div className="dialog-body" style={{ overflow: 'visible' }}>
                 <div className="field">
                   <label className="field-label" htmlFor="species-name-input">
                     Название <span className="req">*</span>
@@ -320,22 +461,11 @@ export const SpeciesTab: React.FC<SpeciesTabProps> = ({
                     <label className="field-label" htmlFor="species-icon-input">
                       Иконка <span className="small muted">(необязательно)</span>
                     </label>
-                    <select
-                      id="species-icon-input"
-                      className="input"
+                    <SpeciesIconSelect
                       value={speciesForm.iconKey}
-                      onChange={(e) =>
-                        setSpeciesForm({ ...speciesForm, iconKey: e.target.value })
-                      }
-                    >
-                      <option value="">По умолчанию</option>
-                      <option value="cat">Кошка (cat)</option>
-                      <option value="dog">Собака (dog)</option>
-                      <option value="pig">Морская свинка (pig)</option>
-                      <option value="fer">Хорёк (fer)</option>
-                      <option value="rab">Кролик (rab)</option>
-                      <option value="par">Попугай (par)</option>
-                    </select>
+                      onChange={(iconKey) => setSpeciesForm({ ...speciesForm, iconKey })}
+                      disabled={savingSpecies}
+                    />
                   </div>
                 </div>
 

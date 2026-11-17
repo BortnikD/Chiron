@@ -2,6 +2,7 @@
 
 import { useCallback } from 'react';
 import { adminApi } from '@/modules/admin/api';
+import { clearClinicDictionariesCache } from '@/modules/clinic/api';
 import { useToast } from '@/shared/components';
 import { useDictionaries } from '@/shared/hooks';
 
@@ -12,6 +13,7 @@ export function useServiceDictionaries(loadData: () => Promise<void>) {
   const createSpecies = useCallback(
     async (data: { name: string; color?: string | null; iconKey?: string | null } | string): Promise<void> => {
       await adminApi.createSpecies(data);
+      clearClinicDictionariesCache();
       await invalidateDictionaries(['species']);
       await loadData();
       const name = typeof data === 'string' ? data : data.name;
@@ -26,6 +28,7 @@ export function useServiceDictionaries(loadData: () => Promise<void>) {
       data: { name?: string; color?: string | null; iconKey?: string | null } | string
     ): Promise<void> => {
       await adminApi.updateSpecies(id, data);
+      clearClinicDictionariesCache();
       await invalidateDictionaries(['species']);
       await loadData();
       const name = typeof data === 'string' ? data : data.name;
@@ -37,6 +40,7 @@ export function useServiceDictionaries(loadData: () => Promise<void>) {
   const deleteSpecies = useCallback(
     async (id: string): Promise<void> => {
       await adminApi.deleteSpecies(id);
+      clearClinicDictionariesCache();
       await invalidateDictionaries(['species']);
       await loadData();
       toast('Вид удалён');
@@ -51,6 +55,7 @@ export function useServiceDictionaries(loadData: () => Promise<void>) {
     ): Promise<void> => {
       if (id) await adminApi.updateSpecialization(id, data);
       else await adminApi.createSpecialization(data);
+      clearClinicDictionariesCache();
       await invalidateDictionaries(['specializations']);
       await loadData();
       toast('Специализация сохранена', data.name);

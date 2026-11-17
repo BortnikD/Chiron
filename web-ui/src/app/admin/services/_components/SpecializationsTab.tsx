@@ -4,7 +4,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { Tags, Plus, Edit2, Trash2, AlertCircle, X } from 'lucide-react';
 import type { Service, Specialization, Veterinarian } from '@/modules/clinic/types';
 import { ConfirmModal } from '@/shared/components';
-import { formatApiError } from '@/shared/lib';
+import { formatApiError, registerSpecializationColors, getSpecStyle, getSpecTone } from '@/shared/lib';
 
 export interface SpecializationsTabProps {
   specializations: Specialization[];
@@ -24,6 +24,10 @@ export const SpecializationsTab: React.FC<SpecializationsTabProps> = ({
   onSaveSpecialization,
   onDeleteSpecialization,
 }) => {
+  useEffect(() => {
+    registerSpecializationColors(specializations);
+  }, [specializations]);
+
   const [isSpecModalOpen, setIsSpecModalOpen] = useState(false);
   const [specForm, setSpecForm] = useState({ id: '', name: '', description: '', color: '' });
   const [savingSpec, setSavingSpec] = useState(false);
@@ -147,28 +151,27 @@ export const SpecializationsTab: React.FC<SpecializationsTabProps> = ({
               <span />
             </div>
 
-            {specializations.map((sp) => (
-              <div key={sp.id} className="trow static">
-                <span className="row" style={{ gap: 8, alignItems: 'center' }}>
-                  <span className="cell-main">{sp.name}</span>
-                  {sp.color && (
-                    <span className="small muted row" style={{ gap: 4, alignItems: 'center' }}>
-                      <span
-                        style={{
-                          width: 10,
-                          height: 10,
-                          borderRadius: '50%',
-                          backgroundColor: sp.color,
-                          display: 'inline-block',
-                        }}
-                      />
-                      <span className="tnum">{sp.color.toUpperCase()}</span>
+            {specializations.map((sp) => {
+              const tone = getSpecTone(sp.id);
+              const specStyle = getSpecStyle(sp.id, specializations);
+              return (
+                <div key={sp.id} className="trow static">
+                  <span className="row" style={{ gap: 8, alignItems: 'center' }}>
+                    <span
+                      className={`t-badge tone-${tone}`}
+                      style={{
+                        ...specStyle,
+                        height: '24px',
+                        padding: '0 10px',
+                        fontSize: '12.5px',
+                      }}
+                    >
+                      {sp.name}
                     </span>
-                  )}
-                </span>
-                <span className="muted small">{sp.description || '—'}</span>
-                <span className="right tnum">{vetCounts[sp.id] || 0}</span>
-                <span className="right tnum">{serviceCounts[sp.id] || 0}</span>
+                  </span>
+                  <span className="muted small">{sp.description || '—'}</span>
+                  <span className="right tnum">{vetCounts[sp.id] || 0}</span>
+                  <span className="right tnum">{serviceCounts[sp.id] || 0}</span>
                 <span className="row-actions right">
                   <button
                     type="button"
@@ -202,7 +205,8 @@ export const SpecializationsTab: React.FC<SpecializationsTabProps> = ({
                   </button>
                 </span>
               </div>
-            ))}
+            );
+          })}
           </div>
         </div>
       </section>

@@ -1,3 +1,4 @@
+import type React from 'react';
 import type { AppointmentStatus, DayOfWeek, UserRole } from '@/shared/types';
 
 export const APPOINTMENT_STATUS_META: Record<
@@ -98,6 +99,69 @@ export const SPEC_TONES: Record<string, string> = {
   '5eed0002-0000-0000-0000-000000000005': 'opht',
   '5eed0002-0000-0000-0000-000000000006': 'prev',
 };
+
+const specColorRegistry = new Map<string, string>();
+
+export function registerSpecializationColors(
+  specs?: ReadonlyArray<{ id: string; color?: string | null }> | Map<string, { color?: string | null }> | Record<string, any> | null
+) {
+  if (!specs) return;
+  if (Array.isArray(specs)) {
+    for (const s of specs) {
+      if (s?.id && s.color) specColorRegistry.set(s.id, s.color);
+    }
+  } else if (specs instanceof Map) {
+    for (const [id, s] of specs.entries()) {
+      if (s?.color) specColorRegistry.set(id, s.color);
+    }
+  } else if (typeof specs === 'object') {
+    for (const [id, s] of Object.entries(specs)) {
+      if (typeof s === 'string' && s.startsWith('#')) specColorRegistry.set(id, s);
+      else if (s && typeof s === 'object' && s.color) specColorRegistry.set(id, s.color);
+    }
+  }
+}
+
+export function getSpecColor(
+  specId?: string | null,
+  specsSource?: ReadonlyArray<{ id: string; color?: string | null }> | Map<string, { color?: string | null }> | Record<string, any>
+): string | undefined {
+  if (!specId) return undefined;
+  if (specsSource) {
+    if (Array.isArray(specsSource)) {
+      const found = specsSource.find((s) => s.id === specId);
+      if (found?.color) {
+        specColorRegistry.set(specId, found.color);
+        return found.color;
+      }
+    } else if (specsSource instanceof Map) {
+      const found = specsSource.get(specId);
+      if (found?.color) {
+        specColorRegistry.set(specId, found.color);
+        return found.color;
+      }
+    } else if (typeof specsSource === 'object') {
+      const item = (specsSource as Record<string, any>)[specId];
+      if (typeof item === 'string' && item.startsWith('#')) {
+        specColorRegistry.set(specId, item);
+        return item;
+      }
+      if (item && typeof item === 'object' && item.color) {
+        specColorRegistry.set(specId, item.color);
+        return item.color;
+      }
+    }
+  }
+  return specColorRegistry.get(specId);
+}
+
+export function getSpecStyle(
+  specId?: string | null,
+  specsSource?: any
+): React.CSSProperties | undefined {
+  const color = getSpecColor(specId, specsSource);
+  return color ? ({ '--tone': color } as React.CSSProperties) : undefined;
+}
 
 export function getSpecTone(specId?: string | null): string {
   return (specId && SPEC_TONES[specId]) || 'ther';

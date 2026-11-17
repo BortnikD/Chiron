@@ -45,6 +45,9 @@ export interface PetFormModalProps {
 
 const EMPTY_USERS: User[] = [];
 
+const normalizeGender = (g?: string | null): Gender =>
+  String(g || '').toUpperCase() === 'FEMALE' ? 'FEMALE' : 'MALE';
+
 export const PetFormModal: React.FC<PetFormModalProps> = ({
   isOpen,
   mode,
@@ -95,7 +98,7 @@ export const PetFormModal: React.FC<PetFormModalProps> = ({
       setName(pet.name || '');
       setOwnerId(pet.ownerId || '');
       setSpeciesId(pet.speciesId || speciesList[0]?.id || '');
-      setGender(pet.gender || 'MALE');
+      setGender(normalizeGender(pet.gender));
       setBirthDate(pet.birthDate ? pet.birthDate.slice(0, 10) : '');
       setWeightKg(pet.weightKg != null ? String(pet.weightKg) : '');
       setBreed(pet.breed || '');
@@ -341,11 +344,13 @@ export const PetFormModal: React.FC<PetFormModalProps> = ({
               <div
                 className="seg"
                 role="radiogroup"
+                aria-label="Пол питомца"
                 style={{
                   display: 'flex',
                   height: '36px',
                   boxSizing: 'border-box',
                   padding: '3px',
+                  width: '100%',
                 }}
               >
                 <button
@@ -353,7 +358,12 @@ export const PetFormModal: React.FC<PetFormModalProps> = ({
                   role="radio"
                   aria-checked={gender === 'MALE'}
                   className={`seg-item ${gender === 'MALE' ? 'on' : ''}`}
-                  style={{ flex: 1, justifyContent: 'center' }}
+                  style={{
+                    flex: 1,
+                    justifyContent: 'center',
+                    cursor: saving ? 'not-allowed' : 'pointer',
+                    userSelect: 'none',
+                  }}
                   onClick={() => setGender('MALE')}
                   disabled={saving}
                 >
@@ -364,7 +374,12 @@ export const PetFormModal: React.FC<PetFormModalProps> = ({
                   role="radio"
                   aria-checked={gender === 'FEMALE'}
                   className={`seg-item ${gender === 'FEMALE' ? 'on' : ''}`}
-                  style={{ flex: 1, justifyContent: 'center' }}
+                  style={{
+                    flex: 1,
+                    justifyContent: 'center',
+                    cursor: saving ? 'not-allowed' : 'pointer',
+                    userSelect: 'none',
+                  }}
                   onClick={() => setGender('FEMALE')}
                   disabled={saving}
                 >

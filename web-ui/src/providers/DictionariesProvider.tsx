@@ -1,7 +1,8 @@
 'use client';
 
 import React, { createContext, useContext, useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import { clinicApi } from '@/modules/clinic/api';
+import { clinicApi, clearClinicDictionariesCache } from '@/modules/clinic/api';
+import { registerSpecializationColors } from '@/shared/lib';
 import type {
   SpeciesResponse,
   SpecializationResponse,
@@ -65,9 +66,11 @@ async function fetchDictionary<T>(key: DictionaryKey, fetcher: () => Promise<T>)
 
 export function DictionariesProvider({ children }: { children: React.ReactNode }) {
   const [species, setSpecies] = useState<SpeciesResponse[]>(() => memoryCache.species || []);
-  const [specializations, setSpecializations] = useState<SpecializationResponse[]>(
-    () => memoryCache.specializations || []
-  );
+  const [specializations, setSpecializations] = useState<SpecializationResponse[]>(() => {
+    const list = memoryCache.specializations || [];
+    registerSpecializationColors(list);
+    return list;
+  });
   const [services, setServices] = useState<ServiceResponse[]>(() => memoryCache.services || []);
   const [veterinarians, setVeterinarians] = useState<VeterinarianResponse[]>(
     () => memoryCache.veterinarians || []
@@ -95,7 +98,9 @@ export function DictionariesProvider({ children }: { children: React.ReactNode }
       if (keys.includes('specializations')) {
         promises.push(
           fetchDictionary('specializations', () => clinicApi.getSpecializations()).then((res) => {
-            if (isMountedRef.current) setSpecializations(Array.isArray(res) ? res : []);
+            const list = Array.isArray(res) ? res : [];
+            registerSpecializationColors(list);
+            if (isMountedRef.current) setSpecializations(list);
           })
         );
       }
@@ -136,6 +141,7 @@ export function DictionariesProvider({ children }: { children: React.ReactNode }
 
   const invalidateDictionaries = useCallback(
     async (keys?: DictionaryKey[]) => {
+      clearClinicDictionariesCache();
       const targetKeys = keys || ['species', 'specializations', 'services', 'veterinarians'];
       for (const k of targetKeys) {
         delete memoryCache[k];

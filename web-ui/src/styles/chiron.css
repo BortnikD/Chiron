@@ -918,7 +918,7 @@ button.step.done:focus-visible { outline: 2px solid var(--ring); outline-offset:
 .tone-cat { --tone: var(--chart-3); } .tone-dog { --tone: var(--chart-2); } .tone-rab { --tone: var(--chart-4); } .tone-par { --tone: var(--chart-1); } .tone-pig { --tone: var(--chart-5); } .tone-fer { --tone: var(--chart-6); }
 .tone-ther { --tone: var(--chart-2); } .tone-surg { --tone: var(--chart-5); } .tone-dent { --tone: var(--chart-4); } .tone-derm { --tone: var(--chart-3); } .tone-opht { --tone: var(--chart-6); } .tone-prev { --tone: var(--chart-1); }
 .tone-CLIENT { --tone: var(--chart-2); } .tone-VETERINARIAN { --tone: var(--chart-1); } .tone-ADMIN { --tone: var(--chart-4); }
-.t-ava { width: 40px; height: 40px; border-radius: 11px; flex: none; display: grid; place-items: center; color: var(--tone, var(--muted-foreground)); background: color-mix(in srgb, var(--tone, var(--muted-foreground)) 16%, transparent); font-weight: 650; font-size: 13px; }
+.t-ava { width: 40px; height: 40px; border-radius: 11px; flex: none; display: grid; place-items: center; color: color-mix(in srgb, var(--tone, var(--muted-foreground)) 75%, var(--foreground)); background: color-mix(in srgb, var(--tone, var(--muted-foreground)) 20%, var(--muted)); border: 1px solid color-mix(in srgb, var(--tone, var(--muted-foreground)) 30%, var(--border)); font-weight: 650; font-size: 13px; }
 .t-ava.lg { width: 52px; height: 52px; border-radius: 14px; font-size: 17px; }
 .t-ava.xl { width: 72px; height: 72px; border-radius: 20px; font-size: 24px; }
 .t-ava.sm { width: 30px; height: 30px; border-radius: 9px; font-size: 11px; }
@@ -989,9 +989,9 @@ button.step.done:focus-visible { outline: 2px solid var(--ring); outline-offset:
   object-position: 50% 25%;
 }
 .t-badge { display: inline-flex; align-items: center; gap: 5px; height: 22px; padding: 0 9px; border-radius: 999px; font-size: 12px; font-weight: 600; white-space: nowrap;
-  color: color-mix(in srgb, var(--tone, var(--muted-foreground)) 80%, var(--foreground)); background: color-mix(in srgb, var(--tone, var(--muted-foreground)) 14%, transparent); }
+  color: var(--foreground); background: color-mix(in srgb, var(--tone, var(--muted-foreground)) 16%, var(--muted)); border: 1px solid color-mix(in srgb, var(--tone, var(--muted-foreground)) 35%, var(--border)); }
 .t-badge .ic { width: 13px; height: 13px; }
-.t-badge::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: var(--tone, var(--muted-foreground)); }
+.t-badge::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--tone, var(--muted-foreground)); box-shadow: 0 0 0 1px color-mix(in srgb, var(--tone, var(--muted-foreground)) 50%, rgba(255,255,255,0.3)); flex-shrink: 0; }
 .t-badge.noicon::before { display: none; }
 .pet-cell { display: inline-flex; align-items: center; gap: 8px; min-width: 0; }
 .pet-cell > span:last-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
