@@ -19,6 +19,13 @@ class CreateNotificationUseCase(
     fun create(dto: CreateNotificationDto): Notification =
         notificationRepository.create(dto).also(::publish)
 
+    fun createAll(dtos: List<CreateNotificationDto>): List<Notification> =
+        if (dtos.isEmpty()) emptyList() else notificationRepository.createAll(dtos).onEach(::publish)
+
+    fun createAllIfAbsent(dtos: List<CreateNotificationDto>): List<Notification> =
+        if (dtos.isEmpty()) emptyList() else notificationRepository.createAllIfAbsent(dtos)
+            .onEach(::publish)
+
     // Used by the scheduler: a notification that already exists is neither stored nor delivered again.
     fun createIfAbsent(dto: CreateNotificationDto): Notification? =
         notificationRepository.createIfAbsent(dto)?.also(::publish)

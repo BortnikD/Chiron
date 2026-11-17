@@ -16,7 +16,7 @@ class AdminUpdateUserUseCase(private val updateUserUseCase: UpdateUserUseCase) {
     private val log = LoggerFactory.getLogger(javaClass)
 
     fun update(actor: Actor, id: UUID, dto: UpdateProfileDto): User {
-        val user = updateUserUseCase.update(id, dto)
+        val user = updateUserUseCase.update(id, dto, actor.userId)
         log.info(
             "Admin {} ({}) updated user {} ({})",
             actor.userId,

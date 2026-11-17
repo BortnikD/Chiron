@@ -20,7 +20,7 @@ class VeterinarianCreateVaccinationUseCase(
 
     fun create(actor: Actor, dto: CreateVaccinationDto): Vaccination {
         accessGuard.requirePatient(actor, dto.petId)
-        val vaccination = createVaccinationUseCase.create(dto)
+        val vaccination = createVaccinationUseCase.create(dto, actor.userId)
         log.info(
             "Veterinarian {} ({}) recorded vaccination {} '{}' for pet {}",
             actor.userId,

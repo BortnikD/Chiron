@@ -13,6 +13,7 @@ import org.mockito.Mockito.`when`
 import org.springframework.context.ApplicationEventPublisher
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
+import kotlin.test.assertTrue
 
 class CreateNotificationUseCaseTest {
     private val repository = mock(NotificationRepository::class.java)
@@ -26,6 +27,35 @@ class CreateNotificationUseCaseTest {
         `when`(repository.create(dto)).thenReturn(notification)
         assertEquals(notification, useCase.create(dto))
         verify(publisher).publishEvent(NotificationCreatedEvent(notification))
+    }
+
+    @Test
+    fun `batch writes once and publishes every inserted notification`() {
+        val other = notification.copy(id = java.util.UUID.randomUUID())
+        val batch = listOf(dto, dto.copy(recipientId = java.util.UUID.randomUUID()))
+        `when`(repository.createAll(batch)).thenReturn(listOf(notification, other))
+        assertEquals(listOf(notification, other), useCase.createAll(batch))
+        verify(repository).createAll(batch)
+        verifyNoMoreInteractions(repository)
+        verify(publisher).publishEvent(NotificationCreatedEvent(notification))
+        verify(publisher).publishEvent(NotificationCreatedEvent(other))
+    }
+
+    @Test
+    fun `batch duplicate suppression publishes only actually inserted rows`() {
+        val batch = listOf(dto, dto)
+        `when`(repository.createAllIfAbsent(batch)).thenReturn(listOf(notification))
+        assertEquals(listOf(notification), useCase.createAllIfAbsent(batch))
+        verify(repository).createAllIfAbsent(batch)
+        verify(publisher).publishEvent(NotificationCreatedEvent(notification))
+        verifyNoMoreInteractions(publisher, repository)
+    }
+
+    @Test
+    fun `empty batches issue no database requests or events`() {
+        assertTrue(useCase.createAll(emptyList()).isEmpty())
+        assertTrue(useCase.createAllIfAbsent(emptyList()).isEmpty())
+        verifyNoMoreInteractions(repository, publisher)
     }
 
     @Test

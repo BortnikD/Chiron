@@ -1,6 +1,8 @@
 package com.bortnik.chiron.application.usecase.common.notification
 
 import com.bortnik.chiron.application.config.ClinicProperties
+import com.bortnik.chiron.application.security.Actor
+import com.bortnik.chiron.domain.entities.enums.UserRole
 import com.bortnik.chiron.application.notification.AppointmentNotificationDetails
 import com.bortnik.chiron.application.notification.NotificationMessages
 import com.bortnik.chiron.domain.dto.notification.CreateNotificationDto
@@ -19,6 +21,9 @@ import com.bortnik.chiron.support.TestEntities.veterinarian
 import org.junit.jupiter.api.Test
 import org.mockito.ArgumentCaptor
 import org.mockito.Mockito.any
+import org.mockito.Mockito.anyList
+import org.mockito.Mockito.never
+import org.mockito.Mockito.verifyNoMoreInteractions
 import org.mockito.Mockito.mock
 import org.mockito.Mockito.times
 import org.mockito.Mockito.verify
@@ -30,6 +35,8 @@ import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 class NotifyAppointmentUseCaseTest {
+    private val client = Actor(pet.ownerId, UserRole.CLIENT, "Client")
+    private val veterinarianActor = Actor(user.id, UserRole.VETERINARIAN, "Veterinarian")
     private val pets = mock(PetRepository::class.java)
     private val services = mock(ServiceRepository::class.java)
     private val vets = mock(VeterinarianRepository::class.java)
@@ -43,7 +50,7 @@ class NotifyAppointmentUseCaseTest {
     fun `client booking addresses veterinarian user and includes appointment context`() {
         allowContext()
         `when`(create.create(any(CreateNotificationDto::class.java) ?: fallback)).thenReturn(notification)
-        useCase.notifyChange(pet.ownerId, null, appointment.copy(status = AppointmentStatus.PENDING))
+        useCase.notifyChange(client, null, appointment.copy(status = AppointmentStatus.PENDING))
         val captor = ArgumentCaptor.forClass(CreateNotificationDto::class.java)
         verify(create).create(captor.capture() ?: fallback)
         assertEquals(expected(user.id, pet.ownerId, NotificationType.APPOINTMENT_BOOKED), captor.value)
@@ -56,7 +63,11 @@ class NotifyAppointmentUseCaseTest {
         val actorId = UUID.randomUUID()
         `when`(vets.findById(previous.id)).thenReturn(previous)
         `when`(create.create(any(CreateNotificationDto::class.java) ?: fallback)).thenReturn(notification)
-        useCase.notifyChange(actorId, appointment.copy(veterinarianId = previous.id), appointment)
+        useCase.notifyChange(
+            Actor(actorId, UserRole.ADMIN, "Admin"),
+            appointment.copy(veterinarianId = previous.id),
+            appointment
+        )
         val captor = ArgumentCaptor.forClass(CreateNotificationDto::class.java)
         verify(create, times(3)).create(captor.capture() ?: fallback)
         assertEquals(
@@ -74,7 +85,7 @@ class NotifyAppointmentUseCaseTest {
     @Test
     fun `unchanged appointment creates no notifications`() {
         allowContext()
-        useCase.notifyChange(pet.ownerId, appointment, appointment)
+        useCase.notifyChange(client, appointment, appointment)
         verifyNoInteractions(create)
     }
 
@@ -110,7 +121,9 @@ class NotifyAppointmentUseCaseTest {
         allowContext()
         `when`(create.create(any(CreateNotificationDto::class.java) ?: fallback)).thenReturn(notification)
         useCase.notifyChange(
-            user.id, appointment, appointment.copy(status = AppointmentStatus.COMPLETED, vetNotes = "New notes"),
+            veterinarianActor,
+            appointment,
+            appointment.copy(status = AppointmentStatus.COMPLETED, vetNotes = "New notes"),
         )
         val captor = ArgumentCaptor.forClass(CreateNotificationDto::class.java)
         verify(create, times(2)).create(captor.capture() ?: fallback)
@@ -132,6 +145,40 @@ class NotifyAppointmentUseCaseTest {
         verify(create, times(2)).create(captor.capture() ?: fallback)
         assertEquals(setOf(actorId, otherAdminId), captor.allValues.map { it.recipientId }.toSet())
         assertTrue(captor.allValues.all { it.type == NotificationType.SCHEDULE_CONFLICT && it.appointmentId == appointment.id })
+    }
+
+    @Test
+    fun `client booking and cancellation notify every administrator with one batch per event`() {
+        allowContext()
+        val administratorIds = (1..100).map { UUID.randomUUID() }
+        `when`(users.findAdministratorIds()).thenReturn(administratorIds)
+        `when`(create.create(any(CreateNotificationDto::class.java) ?: fallback)).thenReturn(notification)
+        `when`(create.createAll(anyList())).thenReturn(emptyList())
+        useCase.notifyChange(client, null, appointment.copy(status = AppointmentStatus.PENDING))
+        useCase.notifyChange(client, appointment, appointment.copy(status = AppointmentStatus.CANCELLED))
+
+        @Suppress("UNCHECKED_CAST")
+        val captor = ArgumentCaptor.forClass(List::class.java) as ArgumentCaptor<List<CreateNotificationDto>>
+        verify(create, times(2)).createAll(captor.capture() ?: emptyList())
+        assertEquals(
+            listOf(NotificationType.APPOINTMENT_BOOKED, NotificationType.APPOINTMENT_CANCELLED),
+            captor.allValues.map { batch -> batch.map { it.type }.distinct().single() })
+        assertTrue(captor.allValues.all { batch -> batch.map { it.recipientId } == administratorIds })
+        verify(users, times(2)).findAdministratorIds()
+        verify(users, times(2)).findById(user.id)
+        verifyNoMoreInteractions(users)
+    }
+
+    @Test
+    fun `repeated cancellation and changes made by staff do not produce client alerts to administrators`() {
+        allowContext()
+        val cancelled = appointment.copy(status = AppointmentStatus.CANCELLED)
+        useCase.notifyChange(client, cancelled, cancelled)
+        useCase.notifyChange(veterinarianActor, appointment, cancelled)
+        useCase.notifyChange(client.copy(role = UserRole.ADMIN), appointment, cancelled)
+        useCase.notifyChange(client.copy(role = UserRole.VETERINARIAN), null, appointment)
+        verify(users, never()).findAdministratorIds()
+        verify(create, never()).createAll(anyList())
     }
 
     private fun allowContext() {

@@ -4,9 +4,12 @@ import com.bortnik.chiron.application.config.ClinicProperties
 import com.bortnik.chiron.application.notification.AppointmentNotificationDetails
 import com.bortnik.chiron.application.notification.NotificationMessages
 import com.bortnik.chiron.application.notification.NotificationText
+import com.bortnik.chiron.application.security.Actor
+import com.bortnik.chiron.domain.entities.enums.UserRole
 import com.bortnik.chiron.domain.dto.notification.CreateNotificationDto
 import com.bortnik.chiron.domain.entities.Appointment
 import com.bortnik.chiron.domain.entities.enums.NotificationType
+import com.bortnik.chiron.domain.entities.enums.AppointmentStatus
 import com.bortnik.chiron.domain.exceptions.notfound.PetNotFoundException
 import com.bortnik.chiron.domain.exceptions.notfound.ServiceNotFoundException
 import com.bortnik.chiron.domain.exceptions.notfound.UserNotFoundException
@@ -33,7 +36,8 @@ class NotifyAppointmentUseCase(
 ) {
 
     // before is null for a just created appointment; who gets what is decided by NotificationRules.
-    fun notifyChange(actorId: UUID, before: Appointment?, after: Appointment) {
+    fun notifyChange(actor: Actor, before: Appointment?, after: Appointment) {
+        val actorId = actor.userId
         val context = contextOf(after)
         val previousVeterinarianUserId = before?.veterinarianId
             ?.takeIf { it != after.veterinarianId }
@@ -49,6 +53,16 @@ class NotifyAppointmentUseCase(
         for ((type, recipientIds) in targets) {
             val text = textOf(type, context)
             recipientIds.forEach { createNotificationUseCase.create(dtoOf(it, actorId, type, text, after)) }
+        }
+        if (actor.role == UserRole.CLIENT && (before == null ||
+                    (before.status != after.status && after.status == AppointmentStatus.CANCELLED))
+        ) {
+            val type =
+                if (before == null) NotificationType.APPOINTMENT_BOOKED else NotificationType.APPOINTMENT_CANCELLED
+            val text = textOf(type, context)
+            createNotificationUseCase.createAll(
+                userRepository.findAdministratorIds().map { dtoOf(it, actorId, type, text, after) },
+            )
         }
     }
 

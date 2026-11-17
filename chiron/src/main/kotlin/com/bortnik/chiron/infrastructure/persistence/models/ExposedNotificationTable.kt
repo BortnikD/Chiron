@@ -4,6 +4,7 @@ import com.bortnik.chiron.domain.entities.enums.NotificationType
 import com.bortnik.chiron.infrastructure.persistence.models.ExposedColumnConstants.ENUM_LENGTH
 import org.jetbrains.exposed.v1.core.dao.id.java.UUIDTable
 import org.jetbrains.exposed.v1.javatime.date
+import org.jetbrains.exposed.v1.javatime.CurrentTimestampWithTimeZone
 import org.jetbrains.exposed.v1.javatime.timestampWithTimeZone
 
 object ExposedNotificationTable : UUIDTable("notification") {
@@ -18,5 +19,5 @@ object ExposedNotificationTable : UUIDTable("notification") {
     val reminderStartAt = timestampWithTimeZone("reminder_start_at").nullable()
     val reminderDueOn = date("reminder_due_on").nullable()
     val readAt = timestampWithTimeZone("read_at").nullable()
-    val createdAt = timestampWithTimeZone("created_at")
+    val createdAt = timestampWithTimeZone("created_at").defaultExpression(CurrentTimestampWithTimeZone)
 }

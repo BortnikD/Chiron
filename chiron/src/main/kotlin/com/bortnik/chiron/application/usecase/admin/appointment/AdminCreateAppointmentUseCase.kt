@@ -20,7 +20,7 @@ class AdminCreateAppointmentUseCase(
 
     fun create(actor: Actor, dto: CreateAppointmentDto): Appointment {
         val appointment = createAppointmentUseCase.create(dto)
-        notifyAppointmentUseCase.notifyChange(actor.userId, before = null, after = appointment)
+        notifyAppointmentUseCase.notifyChange(actor, before = null, after = appointment)
         log.info(
             "Admin {} ({}) created appointment {} for pet {} with veterinarian {} at {}, status {}, price {}",
             actor.userId,

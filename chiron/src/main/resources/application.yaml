@@ -19,7 +19,7 @@ notification:
   vaccination-due:
     # Vaccinations whose next due date is within this many days get a reminder for the owner.
     lead-days: 7
-    # Daily at 09:00 in the clinic time zone.
+    # Upcoming and overdue vaccination reminders, daily at 09:00 in the clinic time zone.
     cron: "0 0 9 * * *"
 
 jwt:

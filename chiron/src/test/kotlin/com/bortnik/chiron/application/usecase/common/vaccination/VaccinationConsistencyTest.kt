@@ -1,6 +1,7 @@
 package com.bortnik.chiron.application.usecase.common.vaccination
 
 import com.bortnik.chiron.domain.dto.Patch
+import com.bortnik.chiron.application.usecase.common.notification.NotifyVaccinationUseCase
 import com.bortnik.chiron.domain.dto.vaccination.CreateVaccinationDto
 import com.bortnik.chiron.domain.dto.vaccination.UpdateVaccinationDto
 import com.bortnik.chiron.domain.exceptions.ValidationException
@@ -29,8 +30,9 @@ class VaccinationConsistencyTest {
     private val repository = mock(VaccinationRepository::class.java)
     private val appointments = mock(AppointmentRepository::class.java)
     private val clock = Clock.fixed(now, ZoneOffset.UTC)
-    private val create = CreateVaccinationUseCase(repository, appointments, clock)
-    private val update = UpdateVaccinationUseCase(repository, clock)
+    private val notifications = mock(NotifyVaccinationUseCase::class.java)
+    private val create = CreateVaccinationUseCase(repository, appointments, clock, notifications)
+    private val update = UpdateVaccinationUseCase(repository, clock, notifications)
     private val dto = CreateVaccinationDto(
         pet.id,
         appointment.id,
@@ -41,9 +43,9 @@ class VaccinationConsistencyTest {
 
     @Test
     fun `vaccination cannot refer to a missing appointment or an appointment of another pet`() {
-        assertFailsWith<AppointmentNotFoundException> { create.create(dto) }
+        assertFailsWith<AppointmentNotFoundException> { create.create(dto, pet.ownerId) }
         `when`(appointments.findById(appointment.id)).thenReturn(appointment.copy(petId = UUID.randomUUID()))
-        assertFailsWith<AppointmentPetMismatchException> { create.create(dto) }
+        assertFailsWith<AppointmentPetMismatchException> { create.create(dto, pet.ownerId) }
         verifyNoInteractions(repository)
     }
 
@@ -51,13 +53,13 @@ class VaccinationConsistencyTest {
     fun `matching appointment permits vaccination creation`() {
         `when`(appointments.findById(appointment.id)).thenReturn(appointment)
         `when`(repository.create(dto)).thenReturn(vaccination.copy(appointmentId = appointment.id))
-        assertEquals(appointment.id, create.create(dto).appointmentId)
+        assertEquals(appointment.id, create.create(dto, pet.ownerId).appointmentId)
     }
 
     @Test
     fun `next due date must be strictly after administration when creating`() {
         for (date in listOf(vaccination.administeredOn, vaccination.administeredOn.minusDays(1))) {
-            assertFailsWith<ValidationException> { create.create(dto.copy(nextDueOn = date)) }
+            assertFailsWith<ValidationException> { create.create(dto.copy(nextDueOn = date), pet.ownerId) }
         }
         verifyNoInteractions(repository, appointments)
     }
@@ -70,7 +72,13 @@ class VaccinationConsistencyTest {
             UpdateVaccinationDto(nextDueOn = Patch.Value(vaccination.administeredOn)),
             UpdateVaccinationDto(nextDueOn = Patch.Value(vaccination.administeredOn.minusDays(1))),
         )
-        for (patch in invalid) assertFailsWith<ValidationException> { update.update(vaccination.id, patch) }
+        for (patch in invalid) assertFailsWith<ValidationException> {
+            update.update(
+                vaccination.id,
+                patch,
+                pet.ownerId
+            )
+        }
         verify(repository, times(invalid.size)).findById(vaccination.id)
         verifyNoMoreInteractions(repository)
     }
@@ -87,7 +95,7 @@ class VaccinationConsistencyTest {
             UpdateVaccinationDto(),
         )) {
             `when`(repository.update(vaccination.id, patch)).thenReturn(vaccination)
-            assertEquals(vaccination, update.update(vaccination.id, patch))
+            assertEquals(vaccination, update.update(vaccination.id, patch, pet.ownerId))
             verify(repository).update(vaccination.id, patch)
         }
     }

@@ -17,6 +17,8 @@ interface UserRepository {
 
     fun findByPhone(phone: String): User?
 
+    fun findAdministratorIds(): List<UUID>
+
     fun findAll(filter: UserFilter, pageRequest: PageRequest): Page<User>
 
     fun update(id: UUID, dto: UpdateUserDto): User?

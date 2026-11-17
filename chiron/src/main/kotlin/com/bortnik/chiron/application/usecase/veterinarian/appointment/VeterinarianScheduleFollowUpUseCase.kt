@@ -45,7 +45,7 @@ class VeterinarianScheduleFollowUpUseCase(
                 priceSnapshot = getServiceUseCase.findPriceForSpecies(serviceId, pet.speciesId),
             ),
         )
-        notifyAppointmentUseCase.notifyChange(actor.userId, before = null, after = appointment)
+        notifyAppointmentUseCase.notifyChange(actor, before = null, after = appointment)
         log.info(
             "Veterinarian {} ({}) scheduled follow-up {} of appointment {} for pet {} at {}, price {}",
             actor.userId,

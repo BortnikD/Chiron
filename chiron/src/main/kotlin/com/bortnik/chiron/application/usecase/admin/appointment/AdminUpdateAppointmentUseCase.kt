@@ -32,7 +32,7 @@ class AdminUpdateAppointmentUseCase(
             dto
         }
         val appointment = updateAppointmentUseCase.update(id, update)
-        notifyAppointmentUseCase.notifyChange(actor.userId, before = before, after = appointment)
+        notifyAppointmentUseCase.notifyChange(actor, before = before, after = appointment)
         log.info(
             "Admin {} ({}) updated appointment {}: veterinarian {}, {} - {}, status {}",
             actor.userId,
