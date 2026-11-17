@@ -104,7 +104,7 @@ class ClientBookAppointmentUseCaseTest {
         assertEquals(appointment, useCase.book(actor, dto))
 
         verify(create).create(expected)
-        verify(notifications).notifyChange(actor.userId, null, appointment)
+        verify(notifications).notifyChange(actor, null, appointment)
     }
 
     private fun booking(startAt: Instant, durationMinutes: Long) = BookAppointmentDto(

@@ -21,7 +21,7 @@ class VeterinarianUpdateVaccinationUseCase(
 
     fun update(actor: Actor, id: UUID, dto: UpdateVaccinationDto): Vaccination {
         accessGuard.requirePatientVaccination(actor, id)
-        val vaccination = updateVaccinationUseCase.update(id, dto)
+        val vaccination = updateVaccinationUseCase.update(id, dto, actor.userId)
         log.info(
             "Veterinarian {} ({}) updated vaccination {} '{}' of pet {}",
             actor.userId,

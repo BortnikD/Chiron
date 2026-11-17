@@ -16,7 +16,7 @@ class AdminUpdateVaccinationUseCase(private val updateVaccinationUseCase: Update
     private val log = LoggerFactory.getLogger(javaClass)
 
     fun update(actor: Actor, id: UUID, dto: UpdateVaccinationDto): Vaccination {
-        val vaccination = updateVaccinationUseCase.update(id, dto)
+        val vaccination = updateVaccinationUseCase.update(id, dto, actor.userId)
         log.info(
             "Admin {} ({}) updated vaccination {} '{}' of pet {}",
             actor.userId,

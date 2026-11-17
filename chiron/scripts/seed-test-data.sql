@@ -548,7 +548,7 @@ WHERE p.id::text LIKE '5eed%'
 
 -- Notifications ------------------------------------------------------------------------------------------------------
 
-INSERT INTO notification (recipient_id, actor_id, type, title, body, appointment_id, pet_id, created_at, read_at)
+INSERT INTO notification (recipient_id, actor_id, type, title, body, appointment_id, pet_id, reminder_start_at, created_at, read_at)
 SELECT recipient.id,
        event.actor_id,
        event.type,
@@ -564,6 +564,7 @@ SELECT recipient.id,
            || ', врач ' || u.full_name || coalesce('. ' || a.cancel_reason, '.'),
        a.id,
        p.id,
+       CASE WHEN event.type = 'APPOINTMENT_REMINDER' THEN a.start_at END,
        event.at,
        CASE
            WHEN event.at < now() - INTERVAL '7 days' OR right(p.id::text, 4)::int % 3 <> 0
@@ -606,13 +607,14 @@ WHERE a.veterinarian_id::text LIKE '5eed%'
   AND event.at <= now()
   AND (event.type <> 'APPOINTMENT_REMINDER' OR recipient.id = p.owner_id);
 
-INSERT INTO notification (recipient_id, type, title, body, pet_id, vaccination_id, created_at, read_at)
+INSERT INTO notification (recipient_id, type, title, body, pet_id, vaccination_id, reminder_due_on, created_at, read_at)
 SELECT p.owner_id,
        'VACCINATION_DUE',
        'Скоро ревакцинация',
        p.name || ': срок ревакцинации «' || v.name || '» — ' || to_char(v.next_due_on, 'DD.MM.YYYY') || '.',
        p.id,
        v.id,
+       v.next_due_on,
        greatest(owner.created_at, (v.next_due_on - 7)::timestamp AT TIME ZONE 'Europe/Moscow'),
        CASE
            WHEN v.next_due_on < today - 7

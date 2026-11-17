@@ -10,7 +10,11 @@ import java.util.UUID
 interface NotificationRepository {
     fun create(dto: CreateNotificationDto): Notification
 
-    // null when a unique index already holds such a notification (one reminder per appointment / vaccination).
+    fun createAll(dtos: List<CreateNotificationDto>): List<Notification>
+
+    fun createAllIfAbsent(dtos: List<CreateNotificationDto>): List<Notification>
+
+    // null when a unique index already holds a reminder for this recipient and scheduled time or due date.
     fun createIfAbsent(dto: CreateNotificationDto): Notification?
 
     // Newest first.

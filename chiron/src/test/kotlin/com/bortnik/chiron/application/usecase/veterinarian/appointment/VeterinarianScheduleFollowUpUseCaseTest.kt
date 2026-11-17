@@ -54,7 +54,7 @@ class VeterinarianScheduleFollowUpUseCaseTest {
             `when`(create.create(expected)).thenReturn(result)
             assertEquals(result, useCase.schedule(actor, appointment.id, request.copy(serviceId = serviceId)))
             verify(create).create(expected)
-            verify(notifications).notifyChange(actor.userId, null, result)
+            verify(notifications).notifyChange(actor, null, result)
         }
     }
 

@@ -7,6 +7,7 @@ import com.bortnik.chiron.domain.dto.pagination.PageRequest
 import com.bortnik.chiron.domain.entities.Notification
 import com.bortnik.chiron.domain.repositories.NotificationRepository
 import com.bortnik.chiron.infrastructure.persistence.exposedSql
+import com.bortnik.chiron.infrastructure.persistence.mappers.toDbTimestamp
 import com.bortnik.chiron.infrastructure.persistence.mappers.toNotification
 import com.bortnik.chiron.infrastructure.persistence.models.ExposedNotificationTable
 import com.bortnik.chiron.infrastructure.persistence.toPage
@@ -15,8 +16,12 @@ import org.jetbrains.exposed.v1.core.SortOrder
 import org.jetbrains.exposed.v1.core.and
 import org.jetbrains.exposed.v1.core.eq
 import org.jetbrains.exposed.v1.core.isNull
+import org.jetbrains.exposed.v1.core.statements.UpdateBuilder
+import org.jetbrains.exposed.v1.core.statements.MultiRowValuesInsertStatement
+import org.jetbrains.exposed.v1.core.statements.ReturningStatement
 import org.jetbrains.exposed.v1.javatime.CurrentTimestampWithTimeZone
 import org.jetbrains.exposed.v1.jdbc.insertReturning
+import org.jetbrains.exposed.v1.jdbc.statements.ReturningBlockingExecutable
 import org.jetbrains.exposed.v1.jdbc.selectAll
 import org.jetbrains.exposed.v1.jdbc.update
 import org.jetbrains.exposed.v1.jdbc.updateReturning
@@ -27,6 +32,14 @@ import java.util.UUID
 @Repository
 @Transactional
 class ExposedNotificationRepository : NotificationRepository {
+
+    override fun createAll(dtos: List<CreateNotificationDto>): List<Notification> = exposedSql {
+        insertAll(dtos, ignoreConflicts = false)
+    }
+
+    override fun createAllIfAbsent(dtos: List<CreateNotificationDto>): List<Notification> = exposedSql {
+        insertAll(dtos, ignoreConflicts = true)
+    }
 
     override fun create(dto: CreateNotificationDto): Notification = exposedSql {
         insert(dto, ignoreConflicts = false).single()
@@ -79,15 +92,35 @@ class ExposedNotificationRepository : NotificationRepository {
 
     private fun insert(dto: CreateNotificationDto, ignoreConflicts: Boolean): List<Notification> =
         ExposedNotificationTable.insertReturning(ignoreErrors = ignoreConflicts) {
-            it[recipientId] = dto.recipientId
-            it[actorId] = dto.actorId
-            it[type] = dto.type
-            it[title] = dto.title
-            it[body] = dto.body
-            it[appointmentId] = dto.appointmentId
-            it[petId] = dto.petId
-            it[vaccinationId] = dto.vaccinationId
+            it.write(dto)
         }.map { it.toNotification() }
+
+    private fun insertAll(dtos: List<CreateNotificationDto>, ignoreConflicts: Boolean): List<Notification> =
+        dtos.chunked(1000).flatMap { batch ->
+            val insert = MultiRowValuesInsertStatement(ExposedNotificationTable, ignoreConflicts)
+            batch.forEach { dto ->
+                insert.addBatch()
+                insert.write(dto)
+            }
+            // RETURNING contains only inserted rows, including when some reminders conflict with a concurrent run.
+            ReturningBlockingExecutable(
+                ReturningStatement(ExposedNotificationTable, ExposedNotificationTable.columns, insert),
+            ).map { it.toNotification() }
+        }
+
+    private fun UpdateBuilder<*>.write(dto: CreateNotificationDto) {
+        this[ExposedNotificationTable.recipientId] = dto.recipientId
+        this[ExposedNotificationTable.actorId] = dto.actorId
+        this[ExposedNotificationTable.type] = dto.type
+        this[ExposedNotificationTable.title] = dto.title
+        this[ExposedNotificationTable.body] = dto.body
+        this[ExposedNotificationTable.appointmentId] = dto.appointmentId
+        this[ExposedNotificationTable.petId] = dto.petId
+        this[ExposedNotificationTable.vaccinationId] = dto.vaccinationId
+        this[ExposedNotificationTable.reminderStartAt] = dto.reminderStartAt?.toDbTimestamp()
+        this[ExposedNotificationTable.reminderDueOn] = dto.reminderDueOn
+        this[ExposedNotificationTable.readAt] = null
+    }
 
     private fun unreadOf(recipientId: UUID): Op<Boolean> =
         (ExposedNotificationTable.recipientId eq recipientId) and ExposedNotificationTable.readAt.isNull()

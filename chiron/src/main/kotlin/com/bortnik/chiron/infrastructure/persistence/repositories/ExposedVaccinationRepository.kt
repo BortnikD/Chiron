@@ -6,6 +6,8 @@ import com.bortnik.chiron.domain.dto.pagination.PageRequest
 import com.bortnik.chiron.domain.dto.vaccination.CreateVaccinationDto
 import com.bortnik.chiron.domain.dto.vaccination.UpdateVaccinationDto
 import com.bortnik.chiron.domain.dto.vaccination.VaccinationFilter
+import com.bortnik.chiron.domain.dto.vaccination.VaccinationReminderDto
+import com.bortnik.chiron.domain.entities.enums.NotificationType
 import com.bortnik.chiron.domain.entities.Vaccination
 import com.bortnik.chiron.domain.repositories.VaccinationRepository
 import com.bortnik.chiron.infrastructure.persistence.containsIgnoreCase
@@ -13,8 +15,10 @@ import com.bortnik.chiron.infrastructure.persistence.exposedSql
 import com.bortnik.chiron.infrastructure.persistence.mappers.toVaccination
 import com.bortnik.chiron.infrastructure.persistence.models.ExposedAppointmentTable
 import com.bortnik.chiron.infrastructure.persistence.models.ExposedPetTable
+import com.bortnik.chiron.infrastructure.persistence.models.ExposedNotificationTable
 import com.bortnik.chiron.infrastructure.persistence.models.ExposedVaccinationTable
 import com.bortnik.chiron.infrastructure.persistence.toPage
+import com.bortnik.chiron.infrastructure.persistence.utils.withoutNewerVaccination
 import org.jetbrains.exposed.v1.core.Op
 import org.jetbrains.exposed.v1.core.SortOrder
 import org.jetbrains.exposed.v1.core.and
@@ -23,6 +27,9 @@ import org.jetbrains.exposed.v1.core.eq
 import org.jetbrains.exposed.v1.core.greaterEq
 import org.jetbrains.exposed.v1.core.inSubQuery
 import org.jetbrains.exposed.v1.core.lessEq
+import org.jetbrains.exposed.v1.core.less
+import org.jetbrains.exposed.v1.core.notExists
+import org.jetbrains.exposed.v1.core.or
 import org.jetbrains.exposed.v1.jdbc.deleteWhere
 import org.jetbrains.exposed.v1.jdbc.insertReturning
 import org.jetbrains.exposed.v1.jdbc.select
@@ -31,6 +38,7 @@ import org.jetbrains.exposed.v1.jdbc.updateReturning
 import org.springframework.stereotype.Repository
 import org.springframework.transaction.annotation.Transactional
 import java.util.UUID
+import java.time.LocalDate
 
 @Repository
 @Transactional
@@ -65,6 +73,33 @@ class ExposedVaccinationRepository : VaccinationRepository {
             .where { filter.toCondition() }
             .orderBy(ExposedVaccinationTable.administeredOn, SortOrder.DESC)
             .map { it.toVaccination() }
+    }
+
+    override fun findReminders(today: LocalDate, dueThrough: LocalDate): List<VaccinationReminderDto> = exposedSql {
+        val alreadyNotified = ExposedNotificationTable.select(ExposedNotificationTable.id).where {
+            (ExposedNotificationTable.vaccinationId eq ExposedVaccinationTable.id) and
+                    (ExposedNotificationTable.recipientId eq ExposedPetTable.ownerId) and
+                    (ExposedNotificationTable.reminderDueOn eq ExposedVaccinationTable.nextDueOn) and (
+                    ((ExposedVaccinationTable.nextDueOn less today) and
+                            (ExposedNotificationTable.type eq NotificationType.VACCINATION_OVERDUE)) or
+                            ((ExposedVaccinationTable.nextDueOn greaterEq today) and
+                                    (ExposedNotificationTable.type eq NotificationType.VACCINATION_DUE))
+                    )
+        }
+        (ExposedVaccinationTable innerJoin ExposedPetTable)
+            .select(ExposedVaccinationTable.columns + listOf(ExposedPetTable.ownerId, ExposedPetTable.name))
+            .where {
+                (ExposedPetTable.isArchived eq false) and
+                        (ExposedVaccinationTable.nextDueOn lessEq dueThrough) and
+                        withoutNewerVaccination() and notExists(alreadyNotified)
+            }
+            .map {
+                VaccinationReminderDto(
+                    it.toVaccination(),
+                    it[ExposedPetTable.ownerId].value,
+                    it[ExposedPetTable.name]
+                )
+            }
     }
 
     override fun findAllByOwnerId(ownerId: UUID, filter: VaccinationFilter): List<Vaccination> = exposedSql {

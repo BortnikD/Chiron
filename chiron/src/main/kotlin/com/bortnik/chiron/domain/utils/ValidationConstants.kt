@@ -93,6 +93,11 @@ object ValidationConstants {
         const val NAME_MAX_LENGTH = 150
     }
 
+    object NotificationRules {
+        const val TITLE_MAX_LENGTH = 200
+        const val BODY_MAX_LENGTH = 4000
+    }
+
     object PaginationRules {
         const val DEFAULT_SIZE = 20
         const val SIZE_MIN = 1
