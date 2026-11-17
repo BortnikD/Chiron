@@ -71,6 +71,7 @@ function AdminVaccinationsContent() {
             <VaccinationsTable
               data={vm.vaccinations}
               pets={vm.pets}
+              petsMap={vm.petsMap}
               speciesList={vm.speciesList}
               selectedId={vm.selectedVaccination?.id ?? null}
               loading={vm.loading}

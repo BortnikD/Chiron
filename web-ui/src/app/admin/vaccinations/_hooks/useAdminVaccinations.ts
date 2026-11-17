@@ -271,6 +271,7 @@ export function useAdminVaccinations() {
   return {
     vaccinations: resource.items,
     pets,
+    petsMap,
     petMap,
     speciesList,
     users,
