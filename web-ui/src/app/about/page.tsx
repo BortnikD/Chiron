@@ -135,13 +135,13 @@ function AboutContent() {
   }, []);
 
   return (
-    <div className="scroll-col grow" style={{ gap: '16px', paddingBottom: '32px' }}>
+    <div className="scroll-col grow" style={{ gap: 'var(--gap)', paddingBottom: 'var(--gap)' }}>
       {/* Главный Hero-блок о клинике без лишних кнопок в правом углу */}
       <section
         className="island"
         style={{
           flex: 'none',
-          padding: '24px 28px',
+          padding: '24px',
           background: 'linear-gradient(135deg, color-mix(in srgb, var(--primary) 8%, var(--card)) 0%, var(--card) 60%)',
           border: '1px solid var(--border)',
         }}
@@ -151,8 +151,8 @@ function AboutContent() {
             <span
               className="t-ava xl round"
               style={{
-                width: '60px',
-                height: '60px',
+                width: '56px',
+                height: '56px',
                 background: 'color-mix(in srgb, var(--primary) 18%, transparent)',
                 color: 'var(--primary)',
                 display: 'grid',
@@ -160,13 +160,13 @@ function AboutContent() {
                 flexShrink: 0,
               }}
             >
-              <HeartPulse size={32} />
+              <HeartPulse size={30} />
             </span>
             <div className="col" style={{ gap: '3px' }}>
-              <span className="h1" style={{ fontSize: '26px', fontWeight: 750, letterSpacing: '-0.02em' }}>
+              <span className="h1" style={{ fontSize: '24px', fontWeight: 750, letterSpacing: '-0.02em' }}>
                 Ветеринарная клиника Chiron
               </span>
-              <span className="muted" style={{ fontSize: '15px', lineHeight: 1.4 }}>
+              <span className="muted" style={{ fontSize: '14.5px', lineHeight: 1.4 }}>
                 Современный ветеринарный госпиталь полного цикла и бережная цифровая экосистема
               </span>
             </div>
@@ -175,7 +175,7 @@ function AboutContent() {
           <p
             style={{
               margin: 0,
-              fontSize: '15px',
+              fontSize: '14.5px',
               lineHeight: 1.6,
               color: 'var(--foreground)',
               maxWidth: '960px',
@@ -189,14 +189,14 @@ function AboutContent() {
           <div
             style={{
               display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
-              gap: '12px',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
+              gap: 'var(--gap)',
               marginTop: '4px',
             }}
           >
             <div
               style={{
-                padding: '14px 18px',
+                padding: '14px 16px',
                 borderRadius: 'var(--radius)',
                 background: 'color-mix(in srgb, var(--card) 65%, transparent)',
                 border: '1px solid var(--border)',
@@ -213,7 +213,7 @@ function AboutContent() {
 
             <div
               style={{
-                padding: '14px 18px',
+                padding: '14px 16px',
                 borderRadius: 'var(--radius)',
                 background: 'color-mix(in srgb, var(--card) 65%, transparent)',
                 border: '1px solid var(--border)',
@@ -230,7 +230,7 @@ function AboutContent() {
 
             <div
               style={{
-                padding: '14px 18px',
+                padding: '14px 16px',
                 borderRadius: 'var(--radius)',
                 background: 'color-mix(in srgb, var(--card) 65%, transparent)',
                 border: '1px solid var(--border)',
@@ -247,7 +247,7 @@ function AboutContent() {
 
             <div
               style={{
-                padding: '14px 18px',
+                padding: '14px 16px',
                 borderRadius: 'var(--radius)',
                 background: 'color-mix(in srgb, var(--card) 65%, transparent)',
                 border: '1px solid var(--border)',
@@ -270,8 +270,8 @@ function AboutContent() {
         style={{
           flex: 'none',
           display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))',
-          gap: '16px',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+          gap: 'var(--gap)',
         }}
       >
         <div
@@ -297,8 +297,8 @@ function AboutContent() {
           >
             <Stethoscope size={22} />
           </span>
-          <span style={{ fontSize: '17px', fontWeight: 650 }}>Врачи узких специализаций</span>
-          <span className="muted" style={{ fontSize: '14px', lineHeight: 1.55 }}>
+          <span style={{ fontSize: '16.5px', fontWeight: 650 }}>Врачи узких специализаций</span>
+          <span className="muted" style={{ fontSize: '13.5px', lineHeight: 1.55 }}>
             Каждый доктор углублённо ведёт своё направление: абдоминальная и ортопедическая хирургия, ветеринарная стоматология, офтальмология и ратология.
           </span>
         </div>
@@ -326,8 +326,8 @@ function AboutContent() {
           >
             <Microscope size={22} />
           </span>
-          <span style={{ fontSize: '17px', fontWeight: 650 }}>Экспертная диагностика</span>
-          <span className="muted" style={{ fontSize: '14px', lineHeight: 1.55 }}>
+          <span style={{ fontSize: '16.5px', fontWeight: 650 }}>Экспертная диагностика</span>
+          <span className="muted" style={{ fontSize: '13.5px', lineHeight: 1.55 }}>
             Цифровой рентген высокого разрешения с минимальной лучевой нагрузкой, УЗИ экспертного класса (Mindray), ЭхоКГ сердца и собственная экспресс-лаборатория.
           </span>
         </div>
@@ -355,8 +355,8 @@ function AboutContent() {
           >
             <ShieldCheck size={22} />
           </span>
-          <span style={{ fontSize: '17px', fontWeight: 650 }}>Стандарты Fear Free</span>
-          <span className="muted" style={{ fontSize: '14px', lineHeight: 1.55 }}>
+          <span style={{ fontSize: '16.5px', fontWeight: 650 }}>Стандарты Fear Free</span>
+          <span className="muted" style={{ fontSize: '13.5px', lineHeight: 1.55 }}>
             Атмосфера без стресса: раздельные зоны ожидания для кошек и собак, нескользящие тёплые столы осмотра, феромонотерапия и деликатная фиксация.
           </span>
         </div>
@@ -384,8 +384,8 @@ function AboutContent() {
           >
             <FileText size={22} />
           </span>
-          <span style={{ fontSize: '17px', fontWeight: 650 }}>Цифровая экосистема</span>
-          <span className="muted" style={{ fontSize: '14px', lineHeight: 1.55 }}>
+          <span style={{ fontSize: '16.5px', fontWeight: 650 }}>Цифровая экосистема</span>
+          <span className="muted" style={{ fontSize: '13.5px', lineHeight: 1.55 }}>
             Полная история визитов, протоколы назначений, результаты анализов и календарь обязательных ревакцинаций доступны владельцу в личном кабинете в 1 клик.
           </span>
         </div>
@@ -396,8 +396,8 @@ function AboutContent() {
         style={{
           flex: 'none',
           display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(380px, 1fr))',
-          gap: '16px',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))',
+          gap: 'var(--gap)',
         }}
       >
         {/* Левый блок: Клинические стандарты доказательной заботы */}
@@ -534,7 +534,7 @@ function AboutContent() {
       </div>
 
       {/* Дружелюбная творческая витрина: «Пациенты и врачи клиники» вместо скучного меню */}
-      <section className="island" style={{ flex: 'none', padding: '24px 28px' }}>
+      <section className="island" style={{ flex: 'none', padding: '24px' }}>
         <div className="col" style={{ gap: '18px' }}>
           <div className="row wrap between" style={{ alignItems: 'center', gap: '12px' }}>
             <div className="row" style={{ gap: '10px', alignItems: 'center' }}>
@@ -577,7 +577,7 @@ function AboutContent() {
             style={{
               display: 'grid',
               gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))',
-              gap: '14px',
+              gap: 'var(--gap)',
             }}
           >
             {FEATURED_PATIENTS.map((p) => {

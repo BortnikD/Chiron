@@ -588,8 +588,10 @@ button.step.done:focus-visible { outline: 2px solid var(--ring); outline-offset:
 .menu-item .ic { color: var(--muted-foreground); }
 .menu-label { font-size: 12px; color: var(--muted-foreground); padding: 8px 10px 4px; font-weight: 500; }
 .menu-sep { height: 1px; background: var(--border); margin: 4px -6px; }
-.notif { all: unset; box-sizing: border-box; display: grid; grid-template-columns: 32px 1fr auto; gap: 10px; padding: 10px 12px; border-radius: 10px; cursor: pointer; width: 100%; align-items: start; }
+.notif { all: unset; box-sizing: border-box; display: grid; grid-template-columns: 32px 1fr auto; gap: 10px; padding: 10px 12px; border-radius: 10px; cursor: pointer; width: 100%; align-items: start; transition: background 0.15s ease, outline 0.15s ease; }
 .notif:hover { background: var(--muted); }
+.notif.is-selected { background: color-mix(in srgb, var(--primary) 12%, var(--card)); outline: 1px solid color-mix(in srgb, var(--primary) 45%, transparent); }
+.notif.is-selected:hover { background: color-mix(in srgb, var(--primary) 18%, var(--card)); }
 .notif:focus-visible { outline: 2px solid var(--ring); outline-offset: -2px; }
 .notif-ic { width: 32px; height: 32px; border-radius: 9px; display: grid; place-items: center; background: var(--muted); color: var(--muted-foreground); }
 .notif-ic.t-booked { background: var(--st-confirmed-bg); color: var(--st-confirmed-fg); }
