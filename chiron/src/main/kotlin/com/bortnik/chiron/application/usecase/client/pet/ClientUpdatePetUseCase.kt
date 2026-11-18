@@ -20,8 +20,8 @@ class ClientUpdatePetUseCase(
     private val log = LoggerFactory.getLogger(javaClass)
 
     fun update(actor: Actor, id: UUID, dto: UpdatePetDto): Pet {
-        accessGuard.requireOwnedPet(actor, id)
-        val pet = updatePetUseCase.update(id, dto)
+        val existing = accessGuard.requireOwnedPet(actor, id)
+        val pet = updatePetUseCase.update(existing, dto, actor.userId)
         log.info(
             "Client {} ({}) updated pet {} '{}', archived {}",
             actor.userId,

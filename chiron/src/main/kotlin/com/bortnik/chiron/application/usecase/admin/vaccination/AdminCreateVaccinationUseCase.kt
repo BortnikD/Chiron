@@ -15,7 +15,7 @@ class AdminCreateVaccinationUseCase(private val createVaccinationUseCase: Create
     private val log = LoggerFactory.getLogger(javaClass)
 
     fun create(actor: Actor, dto: CreateVaccinationDto): Vaccination {
-        val vaccination = createVaccinationUseCase.create(dto)
+        val vaccination = createVaccinationUseCase.create(dto, actor.userId)
         log.info(
             "Admin {} ({}) recorded vaccination {} '{}' for pet {}",
             actor.userId,

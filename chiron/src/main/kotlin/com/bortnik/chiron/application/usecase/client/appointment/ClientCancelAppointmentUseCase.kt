@@ -31,7 +31,7 @@ class ClientCancelAppointmentUseCase(
             vetNotes = Patch.Unchanged,
             cancelReason = reason,
         )
-        notifyAppointmentUseCase.notifyChange(actor.userId, before = appointment, after = cancelled)
+        notifyAppointmentUseCase.notifyChange(actor, before = appointment, after = cancelled)
         log.info("Client {} ({}) cancelled appointment {}", actor.userId, actor.fullName, id)
         return cancelled
     }

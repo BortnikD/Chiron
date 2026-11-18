@@ -4,9 +4,12 @@ import com.bortnik.chiron.application.config.ClinicProperties
 import com.bortnik.chiron.application.notification.AppointmentNotificationDetails
 import com.bortnik.chiron.application.notification.NotificationMessages
 import com.bortnik.chiron.application.notification.NotificationText
+import com.bortnik.chiron.application.security.Actor
+import com.bortnik.chiron.domain.entities.enums.UserRole
 import com.bortnik.chiron.domain.dto.notification.CreateNotificationDto
 import com.bortnik.chiron.domain.entities.Appointment
 import com.bortnik.chiron.domain.entities.enums.NotificationType
+import com.bortnik.chiron.domain.entities.enums.AppointmentStatus
 import com.bortnik.chiron.domain.exceptions.notfound.PetNotFoundException
 import com.bortnik.chiron.domain.exceptions.notfound.ServiceNotFoundException
 import com.bortnik.chiron.domain.exceptions.notfound.UserNotFoundException
@@ -33,7 +36,8 @@ class NotifyAppointmentUseCase(
 ) {
 
     // before is null for a just created appointment; who gets what is decided by NotificationRules.
-    fun notifyChange(actorId: UUID, before: Appointment?, after: Appointment) {
+    fun notifyChange(actor: Actor, before: Appointment?, after: Appointment) {
+        val actorId = actor.userId
         val context = contextOf(after)
         val previousVeterinarianUserId = before?.veterinarianId
             ?.takeIf { it != after.veterinarianId }
@@ -50,13 +54,31 @@ class NotifyAppointmentUseCase(
             val text = textOf(type, context)
             recipientIds.forEach { createNotificationUseCase.create(dtoOf(it, actorId, type, text, after)) }
         }
+        if (actor.role == UserRole.CLIENT && (before == null ||
+                    (before.status != after.status && after.status == AppointmentStatus.CANCELLED))
+        ) {
+            val type =
+                if (before == null) NotificationType.APPOINTMENT_BOOKED else NotificationType.APPOINTMENT_CANCELLED
+            val text = textOf(type, context)
+            createNotificationUseCase.createAll(
+                userRepository.findAdministratorIds().map { dtoOf(it, actorId, type, text, after) },
+            )
+        }
     }
 
-    // Returns false when the owner has already been reminded of this appointment.
+    fun notifyScheduleConflict(actorId: UUID, appointment: Appointment, administratorIds: Set<UUID>) {
+        val context = contextOf(appointment)
+        val type = NotificationType.SCHEDULE_CONFLICT
+        val text = textOf(type, context)
+        administratorIds.forEach { createNotificationUseCase.create(dtoOf(it, actorId, type, text, appointment)) }
+    }
+
+    // Returns false when the owner has already been reminded of this start time.
     fun remind(appointment: Appointment): Boolean {
         val context = contextOf(appointment)
         val type = NotificationType.APPOINTMENT_REMINDER
         val dto = dtoOf(context.ownerId, null, type, textOf(type, context), appointment)
+            .copy(reminderStartAt = appointment.startAt)
         return createNotificationUseCase.createIfAbsent(dto) != null
     }
 
@@ -77,6 +99,7 @@ class NotifyAppointmentUseCase(
                 veterinarianName = veterinarianUser.fullName,
                 startAt = appointment.startAt,
                 cancelReason = appointment.cancelReason,
+                status = appointment.status,
             ),
         )
     }

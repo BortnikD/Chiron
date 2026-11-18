@@ -1,6 +1,7 @@
 package com.bortnik.chiron.application.usecase.admin.workschedule
 
 import com.bortnik.chiron.application.security.Actor
+import com.bortnik.chiron.application.usecase.common.notification.NotifyScheduleConflictsUseCase
 import com.bortnik.chiron.domain.dto.workschedule.CreateWorkScheduleDto
 import com.bortnik.chiron.domain.entities.WorkSchedule
 import com.bortnik.chiron.domain.repositories.WorkScheduleRepository
@@ -11,13 +12,18 @@ import org.springframework.transaction.annotation.Transactional
 
 @Service
 @Transactional
-class AdminCreateWorkScheduleUseCase(private val workScheduleRepository: WorkScheduleRepository) {
+class AdminCreateWorkScheduleUseCase(
+    private val workScheduleRepository: WorkScheduleRepository,
+    private val notifyScheduleConflicts: NotifyScheduleConflictsUseCase,
+) {
 
     private val log = LoggerFactory.getLogger(javaClass)
 
     fun create(actor: Actor, dto: CreateWorkScheduleDto): WorkSchedule {
         WorkScheduleValidator.validate(dto)
+        val conflictsBefore = notifyScheduleConflicts.conflictingIds(dto.veterinarianId)
         val schedule = workScheduleRepository.create(dto)
+        notifyScheduleConflicts.notifyNewConflicts(actor.userId, schedule.veterinarianId, conflictsBefore)
         log.info(
             "Admin {} ({}) created work schedule {} for veterinarian {}: {} {}-{}",
             actor.userId,

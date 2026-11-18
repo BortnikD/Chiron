@@ -1,6 +1,10 @@
 package com.bortnik.chiron.application.usecase.common.user
 
 import com.bortnik.chiron.domain.dto.orElse
+import com.bortnik.chiron.application.notification.NotificationMessages
+import com.bortnik.chiron.application.usecase.common.notification.CreateNotificationUseCase
+import com.bortnik.chiron.domain.dto.notification.CreateNotificationDto
+import com.bortnik.chiron.domain.entities.enums.NotificationType
 import com.bortnik.chiron.domain.dto.user.UpdateProfileDto
 import com.bortnik.chiron.domain.dto.user.UpdateUserDto
 import com.bortnik.chiron.domain.entities.User
@@ -15,9 +19,12 @@ import java.util.UUID
 
 @Service
 @Transactional
-class UpdateUserUseCase(private val userRepository: UserRepository) {
+class UpdateUserUseCase(
+    private val userRepository: UserRepository,
+    private val createNotification: CreateNotificationUseCase,
+) {
 
-    fun update(id: UUID, dto: UpdateProfileDto): User {
+    fun update(id: UUID, dto: UpdateProfileDto, actorId: UUID): User {
         UserValidator.validate(dto)
         val existing = userRepository.findById(id) ?: throw UserNotFoundException(id)
         dto.email?.let { email ->
@@ -43,6 +50,15 @@ class UpdateUserUseCase(private val userRepository: UserRepository) {
             fullName = fullName,
             phone = dto.phone,
         )
-        return userRepository.update(id, update) ?: throw UserNotFoundException(id)
+        val updated = userRepository.update(id, update) ?: throw UserNotFoundException(id)
+        NotificationMessages.forAccountUpdate(existing, updated)?.let { text ->
+            createNotification.create(
+                CreateNotificationDto(
+                    recipientId = updated.id, actorId = actorId, type = NotificationType.ACCOUNT_UPDATED,
+                    title = text.title, body = text.body,
+                ),
+            )
+        }
+        return updated
     }
 }

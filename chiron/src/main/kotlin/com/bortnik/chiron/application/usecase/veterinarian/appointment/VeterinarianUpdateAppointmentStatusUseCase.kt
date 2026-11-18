@@ -30,7 +30,7 @@ class VeterinarianUpdateAppointmentStatusUseCase(
             vetNotes = dto.vetNotes,
             cancelReason = dto.cancelReason,
         )
-        notifyAppointmentUseCase.notifyChange(actor.userId, before = appointment, after = updated)
+        notifyAppointmentUseCase.notifyChange(actor, before = appointment, after = updated)
         log.info(
             "Veterinarian {} ({}) changed status of appointment {}: {} -> {}",
             actor.userId,

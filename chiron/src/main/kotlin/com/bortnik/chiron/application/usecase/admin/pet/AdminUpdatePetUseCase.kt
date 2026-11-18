@@ -2,6 +2,7 @@ package com.bortnik.chiron.application.usecase.admin.pet
 
 import com.bortnik.chiron.application.security.Actor
 import com.bortnik.chiron.application.usecase.common.pet.UpdatePetUseCase
+import com.bortnik.chiron.application.usecase.common.pet.GetPetUseCase
 import com.bortnik.chiron.domain.dto.pet.UpdatePetDto
 import com.bortnik.chiron.domain.entities.Pet
 import org.slf4j.LoggerFactory
@@ -11,12 +12,16 @@ import java.util.UUID
 
 @Service
 @Transactional
-class AdminUpdatePetUseCase(private val updatePetUseCase: UpdatePetUseCase) {
+class AdminUpdatePetUseCase(
+    private val updatePetUseCase: UpdatePetUseCase,
+    private val getPetUseCase: GetPetUseCase,
+) {
 
     private val log = LoggerFactory.getLogger(javaClass)
 
     fun update(actor: Actor, id: UUID, dto: UpdatePetDto): Pet {
-        val pet = updatePetUseCase.update(id, dto)
+        val existing = getPetUseCase.findById(id)
+        val pet = updatePetUseCase.update(existing, dto, actor.userId)
         log.info(
             "Admin {} ({}) updated pet {} '{}', archived {}",
             actor.userId,

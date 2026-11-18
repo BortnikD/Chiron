@@ -19,8 +19,7 @@ class SendAppointmentRemindersUseCase(
 
     private val log = LoggerFactory.getLogger(javaClass)
 
-    // Every pending or confirmed appointment that starts within the lead time is reminded of once, so a run only
-    // adds reminders for the appointments that entered the window since the previous one. Returns how many were sent.
+    // Reminds each pending or confirmed appointment once per start time within the lead window.
     fun send(): Int {
         val now = Instant.now()
         val appointments = appointmentRepository.findAll(

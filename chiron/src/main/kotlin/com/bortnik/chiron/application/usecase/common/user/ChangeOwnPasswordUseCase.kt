@@ -1,6 +1,10 @@
 package com.bortnik.chiron.application.usecase.common.user
 
 import com.bortnik.chiron.application.security.Actor
+import com.bortnik.chiron.application.notification.NotificationMessages
+import com.bortnik.chiron.application.usecase.common.notification.CreateNotificationUseCase
+import com.bortnik.chiron.domain.dto.notification.CreateNotificationDto
+import com.bortnik.chiron.domain.entities.enums.NotificationType
 import com.bortnik.chiron.domain.dto.user.ChangePasswordDto
 import com.bortnik.chiron.domain.dto.user.UpdateUserDto
 import com.bortnik.chiron.domain.exceptions.InvalidCredentialsException
@@ -18,6 +22,7 @@ import org.springframework.transaction.annotation.Transactional
 class ChangeOwnPasswordUseCase(
     private val userRepository: UserRepository,
     private val passwordEncoder: PasswordEncoder,
+    private val createNotification: CreateNotificationUseCase,
 ) {
 
     private val log = LoggerFactory.getLogger(javaClass)
@@ -32,6 +37,13 @@ class ChangeOwnPasswordUseCase(
         }
         val update = UpdateUserDto(passwordHash = requireNotNull(passwordEncoder.encode(dto.newPassword)))
         userRepository.update(actor.userId, update) ?: throw UserNotFoundException(actor.userId)
+        val text = NotificationMessages.forPasswordChange()
+        createNotification.create(
+            CreateNotificationDto(
+                recipientId = actor.userId, actorId = actor.userId, type = NotificationType.PASSWORD_CHANGED,
+                title = text.title, body = text.body,
+            ),
+        )
         log.info("{} {} ({}) changed own password", actor.role, actor.userId, actor.fullName)
     }
 }

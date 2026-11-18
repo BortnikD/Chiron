@@ -1,6 +1,9 @@
 package com.bortnik.chiron.application.usecase.common.user
 
 import com.bortnik.chiron.application.security.toActor
+import com.bortnik.chiron.application.usecase.common.notification.CreateNotificationUseCase
+import com.bortnik.chiron.domain.dto.notification.CreateNotificationDto
+import com.bortnik.chiron.domain.entities.enums.NotificationType
 import com.bortnik.chiron.application.usecase.common.auth.AuthenticateUserUseCase
 import com.bortnik.chiron.domain.dto.user.ChangePasswordDto
 import com.bortnik.chiron.domain.dto.user.UpdateUserDto
@@ -37,7 +40,8 @@ class ChangeOwnPasswordUseCaseTest {
 
     private val encoder = BCryptPasswordEncoder(4)
     private val repository = mock(UserRepository::class.java)
-    private val useCase = ChangeOwnPasswordUseCase(repository, encoder)
+    private val notifications = mock(CreateNotificationUseCase::class.java)
+    private val useCase = ChangeOwnPasswordUseCase(repository, encoder, notifications)
 
     @Test
     fun `every role can change own password and only the new password authenticates`() {
@@ -66,6 +70,23 @@ class ChangeOwnPasswordUseCaseTest {
     }
 
     @Test
+    fun `password change notifies self without including password or hash`() {
+        val before = user()
+        allowPasswordUpdate(before)
+        useCase.change(before.toActor(), ChangePasswordDto("old-password", "new-password"))
+        val captor = ArgumentCaptor.forClass(CreateNotificationDto::class.java)
+        val fallback =
+            CreateNotificationDto(before.id, type = NotificationType.PASSWORD_CHANGED, title = "Title", body = "Body")
+        verify(notifications).create(captor.capture() ?: fallback)
+        assertEquals(before.id, captor.value.recipientId)
+        assertEquals(before.id, captor.value.actorId)
+        assertEquals(NotificationType.PASSWORD_CHANGED, captor.value.type)
+        assertFalse(captor.value.body.contains("old-password"))
+        assertFalse(captor.value.body.contains("new-password"))
+        assertFalse(captor.value.body.contains(before.passwordHash))
+    }
+
+    @Test
     fun `incorrect current password leaves the stored password unchanged`() {
         val before = user()
         `when`(repository.findById(before.id)).thenReturn(before)
@@ -76,6 +97,7 @@ class ChangeOwnPasswordUseCaseTest {
 
         verify(repository).findById(before.id)
         verifyNoMoreInteractions(repository)
+        verifyNoInteractions(notifications)
     }
 
     @Test

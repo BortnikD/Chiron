@@ -7,6 +7,7 @@ import com.bortnik.chiron.domain.dto.user.CreateUserDto
 import com.bortnik.chiron.domain.dto.user.UpdateUserDto
 import com.bortnik.chiron.domain.dto.user.UserFilter
 import com.bortnik.chiron.domain.entities.User
+import com.bortnik.chiron.domain.entities.enums.UserRole
 import com.bortnik.chiron.domain.repositories.UserRepository
 import com.bortnik.chiron.infrastructure.persistence.containsIgnoreCase
 import com.bortnik.chiron.infrastructure.persistence.exposedSql
@@ -26,6 +27,7 @@ import org.jetbrains.exposed.v1.javatime.CurrentTimestampWithTimeZone
 import org.jetbrains.exposed.v1.jdbc.deleteWhere
 import org.jetbrains.exposed.v1.jdbc.insertReturning
 import org.jetbrains.exposed.v1.jdbc.selectAll
+import org.jetbrains.exposed.v1.jdbc.select
 import org.jetbrains.exposed.v1.jdbc.updateReturning
 import org.springframework.stereotype.Repository
 import org.springframework.transaction.annotation.Transactional
@@ -69,6 +71,12 @@ class ExposedUserRepository : UserRepository {
             ?.toUser()
     }
 
+    override fun findAdministratorIds(): List<UUID> = exposedSql {
+        ExposedUserTable.select(ExposedUserTable.id)
+            .where { ExposedUserTable.role eq UserRole.ADMIN }
+            .map { it[ExposedUserTable.id].value }
+    }
+
     override fun findAll(filter: UserFilter, pageRequest: PageRequest): Page<User> = exposedSql {
         ExposedUserTable.selectAll()
             .where { filter.toCondition() }
@@ -103,10 +111,10 @@ class ExposedUserRepository : UserRepository {
         .andIfNotNull(
             search?.let {
                 ExposedUserTable.fullName.containsIgnoreCase(it) or
-                    ExposedUserTable.firstName.containsIgnoreCase(it) or
-                    ExposedUserTable.middleName.containsIgnoreCase(it) or
-                    ExposedUserTable.email.containsIgnoreCase(it) or
-                    ExposedUserTable.phone.containsIgnoreCase(it)
+                        ExposedUserTable.firstName.containsIgnoreCase(it) or
+                        ExposedUserTable.middleName.containsIgnoreCase(it) or
+                        ExposedUserTable.email.containsIgnoreCase(it) or
+                        ExposedUserTable.phone.containsIgnoreCase(it)
             },
         )
         .andIfNotNull(createdFrom?.let { ExposedUserTable.createdAt greaterEq it.toDbTimestamp() })

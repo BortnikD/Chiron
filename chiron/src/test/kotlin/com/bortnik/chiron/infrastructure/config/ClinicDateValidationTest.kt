@@ -1,6 +1,8 @@
 package com.bortnik.chiron.infrastructure.config
 
 import com.bortnik.chiron.application.config.ClinicProperties
+import com.bortnik.chiron.application.usecase.common.notification.CreateNotificationUseCase
+import com.bortnik.chiron.application.usecase.common.notification.NotifyVaccinationUseCase
 import com.bortnik.chiron.application.usecase.common.pet.CreatePetUseCase
 import com.bortnik.chiron.application.usecase.common.pet.UpdatePetUseCase
 import com.bortnik.chiron.application.usecase.common.vaccination.CreateVaccinationUseCase
@@ -83,20 +85,27 @@ class ClinicDateValidationTest {
         `when`(vaccinations.update(vaccination.id, updateVaccination)).thenReturn(vaccination)
 
         val petCreate = CreatePetUseCase(pets, clock)
-        val petUpdate = UpdatePetUseCase(pets, clock)
-        val vaccinationCreate = CreateVaccinationUseCase(vaccinations, appointments, clock)
-        val vaccinationUpdate = UpdateVaccinationUseCase(vaccinations, clock)
+        val petUpdate = UpdatePetUseCase(pets, clock, mock(CreateNotificationUseCase::class.java))
+        val notifyVaccination = mock(NotifyVaccinationUseCase::class.java)
+        val vaccinationCreate = CreateVaccinationUseCase(vaccinations, appointments, clock, notifyVaccination)
+        val vaccinationUpdate = UpdateVaccinationUseCase(vaccinations, clock, notifyVaccination)
         assertEquals(pet, petCreate.create(createPet))
-        assertEquals(pet, petUpdate.update(petId, updatePet))
-        assertEquals(vaccination, vaccinationCreate.create(createVaccination))
-        assertEquals(vaccination, vaccinationUpdate.update(vaccination.id, updateVaccination))
+        assertEquals(pet, petUpdate.update(pet, updatePet, pet.ownerId))
+        assertEquals(vaccination, vaccinationCreate.create(createVaccination, pet.ownerId))
+        assertEquals(vaccination, vaccinationUpdate.update(vaccination.id, updateVaccination, pet.ownerId))
 
         val tomorrow = today.plusDays(1)
         val invalidWrites = listOf<() -> Unit>(
             { petCreate.create(createPet.copy(birthDate = tomorrow)) },
-            { petUpdate.update(petId, updatePet.copy(birthDate = Patch.Value(tomorrow))) },
-            { vaccinationCreate.create(createVaccination.copy(administeredOn = tomorrow)) },
-            { vaccinationUpdate.update(vaccination.id, updateVaccination.copy(administeredOn = tomorrow)) },
+            { petUpdate.update(pet, updatePet.copy(birthDate = Patch.Value(tomorrow)), pet.ownerId) },
+            { vaccinationCreate.create(createVaccination.copy(administeredOn = tomorrow), pet.ownerId) },
+            {
+                vaccinationUpdate.update(
+                    vaccination.id,
+                    updateVaccination.copy(administeredOn = tomorrow),
+                    pet.ownerId
+                )
+            },
         )
         for (write in invalidWrites) {
             assertTrue(assertFailsWith<ValidationException> { write() }.errors.isNotEmpty())

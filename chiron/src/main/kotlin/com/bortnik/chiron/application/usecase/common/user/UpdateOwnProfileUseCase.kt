@@ -16,7 +16,7 @@ class UpdateOwnProfileUseCase(private val updateUserUseCase: UpdateUserUseCase) 
     private val log = LoggerFactory.getLogger(javaClass)
 
     fun update(actor: Actor, dto: UpdateProfileDto): User {
-        val user = updateUserUseCase.update(actor.userId, dto)
+        val user = updateUserUseCase.update(actor.userId, dto, actor.userId)
         log.info(
             "{} {} ({}) updated own profile, full name is now {}",
             actor.role,

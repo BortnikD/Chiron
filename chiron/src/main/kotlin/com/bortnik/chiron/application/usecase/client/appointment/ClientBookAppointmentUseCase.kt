@@ -52,7 +52,7 @@ class ClientBookAppointmentUseCase(
                 clientComment = dto.clientComment,
             ),
         )
-        notifyAppointmentUseCase.notifyChange(actor.userId, before = null, after = appointment)
+        notifyAppointmentUseCase.notifyChange(actor, before = null, after = appointment)
         log.info(
             "Client {} ({}) booked appointment {} for pet {} with veterinarian {} at {}, price {}",
             actor.userId,

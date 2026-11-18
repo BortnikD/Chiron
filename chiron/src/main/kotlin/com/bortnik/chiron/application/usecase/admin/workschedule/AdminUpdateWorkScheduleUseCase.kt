@@ -1,6 +1,7 @@
 package com.bortnik.chiron.application.usecase.admin.workschedule
 
 import com.bortnik.chiron.application.security.Actor
+import com.bortnik.chiron.application.usecase.common.notification.NotifyScheduleConflictsUseCase
 import com.bortnik.chiron.domain.dto.workschedule.UpdateWorkScheduleDto
 import com.bortnik.chiron.domain.entities.WorkSchedule
 import com.bortnik.chiron.domain.exceptions.notfound.WorkScheduleNotFoundException
@@ -13,14 +14,19 @@ import java.util.UUID
 
 @Service
 @Transactional
-class AdminUpdateWorkScheduleUseCase(private val workScheduleRepository: WorkScheduleRepository) {
+class AdminUpdateWorkScheduleUseCase(
+    private val workScheduleRepository: WorkScheduleRepository,
+    private val notifyScheduleConflicts: NotifyScheduleConflictsUseCase,
+) {
 
     private val log = LoggerFactory.getLogger(javaClass)
 
     fun update(actor: Actor, id: UUID, dto: UpdateWorkScheduleDto): WorkSchedule {
         val existing = workScheduleRepository.findById(id) ?: throw WorkScheduleNotFoundException(id)
         WorkScheduleValidator.validate(existing, dto)
+        val conflictsBefore = notifyScheduleConflicts.conflictingIds(existing.veterinarianId)
         val schedule = workScheduleRepository.update(id, dto) ?: throw WorkScheduleNotFoundException(id)
+        notifyScheduleConflicts.notifyNewConflicts(actor.userId, schedule.veterinarianId, conflictsBefore)
         log.info(
             "Admin {} ({}) updated work schedule {} for veterinarian {}: {} {}-{}",
             actor.userId,

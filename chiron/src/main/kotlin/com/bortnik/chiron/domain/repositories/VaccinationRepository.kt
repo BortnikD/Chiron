@@ -5,6 +5,8 @@ import com.bortnik.chiron.domain.dto.pagination.PageRequest
 import com.bortnik.chiron.domain.dto.vaccination.CreateVaccinationDto
 import com.bortnik.chiron.domain.dto.vaccination.UpdateVaccinationDto
 import com.bortnik.chiron.domain.dto.vaccination.VaccinationFilter
+import com.bortnik.chiron.domain.dto.vaccination.VaccinationReminderDto
+import java.time.LocalDate
 import com.bortnik.chiron.domain.entities.Vaccination
 import java.util.UUID
 
@@ -18,6 +20,8 @@ interface VaccinationRepository {
     fun findAllByOwnerId(ownerId: UUID, filter: VaccinationFilter): List<Vaccination>
 
     fun findAll(filter: VaccinationFilter): List<Vaccination>
+
+    fun findReminders(today: LocalDate, dueThrough: LocalDate): List<VaccinationReminderDto>
 
     fun findAll(filter: VaccinationFilter, pageRequest: PageRequest): Page<Vaccination>
 

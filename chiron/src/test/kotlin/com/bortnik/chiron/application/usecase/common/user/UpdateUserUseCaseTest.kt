@@ -1,6 +1,11 @@
 package com.bortnik.chiron.application.usecase.common.user
 
 import com.bortnik.chiron.domain.dto.Patch
+import com.bortnik.chiron.application.usecase.common.notification.CreateNotificationUseCase
+import com.bortnik.chiron.domain.dto.notification.CreateNotificationDto
+import com.bortnik.chiron.domain.entities.enums.NotificationType
+import org.mockito.ArgumentCaptor
+import org.mockito.Mockito.verifyNoInteractions
 import com.bortnik.chiron.domain.dto.user.UpdateProfileDto
 import com.bortnik.chiron.domain.dto.user.UpdateUserDto
 import com.bortnik.chiron.domain.exceptions.alreadyexists.UserAlreadyExistsException
@@ -15,10 +20,13 @@ import org.mockito.Mockito.`when`
 import java.util.UUID
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertFalse
+import kotlin.test.assertTrue
 
 class UpdateUserUseCaseTest {
     private val repository = mock(UserRepository::class.java)
-    private val useCase = UpdateUserUseCase(repository)
+    private val notifications = mock(CreateNotificationUseCase::class.java)
+    private val useCase = UpdateUserUseCase(repository, notifications)
 
     @Test
     fun `partial name changes rebuild full name from changed and retained parts`() {
@@ -35,7 +43,7 @@ class UpdateUserUseCaseTest {
         )
         for ((request, expected) in cases) {
             `when`(repository.update(user.id, expected)).thenReturn(existing)
-            assertEquals(existing, useCase.update(user.id, request))
+            assertEquals(existing, useCase.update(user.id, request, user.id))
             verify(repository).update(user.id, expected)
         }
     }
@@ -47,8 +55,37 @@ class UpdateUserUseCaseTest {
         `when`(repository.findByPhone(user.phone)).thenReturn(user)
         val expected = UpdateUserDto(email = user.email, phone = user.phone)
         `when`(repository.update(user.id, expected)).thenReturn(user)
-        assertEquals(user, useCase.update(user.id, UpdateProfileDto(email = user.email, phone = user.phone)))
+        assertEquals(user, useCase.update(user.id, UpdateProfileDto(email = user.email, phone = user.phone), user.id))
         verify(repository).update(user.id, expected)
+    }
+
+    @Test
+    fun `self service and administrator contact changes notify user without exposing contact values`() {
+        for (actorId in listOf(user.id, UUID.randomUUID())) {
+            val dto = UpdateProfileDto(email = "new@example.com", phone = "+79990000099", firstName = "Pavel")
+            val update =
+                UpdateUserDto(email = dto.email, phone = dto.phone, firstName = dto.firstName, fullName = "P. Petrov")
+            val updated =
+                user.copy(email = dto.email!!, phone = dto.phone!!, firstName = dto.firstName!!, fullName = "P. Petrov")
+            `when`(repository.findById(user.id)).thenReturn(user)
+            `when`(repository.update(user.id, update)).thenReturn(updated)
+            useCase.update(user.id, dto, actorId)
+        }
+        val fallback =
+            CreateNotificationDto(user.id, type = NotificationType.ACCOUNT_UPDATED, title = "Title", body = "Body")
+        val captor = ArgumentCaptor.forClass(CreateNotificationDto::class.java)
+        verify(notifications, times(2)).create(captor.capture() ?: fallback)
+        assertTrue(captor.allValues.all { it.recipientId == user.id && it.type == NotificationType.ACCOUNT_UPDATED })
+        assertEquals(user.id, captor.allValues.first().actorId)
+        assertFalse(captor.allValues.any { it.body.contains("new@example.com") || it.body.contains("+79990000099") })
+    }
+
+    @Test
+    fun `unchanged profile creates no notification`() {
+        `when`(repository.findById(user.id)).thenReturn(user)
+        `when`(repository.update(user.id, UpdateUserDto())).thenReturn(user)
+        useCase.update(user.id, UpdateProfileDto(), user.id)
+        verifyNoInteractions(notifications)
     }
 
     @Test
@@ -56,11 +93,24 @@ class UpdateUserUseCaseTest {
         `when`(repository.findById(user.id)).thenReturn(user)
         `when`(repository.findByEmail(user.email)).thenReturn(user.copy(id = UUID.randomUUID()))
         `when`(repository.findByPhone(user.phone)).thenReturn(user.copy(id = UUID.randomUUID()))
-        assertFailsWith<UserAlreadyExistsException> { useCase.update(user.id, UpdateProfileDto(email = user.email)) }
-        assertFailsWith<UserAlreadyExistsException> { useCase.update(user.id, UpdateProfileDto(phone = user.phone)) }
+        assertFailsWith<UserAlreadyExistsException> {
+            useCase.update(
+                user.id,
+                UpdateProfileDto(email = user.email),
+                user.id
+            )
+        }
+        assertFailsWith<UserAlreadyExistsException> {
+            useCase.update(
+                user.id,
+                UpdateProfileDto(phone = user.phone),
+                user.id
+            )
+        }
         verify(repository, times(2)).findById(user.id)
         verify(repository).findByEmail(user.email)
         verify(repository).findByPhone(user.phone)
         verifyNoMoreInteractions(repository)
+        verifyNoInteractions(notifications)
     }
 }
