@@ -16,6 +16,8 @@ import com.bortnik.chiron.support.TestEntities.vaccination
 import com.bortnik.chiron.support.TestEntities.veterinarian
 import org.junit.jupiter.api.Test
 import org.mockito.Mockito.mock
+import org.mockito.Mockito.never
+import org.mockito.Mockito.verify
 import org.mockito.Mockito.`when`
 import java.util.UUID
 import kotlin.test.assertEquals
@@ -51,6 +53,23 @@ class ResourceAccessGuardTest {
 
         `when`(appointments.findById(appointment.id)).thenReturn(appointment.copy(veterinarianId = vet.userId))
         assertFailsWith<AccessDeniedException> { guard.requireAssignedAppointment(vet, appointment.id) }
+    }
+
+    @Test
+    fun `mutation access checks the locked appointment rather than an earlier unlocked assignment`() {
+        `when`(veterinarians.findByUserId(vet.userId)).thenReturn(veterinarian)
+        `when`(appointments.findById(appointment.id)).thenReturn(appointment)
+        `when`(appointments.findByIdForUpdate(appointment.id)).thenReturn(appointment)
+
+        assertEquals(appointment, guard.requireAssignedAppointment(vet, appointment.id, forUpdate = true))
+        verify(appointments).findByIdForUpdate(appointment.id)
+        verify(appointments, never()).findById(appointment.id)
+
+        `when`(appointments.findByIdForUpdate(appointment.id))
+            .thenReturn(appointment.copy(veterinarianId = UUID.randomUUID()))
+        assertFailsWith<AccessDeniedException> {
+            guard.requireAssignedAppointment(vet, appointment.id, forUpdate = true)
+        }
     }
 
     @Test

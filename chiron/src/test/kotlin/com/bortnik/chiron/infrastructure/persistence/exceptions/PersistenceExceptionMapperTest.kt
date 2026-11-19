@@ -13,6 +13,7 @@ class PersistenceExceptionMapperTest {
     @Test
     fun `fromSqlState resolves known code and falls back to UNKNOWN`() {
         assertSame(SqlError.UNIQUE_VIOLATION, SqlError.fromSqlState("23505"))
+        assertSame(SqlError.EXCLUSION_VIOLATION, SqlError.fromSqlState("23P01"))
         assertSame(SqlError.DEADLOCK_DETECTED, SqlError.fromSqlState("40P01"))
         assertSame(SqlError.UNKNOWN, SqlError.fromSqlState("42P01"))
         assertSame(SqlError.UNKNOWN, SqlError.fromSqlState(null))
@@ -56,6 +57,7 @@ class PersistenceExceptionMapperTest {
         assertIs<CheckViolationException>(pgError("23514", "check").toPersistenceException())
         assertIs<InvalidDataException>(pgError("22P02", "invalid input syntax for type uuid").toPersistenceException())
         assertIs<ConcurrencyException>(pgError("40P01", "deadlock detected").toPersistenceException())
+        assertIs<ConcurrencyException>(pgError("23P01", "conflicting appointment interval").toPersistenceException())
         assertIs<QueryTimeoutException>(pgError("57014", "canceling statement").toPersistenceException())
         assertIs<ConnectionException>(pgError("08006", "connection failure").toPersistenceException())
         assertIs<UnknownPersistenceException>(pgError("42P01", "relation does not exist").toPersistenceException())

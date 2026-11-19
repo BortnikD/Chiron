@@ -31,7 +31,7 @@ WHERE pet_id IN (SELECT id FROM pet WHERE id::text LIKE '5eed%' OR owner_id::tex
 DELETE
 FROM appointment
 WHERE veterinarian_id::text LIKE '5eed%'
-   OR service_id::text LIKE '5eed%'
+   OR id IN (SELECT appointment_id FROM appointment_service WHERE service_id::text LIKE '5eed%')
    OR pet_id IN (SELECT id FROM pet WHERE id::text LIKE '5eed%' OR owner_id::text LIKE '5eed%');
 
 DELETE
@@ -338,7 +338,26 @@ ANALYZE pet, veterinarian, service_species, veterinarian_species_permission;
 
 -- Fixed daily slots per veterinarian (day_of_week NULL = Monday to Friday); slots never overlap and fit the working
 -- hours for every species, including the service buffer. Demand grows over time and peaks in spring and autumn.
-INSERT INTO appointment (veterinarian_id, pet_id, service_id, start_at, end_at, status, price_snapshot,
+CREATE TEMP TABLE seed_appointment
+(
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    veterinarian_id UUID,
+    pet_id UUID,
+    service_id UUID,
+    start_at TIMESTAMPTZ,
+    end_at TIMESTAMPTZ,
+    status TEXT,
+    price_snapshot NUMERIC(13, 2),
+    client_comment TEXT,
+    vet_notes TEXT,
+    cancelled_by UUID,
+    cancelled_at TIMESTAMPTZ,
+    cancel_reason TEXT,
+    created_at TIMESTAMPTZ,
+    updated_at TIMESTAMPTZ
+) ON COMMIT DROP;
+
+INSERT INTO seed_appointment (veterinarian_id, pet_id, service_id, start_at, end_at, status, price_snapshot,
                          client_comment, vet_notes, cancelled_by, cancelled_at, cancel_reason, created_at, updated_at)
 WITH params AS (SELECT (now() AT TIME ZONE 'Europe/Moscow')::date AS today),
      slots(vet_n, day_of_week, slot_time, service_n) AS (VALUES (1, NULL, TIME '09:00', 1),
@@ -502,7 +521,86 @@ SELECT veterinarian_id,
        CASE WHEN status = 'PENDING' THEN created_at ELSE greatest(created_at, least(end_at, now())) END
 FROM statused;
 
-ANALYZE appointment;
+INSERT INTO appointment (id, veterinarian_id, pet_id, start_at, end_at, status, client_comment, vet_notes,
+                         cancelled_by, cancelled_at, cancel_reason, created_at, updated_at)
+SELECT id, veterinarian_id, pet_id, start_at, end_at, status, client_comment, vet_notes,
+       cancelled_by, cancelled_at, cancel_reason, created_at, updated_at
+FROM seed_appointment;
+
+INSERT INTO appointment_service (appointment_id, service_id, name_snapshot, price_snapshot, duration_min_snapshot,
+                                 buffer_after_min_snapshot, is_planned, is_performed, added_by, created_at,
+                                 updated_by, updated_at)
+SELECT a.id, s.id, s.name, a.price_snapshot, coalesce(ss.duration_min, s.base_duration_min), s.buffer_after_min,
+       TRUE, CASE WHEN a.status = 'COMPLETED' THEN TRUE
+                  WHEN a.status IN ('CANCELLED', 'NO_SHOW') THEN FALSE END,
+       p.owner_id, a.created_at, v.user_id, a.updated_at
+FROM seed_appointment a
+         JOIN pet p ON p.id = a.pet_id
+         JOIN veterinarian v ON v.id = a.veterinarian_id
+         JOIN service s ON s.id = a.service_id
+         JOIN service_species ss ON ss.service_id = s.id AND ss.species_id = p.species_id;
+
+-- Additional procedures were performed during completed examinations; the booked interval stays unchanged.
+INSERT INTO appointment_service (appointment_id, service_id, name_snapshot, price_snapshot, duration_min_snapshot,
+                                 buffer_after_min_snapshot, is_planned, is_performed, added_by, created_at,
+                                 updated_by, updated_at)
+SELECT a.id, s.id, s.name, coalesce(ss.price, s.base_price), coalesce(ss.duration_min, s.base_duration_min),
+       s.buffer_after_min, FALSE, TRUE, v.user_id, a.end_at, v.user_id, a.end_at
+FROM seed_appointment a
+         JOIN pet p ON p.id = a.pet_id
+         JOIN veterinarian v ON v.id = a.veterinarian_id
+         JOIN service s ON s.id = '5eed0003-0000-0000-0000-000000000002'
+         JOIN service_species ss ON ss.service_id = s.id AND ss.species_id = p.species_id
+WHERE a.status = 'COMPLETED'
+  AND a.service_id IN ('5eed0003-0000-0000-0000-000000000001', '5eed0003-0000-0000-0000-000000000006')
+  AND right(p.id::text, 4)::int % 13 = 0;
+
+-- A combined vaccination and examination reserves the sum of procedures and only the largest buffer.
+WITH candidates AS (
+    SELECT a.id, s.id AS service_id, s.name, coalesce(ss.price, s.base_price) AS price,
+           coalesce(ss.duration_min, s.base_duration_min) AS duration_min, s.buffer_after_min,
+           booked_service.is_performed, p.owner_id, a.created_at, a.updated_at, extended.end_at
+    FROM appointment a
+             JOIN appointment_service booked_service ON booked_service.appointment_id = a.id AND booked_service.is_planned
+             JOIN pet p ON p.id = a.pet_id
+             JOIN service s ON s.id = '5eed0003-0000-0000-0000-000000000001'
+             JOIN service_species ss ON ss.service_id = s.id AND ss.species_id = p.species_id
+             JOIN work_schedule w ON w.veterinarian_id = a.veterinarian_id
+                 AND w.day_of_week = extract(isodow FROM a.start_at AT TIME ZONE 'Europe/Moscow')
+             CROSS JOIN LATERAL (SELECT a.start_at + make_interval(mins => booked_service.duration_min_snapshot
+                 + coalesce(ss.duration_min, s.base_duration_min)
+                 + greatest(booked_service.buffer_after_min_snapshot, s.buffer_after_min)) AS end_at) AS extended
+    WHERE a.veterinarian_id::text LIKE '5eed%'
+      AND booked_service.service_id = '5eed0003-0000-0000-0000-000000000002'
+      AND a.status IN ('PENDING', 'CONFIRMED', 'COMPLETED')
+      AND right(p.id::text, 4)::int % 7 = 0
+      AND (a.status <> 'COMPLETED' OR extended.end_at <= now())
+      AND (extended.end_at AT TIME ZONE 'Europe/Moscow')::time <= w.end_time
+      AND (w.break_start IS NULL OR NOT ((a.start_at AT TIME ZONE 'Europe/Moscow')::time < w.break_end
+          AND (extended.end_at AT TIME ZONE 'Europe/Moscow')::time > w.break_start))
+      AND NOT EXISTS (SELECT 1 FROM appointment other
+                      WHERE other.veterinarian_id = a.veterinarian_id AND other.id <> a.id
+                        AND other.status <> 'CANCELLED'
+                        AND other.start_at < extended.end_at AND other.end_at > a.start_at)
+      AND NOT EXISTS (SELECT 1 FROM schedule_exception e
+                      WHERE e.veterinarian_id = a.veterinarian_id
+                        AND (a.start_at AT TIME ZONE 'Europe/Moscow')::date BETWEEN e.start_date AND e.end_date
+                        AND (e.type = 'ABSENCE'
+                          OR (extended.end_at AT TIME ZONE 'Europe/Moscow')::time > e.end_time))
+), inserted AS (
+    INSERT INTO appointment_service (appointment_id, service_id, name_snapshot, price_snapshot, duration_min_snapshot,
+                                     buffer_after_min_snapshot, is_planned, is_performed, added_by, created_at, updated_at)
+    SELECT id, service_id, name, price, duration_min, buffer_after_min, TRUE, is_performed,
+           owner_id, created_at, updated_at
+    FROM candidates
+    RETURNING appointment_id
+)
+UPDATE appointment a SET end_at = candidates.end_at,
+    updated_at = CASE WHEN a.status = 'COMPLETED' THEN greatest(a.updated_at, candidates.end_at) ELSE a.updated_at END
+FROM candidates JOIN inserted ON inserted.appointment_id = candidates.id
+WHERE a.id = candidates.id;
+
+ANALYZE appointment, appointment_service;
 
 -- Use the latest completed visit of the same pet, including referrals to a different specialist.
 UPDATE appointment b
@@ -529,8 +627,9 @@ SELECT DISTINCT ON (a.pet_id) a.pet_id,
                               (a.start_at AT TIME ZONE 'Europe/Moscow')::date,
                               (a.start_at AT TIME ZONE 'Europe/Moscow')::date + 365
 FROM appointment a
+         JOIN appointment_service performed ON performed.appointment_id = a.id AND performed.is_performed
 WHERE a.veterinarian_id::text LIKE '5eed%'
-  AND a.service_id = '5eed0003-0000-0000-0000-000000000002'
+  AND performed.service_id = '5eed0003-0000-0000-0000-000000000002'
   AND a.status = 'COMPLETED'
 ORDER BY a.pet_id, a.start_at DESC;
 
@@ -560,7 +659,7 @@ SELECT recipient.id,
            WHEN 'APPOINTMENT_RESCHEDULED' THEN 'Запись перенесена'
            WHEN 'FOLLOW_UP_SCHEDULED' THEN 'Назначен повторный приём'
            WHEN 'APPOINTMENT_REMINDER' THEN 'Напоминание о приёме' END,
-       p.name || ' — ' || s.name || ', ' || to_char(a.start_at AT TIME ZONE 'Europe/Moscow', 'DD.MM.YYYY HH24:MI')
+       p.name || ' — ' || services.names || ', ' || to_char(a.start_at AT TIME ZONE 'Europe/Moscow', 'DD.MM.YYYY HH24:MI')
            || ', врач ' || u.full_name || coalesce('. ' || a.cancel_reason, '.'),
        a.id,
        p.id,
@@ -571,7 +670,9 @@ SELECT recipient.id,
                THEN least(event.at + INTERVAL '2 hours', now()) END
 FROM appointment a
          JOIN pet p ON p.id = a.pet_id
-         JOIN service s ON s.id = a.service_id
+         CROSS JOIN LATERAL (SELECT string_agg(item.name_snapshot, ', ' ORDER BY item.created_at, item.service_id) AS names
+                             FROM appointment_service item
+                             WHERE item.appointment_id = a.id AND item.is_planned) AS services
          JOIN veterinarian v ON v.id = a.veterinarian_id
          JOIN users u ON u.id = v.user_id
          CROSS JOIN LATERAL (

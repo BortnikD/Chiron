@@ -6,10 +6,12 @@ import com.bortnik.chiron.domain.dto.veterinarian.VeterinarianFilter
 import com.bortnik.chiron.domain.entities.ServiceSpecies
 import com.bortnik.chiron.domain.entities.Species
 import com.bortnik.chiron.domain.entities.WorkSchedule
+import com.bortnik.chiron.domain.exceptions.ValidationException
 import com.bortnik.chiron.domain.exceptions.rules.ServiceInactiveException
 import com.bortnik.chiron.domain.exceptions.rules.ServiceNotAvailableForSpeciesException
 import com.bortnik.chiron.domain.exceptions.rules.VeterinarianInactiveException
 import com.bortnik.chiron.domain.exceptions.rules.VeterinarianNotPermittedForSpeciesException
+import com.bortnik.chiron.domain.exceptions.rules.VeterinarianServiceSpecializationMismatchException
 import com.bortnik.chiron.domain.repositories.ServiceRepository
 import com.bortnik.chiron.domain.repositories.ServiceSpeciesRepository
 import com.bortnik.chiron.domain.repositories.SpeciesRepository
@@ -41,15 +43,19 @@ class FindAvailableSlotsUseCaseTest {
     private val availability = mock(CheckAppointmentAvailabilityUseCase::class.java)
     private val clinic = ClinicProperties("Europe/Moscow", 15)
     private val useCase =
-        FindAvailableSlotsUseCase(species, services, overrides, vets, permissions, availability, clinic)
+        FindAvailableSlotsUseCase(
+            species, ResolveAppointmentServicesUseCase(services, overrides), vets, permissions, availability, clinic,
+        )
     private val date = LocalDate.now(clinic.zoneId).plusDays(2)
-    private val filter = AvailableSlotFilter(pet.speciesId, service.id, from = date, to = date)
+    private val filter = AvailableSlotFilter(pet.speciesId, listOf(service.id), from = date, to = date)
 
     @Test
     fun `clinic search merges veterinarians sorts slots and includes species duration plus buffer`() {
         allowService(duration = 15)
         val other = veterinarian.copy(id = UUID.randomUUID())
-        val query = VeterinarianFilter(speciesId = pet.speciesId, isActive = true)
+        val query = VeterinarianFilter(
+            speciesId = pet.speciesId, specializationId = service.specializationId, isActive = true,
+        )
         `when`(vets.findAll(query)).thenReturn(listOf(other, veterinarian))
         allowHours(other.id, date, 10, 11)
         allowHours(veterinarian.id, date, 9, 11)
@@ -76,6 +82,49 @@ class FindAvailableSlotsUseCaseTest {
     }
 
     @Test
+    fun `multiple services need one continuous interval with a single maximum buffer`() {
+        allowService(duration = 30)
+        val other = service.copy(id = UUID.randomUUID(), baseDurationMin = 20, bufferAfterMin = 10)
+        val ids = listOf(service.id, other.id)
+        `when`(services.findAllByIds(ids)).thenReturn(listOf(service, other))
+        `when`(overrides.findAllBySpeciesId(pet.speciesId)).thenReturn(ids.map { ServiceSpecies(it, pet.speciesId) })
+        `when`(vets.findById(veterinarian.id)).thenReturn(veterinarian)
+        `when`(permissions.exists(veterinarian.id, pet.speciesId)).thenReturn(true)
+        allowHours(veterinarian.id, date, 9, 10)
+
+        assertTrue(useCase.find(filter.copy(serviceIds = ids, veterinarianId = veterinarian.id)).isEmpty())
+
+        allowHours(veterinarian.id, date, 9, 11)
+        val slots = useCase.find(filter.copy(serviceIds = ids, veterinarianId = veterinarian.id))
+        assertTrue(slots.isNotEmpty())
+        assertTrue(slots.all { Duration.between(it.startAt, it.endAt) == Duration.ofMinutes(65) })
+    }
+
+    @Test
+    fun `slot search rejects a combined duration longer than one day before searching doctors`() {
+        allowService(duration = null)
+        val other = service.copy(id = UUID.randomUUID(), baseDurationMin = 600)
+        val ids = listOf(service.id, other.id)
+        `when`(services.findAllByIds(ids)).thenReturn(listOf(service.copy(baseDurationMin = 900), other))
+        `when`(overrides.findAllBySpeciesId(pet.speciesId)).thenReturn(ids.map { ServiceSpecies(it, pet.speciesId) })
+
+        assertFailsWith<ValidationException> { useCase.find(filter.copy(serviceIds = ids)) }
+        verifyNoInteractions(vets, availability)
+    }
+
+    @Test
+    fun `explicit doctor must match the specialization of all selected services`() {
+        allowService(duration = 15)
+        `when`(vets.findById(veterinarian.id)).thenReturn(veterinarian.copy(specializationId = UUID.randomUUID()))
+        `when`(permissions.exists(veterinarian.id, pet.speciesId)).thenReturn(true)
+
+        assertFailsWith<VeterinarianServiceSpecializationMismatchException> {
+            useCase.find(filter.copy(veterinarianId = veterinarian.id))
+        }
+        verifyNoInteractions(availability)
+    }
+
+    @Test
     fun `past dates return no slots`() {
         allowService(duration = 15)
         val past = date.minusDays(4)
@@ -99,23 +148,25 @@ class FindAvailableSlotsUseCaseTest {
     @Test
     fun `inactive or species incompatible service is rejected before searching veterinarians`() {
         allowService(duration = null)
-        `when`(services.findById(service.id)).thenReturn(service.copy(isActive = false))
+        `when`(services.findAllByIds(listOf(service.id))).thenReturn(listOf(service.copy(isActive = false)))
         assertFailsWith<ServiceInactiveException> { useCase.find(filter) }
-        `when`(services.findById(service.id)).thenReturn(service)
-        `when`(overrides.findById(service.id, pet.speciesId)).thenReturn(null)
+        `when`(services.findAllByIds(listOf(service.id))).thenReturn(listOf(service))
+        `when`(overrides.findAllBySpeciesId(pet.speciesId)).thenReturn(emptyList())
         assertFailsWith<ServiceNotAvailableForSpeciesException> { useCase.find(filter) }
         verifyNoInteractions(vets, availability)
     }
 
     private fun allowService(duration: Int?) {
         `when`(species.findById(pet.speciesId)).thenReturn(Species(pet.speciesId, "Species"))
-        `when`(services.findById(service.id)).thenReturn(service)
-        `when`(overrides.findById(service.id, pet.speciesId)).thenReturn(
-            ServiceSpecies(
-                service.id,
-                pet.speciesId,
-                durationMin = duration
-            )
+        `when`(services.findAllByIds(listOf(service.id))).thenReturn(listOf(service))
+        `when`(overrides.findAllBySpeciesId(pet.speciesId)).thenReturn(
+            listOf(
+                ServiceSpecies(
+                    service.id,
+                    pet.speciesId,
+                    durationMin = duration
+                )
+            ),
         )
     }
 

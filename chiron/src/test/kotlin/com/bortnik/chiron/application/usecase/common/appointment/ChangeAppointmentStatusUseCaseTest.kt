@@ -5,6 +5,7 @@ import com.bortnik.chiron.domain.dto.appointment.UpdateAppointmentDto
 import com.bortnik.chiron.domain.entities.enums.AppointmentStatus
 import com.bortnik.chiron.support.TestEntities.appointment
 import com.bortnik.chiron.support.TestEntities.pet
+import com.bortnik.chiron.support.TestEntities.service
 import org.junit.jupiter.api.Test
 import org.mockito.ArgumentCaptor
 import org.mockito.Mockito.any
@@ -26,7 +27,8 @@ class ChangeAppointmentStatusUseCaseTest {
         `when`(
             update.update(
                 eq(appointment.id) ?: appointment.id,
-                any(UpdateAppointmentDto::class.java) ?: UpdateAppointmentDto()
+                any(UpdateAppointmentDto::class.java) ?: UpdateAppointmentDto(),
+                eq(pet.ownerId) ?: pet.ownerId,
             )
         )
             .thenReturn(appointment)
@@ -34,7 +36,10 @@ class ChangeAppointmentStatusUseCaseTest {
         useCase.change(appointment, AppointmentStatus.CANCELLED, pet.ownerId, Patch.Value("Notes"), "Cannot attend")
         val after = Instant.now()
         val captor = ArgumentCaptor.forClass(UpdateAppointmentDto::class.java)
-        verify(update).update(eq(appointment.id) ?: appointment.id, captor.capture() ?: UpdateAppointmentDto())
+        verify(update).update(
+            eq(appointment.id) ?: appointment.id, captor.capture() ?: UpdateAppointmentDto(),
+            eq(pet.ownerId) ?: pet.ownerId
+        )
         val dto = captor.value
         val cancelledAt = assertIs<Patch.Value<Instant?>>(dto.cancelledAt).value!!
         assertTrue(cancelledAt >= before && cancelledAt <= after)
@@ -55,7 +60,7 @@ class ChangeAppointmentStatusUseCaseTest {
             cancelledAt = appointment.startAt, cancelReason = "Original reason",
         )
         val expected = UpdateAppointmentDto(status = AppointmentStatus.CANCELLED)
-        `when`(update.update(appointment.id, expected)).thenReturn(cancelled)
+        `when`(update.update(appointment.id, expected, appointment.veterinarianId)).thenReturn(cancelled)
         assertEquals(
             cancelled,
             useCase.change(
@@ -66,14 +71,20 @@ class ChangeAppointmentStatusUseCaseTest {
                 "Other reason"
             )
         )
-        verify(update).update(appointment.id, expected)
+        verify(update).update(appointment.id, expected, appointment.veterinarianId)
     }
 
     @Test
     fun `non cancellation status forwards notes without cancellation metadata`() {
-        val expected = UpdateAppointmentDto(status = AppointmentStatus.COMPLETED, vetNotes = Patch.Value(null))
-        `when`(update.update(appointment.id, expected)).thenReturn(appointment)
-        useCase.change(appointment, AppointmentStatus.COMPLETED, pet.ownerId, Patch.Value(null), null)
-        verify(update).update(appointment.id, expected)
+        val expected = UpdateAppointmentDto(
+            status = AppointmentStatus.COMPLETED, vetNotes = Patch.Value(null),
+            performedServiceIds = listOf(service.id)
+        )
+        `when`(update.update(appointment.id, expected, pet.ownerId)).thenReturn(appointment)
+        useCase.change(
+            appointment, AppointmentStatus.COMPLETED, pet.ownerId, Patch.Value(null), null,
+            performedServiceIds = listOf(service.id)
+        )
+        verify(update).update(appointment.id, expected, pet.ownerId)
     }
 }

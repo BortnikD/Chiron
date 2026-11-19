@@ -12,6 +12,7 @@ import com.bortnik.chiron.infrastructure.persistence.models.ExposedAppointmentTa
 import com.bortnik.chiron.infrastructure.persistence.models.ExposedPetTable
 import com.bortnik.chiron.infrastructure.persistence.models.ExposedVaccinationTable
 import com.bortnik.chiron.infrastructure.persistence.utils.withoutNewerVaccination
+import com.bortnik.chiron.infrastructure.persistence.utils.findAppointmentServices
 import org.jetbrains.exposed.v1.core.Case
 import org.jetbrains.exposed.v1.core.SortOrder
 import org.jetbrains.exposed.v1.core.and
@@ -60,12 +61,15 @@ class ExposedClientSummaryRepository : ClientSummaryRepository {
     }
 
     override fun findNextAppointment(ownerId: UUID, now: Instant): Appointment? = exposedSql {
-        ExposedAppointmentTable.selectAll()
+        val row = ExposedAppointmentTable.selectAll()
             .where { (ExposedAppointmentTable.petId inSubQuery ownPets(ownerId)) and upcoming(now) }
             .orderBy(ExposedAppointmentTable.startAt to SortOrder.ASC, ExposedAppointmentTable.id to SortOrder.ASC)
             .limit(1)
             .singleOrNull()
-            ?.toAppointment()
+        row?.toAppointment(
+            findAppointmentServices(listOf(row[ExposedAppointmentTable.id].value))
+                [row[ExposedAppointmentTable.id].value].orEmpty()
+        )
     }
 
     override fun countVaccinations(

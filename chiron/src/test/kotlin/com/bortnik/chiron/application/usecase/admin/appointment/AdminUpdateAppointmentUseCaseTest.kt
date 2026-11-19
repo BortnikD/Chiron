@@ -6,11 +6,13 @@ import com.bortnik.chiron.application.security.Actor
 import com.bortnik.chiron.application.usecase.common.appointment.CheckAppointmentAvailabilityUseCase
 import com.bortnik.chiron.application.usecase.common.appointment.GetAppointmentUseCase
 import com.bortnik.chiron.application.usecase.common.appointment.UpdateAppointmentUseCase
+import com.bortnik.chiron.application.usecase.common.appointment.ResolveAppointmentServicesUseCase
 import com.bortnik.chiron.application.usecase.common.notification.CreateNotificationUseCase
 import com.bortnik.chiron.application.usecase.common.notification.NotifyAppointmentUseCase
 import com.bortnik.chiron.domain.dto.Patch
 import com.bortnik.chiron.domain.dto.appointment.UpdateAppointmentDto
 import com.bortnik.chiron.domain.dto.notification.CreateNotificationDto
+import com.bortnik.chiron.domain.entities.AppointmentService
 import com.bortnik.chiron.domain.entities.enums.AppointmentStatus
 import com.bortnik.chiron.domain.entities.enums.NotificationType
 import com.bortnik.chiron.domain.entities.enums.UserRole
@@ -18,6 +20,7 @@ import com.bortnik.chiron.domain.repositories.AppointmentRepository
 import com.bortnik.chiron.domain.repositories.NotificationRepository
 import com.bortnik.chiron.domain.repositories.PetRepository
 import com.bortnik.chiron.domain.repositories.ServiceRepository
+import com.bortnik.chiron.domain.repositories.ServiceSpeciesRepository
 import com.bortnik.chiron.domain.repositories.UserRepository
 import com.bortnik.chiron.domain.repositories.VeterinarianRepository
 import com.bortnik.chiron.domain.repositories.VeterinarianSpeciesPermissionRepository
@@ -31,6 +34,7 @@ import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.mockito.ArgumentCaptor
 import org.mockito.Mockito.any
+import org.mockito.Mockito.anyList
 import org.mockito.Mockito.eq
 import org.mockito.Mockito.mock
 import org.mockito.Mockito.times
@@ -38,6 +42,8 @@ import org.mockito.Mockito.verify
 import org.mockito.Mockito.`when`
 import org.springframework.context.ApplicationEventPublisher
 import java.util.UUID
+import java.time.Clock
+import java.time.ZoneOffset
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 
@@ -53,15 +59,17 @@ class AdminUpdateAppointmentUseCaseTest {
     private val notificationFallback =
         CreateNotificationDto(pet.ownerId, type = notification.type, title = "Title", body = "Body")
     private val actor = Actor(UUID.randomUUID(), UserRole.ADMIN, "Admin")
+    private var stored = appointment
     private val useCase = AdminUpdateAppointmentUseCase(
         GetAppointmentUseCase(appointments),
         UpdateAppointmentUseCase(
             appointments, pets, vets, mock(VeterinarianSpeciesPermissionRepository::class.java),
             mock(CheckAppointmentAvailabilityUseCase::class.java),
+            ResolveAppointmentServicesUseCase(services, mock(ServiceSpeciesRepository::class.java)),
+            Clock.fixed(appointment.startAt.plusSeconds(60), ZoneOffset.UTC),
         ),
         NotifyAppointmentUseCase(
             pets,
-            services,
             vets,
             users,
             CreateNotificationUseCase(notifications, publisher),
@@ -71,7 +79,12 @@ class AdminUpdateAppointmentUseCaseTest {
 
     @BeforeEach
     fun prepare() {
-        `when`(appointments.findById(appointment.id)).thenReturn(appointment)
+        `when`(appointments.findById(appointment.id)).thenAnswer { stored }
+        `when`(appointments.findByIdForUpdate(appointment.id)).thenAnswer { stored }
+        `when`(appointments.replaceServices(eq(appointment.id) ?: appointment.id, anyList())).thenAnswer {
+            stored = stored.copy(services = it.getArgument<List<AppointmentService>>(1))
+            stored
+        }
         `when`(
             appointments.update(
                 eq(appointment.id) ?: appointment.id,
@@ -80,16 +93,16 @@ class AdminUpdateAppointmentUseCaseTest {
         )
             .thenAnswer { invocation ->
                 val dto = invocation.getArgument<UpdateAppointmentDto>(1)
-                appointment.copy(
+                stored = stored.copy(
                     status = dto.status ?: appointment.status,
                     vetNotes = if (dto.vetNotes is Patch.Value) dto.vetNotes.value else appointment.vetNotes,
                     cancelledBy = if (dto.cancelledBy is Patch.Value) dto.cancelledBy.value else null,
                     cancelledAt = if (dto.cancelledAt is Patch.Value) dto.cancelledAt.value else null,
                     cancelReason = if (dto.cancelReason is Patch.Value) dto.cancelReason.value else null,
                 )
+                stored
             }
         `when`(pets.findById(pet.id)).thenReturn(pet)
-        `when`(services.findById(service.id)).thenReturn(service)
         `when`(vets.findById(veterinarian.id)).thenReturn(veterinarian)
         `when`(users.findById(user.id)).thenReturn(user)
         `when`(notifications.create(any(CreateNotificationDto::class.java) ?: notificationFallback)).thenReturn(
@@ -119,7 +132,10 @@ class AdminUpdateAppointmentUseCaseTest {
         val result = useCase.update(
             actor,
             appointment.id,
-            UpdateAppointmentDto(status = AppointmentStatus.COMPLETED, vetNotes = Patch.Value("Results")),
+            UpdateAppointmentDto(
+                status = AppointmentStatus.COMPLETED, vetNotes = Patch.Value("Results"),
+                performedServiceIds = listOf(service.id)
+            ),
         )
         assertEquals(AppointmentStatus.COMPLETED, result.status)
         val captor = ArgumentCaptor.forClass(CreateNotificationDto::class.java)

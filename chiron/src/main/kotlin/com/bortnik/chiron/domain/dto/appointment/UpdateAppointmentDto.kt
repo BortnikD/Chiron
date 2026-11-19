@@ -11,6 +11,8 @@ data class UpdateAppointmentDto(
     val startAt: Instant? = null,
     val endAt: Instant? = null,
     val status: AppointmentStatus? = null,
+    val serviceIds: List<UUID>? = null,
+    val performedServiceIds: List<UUID>? = null,
     val clientComment: Patch<String?> = Patch.Unchanged,
     val vetNotes: Patch<String?> = Patch.Unchanged,
     val cancelledBy: Patch<UUID?> = Patch.Unchanged,

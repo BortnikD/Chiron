@@ -13,16 +13,24 @@ import java.util.UUID
 @Transactional
 class ChangeAppointmentStatusUseCase(private val updateAppointmentUseCase: UpdateAppointmentUseCase) {
 
-    // Changes only the status and the notes. Cancellation metadata is recorded only when the appointment
-    // actually moves into CANCELLED, so repeated cancels do not overwrite it.
+    // The common update rechecks cancellation metadata against the locked appointment.
     fun change(
         appointment: Appointment,
         status: AppointmentStatus,
         actorId: UUID,
         vetNotes: Patch<String?>,
         cancelReason: String?,
+        serviceIds: List<UUID>? = null,
+        performedServiceIds: List<UUID>? = null,
+        endAt: Instant? = null,
     ): Appointment {
-        val dto = UpdateAppointmentDto(status = status, vetNotes = vetNotes)
+        val dto = UpdateAppointmentDto(
+            status = status,
+            vetNotes = vetNotes,
+            serviceIds = serviceIds,
+            performedServiceIds = performedServiceIds,
+            endAt = endAt,
+        )
         val cancelling = status == AppointmentStatus.CANCELLED && appointment.status != AppointmentStatus.CANCELLED
         return updateAppointmentUseCase.update(
             appointment.id,
@@ -35,6 +43,7 @@ class ChangeAppointmentStatusUseCase(private val updateAppointmentUseCase: Updat
             } else {
                 dto
             },
+            actorId,
         )
     }
 }

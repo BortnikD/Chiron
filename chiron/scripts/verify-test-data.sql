@@ -43,10 +43,19 @@ $$
             OR (SELECT count(*) FROM veterinarian WHERE id::text LIKE '5eed%') <> 8
             OR (SELECT count(*) FROM appointment WHERE veterinarian_id::text LIKE '5eed%') < 10000
             OR (SELECT count(DISTINCT veterinarian_id) FROM appointment WHERE veterinarian_id::text LIKE '5eed%') <> 8
-            OR (SELECT count(DISTINCT service_id) FROM appointment WHERE veterinarian_id::text LIKE '5eed%') <> 11
+            OR (SELECT count(DISTINCT item.service_id) FROM appointment_service item
+                    JOIN appointment a ON a.id = item.appointment_id WHERE a.veterinarian_id::text LIKE '5eed%') <> 11
             OR (SELECT count(DISTINCT status) FROM appointment WHERE veterinarian_id::text LIKE '5eed%') <> 5
             OR (SELECT count(DISTINCT type) FROM notification WHERE recipient_id::text LIKE '5eed%') <> 8 THEN
             RAISE EXCEPTION 'Demo data volume or scenario coverage is incomplete';
+        END IF;
+
+        IF NOT EXISTS (SELECT 1 FROM appointment_service item JOIN appointment a ON a.id = item.appointment_id
+                       WHERE a.veterinarian_id::text LIKE '5eed%' AND item.is_planned
+                       GROUP BY item.appointment_id HAVING count(*) > 1)
+            OR NOT EXISTS (SELECT 1 FROM appointment_service item JOIN appointment a ON a.id = item.appointment_id
+                           WHERE a.veterinarian_id::text LIKE '5eed%' AND NOT item.is_planned AND item.is_performed) THEN
+            RAISE EXCEPTION 'Demo multi-service and additional performed procedures are missing';
         END IF;
 
         IF (SELECT count(DISTINCT date_trunc('month', start_at AT TIME ZONE 'Europe/Moscow'))
@@ -74,7 +83,8 @@ $$
                             JOIN pet p ON p.id = a.pet_id
                             JOIN users owner ON owner.id = p.owner_id
                             JOIN veterinarian v ON v.id = a.veterinarian_id
-                            JOIN service s ON s.id = a.service_id
+                            JOIN appointment_service item ON item.appointment_id = a.id
+                            JOIN service s ON s.id = item.service_id
                             LEFT JOIN service_species ss ON ss.service_id = s.id AND ss.species_id = p.species_id
                             LEFT JOIN veterinarian_species_permission permission
                                       ON permission.veterinarian_id = v.id AND permission.species_id = p.species_id
@@ -82,8 +92,13 @@ $$
                      AND (
                        ss.service_id IS NULL OR permission.veterinarian_id IS NULL
                            OR v.specialization_id <> s.specialization_id
-                           OR extract(epoch FROM (a.end_at - a.start_at)) / 60
-                           <> coalesce(ss.duration_min, s.base_duration_min) + s.buffer_after_min
+                           OR (item.is_planned AND extract(epoch FROM (a.end_at - a.start_at)) / 60
+                           <> (SELECT sum(planned.duration_min_snapshot) + max(planned.buffer_after_min_snapshot)
+                               FROM appointment_service planned WHERE planned.appointment_id = a.id AND planned.is_planned))
+                           OR item.duration_min_snapshot <> coalesce(ss.duration_min, s.base_duration_min)
+                           OR item.buffer_after_min_snapshot <> s.buffer_after_min
+                           OR (a.status = 'COMPLETED' AND item.is_performed IS NULL)
+                           OR (a.status IN ('CANCELLED', 'NO_SHOW') AND item.is_performed IS DISTINCT FROM FALSE)
                            OR a.created_at < greatest(p.created_at, owner.created_at, v.created_at, s.created_at)
                            OR a.created_at >= a.start_at OR a.created_at > now() OR a.updated_at > now()
                            OR a.updated_at < a.created_at

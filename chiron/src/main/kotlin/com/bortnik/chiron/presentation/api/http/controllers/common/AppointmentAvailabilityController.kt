@@ -3,12 +3,15 @@ package com.bortnik.chiron.presentation.api.http.controllers.common
 import com.bortnik.chiron.application.usecase.common.appointment.CheckAppointmentAvailabilityUseCase
 import com.bortnik.chiron.application.usecase.common.appointment.FindAvailableSlotsUseCase
 import com.bortnik.chiron.domain.dto.appointment.AvailableSlotFilter
+import com.bortnik.chiron.domain.utils.ValidationConstants.AppointmentRules
 import com.bortnik.chiron.presentation.api.http.ApiResponse
 import com.bortnik.chiron.presentation.api.http.dto.response.AvailableSlotResponse
 import com.bortnik.chiron.presentation.api.http.mappers.toResponse
 import io.swagger.v3.oas.annotations.Operation
 import io.swagger.v3.oas.annotations.Parameter
 import io.swagger.v3.oas.annotations.tags.Tag
+import jakarta.validation.constraints.NotNull
+import jakarta.validation.constraints.Size
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.RequestParam
@@ -51,18 +54,19 @@ class AppointmentAvailabilityController(
         summary = "Find available slots",
         description = """
             Returns free slots in the period, sorted by start time, each with the veterinarians who can take it.
-            Without veterinarianId all active veterinarians permitted to treat the species are searched;
-            with it the veterinarian must be active and permitted to treat the species.
-            A slot lasts as long as the service takes for the species plus the service buffer, starts on the clinic
+            Without veterinarianId all active veterinarians permitted to treat the species and matching every selected
+            service specialization are searched; with it the veterinarian must meet the same requirements.
+            A slot lasts for the sum of species-specific service durations plus the maximum service buffer, starts on the clinic
             slot grid and satisfies the same rules as the slot availability check; slots in the past are omitted.
-            The service must be active and available for the species.
+            Every service must be active and available for the species. Select 1 to 20 distinct services.
             The period is given in clinic-local dates, both inclusive, and must not exceed 14 days.
         """,
     )
     @GetMapping("/slots")
     fun findAvailableSlots(
         @RequestParam speciesId: UUID,
-        @RequestParam serviceId: UUID,
+        @Size(min = 1, max = AppointmentRules.MAX_SERVICES)
+        @RequestParam serviceIds: List<@NotNull UUID>,
         @RequestParam(required = false) veterinarianId: UUID?,
         @Parameter(description = "First date of the period, ISO-8601 date") @RequestParam from: LocalDate,
         @Parameter(description = "Last date of the period, ISO-8601 date") @RequestParam to: LocalDate,
@@ -71,7 +75,7 @@ class AppointmentAvailabilityController(
             findAvailableSlotsUseCase.find(
                 AvailableSlotFilter(
                     speciesId = speciesId,
-                    serviceId = serviceId,
+                    serviceIds = serviceIds,
                     veterinarianId = veterinarianId,
                     from = from,
                     to = to,

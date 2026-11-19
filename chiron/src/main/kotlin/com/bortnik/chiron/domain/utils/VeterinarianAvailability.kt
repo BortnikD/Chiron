@@ -1,6 +1,6 @@
 package com.bortnik.chiron.domain.utils
 
-import com.bortnik.chiron.domain.entities.Appointment
+import com.bortnik.chiron.domain.dto.appointment.AppointmentInterval
 import com.bortnik.chiron.domain.entities.ScheduleException
 import com.bortnik.chiron.domain.entities.WorkSchedule
 import com.bortnik.chiron.domain.entities.enums.AppointmentStatus
@@ -17,7 +17,7 @@ import java.util.UUID
 class VeterinarianAvailability(
     private val workSchedules: List<WorkSchedule>,
     private val scheduleExceptions: List<ScheduleException>,
-    private val appointments: List<Appointment>,
+    private val appointments: List<AppointmentInterval>,
     private val zone: ZoneId,
     private val slotStepMin: Int,
 ) {
