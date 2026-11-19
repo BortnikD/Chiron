@@ -9,6 +9,7 @@ import type {
   PhotoLinks,
   StatisticsGranularity,
   CreateServiceRequest,
+  AppNotification,
 } from '@/shared/types';
 import type {
   Veterinarian,
@@ -399,4 +400,17 @@ export const adminApi = {
     const query = params.toString() ? `?${params.toString()}` : '';
     return api.get<SpeciesStatistics[]>(`/api/v1/admin/statistics/species${query}`);
   },
+
+  // ─── Персональные уведомления пользователям ──────────────────
+  sendNotification: (
+    recipientId: number | string,
+    data: {
+      title: string;
+      body: string;
+      appointmentId?: string | number | null;
+      petId?: string | number | null;
+      vaccinationId?: string | number | null;
+    }
+  ) =>
+    api.post<AppNotification>(`/api/v1/admin/notifications/users/${recipientId}`, data),
 };

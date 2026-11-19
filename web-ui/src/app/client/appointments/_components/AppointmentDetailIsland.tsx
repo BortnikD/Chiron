@@ -5,8 +5,8 @@ import Link from 'next/link';
 import { X, XCircle, Repeat } from 'lucide-react';
 import type { Appointment, Pet } from '@/modules/client/types';
 import type { Service, Veterinarian } from '@/modules/clinic/types';
+import { AppointmentStatusBadge } from '@/shared/components';
 import {
-  APPOINTMENT_STATUS_META,
   formatCurrency,
   formatDateShort,
   formatSlotTime,
@@ -56,8 +56,6 @@ export function AppointmentDetailIsland({
     (pet?.speciesId ? speciesMap[pet.speciesId] : undefined) ||
     '';
   const vetName = resolveVetName(appointment, veterinariansMap);
-  const statusLabel =
-    APPOINTMENT_STATUS_META[appointment.status]?.label || appointment.status;
 
   const dateLabel = formatDateShort(appointment.startAt);
   const timeRange = `${formatSlotTime(appointment.startAt)}–${formatSlotTime(appointment.endAt)}`;
@@ -110,7 +108,7 @@ export function AppointmentDetailIsland({
       <div className="island-body">
         <div className="col" style={{ gap: '16px' }}>
           <div className="row wrap">
-            <span className={`badge st badge-${appointment.status}`}>{statusLabel}</span>
+            <AppointmentStatusBadge status={appointment.status} />
             {appointment.followUpOf && (
               <span className="badge badge-accent">
                 <Repeat className="ic" style={{ width: '12px', height: '12px' }} />

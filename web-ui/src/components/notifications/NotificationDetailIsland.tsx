@@ -14,6 +14,7 @@ import {
   Clock,
   CircleDot,
   PawPrint,
+  Mail,
 } from 'lucide-react';
 import type { AppNotification, UserRole } from '@/shared/types';
 import { getNotifMeta, getNotificationHref } from './notifMeta';
@@ -24,6 +25,7 @@ export interface NotificationDetailIslandProps {
   role?: UserRole | null;
   onClose: () => void;
   onMarkRead: (id: string) => Promise<void>;
+  onOpenCompose?: () => void;
 }
 
 export const NotificationDetailIsland: React.FC<NotificationDetailIslandProps> = ({
@@ -31,13 +33,14 @@ export const NotificationDetailIsland: React.FC<NotificationDetailIslandProps> =
   role,
   onClose,
   onMarkRead,
+  onOpenCompose,
 }) => {
   const router = useRouter();
   const [marking, setMarking] = useState(false);
 
   if (!notification) {
     return (
-      <section className="island detail-island" style={{ width: 420 }} aria-label="Детали уведомления">
+      <section className="island detail-island" aria-label="Детали уведомления">
         <div className="empty" style={{ height: '100%', minHeight: '360px', justifyContent: 'center' }}>
           <div className="empty-art">
             <Bell className="ic ic-40" />
@@ -46,6 +49,17 @@ export const NotificationDetailIsland: React.FC<NotificationDetailIslandProps> =
           <span className="small muted" style={{ maxWidth: '280px', textAlign: 'center' }}>
             Нажмите на любое событие из списка слева, чтобы посмотреть подробный текст, дату и связанные записи
           </span>
+          {role === 'ADMIN' && onOpenCompose && (
+            <button
+              type="button"
+              className="btn btn-primary btn-sm"
+              style={{ marginTop: '12px' }}
+              onClick={onOpenCompose}
+            >
+              <Mail size={15} />
+              <span>Написать пользователю</span>
+            </button>
+          )}
         </div>
       </section>
     );
@@ -94,7 +108,7 @@ export const NotificationDetailIsland: React.FC<NotificationDetailIslandProps> =
     : null;
 
   return (
-    <section className="island detail-island" style={{ width: 420 }} aria-label="Детали уведомления">
+    <section className="island detail-island" aria-label="Детали уведомления">
       {/* Шапка островка */}
       <div className="island-head">
         <div className="row" style={{ alignItems: 'center', gap: '12px', minWidth: 0 }}>
@@ -147,7 +161,7 @@ export const NotificationDetailIsland: React.FC<NotificationDetailIslandProps> =
       </div>
 
       {/* Тело островка с подробностями */}
-      <div className="island-body col" style={{ gap: '18px', padding: '16px 20px' }}>
+      <div className="island-body col" style={{ gap: '16px', padding: '16px' }}>
         {/* Заголовок события */}
         <div className="col" style={{ gap: '6px' }}>
           <span className="menu-label" style={{ padding: 0 }}>Тема оповещения</span>
@@ -218,7 +232,9 @@ export const NotificationDetailIsland: React.FC<NotificationDetailIslandProps> =
         {/* Связанные сущности (приём, питомец, вакцинация) */}
         {(notification.appointmentId || notification.petId || notification.vaccinationId) && (
           <div className="col" style={{ gap: '8px' }}>
-            <span className="menu-label" style={{ padding: 0 }}>Связанные данные клиники</span>
+            <span className="menu-label" style={{ padding: 0 }}>
+              {role === 'CLIENT' ? 'Связанная запись' : 'Связанные данные клиники'}
+            </span>
 
             {notification.appointmentId && (
               <div
@@ -231,10 +247,12 @@ export const NotificationDetailIsland: React.FC<NotificationDetailIslandProps> =
                 }}
               >
                 <div className="row items-center" style={{ gap: '10px' }}>
-                  <Calendar size={18} className="text-primary" />
+                  <Calendar size={18} className="text-primary flex-none" />
                   <div className="col" style={{ gap: '2px' }}>
                     <b style={{ fontSize: '13.5px' }}>Запись на приём</b>
-                    <span className="small muted font-mono">ID: {notification.appointmentId.slice(0, 18)}…</span>
+                    {role !== 'CLIENT' && (
+                      <span className="small muted font-mono">ID: {notification.appointmentId.slice(0, 18)}…</span>
+                    )}
                   </div>
                 </div>
                 {href && (
@@ -244,7 +262,7 @@ export const NotificationDetailIsland: React.FC<NotificationDetailIslandProps> =
                     onClick={handleNavigate}
                   >
                     <ExternalLink size={13} />
-                    Открыть
+                    <span>Открыть</span>
                   </button>
                 )}
               </div>
@@ -261,21 +279,33 @@ export const NotificationDetailIsland: React.FC<NotificationDetailIslandProps> =
                 }}
               >
                 <div className="row items-center" style={{ gap: '10px' }}>
-                  <PawPrint size={18} className="text-primary" />
+                  <PawPrint size={18} className="text-primary flex-none" />
                   <div className="col" style={{ gap: '2px' }}>
-                    <b style={{ fontSize: '13.5px' }}>Пациент клиники</b>
-                    <span className="small muted font-mono">ID: {notification.petId.slice(0, 18)}…</span>
+                    <b style={{ fontSize: '13.5px' }}>
+                      {role === 'CLIENT' ? 'Карточка питомца' : 'Пациент клиники'}
+                    </b>
+                    {role !== 'CLIENT' && (
+                      <span className="small muted font-mono">ID: {notification.petId.slice(0, 18)}…</span>
+                    )}
                   </div>
                 </div>
-                {role === 'ADMIN' && (
+                {role === 'ADMIN' ? (
                   <Link
                     href={`/admin/pets?sel=${encodeURIComponent(notification.petId)}`}
                     className="btn btn-outline btn-xs"
                   >
                     <ExternalLink size={13} />
-                    Карта
+                    <span>Карта</span>
                   </Link>
-                )}
+                ) : role === 'CLIENT' ? (
+                  <Link
+                    href={`/client/pets?sel=${encodeURIComponent(notification.petId)}`}
+                    className="btn btn-outline btn-xs"
+                  >
+                    <ExternalLink size={13} />
+                    <span>Карта</span>
+                  </Link>
+                ) : null}
               </div>
             )}
 
@@ -290,12 +320,25 @@ export const NotificationDetailIsland: React.FC<NotificationDetailIslandProps> =
                 }}
               >
                 <div className="row items-center" style={{ gap: '10px' }}>
-                  <Syringe size={18} className="text-primary" />
+                  <Syringe size={18} className="text-primary flex-none" />
                   <div className="col" style={{ gap: '2px' }}>
-                    <b style={{ fontSize: '13.5px' }}>Запись вакцинации</b>
-                    <span className="small muted font-mono">ID: {notification.vaccinationId.slice(0, 18)}…</span>
+                    <b style={{ fontSize: '13.5px' }}>
+                      {role === 'CLIENT' ? 'Прививка' : 'Запись вакцинации'}
+                    </b>
+                    {role !== 'CLIENT' && (
+                      <span className="small muted font-mono">ID: {notification.vaccinationId.slice(0, 18)}…</span>
+                    )}
                   </div>
                 </div>
+                {role === 'CLIENT' && (
+                  <Link
+                    href={`/client/vaccinations?sel=${encodeURIComponent(notification.vaccinationId)}`}
+                    className="btn btn-outline btn-xs"
+                  >
+                    <ExternalLink size={13} />
+                    <span>Открыть</span>
+                  </Link>
+                )}
               </div>
             )}
           </div>

@@ -13,7 +13,7 @@ import type { Appointment, Pet } from '@/modules/client/types';
 import type { Veterinarian, Service, Species } from '@/modules/clinic/types';
 import type { User } from '@/shared/types';
 import { PetAvatar } from '@/components/ui/EntityAvatar';
-import { DataTable, type DataTableColumn, type PaginationFooterProps } from '@/shared/components';
+import { DataTable, AppointmentStatusBadge, type DataTableColumn, type PaginationFooterProps } from '@/shared/components';
 import {
   APPOINTMENT_STATUS_META,
   formatCurrency,
@@ -153,14 +153,7 @@ export const AdminAppointmentsTable: React.FC<AdminAppointmentsTableProps> = ({
         key: 'status',
         title: 'Статус',
         width: '1fr',
-        render: (a) => {
-          const sInfo = APPOINTMENT_STATUS_META[a.status] || {
-            label: a.status,
-            short: a.status,
-            cls: 'badge-outline',
-          };
-          return <span className={`badge st ${sInfo.cls}`}>{sInfo.short}</span>;
-        },
+        render: (a) => <AppointmentStatusBadge status={a.status} useShortLabel />,
       },
       {
         key: 'price',

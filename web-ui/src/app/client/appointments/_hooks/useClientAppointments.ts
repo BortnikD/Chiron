@@ -35,28 +35,13 @@ export function useClientAppointments(initialSelectedId?: string | null) {
   const { toast } = useToast();
 
   const {
-    services: dictServices,
-    veterinarians: dictVets,
-    species: dictSpecies,
+    services,
+    veterinarians,
+    species: speciesList,
   } = useDictionaries();
 
   const [pets, setPets] = useState<Pet[]>([]);
-  const [services, setServices] = useState<Service[]>(() => dictServices);
-  const [veterinarians, setVeterinarians] = useState<Veterinarian[]>(() => dictVets);
-  const [speciesList, setSpeciesList] = useState<Species[]>(() => dictSpecies);
   const [parentApptsMap, setParentApptsMap] = useState<Record<string, Appointment>>({});
-
-  useEffect(() => {
-    if (dictServices.length > 0) setServices(dictServices);
-  }, [dictServices]);
-
-  useEffect(() => {
-    if (dictVets.length > 0) setVeterinarians(dictVets);
-  }, [dictVets]);
-
-  useEffect(() => {
-    if (dictSpecies.length > 0) setSpeciesList(dictSpecies);
-  }, [dictSpecies]);
 
   const [selectedAppt, setSelectedAppt] = useState<Appointment | null>(null);
 

@@ -66,6 +66,55 @@ export function getUserInitials(
   return fallback;
 }
 
+/**
+ * Форматирует полное имя пользователя (Фамилия Имя [Отчество]) с защитой от отсутствующих частей.
+ */
+export function formatUserFullName(
+  user?: {
+    firstName?: string | null;
+    lastName?: string | null;
+    middleName?: string | null;
+    fullName?: string | null;
+    email?: string | null;
+  } | null,
+  fallback = '—'
+): string {
+  if (!user) return fallback;
+  if (user.fullName) return user.fullName;
+  const parts = [user.lastName, user.firstName, user.middleName].filter(Boolean);
+  if (parts.length > 0) return parts.join(' ');
+  return user.email || fallback;
+}
+
+/**
+ * Группирует массив элементов по датам (Сегодня, Вчера, Ранее) в московском часовом поясе.
+ */
+export function groupItemsByDate<T extends { createdAt?: string | null }>(
+  list: T[]
+): { label: string; items: T[] }[] {
+  const today = getMoscowTodayIso(0);
+  const yesterday = getMoscowTodayIso(-1);
+
+  const groups: { label: string; items: T[] }[] = [
+    { label: 'Сегодня', items: [] },
+    { label: 'Вчера', items: [] },
+    { label: 'Ранее', items: [] },
+  ];
+
+  list.forEach((item) => {
+    const itemDate = item.createdAt ? getMoscowDateKey(item.createdAt) : '';
+    if (itemDate === today) {
+      groups[0].items.push(item);
+    } else if (itemDate === yesterday) {
+      groups[1].items.push(item);
+    } else {
+      groups[2].items.push(item);
+    }
+  });
+
+  return groups.filter((g) => g.items.length > 0);
+}
+
 export function formatCurrency(amount?: number | null): string {
   if (amount == null || Number.isNaN(amount)) return '0 ₽';
   return `${Math.round(amount).toLocaleString('ru-RU')} ₽`;

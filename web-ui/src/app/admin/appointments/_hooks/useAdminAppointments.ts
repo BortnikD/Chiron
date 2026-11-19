@@ -38,28 +38,13 @@ export function useAdminAppointments() {
   const initialServiceId = searchParams.get('serviceId') || 'ALL';
 
   const {
-    species: dictSpecies,
-    services: dictServices,
-    veterinarians: dictVets,
+    species: speciesList,
+    services,
+    veterinarians,
   } = useDictionaries();
 
-  const [veterinarians, setVeterinarians] = useState<Veterinarian[]>(() => dictVets);
-  const [services, setServices] = useState<Service[]>(() => dictServices);
-  const [speciesList, setSpeciesList] = useState<Species[]>(() => dictSpecies);
   const [pets, setPets] = useState<Pet[]>([]);
   const [users, setUsers] = useState<User[]>([]);
-
-  useEffect(() => {
-    if (dictVets.length > 0) setVeterinarians(dictVets);
-  }, [dictVets]);
-
-  useEffect(() => {
-    if (dictServices.length > 0) setServices(dictServices);
-  }, [dictServices]);
-
-  useEffect(() => {
-    if (dictSpecies.length > 0) setSpeciesList(dictSpecies);
-  }, [dictSpecies]);
 
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [editAppt, setEditAppt] = useState<Appointment | null>(null);

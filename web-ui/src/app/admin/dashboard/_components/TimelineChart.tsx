@@ -105,7 +105,7 @@ function calculateYAxis(
   return { niceMax, ticks };
 }
 
-export function TimelineChart({
+export const TimelineChart = React.memo(function TimelineChart({
   timeline,
   metric: propMetric,
   onMetricChange,
@@ -508,4 +508,4 @@ export function TimelineChart({
       </div>
     </section>
   );
-}
+});

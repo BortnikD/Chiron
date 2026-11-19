@@ -14,6 +14,7 @@ export interface DashboardKpiRate {
   count: string;
   w: string;
   color: string;
+  countNum?: number;
 }
 
 export interface DashboardStatusBreakdown {
@@ -26,6 +27,7 @@ export interface DashboardStatusBreakdown {
 export interface DashboardKpiStats {
   revenue: string;
   expected: string;
+  totalPossible: string;
   recvW: string;
   expW: string;
   recvPct: string;
@@ -49,6 +51,7 @@ export interface DatePeriodSelectorProps {
   stTo: string;
   onFromChange: (date: string) => void;
   onToChange: (date: string) => void;
+  loading?: boolean;
 }
 
 export interface KpiMetricsGridProps {

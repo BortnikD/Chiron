@@ -5,7 +5,7 @@ import { Calendar, CalendarDays, Repeat, X } from 'lucide-react';
 import type { Appointment, Pet } from '@/modules/client/types';
 import type { AppointmentStatus } from '@/shared/types';
 import { PetAvatar } from '@/components/ui/EntityAvatar';
-import { DataTable, type DataTableColumn, type PaginationFooterProps } from '@/shared/components';
+import { DataTable, AppointmentStatusBadge, type DataTableColumn, type PaginationFooterProps } from '@/shared/components';
 import {
   APPOINTMENT_STATUS_META,
   formatCurrency,
@@ -158,14 +158,7 @@ export const VetAppointmentsTable: React.FC<VetAppointmentsTableProps> = ({
         key: 'status',
         title: 'Статус',
         width: '1.3fr',
-        render: (a) => {
-          const stMeta = APPOINTMENT_STATUS_META[a.status];
-          return (
-            <span className={`badge st badge-${a.status}`} title={stMeta?.label || a.status}>
-              {stMeta?.short || a.status}
-            </span>
-          );
-        },
+        render: (a) => <AppointmentStatusBadge status={a.status} useShortLabel />,
       },
       {
         key: 'price',

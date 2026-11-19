@@ -7,8 +7,8 @@ import type { Appointment, Pet } from '@/modules/client/types';
 import type { Veterinarian, Service, Species } from '@/modules/clinic/types';
 import type { User } from '@/shared/types';
 import { PetAvatar } from '@/components/ui/EntityAvatar';
+import { AppointmentStatusBadge } from '@/shared/components';
 import {
-  APPOINTMENT_STATUS_META,
   canTransitionAppointmentStatus,
   formatCurrency,
   formatDateShort,
@@ -63,11 +63,6 @@ export const AdminAppointmentDetailIsland: React.FC<AdminAppointmentDetailIsland
     '—';
   const dtStart = formatDateTimeCompact(appointment.startAt);
   const dtEnd = formatDateTimeCompact(appointment.endAt);
-  const sInfo = APPOINTMENT_STATUS_META[appointment.status] || {
-    label: appointment.status,
-    short: appointment.status,
-    cls: 'badge-outline',
-  };
 
   const tone = getSpeciesTone(pet?.species?.name || speciesName || pet?.speciesId || 'cat', speciesList);
 
@@ -105,7 +100,7 @@ export const AdminAppointmentDetailIsland: React.FC<AdminAppointmentDetailIsland
       <div className="island-body" style={{ paddingTop: 14 }}>
         <div className="col" style={{ gap: 16 }}>
           <div className="row wrap" style={{ gap: 8 }}>
-            <span className={`badge st ${sInfo.cls}`}>{sInfo.label}</span>
+            <AppointmentStatusBadge status={appointment.status} />
             {appointment.followUpOf && (
               <span className="badge badge-accent">Повторный приём</span>
             )}

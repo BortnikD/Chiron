@@ -1,17 +1,22 @@
 'use client';
 
-import React, { useMemo } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Shapes } from 'lucide-react';
 import { formatCurrency, pluralRu } from '@/shared/lib';
 import { pct } from './utils';
 import type { SpeciesDistributionIslandProps } from './types';
 
-const CHART_COLORS = ['var(--chart-1)', 'var(--chart-2)', 'var(--chart-3)', 'var(--chart-4)'];
+const CHART_COLORS = ['var(--chart-1)', 'var(--chart-2)', 'var(--chart-3)', 'var(--chart-4)', 'var(--chart-5, #eab308)'];
 
-export function SpeciesDistributionIsland({ speciesStats }: SpeciesDistributionIslandProps) {
+export const SpeciesDistributionIsland = React.memo(function SpeciesDistributionIsland({ speciesStats }: SpeciesDistributionIslandProps) {
+  const [hoveredId, setHoveredId] = useState<string | null>(null);
+
+  const radius = 62;
+  const circumference = 2 * Math.PI * radius;
+
   const speciesData = useMemo(() => {
     if (speciesStats.length === 0) {
-      return { totalRev: formatCurrency(0), donut: 'var(--muted)', rows: [] };
+      return { totalRevNum: 0, totalRev: formatCurrency(0), segments: [], rows: [] };
     }
 
     const list = speciesStats.map((sp, idx) => ({
@@ -23,39 +28,54 @@ export function SpeciesDistributionIsland({ speciesStats }: SpeciesDistributionI
       color: CHART_COLORS[idx % CHART_COLORS.length],
     }));
 
-    const totalRev = list.reduce((acc, sp) => acc + sp.rev, 0);
+    const totalRevNum = list.reduce((acc, sp) => acc + sp.rev, 0);
+    const gap = list.length > 1 ? 2 : 0;
+
     let acc = 0;
-    const segs = list.map((sp) => {
-      const from = acc;
-      acc += totalRev ? (sp.rev / totalRev) * 100 : 0;
-      return `${sp.color} ${from.toFixed(2)}% ${acc.toFixed(2)}%`;
+    const segments = list.map((sp) => {
+      const sharePct = totalRevNum > 0 ? (sp.rev / totalRevNum) * 100 : 0;
+      const strokeLength = (sharePct / 100) * circumference;
+      const strokeOffset = -(acc / 100) * circumference;
+      acc += sharePct;
+
+      return {
+        ...sp,
+        sharePct,
+        strokeLength: Math.max(0.5, strokeLength - gap),
+        strokeOffset,
+      };
     });
 
-    const spDonut = totalRev ? `conic-gradient(${segs.join(', ')})` : 'var(--muted)';
+    const rows = segments.map((sp) => ({
+      ...sp,
+      sub: `${sp.pets ? sp.pets + ' ' + pluralRu(sp.pets, 'питомец', 'питомца', 'питомцев') + ' · ' : ''}${sp.total} ${pluralRu(sp.total, 'запись', 'записи', 'записей')}`,
+      revenue: formatCurrency(sp.rev),
+      share: pct(sp.rev, totalRevNum),
+    }));
 
     return {
-      totalRev: formatCurrency(totalRev),
-      donut: spDonut,
-      rows: list.map((sp) => ({
-        id: sp.id,
-        name: sp.name,
-        color: sp.color,
-        sub: `${sp.pets ? sp.pets + ' ' + pluralRu(sp.pets, 'питомец', 'питомца', 'питомцев') + ' · ' : ''}${sp.total} ${pluralRu(sp.total, 'запись', 'записи', 'записей')}`,
-        revenue: formatCurrency(sp.rev),
-        share: pct(sp.rev, totalRev),
-      })),
+      totalRevNum,
+      totalRev: formatCurrency(totalRevNum),
+      segments,
+      rows,
     };
-  }, [speciesStats]);
+  }, [speciesStats, circumference]);
+
+  const activeItem = useMemo(() => {
+    if (!hoveredId) return null;
+    return speciesData.rows.find((s) => s.id === hoveredId) || null;
+  }, [hoveredId, speciesData.rows]);
 
   return (
     <section className="island" aria-label="Статистика по видам">
       <div className="island-head">
         <span className="island-title">
-          <Shapes className="ic w-4 h-4" />
+          <Shapes className="ic w-4 h-4 text-primary" />
           <span>По видам животных</span>
         </span>
         <span className="small muted">доля выручки</span>
       </div>
+
       <div className="island-body">
         {speciesData.rows.length === 0 ? (
           <div className="empty" style={{ padding: '24px 12px' }}>
@@ -64,69 +84,166 @@ export function SpeciesDistributionIsland({ speciesStats }: SpeciesDistributionI
           </div>
         ) : (
           <div className="col" style={{ gap: '18px', alignItems: 'center' }}>
+            {/* Четкий SVG Donut */}
             <div
               style={{
+                position: 'relative',
                 width: '168px',
                 height: '168px',
-                borderRadius: '50%',
-                background: speciesData.donut,
+                flex: 'none',
                 display: 'grid',
                 placeItems: 'center',
-                flex: 'none',
               }}
-              role="img"
-              aria-label="Доля выручки по видам животных"
             >
+              <svg
+                width="168"
+                height="168"
+                viewBox="0 0 168 168"
+                style={{ transform: 'rotate(-90deg)', overflow: 'visible' }}
+              >
+                {speciesData.segments.length === 0 ? (
+                  <circle
+                    cx="84"
+                    cy="84"
+                    r={radius}
+                    fill="none"
+                    stroke="var(--muted)"
+                    strokeWidth="18"
+                  />
+                ) : (
+                  speciesData.segments.map((s) => {
+                    const isHovered = hoveredId === s.id;
+                    return (
+                      <circle
+                        key={s.id}
+                        cx="84"
+                        cy="84"
+                        r={radius}
+                        fill="none"
+                        stroke={s.color}
+                        strokeWidth={isHovered ? 24 : 18}
+                        strokeDasharray={`${s.strokeLength} ${circumference}`}
+                        strokeDashoffset={s.strokeOffset}
+                        strokeLinecap="butt"
+                        style={{
+                          cursor: 'pointer',
+                          transition: 'stroke-width 0.15s ease, opacity 0.15s ease',
+                          opacity: hoveredId && !isHovered ? 0.35 : 1,
+                        }}
+                        onMouseEnter={() => setHoveredId(s.id)}
+                        onMouseLeave={() => setHoveredId(null)}
+                      />
+                    );
+                  })
+                )}
+              </svg>
+
+              {/* Центр кольца: детальная информация без перекрытия списка */}
               <div
                 style={{
-                  width: '112px',
-                  height: '112px',
+                  position: 'absolute',
+                  width: '104px',
+                  height: '104px',
                   borderRadius: '50%',
                   background: 'var(--card)',
-                  display: 'grid',
-                  placeItems: 'center',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  justifyContent: 'center',
                   textAlign: 'center',
+                  pointerEvents: 'none',
+                  padding: '4px',
                 }}
               >
-                <div className="col" style={{ gap: 0, alignItems: 'center' }}>
-                  <span className="kpi-value" style={{ fontSize: '18px' }}>
-                    {speciesData.totalRev}
-                  </span>
-                  <span className="small muted">выручка</span>
-                </div>
+                {activeItem ? (
+                  <div className="col" style={{ gap: '1px', alignItems: 'center' }}>
+                    <span
+                      style={{
+                        fontSize: '14.5px',
+                        fontWeight: 750,
+                        color: activeItem.color,
+                        lineHeight: 1.15,
+                        maxWidth: '92px',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        whiteSpace: 'nowrap',
+                      }}
+                    >
+                      {activeItem.name}
+                    </span>
+                    <span style={{ fontSize: '12px', fontWeight: 700, color: 'var(--foreground)' }}>
+                      {activeItem.revenue}
+                    </span>
+                    <span className="small muted" style={{ fontSize: '10.5px' }}>
+                      {activeItem.share}
+                    </span>
+                  </div>
+                ) : (
+                  <div className="col" style={{ gap: 0, alignItems: 'center' }}>
+                    <span className="kpi-value" style={{ fontSize: '17px' }}>
+                      {speciesData.totalRev}
+                    </span>
+                    <span className="small muted" style={{ fontSize: '11px' }}>выручка</span>
+                  </div>
+                )}
               </div>
             </div>
 
-            <div className="col" style={{ gap: '10px', width: '100%' }}>
-              {speciesData.rows.map((r) => (
-                <div key={r.id} className="row between" style={{ gap: '10px', alignItems: 'flex-start' }}>
-                  <div className="row" style={{ gap: '10px', alignItems: 'flex-start', minWidth: 0 }}>
-                    <i
-                      style={{
-                        width: '10px',
-                        height: '10px',
-                        borderRadius: '3px',
-                        background: r.color,
-                        display: 'inline-block',
-                        marginTop: '5px',
-                        flex: 'none',
-                      }}
-                    />
-                    <div className="col" style={{ gap: 0 }}>
-                      <span className="cell-main">{r.name}</span>
-                      <span className="cell-sub">{r.sub}</span>
+            {/* Список видов — чистый и без наложения */}
+            <div className="col" style={{ gap: '6px', width: '100%' }}>
+              {speciesData.rows.map((r) => {
+                const isHovered = hoveredId === r.id;
+                return (
+                  <div
+                    key={r.id}
+                    className="row between"
+                    style={{
+                      gap: '10px',
+                      alignItems: 'center',
+                      padding: '6px 8px',
+                      borderRadius: '8px',
+                      cursor: 'pointer',
+                      transition: 'background 0.12s ease',
+                      background: isHovered
+                        ? 'color-mix(in srgb, var(--primary) 12%, var(--muted))'
+                        : 'transparent',
+                    }}
+                    onMouseEnter={() => setHoveredId(r.id)}
+                    onMouseLeave={() => setHoveredId(null)}
+                  >
+                    <div className="row" style={{ gap: '10px', alignItems: 'center', minWidth: 0 }}>
+                      <i
+                        style={{
+                          width: '10px',
+                          height: '10px',
+                          borderRadius: '3px',
+                          background: r.color,
+                          display: 'inline-block',
+                          flex: 'none',
+                          transform: isHovered ? 'scale(1.25)' : 'none',
+                          transition: 'transform 0.12s ease',
+                        }}
+                      />
+                      <div className="col" style={{ gap: 0 }}>
+                        <span className="cell-main" style={{ fontWeight: isHovered ? 700 : 500 }}>
+                          {r.name}
+                        </span>
+                        <span className="cell-sub">{r.sub}</span>
+                      </div>
+                    </div>
+                    <div className="col" style={{ gap: 0, alignItems: 'flex-end', flexShrink: 0 }}>
+                      <span className="tnum cell-main" style={{ fontWeight: isHovered ? 700 : 500 }}>
+                        {r.revenue}
+                      </span>
+                      <span className="cell-sub tnum">{r.share}</span>
                     </div>
                   </div>
-                  <div className="col" style={{ gap: 0, alignItems: 'flex-end' }}>
-                    <span className="tnum cell-main">{r.revenue}</span>
-                    <span className="cell-sub tnum">{r.share}</span>
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </div>
         )}
       </div>
     </section>
   );
-}
+});

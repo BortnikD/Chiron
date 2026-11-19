@@ -13,8 +13,8 @@ import {
 import type { Pet, Appointment } from '@/modules/client/types';
 import type { Service, Species, Veterinarian } from '@/modules/clinic/types';
 import type { User } from '@/shared/types';
-import { USER_ROLE_META, formatApiError, formatDateShort, getUserInitials, normalizePhone } from '@/shared/lib';
-import { PhoneInput } from '@/shared/components';
+import { formatApiError, formatDateShort, formatUserFullName, getUserInitials, normalizePhone } from '@/shared/lib';
+import { PhoneInput, UserRoleBadge } from '@/shared/components';
 import { UserRelationsTabs } from './UserRelationsTabs';
 
 export interface AdminUserDetailIslandProps {
@@ -117,7 +117,6 @@ export const AdminUserDetailIsland: React.FC<AdminUserDetailIslandProps> = ({
     }
   };
 
-  const rInfo = USER_ROLE_META[user.role] || { label: user.role, cls: 'badge-outline' };
   const vetProfile = veterinarians.find((v) => v.userId === user.id);
   const fullPreview =
     [editForm.lastName, editForm.firstName, editForm.middleName].filter(Boolean).join(' ') || '—';
@@ -129,11 +128,11 @@ export const AdminUserDetailIsland: React.FC<AdminUserDetailIslandProps> = ({
           <span className="avatar avatar-lg">{getUserInitials(user, 'ПЛ')}</span>
           <div className="col" style={{ gap: 2 }}>
             <span className="h2">
-              {user.fullName || `${user.firstName} ${user.lastName}`}
+              {formatUserFullName(user)}
             </span>
-            <span className={`badge ${rInfo.cls}`} style={{ alignSelf: 'flex-start' }}>
-              {rInfo.label}
-            </span>
+            <div style={{ alignSelf: 'flex-start' }}>
+              <UserRoleBadge role={user.role} />
+            </div>
           </div>
         </div>
         <div className="row" style={{ gap: 4 }}>

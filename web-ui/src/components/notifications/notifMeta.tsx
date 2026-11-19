@@ -1,13 +1,20 @@
 import React from 'react';
 import {
   AlarmClock,
+  AlertTriangle,
   Bell,
   Calendar,
   CalendarCheck,
   CalendarPlus,
   CalendarX,
+  CheckCircle2,
+  FileText,
+  KeyRound,
+  MessageSquare,
+  PawPrint,
   Repeat,
   Syringe,
+  User,
   UserX,
 } from 'lucide-react';
 import type { AppNotification, UserRole } from '@/shared/types';
@@ -22,6 +29,65 @@ export interface NotifMeta {
 
 export function getNotifMeta(n: AppNotification): NotifMeta {
   const t = String(n.type || '');
+  if (t === 'ADMIN_MESSAGE') {
+    return {
+      cls: 't-admin-msg',
+      icon: <MessageSquare className="ic" />,
+      label: 'Сообщение администрации',
+      tone: 'blue',
+      shortType: 'Сообщение',
+    };
+  }
+  if (t === 'SCHEDULE_CONFLICT') {
+    return {
+      cls: 't-conflict',
+      icon: <AlertTriangle className="ic" />,
+      label: 'Конфликт в расписании',
+      tone: 'red',
+      shortType: 'Конфликт',
+    };
+  }
+  if (t === 'APPOINTMENT_COMPLETED') {
+    return {
+      cls: 't-completed',
+      icon: <CheckCircle2 className="ic" />,
+      label: 'Приём завершён',
+      tone: 'green',
+      shortType: 'Завершено',
+    };
+  }
+  if (t === 'APPOINTMENT_NOTES_UPDATED') {
+    return {
+      cls: 't-notes',
+      icon: <FileText className="ic" />,
+      label: 'Заметки к приёму',
+      tone: 'blue',
+      shortType: 'Заметки',
+    };
+  }
+  if (t === 'ACCOUNT_UPDATED' || t === 'PASSWORD_CHANGED') {
+    return {
+      cls: 't-account',
+      icon: t === 'PASSWORD_CHANGED' ? <KeyRound className="ic" /> : <User className="ic" />,
+      label: t === 'PASSWORD_CHANGED' ? 'Пароль изменён' : 'Профиль обновлён',
+      tone: 'amber',
+      shortType: 'Безопасность',
+    };
+  }
+  if (t === 'PET_UPDATED' || t === 'PET_ARCHIVED' || t === 'PET_RESTORED') {
+    return {
+      cls: 't-pet',
+      icon: <PawPrint className="ic" />,
+      label:
+        t === 'PET_ARCHIVED'
+          ? 'Питомец архивирован'
+          : t === 'PET_RESTORED'
+          ? 'Питомец восстановлен'
+          : 'Профиль питомца обновлён',
+      tone: 'purple',
+      shortType: 'Питомец',
+    };
+  }
   if (t === 'APPOINTMENT_NO_SHOW' || t.includes('NO_SHOW')) {
     return {
       cls: 't-noshow',

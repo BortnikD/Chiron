@@ -13,7 +13,7 @@ import {
 import type { Appointment, Pet } from '@/modules/client/types';
 import type { Service, Veterinarian } from '@/modules/clinic/types';
 import { PetAvatar } from '@/components/ui/EntityAvatar';
-import { PaginationFooter } from '@/shared/components';
+import { PaginationFooter, AppointmentStatusBadge } from '@/shared/components';
 import {
   APPOINTMENT_STATUS_META,
   formatCurrency,
@@ -167,9 +167,6 @@ export function AppointmentsList({
                 pet?.species?.name || pet?.speciesName || pet?.speciesId,
                 speciesMap
               );
-              const meta = APPOINTMENT_STATUS_META[a.status];
-              const statusShort = meta?.short || a.status;
-              const statusLabel = meta?.label || a.status;
               const price = a.priceSnapshot ?? a.price;
 
               return (
@@ -206,9 +203,7 @@ export function AppointmentsList({
                   <span>{svc?.name || a.serviceName || 'Услуга'}</span>
                   <span>{resolveVetName(a, vetsMap)}</span>
                   <span>
-                    <span className={`badge st badge-${a.status}`} title={statusLabel}>
-                      {statusShort}
-                    </span>
+                    <AppointmentStatusBadge status={a.status} useShortLabel />
                   </span>
                   <span className="right tnum">
                     {price != null ? formatCurrency(price) : '—'}
