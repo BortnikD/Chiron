@@ -11,6 +11,7 @@ import com.bortnik.chiron.domain.exceptions.rules.AppointmentSlotUnavailableExce
 import com.bortnik.chiron.domain.exceptions.rules.InvalidAppointmentStatusTransitionException
 import com.bortnik.chiron.domain.exceptions.rules.VeterinarianInactiveException
 import com.bortnik.chiron.domain.exceptions.rules.VeterinarianNotPermittedForSpeciesException
+import com.bortnik.chiron.domain.exceptions.rules.VeterinarianServiceSpecializationMismatchException
 import com.bortnik.chiron.domain.repositories.AppointmentRepository
 import com.bortnik.chiron.domain.repositories.PetRepository
 import com.bortnik.chiron.domain.repositories.ServiceRepository
@@ -169,14 +170,34 @@ class UpdateAppointmentUseCaseTest {
     }
 
     @Test
-    fun `after completion extra services and corrections preserve old snapshots and booked interval`() {
+    fun `after completion services from multiple specializations preserve snapshots and booked interval`() {
+        val dentistry = extra.copy(specializationId = UUID.randomUUID())
+        val imaging = extra.copy(id = UUID.randomUUID(), specializationId = UUID.randomUUID(), basePrice = 30.0)
+        val ids = listOf(service.id, dentistry.id, imaging.id)
+        `when`(services.findAllByIds(ids)).thenReturn(listOf(imaging, service, dentistry))
+        `when`(overrides.findAllBySpeciesId(pet.speciesId)).thenReturn(ids.map { ServiceSpecies(it, pet.speciesId) })
+        `when`(veterinarians.findById(veterinarian.id)).thenReturn(
+            veterinarian.copy(
+                specializationIds = listOf(
+                    service.specializationId,
+                    dentistry.specializationId,
+                    imaging.specializationId
+                )
+            ),
+        )
         stored = appointment.copy(
             status = AppointmentStatus.COMPLETED,
             services = appointment.services.map { it.copy(isPerformed = true, priceSnapshot = 80.0) })
         val result = useCase(appointment.endAt.plusSeconds(60)).update(
-            appointment.id, UpdateAppointmentDto(performedServiceIds = listOf(service.id, extra.id)), actorId,
+            appointment.id, UpdateAppointmentDto(performedServiceIds = ids), actorId,
         )
-        assertEquals(130.0, result.actualTotal)
+        assertEquals(160.0, result.actualTotal)
+        assertEquals(ids, result.services.filter { it.isPerformed == true }.map { it.serviceId })
+        assertEquals(
+            result, useCase(appointment.endAt.plusSeconds(60)).update(
+                appointment.id, UpdateAppointmentDto(performedServiceIds = ids), actorId,
+            )
+        )
         assertEquals(80.0, result.services.single { it.serviceId == service.id }.priceSnapshot)
         assertEquals(appointment.startAt, result.startAt)
         assertEquals(appointment.endAt, result.endAt)
@@ -191,11 +212,32 @@ class UpdateAppointmentUseCaseTest {
     }
 
     @Test
+    fun `performed selections reject a specialization outside the veterinarian profile`() {
+        val outside = extra.copy(specializationId = UUID.randomUUID())
+        val ids = listOf(service.id, outside.id)
+        `when`(services.findAllByIds(ids)).thenReturn(listOf(service, outside))
+        val afterStart = useCase(appointment.startAt.plusSeconds(60))
+
+        val error = assertFailsWith<VeterinarianServiceSpecializationMismatchException> {
+            afterStart.update(appointment.id, UpdateAppointmentDto(performedServiceIds = ids), actorId)
+        }
+        assertEquals(outside.specializationId, error.specializationId)
+        assertEquals(appointment, stored)
+
+        `when`(services.findAllByIds(listOf(service.id))).thenReturn(listOf(service.copy(specializationId = outside.specializationId)))
+        assertFailsWith<VeterinarianServiceSpecializationMismatchException> {
+            afterStart.update(appointment.id, UpdateAppointmentDto(performedServiceIds = listOf(service.id)), actorId)
+        }
+        assertEquals(appointment, stored)
+    }
+
+    @Test
     fun `recording a completed extra does not apply booking duration limits to medical facts`() {
         stored = appointment.copy(
             status = AppointmentStatus.COMPLETED,
             services = appointment.services.map { it.copy(isPerformed = true) })
-        `when`(services.findAllByIds(listOf(extra.id))).thenReturn(listOf(extra.copy(baseDurationMin = 2000)))
+        `when`(services.findAllByIds(listOf(service.id, extra.id)))
+            .thenReturn(listOf(service, extra.copy(baseDurationMin = 2000)))
 
         val result = useCase(appointment.endAt.plusSeconds(60)).update(
             appointment.id, UpdateAppointmentDto(performedServiceIds = listOf(service.id, extra.id)), actorId,

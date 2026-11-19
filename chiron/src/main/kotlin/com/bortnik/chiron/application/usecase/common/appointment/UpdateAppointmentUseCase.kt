@@ -12,7 +12,6 @@ import com.bortnik.chiron.domain.exceptions.rules.InvalidAppointmentStatusTransi
 import com.bortnik.chiron.domain.exceptions.rules.PetArchivedException
 import com.bortnik.chiron.domain.exceptions.rules.VeterinarianInactiveException
 import com.bortnik.chiron.domain.exceptions.rules.VeterinarianNotPermittedForSpeciesException
-import com.bortnik.chiron.domain.exceptions.rules.VeterinarianServiceSpecializationMismatchException
 import com.bortnik.chiron.domain.repositories.AppointmentRepository
 import com.bortnik.chiron.domain.repositories.PetRepository
 import com.bortnik.chiron.domain.repositories.VeterinarianRepository
@@ -131,10 +130,9 @@ class UpdateAppointmentUseCase(
             if (!permissionRepository.exists(veterinarian.id, pet.speciesId)) {
                 throw VeterinarianNotPermittedForSpeciesException(veterinarian.id, pet.speciesId)
             }
-            val resolved = resolveServices.resolve(services.filter { it.isPlanned }.map { it.serviceId }, pet.speciesId)
-            if (resolved.specializationId != veterinarian.specializationId) {
-                throw VeterinarianServiceSpecializationMismatchException(veterinarian.id, resolved.specializationId)
-            }
+            val resolved =
+                resolveServices.resolvePlanned(services.filter { it.isPlanned }.map { it.serviceId }, pet.speciesId)
+            veterinarian.requireSpecialization(resolved.specializationId)
             checkAvailability.check(veterinarian.id, startAt, endAt, excludeAppointmentId = id)
         }
 
@@ -158,7 +156,7 @@ class UpdateAppointmentUseCase(
         appointment: Appointment, serviceIds: List<UUID>, actorId: UUID?,
     ): List<AppointmentService> {
         val pet = petRepository.findById(appointment.petId) ?: throw PetNotFoundException(appointment.petId)
-        val resolved = resolveServices.resolve(serviceIds, pet.speciesId, actorId)
+        val resolved = resolveServices.resolvePlanned(serviceIds, pet.speciesId, actorId)
         val existing = appointment.services.associateBy { it.serviceId }
         return resolved.services.map { fresh ->
             val retained = existing[fresh.serviceId]
@@ -179,17 +177,13 @@ class UpdateAppointmentUseCase(
     private fun recordPerformedServices(
         appointment: Appointment, serviceIds: List<UUID>, actorId: UUID?,
     ): List<AppointmentService> {
-        val existingIds = appointment.services.map { it.serviceId }.toSet()
-        val addedIds = serviceIds.filter { it !in existingIds }
-        val added = if (addedIds.isEmpty()) emptyList() else {
-            val pet = petRepository.findById(appointment.petId) ?: throw PetNotFoundException(appointment.petId)
+        val added = if (serviceIds.isEmpty()) emptyList() else {
             val veterinarian = veterinarianRepository.findById(appointment.veterinarianId)
                 ?: throw VeterinarianNotFoundException(appointment.veterinarianId)
-            val resolved = resolveServices.resolve(addedIds, pet.speciesId, actorId)
-            if (resolved.specializationId != veterinarian.specializationId) {
-                throw VeterinarianServiceSpecializationMismatchException(veterinarian.id, resolved.specializationId)
-            }
-            resolved.services.map { it.copy(isPlanned = false, isPerformed = true) }
+            val pet = petRepository.findById(appointment.petId) ?: throw PetNotFoundException(appointment.petId)
+            resolveServices.resolvePerformedAdditions(
+                serviceIds, appointment.services.map { it.serviceId }.toSet(), pet.speciesId, veterinarian, actorId,
+            ).map { it.copy(isPlanned = false, isPerformed = true) }
         }
         val selected = serviceIds.toSet()
         val now = clock.instant()

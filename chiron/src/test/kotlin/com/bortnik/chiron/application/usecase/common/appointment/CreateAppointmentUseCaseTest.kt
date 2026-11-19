@@ -60,8 +60,15 @@ class CreateAppointmentUseCaseTest {
     )
 
     @Test
-    fun `valid booking checks availability and freezes species price and author per service`() {
+    fun `booking under a secondary specialization checks availability and freezes species price and author`() {
         allowBooking()
+        val primary = UUID.randomUUID()
+        `when`(veterinarians.findById(veterinarian.id)).thenReturn(
+            veterinarian.copy(
+                specializationId = primary,
+                specializationIds = listOf(primary, service.specializationId)
+            ),
+        )
         `when`(species.findAllBySpeciesId(pet.speciesId)).thenReturn(
             listOf(ServiceSpecies(service.id, pet.speciesId, price = 80.0)),
         )
@@ -99,7 +106,10 @@ class CreateAppointmentUseCaseTest {
     @Test
     fun `booking doctor must match the selected service specialization`() {
         allowBooking()
-        `when`(veterinarians.findById(veterinarian.id)).thenReturn(veterinarian.copy(specializationId = UUID.randomUUID()))
+        val other = UUID.randomUUID()
+        `when`(veterinarians.findById(veterinarian.id)).thenReturn(
+            veterinarian.copy(specializationId = other, specializationIds = listOf(other)),
+        )
 
         assertFailsWith<VeterinarianServiceSpecializationMismatchException> { useCase.create(dto) }
         verifyNoInteractions(appointments, availability)

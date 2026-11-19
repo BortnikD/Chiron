@@ -71,9 +71,15 @@ class FindAvailableSlotsUseCaseTest {
     }
 
     @Test
-    fun `base duration is used when no species duration override exists`() {
+    fun `slots for a secondary specialization use the base duration when there is no species override`() {
         allowService(duration = null)
-        `when`(vets.findById(veterinarian.id)).thenReturn(veterinarian)
+        val primary = UUID.randomUUID()
+        `when`(vets.findById(veterinarian.id)).thenReturn(
+            veterinarian.copy(
+                specializationId = primary,
+                specializationIds = listOf(primary, service.specializationId)
+            ),
+        )
         `when`(permissions.exists(veterinarian.id, pet.speciesId)).thenReturn(true)
         allowHours(veterinarian.id, date, 9, 10)
         val slots = useCase.find(filter.copy(veterinarianId = veterinarian.id))
@@ -115,7 +121,10 @@ class FindAvailableSlotsUseCaseTest {
     @Test
     fun `explicit doctor must match the specialization of all selected services`() {
         allowService(duration = 15)
-        `when`(vets.findById(veterinarian.id)).thenReturn(veterinarian.copy(specializationId = UUID.randomUUID()))
+        val other = UUID.randomUUID()
+        `when`(vets.findById(veterinarian.id)).thenReturn(
+            veterinarian.copy(specializationId = other, specializationIds = listOf(other)),
+        )
         `when`(permissions.exists(veterinarian.id, pet.speciesId)).thenReturn(true)
 
         assertFailsWith<VeterinarianServiceSpecializationMismatchException> {

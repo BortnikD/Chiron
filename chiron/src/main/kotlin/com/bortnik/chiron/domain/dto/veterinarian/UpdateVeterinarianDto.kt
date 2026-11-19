@@ -9,4 +9,5 @@ data class UpdateVeterinarianDto(
     val bio: Patch<String?> = Patch.Unchanged,
     val experienceYears: Int? = null,
     val isActive: Boolean? = null,
+    val specializationIds: List<UUID>? = null,
 )

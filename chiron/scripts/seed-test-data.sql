@@ -239,6 +239,11 @@ FROM (VALUES (5, 1, 'Ветеринарный терапевт и специал
              (8, 1, 'Специалист по экзотическим млекопитающим и птицам', 8)) AS v(n, specialization_n, bio, experience)
          JOIN users u ON u.id = ('5eed0004-0000-0000-0000-00000000000' || n)::uuid;
 
+INSERT INTO veterinarian_specialization (veterinarian_id, specialization_id)
+SELECT id, specialization_id
+FROM veterinarian
+WHERE id::text LIKE '5eed%';
+
 INSERT INTO veterinarian_species_permission (veterinarian_id, species_id)
 VALUES ('5eed0006-0000-0000-0000-000000000001', '5eed0001-0000-0000-0000-000000000001'),
        ('5eed0006-0000-0000-0000-000000000001', '5eed0001-0000-0000-0000-000000000002'),

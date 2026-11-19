@@ -88,10 +88,13 @@ $$
                             LEFT JOIN service_species ss ON ss.service_id = s.id AND ss.species_id = p.species_id
                             LEFT JOIN veterinarian_species_permission permission
                                       ON permission.veterinarian_id = v.id AND permission.species_id = p.species_id
+                            LEFT JOIN veterinarian_specialization assignment
+                                      ON assignment.veterinarian_id = v.id
+                                          AND assignment.specialization_id = s.specialization_id
                    WHERE a.veterinarian_id::text LIKE '5eed%'
                      AND (
                        ss.service_id IS NULL OR permission.veterinarian_id IS NULL
-                           OR v.specialization_id <> s.specialization_id
+                           OR assignment.veterinarian_id IS NULL
                            OR (item.is_planned AND extract(epoch FROM (a.end_at - a.start_at)) / 60
                            <> (SELECT sum(planned.duration_min_snapshot) + max(planned.buffer_after_min_snapshot)
                                FROM appointment_service planned WHERE planned.appointment_id = a.id AND planned.is_planned))

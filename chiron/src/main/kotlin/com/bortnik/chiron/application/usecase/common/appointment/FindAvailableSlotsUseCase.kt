@@ -9,7 +9,6 @@ import com.bortnik.chiron.domain.exceptions.notfound.SpeciesNotFoundException
 import com.bortnik.chiron.domain.exceptions.notfound.VeterinarianNotFoundException
 import com.bortnik.chiron.domain.exceptions.rules.VeterinarianInactiveException
 import com.bortnik.chiron.domain.exceptions.rules.VeterinarianNotPermittedForSpeciesException
-import com.bortnik.chiron.domain.exceptions.rules.VeterinarianServiceSpecializationMismatchException
 import com.bortnik.chiron.domain.repositories.SpeciesRepository
 import com.bortnik.chiron.domain.repositories.VeterinarianRepository
 import com.bortnik.chiron.domain.repositories.VeterinarianSpeciesPermissionRepository
@@ -33,7 +32,7 @@ class FindAvailableSlotsUseCase(
     fun find(filter: AvailableSlotFilter): List<AvailableSlot> {
         AppointmentValidator.validate(filter)
         if (speciesRepository.findById(filter.speciesId) == null) throw SpeciesNotFoundException(filter.speciesId)
-        val resolved = resolveServices.resolve(filter.serviceIds, filter.speciesId)
+        val resolved = resolveServices.resolvePlanned(filter.serviceIds, filter.speciesId)
         AppointmentValidator.validateDurationMinutes(resolved.durationMin.toLong() + resolved.bufferAfterMin)
         val duration = Duration.ofMinutes(resolved.durationMin.toLong() + resolved.bufferAfterMin)
         val now = Instant.now()
@@ -65,9 +64,7 @@ class FindAvailableSlotsUseCase(
         if (!permissionRepository.exists(veterinarian.id, filter.speciesId)) {
             throw VeterinarianNotPermittedForSpeciesException(veterinarian.id, filter.speciesId)
         }
-        if (veterinarian.specializationId != specializationId) {
-            throw VeterinarianServiceSpecializationMismatchException(veterinarian.id, specializationId)
-        }
+        veterinarian.requireSpecialization(specializationId)
         return listOf(veterinarian)
     }
 }

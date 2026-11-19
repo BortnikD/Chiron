@@ -11,7 +11,6 @@ import com.bortnik.chiron.domain.exceptions.rules.FollowUpNotAllowedException
 import com.bortnik.chiron.domain.exceptions.rules.PetArchivedException
 import com.bortnik.chiron.domain.exceptions.rules.VeterinarianInactiveException
 import com.bortnik.chiron.domain.exceptions.rules.VeterinarianNotPermittedForSpeciesException
-import com.bortnik.chiron.domain.exceptions.rules.VeterinarianServiceSpecializationMismatchException
 import com.bortnik.chiron.domain.repositories.AppointmentRepository
 import com.bortnik.chiron.domain.repositories.PetRepository
 import com.bortnik.chiron.domain.repositories.VeterinarianRepository
@@ -52,11 +51,9 @@ class CreateAppointmentUseCase(
         if (!permissionRepository.exists(veterinarian.id, pet.speciesId)) {
             throw VeterinarianNotPermittedForSpeciesException(veterinarian.id, pet.speciesId)
         }
-        val resolved = resolveServices.resolve(dto.serviceIds, pet.speciesId, actorId)
+        val resolved = resolveServices.resolvePlanned(dto.serviceIds, pet.speciesId, actorId)
         AppointmentValidator.validateDurationMinutes(resolved.durationMin.toLong() + resolved.bufferAfterMin)
-        if (veterinarian.specializationId != resolved.specializationId) {
-            throw VeterinarianServiceSpecializationMismatchException(veterinarian.id, resolved.specializationId)
-        }
+        veterinarian.requireSpecialization(resolved.specializationId)
         val endAt = dto.startAt + Duration.ofMinutes(resolved.durationMin.toLong() + resolved.bufferAfterMin)
         validateAll {
             ensure(

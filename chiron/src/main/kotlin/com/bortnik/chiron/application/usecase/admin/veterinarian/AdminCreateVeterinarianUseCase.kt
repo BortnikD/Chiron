@@ -5,8 +5,10 @@ import com.bortnik.chiron.domain.dto.veterinarian.CreateVeterinarianDto
 import com.bortnik.chiron.domain.dto.veterinarian.VeterinarianDetailsDto
 import com.bortnik.chiron.domain.entities.enums.UserRole
 import com.bortnik.chiron.domain.exceptions.alreadyexists.VeterinarianAlreadyExistsException
+import com.bortnik.chiron.domain.exceptions.notfound.SpecializationNotFoundException
 import com.bortnik.chiron.domain.exceptions.notfound.UserNotFoundException
 import com.bortnik.chiron.domain.exceptions.rules.UserRoleMismatchException
+import com.bortnik.chiron.domain.repositories.SpecializationRepository
 import com.bortnik.chiron.domain.repositories.UserRepository
 import com.bortnik.chiron.domain.repositories.VeterinarianRepository
 import com.bortnik.chiron.domain.utils.validators.VeterinarianValidator
@@ -19,6 +21,7 @@ import org.springframework.transaction.annotation.Transactional
 class AdminCreateVeterinarianUseCase(
     private val veterinarianRepository: VeterinarianRepository,
     private val userRepository: UserRepository,
+    private val specializationRepository: SpecializationRepository,
 ) {
 
     private val log = LoggerFactory.getLogger(javaClass)
@@ -34,6 +37,8 @@ class AdminCreateVeterinarianUseCase(
         if (veterinarianRepository.findByUserId(dto.userId) != null) {
             throw VeterinarianAlreadyExistsException.byUserId(dto.userId)
         }
+        val existingIds = specializationRepository.findAllByIds(dto.specializationIds).map { it.id }.toSet()
+        dto.specializationIds.firstOrNull { it !in existingIds }?.let { throw SpecializationNotFoundException(it) }
         val veterinarian = veterinarianRepository.create(dto)
         log.info(
             "Admin {} ({}) created veterinarian profile {} for user {} ({})",

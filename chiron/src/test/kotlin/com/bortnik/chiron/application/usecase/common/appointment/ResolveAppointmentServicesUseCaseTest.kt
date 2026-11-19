@@ -36,7 +36,7 @@ class ResolveAppointmentServicesUseCaseTest {
             )
         )
 
-        val result = useCase.resolve(ids, pet.speciesId, pet.ownerId)
+        val result = useCase.resolvePlanned(ids, pet.speciesId, pet.ownerId)
 
         assertEquals(ids, result.services.map { it.serviceId })
         assertEquals(listOf(service.name, other.name), result.services.map { it.nameSnapshot })
@@ -51,7 +51,7 @@ class ResolveAppointmentServicesUseCaseTest {
     @Test
     fun `empty duplicate and oversized selections are rejected before database access`() {
         for (selection in listOf(emptyList(), listOf(service.id, service.id), List(21) { UUID.randomUUID() })) {
-            assertFailsWith<ValidationException> { useCase.resolve(selection, pet.speciesId) }
+            assertFailsWith<ValidationException> { useCase.resolvePlanned(selection, pet.speciesId) }
         }
         verifyNoInteractions(services, overrides)
     }
@@ -68,15 +68,15 @@ class ResolveAppointmentServicesUseCaseTest {
             )
         )
 
-        assertFailsWith<ServiceNotFoundException> { useCase.resolve(ids, pet.speciesId) }
+        assertFailsWith<ServiceNotFoundException> { useCase.resolvePlanned(ids, pet.speciesId) }
     }
 
     @Test
-    fun `services from different specializations cannot share one appointment`() {
+    fun `services from different specializations cannot share one appointment plan`() {
         `when`(services.findAllByIds(ids)).thenReturn(listOf(service, other.copy(specializationId = UUID.randomUUID())))
         `when`(overrides.findAllBySpeciesId(pet.speciesId)).thenReturn(ids.map { ServiceSpecies(it, pet.speciesId) })
 
-        val error = assertFailsWith<ValidationException> { useCase.resolve(ids, pet.speciesId) }
+        val error = assertFailsWith<ValidationException> { useCase.resolvePlanned(ids, pet.speciesId) }
 
         assertEquals(listOf("serviceIds"), error.errors.map { it.field })
     }
@@ -91,7 +91,7 @@ class ResolveAppointmentServicesUseCaseTest {
         )
         `when`(overrides.findAllBySpeciesId(pet.speciesId)).thenReturn(ids.map { ServiceSpecies(it, pet.speciesId) })
 
-        val result = useCase.resolve(ids, pet.speciesId)
+        val result = useCase.resolvePlanned(ids, pet.speciesId)
 
         assertEquals(1500, result.durationMin)
         assertEquals(15, result.bufferAfterMin)

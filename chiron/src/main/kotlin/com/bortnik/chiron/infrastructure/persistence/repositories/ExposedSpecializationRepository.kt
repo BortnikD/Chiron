@@ -10,6 +10,7 @@ import com.bortnik.chiron.infrastructure.persistence.mappers.toSpecialization
 import com.bortnik.chiron.infrastructure.persistence.models.ExposedSpecializationTable
 import org.jetbrains.exposed.v1.core.SortOrder
 import org.jetbrains.exposed.v1.core.eq
+import org.jetbrains.exposed.v1.core.inList
 import org.jetbrains.exposed.v1.jdbc.deleteWhere
 import org.jetbrains.exposed.v1.jdbc.insertReturning
 import org.jetbrains.exposed.v1.jdbc.selectAll
@@ -40,6 +41,13 @@ class ExposedSpecializationRepository : SpecializationRepository {
     override fun findAll(): List<Specialization> = exposedSql {
         ExposedSpecializationTable.selectAll()
             .orderBy(ExposedSpecializationTable.name, SortOrder.ASC)
+            .map { it.toSpecialization() }
+    }
+
+    override fun findAllByIds(ids: List<UUID>): List<Specialization> = exposedSql {
+        if (ids.isEmpty()) return@exposedSql emptyList()
+        ExposedSpecializationTable.selectAll()
+            .where { ExposedSpecializationTable.id inList ids }
             .map { it.toSpecialization() }
     }
 

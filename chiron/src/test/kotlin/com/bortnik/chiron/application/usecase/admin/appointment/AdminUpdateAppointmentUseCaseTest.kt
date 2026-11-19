@@ -129,6 +129,7 @@ class AdminUpdateAppointmentUseCaseTest {
 
     @Test
     fun `completion with notes reaches stored notifications through real shared use cases`() {
+        `when`(services.findAllByIds(listOf(service.id))).thenReturn(listOf(service))
         val result = useCase.update(
             actor,
             appointment.id,
