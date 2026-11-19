@@ -7,6 +7,7 @@ import com.bortnik.chiron.application.usecase.common.notification.GetOwnNotifica
 import com.bortnik.chiron.domain.dto.client.ClientAppointmentTotalsDto
 import com.bortnik.chiron.domain.dto.client.ClientVaccinationTotalsDto
 import com.bortnik.chiron.domain.entities.Appointment
+import com.bortnik.chiron.domain.entities.AppointmentService
 import com.bortnik.chiron.domain.entities.enums.AppointmentStatus
 import com.bortnik.chiron.domain.entities.enums.UserRole
 import com.bortnik.chiron.domain.repositories.ClientSummaryRepository
@@ -132,7 +133,13 @@ class ClientGetSummaryUseCaseTest {
         `when`(summaryRepository.countActivePets(client.userId)).thenReturn(0)
         `when`(summaryRepository.countAppointments(client.userId, now)).thenReturn(ClientAppointmentTotalsDto())
         `when`(summaryRepository.findNextAppointment(client.userId, now)).thenReturn(null)
-        `when`(summaryRepository.countVaccinations(client.userId, today, dueTo)).thenReturn(ClientVaccinationTotalsDto())
+        `when`(
+            summaryRepository.countVaccinations(
+                client.userId,
+                today,
+                dueTo
+            )
+        ).thenReturn(ClientVaccinationTotalsDto())
         `when`(notifications.countUnread(client.userId)).thenReturn(0)
     }
 
@@ -150,11 +157,10 @@ class ClientGetSummaryUseCaseTest {
         id = UUID.randomUUID(),
         veterinarianId = UUID.randomUUID(),
         petId = UUID.randomUUID(),
-        serviceId = UUID.randomUUID(),
+        services = listOf(AppointmentService(UUID.randomUUID(), "Visit", 1000.0, 30, 0)),
         startAt = now,
         endAt = now.plusSeconds(1800),
         status = AppointmentStatus.CONFIRMED,
-        priceSnapshot = 1000.0,
         createdAt = now.minusSeconds(3600),
         updatedAt = now.minusSeconds(3600),
     )

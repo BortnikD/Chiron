@@ -95,7 +95,7 @@ class AppointmentValidatorTest {
     }
 
     private fun slotFilter(from: LocalDate, to: LocalDate) =
-        AvailableSlotFilter(speciesId = UUID.randomUUID(), serviceId = UUID.randomUUID(), from = from, to = to)
+        AvailableSlotFilter(speciesId = UUID.randomUUID(), serviceIds = listOf(UUID.randomUUID()), from = from, to = to)
 
     private companion object {
         val NOW: Instant = Instant.parse("2026-09-25T10:00:00Z")

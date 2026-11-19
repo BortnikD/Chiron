@@ -2,6 +2,7 @@ package com.bortnik.chiron.domain.utils
 
 import com.bortnik.chiron.domain.dto.notification.NotificationTarget
 import com.bortnik.chiron.domain.entities.Appointment
+import com.bortnik.chiron.domain.entities.AppointmentService
 import com.bortnik.chiron.domain.entities.enums.AppointmentStatus
 import com.bortnik.chiron.domain.entities.enums.NotificationType
 import org.junit.jupiter.api.Test
@@ -138,6 +139,43 @@ class NotificationRulesTest {
     }
 
     @Test
+    fun `performed service changes notify both parties except the author`() {
+        val before = appointment(AppointmentStatus.COMPLETED)
+        val after = before.copy(services = before.services.map { it.copy(isPerformed = true) })
+
+        assertEquals(
+            listOf(NotificationTarget(NotificationType.APPOINTMENT_SERVICES_UPDATED, setOf(OWNER))),
+            rules(before, after, actorId = VET_USER),
+        )
+        assertEquals(
+            listOf(NotificationTarget(NotificationType.APPOINTMENT_SERVICES_UPDATED, setOf(OWNER, VET_USER))),
+            rules(before, after, actorId = ADMIN),
+        )
+    }
+
+    @Test
+    fun `completion includes confirmed services without a duplicate services alert`() {
+        val before = appointment(AppointmentStatus.CONFIRMED)
+        val after = before.copy(
+            status = AppointmentStatus.COMPLETED,
+            services = before.services.map { it.copy(isPerformed = true) })
+
+        assertEquals(
+            listOf(NotificationTarget(NotificationType.APPOINTMENT_COMPLETED, setOf(OWNER))),
+            rules(before, after, actorId = VET_USER),
+        )
+    }
+
+    @Test
+    fun `service order and audit metadata changes alone do not produce alerts`() {
+        val before = appointment()
+        val after =
+            before.copy(services = before.services.map { it.copy(updatedBy = ADMIN, updatedAt = Instant.now()) })
+
+        assertTrue(rules(before, after, actorId = ADMIN).isEmpty())
+    }
+
+    @Test
     fun `moving to another veterinarian also notifies the previous one`() {
         val before = appointment()
         val after = before.copy(veterinarianId = UUID.randomUUID())
@@ -191,12 +229,11 @@ class NotificationRulesTest {
             id = UUID.randomUUID(),
             veterinarianId = UUID.randomUUID(),
             petId = UUID.randomUUID(),
-            serviceId = UUID.randomUUID(),
+            services = listOf(AppointmentService(UUID.randomUUID(), "Visit", 1500.0, 30, 0)),
             followUpOf = followUpOf,
             startAt = startAt,
             endAt = startAt + Duration.ofMinutes(30),
             status = status,
-            priceSnapshot = 1500.0,
             createdAt = startAt,
             updatedAt = startAt,
         )

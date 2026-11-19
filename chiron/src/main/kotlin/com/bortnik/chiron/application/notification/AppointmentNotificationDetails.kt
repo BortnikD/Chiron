@@ -10,4 +10,6 @@ data class AppointmentNotificationDetails(
     val startAt: Instant,
     val cancelReason: String? = null,
     val status: AppointmentStatus,
+    val estimatedTotal: Double? = null,
+    val actualTotal: Double? = null,
 )

@@ -10,6 +10,7 @@ import com.bortnik.chiron.infrastructure.persistence.models.ExposedAppointmentTa
 import com.bortnik.chiron.infrastructure.persistence.models.ExposedPetTable
 import com.bortnik.chiron.infrastructure.persistence.models.ExposedVaccinationTable
 import com.bortnik.chiron.infrastructure.persistence.utils.withoutNewerVaccination
+import com.bortnik.chiron.infrastructure.persistence.utils.findAppointmentServices
 import org.jetbrains.exposed.v1.core.SortOrder
 import org.jetbrains.exposed.v1.core.and
 import org.jetbrains.exposed.v1.core.count
@@ -37,12 +38,11 @@ class ExposedPetSummaryRepository : PetSummaryRepository {
             .where { ExposedAppointmentTable.petId inSubQuery ownedPets }
             .groupBy(ExposedAppointmentTable.petId, ExposedAppointmentTable.status)
             .groupBy { it[ExposedAppointmentTable.petId].value }
-        val nextAppointments = ExposedAppointmentTable
+        val nextAppointmentRows = ExposedAppointmentTable
             .select(
                 ExposedAppointmentTable.petId,
                 ExposedAppointmentTable.id,
                 ExposedAppointmentTable.startAt,
-                ExposedAppointmentTable.serviceId,
             )
             .where {
                 (ExposedAppointmentTable.petId inSubQuery ownedPets) and
@@ -54,13 +54,16 @@ class ExposedPetSummaryRepository : PetSummaryRepository {
             }
             .withDistinctOn(ExposedAppointmentTable.petId to SortOrder.ASC)
             .orderBy(ExposedAppointmentTable.startAt to SortOrder.ASC, ExposedAppointmentTable.id to SortOrder.ASC)
-            .associate {
-                it[ExposedAppointmentTable.petId].value to PetNextAppointmentDto(
-                    id = it[ExposedAppointmentTable.id].value,
-                    startAt = it[ExposedAppointmentTable.startAt].toInstant(),
-                    serviceId = it[ExposedAppointmentTable.serviceId].value,
-                )
-            }
+            .toList()
+        val services = findAppointmentServices(nextAppointmentRows.map { it[ExposedAppointmentTable.id].value })
+        val nextAppointments = nextAppointmentRows.associate {
+            it[ExposedAppointmentTable.petId].value to PetNextAppointmentDto(
+                id = it[ExposedAppointmentTable.id].value,
+                startAt = it[ExposedAppointmentTable.startAt].toInstant(),
+                serviceIds = services[it[ExposedAppointmentTable.id].value].orEmpty()
+                    .filter { service -> service.isPlanned }.map { service -> service.serviceId },
+            )
+        }
         val vaccinationCount = ExposedVaccinationTable.id.count()
         val vaccinationCounts = ExposedVaccinationTable
             .select(ExposedVaccinationTable.petId, vaccinationCount)

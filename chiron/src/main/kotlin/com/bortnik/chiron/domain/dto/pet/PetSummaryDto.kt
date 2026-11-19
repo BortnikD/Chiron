@@ -7,7 +7,7 @@ import java.util.UUID
 data class PetNextAppointmentDto(
     val id: UUID,
     val startAt: Instant,
-    val serviceId: UUID,
+    val serviceIds: List<UUID>,
 )
 
 data class PetSummaryDto(

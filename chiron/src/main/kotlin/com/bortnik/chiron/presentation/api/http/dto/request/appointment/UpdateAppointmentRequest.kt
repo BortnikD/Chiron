@@ -3,6 +3,7 @@ package com.bortnik.chiron.presentation.api.http.dto.request.appointment
 import com.bortnik.chiron.domain.entities.enums.AppointmentStatus
 import com.bortnik.chiron.domain.utils.ValidationConstants.AppointmentRules
 import jakarta.validation.constraints.Size
+import jakarta.validation.constraints.NotNull
 import org.openapitools.jackson.nullable.JsonNullable
 import java.time.Instant
 import java.util.UUID
@@ -13,6 +14,17 @@ data class UpdateAppointmentRequest(
     val startAt: Instant? = null,
     val endAt: Instant? = null,
     val status: AppointmentStatus? = null,
+    @field:Size(
+        min = 1,
+        max = AppointmentRules.MAX_SERVICES,
+        message = "must contain between 1 and ${AppointmentRules.MAX_SERVICES} services",
+    )
+    val serviceIds: List<@NotNull UUID>? = null,
+    @field:Size(
+        max = AppointmentRules.MAX_SERVICES,
+        message = "must contain at most ${AppointmentRules.MAX_SERVICES} services",
+    )
+    val performedServiceIds: List<@NotNull UUID>? = null,
     @field:Size(
         max = AppointmentRules.CLIENT_COMMENT_MAX_LENGTH,
         message = "must be at most ${AppointmentRules.CLIENT_COMMENT_MAX_LENGTH} characters",

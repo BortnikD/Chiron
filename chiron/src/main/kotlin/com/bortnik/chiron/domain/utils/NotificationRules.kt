@@ -71,6 +71,13 @@ object NotificationRules {
         }
 
         if (before != null) {
+            val previousServices = before.services.associate { it.serviceId to (it.isPlanned to it.isPerformed) }
+            val currentServices = after.services.associate { it.serviceId to (it.isPlanned to it.isPerformed) }
+            if (previousServices != currentServices &&
+                !(before.status != after.status && after.status == AppointmentStatus.COMPLETED)
+            ) {
+                targets += NotificationTarget(NotificationType.APPOINTMENT_SERVICES_UPDATED, parties)
+            }
             val notesRecipients = mutableSetOf<UUID>()
             if (before.vetNotes != after.vetNotes) notesRecipients += ownerId
             if (before.clientComment != after.clientComment) notesRecipients += veterinarianUserId

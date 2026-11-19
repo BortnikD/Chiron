@@ -12,6 +12,8 @@ interface SpecializationRepository {
 
     fun findAll(): List<Specialization>
 
+    fun findAllByIds(ids: List<UUID>): List<Specialization>
+
     fun update(id: UUID, dto: UpdateSpecializationDto): Specialization?
 
     fun deleteById(id: UUID): Boolean

@@ -7,11 +7,10 @@ import java.util.UUID
 data class CreateAppointmentDto(
     val veterinarianId: UUID,
     val petId: UUID,
-    val serviceId: UUID,
+    val serviceIds: List<UUID>,
     val followUpOf: UUID? = null,
     val startAt: Instant,
     val endAt: Instant,
     val status: AppointmentStatus = AppointmentStatus.PENDING,
-    val priceSnapshot: Double,
     val clientComment: String? = null,
 )

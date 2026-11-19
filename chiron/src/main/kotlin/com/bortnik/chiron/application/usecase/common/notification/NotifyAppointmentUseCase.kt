@@ -5,17 +5,15 @@ import com.bortnik.chiron.application.notification.AppointmentNotificationDetail
 import com.bortnik.chiron.application.notification.NotificationMessages
 import com.bortnik.chiron.application.notification.NotificationText
 import com.bortnik.chiron.application.security.Actor
-import com.bortnik.chiron.domain.entities.enums.UserRole
 import com.bortnik.chiron.domain.dto.notification.CreateNotificationDto
 import com.bortnik.chiron.domain.entities.Appointment
-import com.bortnik.chiron.domain.entities.enums.NotificationType
 import com.bortnik.chiron.domain.entities.enums.AppointmentStatus
+import com.bortnik.chiron.domain.entities.enums.NotificationType
+import com.bortnik.chiron.domain.entities.enums.UserRole
 import com.bortnik.chiron.domain.exceptions.notfound.PetNotFoundException
-import com.bortnik.chiron.domain.exceptions.notfound.ServiceNotFoundException
 import com.bortnik.chiron.domain.exceptions.notfound.UserNotFoundException
 import com.bortnik.chiron.domain.exceptions.notfound.VeterinarianNotFoundException
 import com.bortnik.chiron.domain.repositories.PetRepository
-import com.bortnik.chiron.domain.repositories.ServiceRepository
 import com.bortnik.chiron.domain.repositories.UserRepository
 import com.bortnik.chiron.domain.repositories.VeterinarianRepository
 import com.bortnik.chiron.domain.utils.NotificationRules
@@ -28,7 +26,6 @@ import java.util.UUID
 @Transactional
 class NotifyAppointmentUseCase(
     private val petRepository: PetRepository,
-    private val serviceRepository: ServiceRepository,
     private val veterinarianRepository: VeterinarianRepository,
     private val userRepository: UserRepository,
     private val createNotificationUseCase: CreateNotificationUseCase,
@@ -84,8 +81,11 @@ class NotifyAppointmentUseCase(
 
     private fun contextOf(appointment: Appointment): AppointmentContext {
         val pet = petRepository.findById(appointment.petId) ?: throw PetNotFoundException(appointment.petId)
-        val service = serviceRepository.findById(appointment.serviceId)
-            ?: throw ServiceNotFoundException(appointment.serviceId)
+        val services = appointment.services.filter {
+            if (appointment.status == AppointmentStatus.COMPLETED) it.isPerformed == true
+            else it.isPlanned || it.isPerformed == true
+        }
+        val serviceNames = NotificationMessages.appointmentServiceNames(services.map { it.nameSnapshot })
         val veterinarian = veterinarianRepository.findById(appointment.veterinarianId)
             ?: throw VeterinarianNotFoundException(appointment.veterinarianId)
         val veterinarianUser = userRepository.findById(veterinarian.userId)
@@ -95,11 +95,13 @@ class NotifyAppointmentUseCase(
             veterinarianUserId = veterinarian.userId,
             details = AppointmentNotificationDetails(
                 petName = pet.name,
-                serviceName = service.name,
+                serviceName = serviceNames,
                 veterinarianName = veterinarianUser.fullName,
                 startAt = appointment.startAt,
                 cancelReason = appointment.cancelReason,
                 status = appointment.status,
+                estimatedTotal = appointment.estimatedTotal,
+                actualTotal = appointment.actualTotal,
             ),
         )
     }

@@ -11,6 +11,8 @@ interface ServiceRepository {
 
     fun findById(id: UUID): Service?
 
+    fun findAllByIds(ids: List<UUID>): List<Service>
+
     fun findAll(filter: ServiceFilter): List<Service>
 
     fun update(id: UUID, dto: UpdateServiceDto): Service?

@@ -34,6 +34,7 @@ fun SQLException.toPersistenceException(): PersistenceException {
             -> InvalidDataException(sqlError, sqlState, message, this)
 
         SqlError.SERIALIZATION_FAILURE,
+        SqlError.EXCLUSION_VIOLATION,
         SqlError.DEADLOCK_DETECTED,
         SqlError.LOCK_NOT_AVAILABLE,
             -> ConcurrencyException(sqlError, sqlState, message, this)

@@ -59,13 +59,17 @@ class VeterinarianAppointmentController(
         ApiResponse.success(getAppointmentUseCase.findById(actor, id).toResponse())
 
     @Operation(
-        summary = "Update status and notes of own appointment",
+        summary = "Update status, services and notes of own appointment",
         description = """
             Allowed status transitions: PENDING -> CONFIRMED | CANCELLED; CONFIRMED -> COMPLETED | CANCELLED | NO_SHOW.
             Omitted fields are kept; vetNotes: null clears the notes.
             cancelReason is used only when the appointment is being cancelled;
             the current user and time are recorded as the cancellation author and moment.
-            Time, veterinarian and client comment cannot be changed here.
+            serviceIds replaces the planned services before the visit, recalculating its occupied interval.
+            performedServiceIds is the complete set of actually provided services, including additional services;
+            it is required when completing the visit and may be corrected during a started CONFIRMED or COMPLETED visit.
+            Actual-service changes do not modify the booked interval. endAt explicitly extends the reserved time and
+            must pass availability checks. The start, veterinarian and client comment cannot be changed here.
         """,
     )
     @PatchMapping("/{id}")
@@ -81,9 +85,10 @@ class VeterinarianAppointmentController(
         description = """
             Creates a CONFIRMED appointment with the current veterinarian for the same pet, linked to the original one
             via followUpOf. The original appointment must be CONFIRMED or COMPLETED, and the follow-up must start
-            after it ends. serviceId defaults to the service of the original appointment. The price is taken from
-            the service, using the species-specific override when one exists. The pet must not be archived,
-            the service must be active and available for the species, and the slot must be available.
+            after it ends. serviceIds explicitly selects the follow-up services; the original set is not copied.
+            Prices are frozen per service using species-specific overrides. The pet must not be archived,
+            every service must be active, available for the species and match the veterinarian specialization,
+            and the entire calculated slot must be available.
         """,
     )
     @PostMapping("/{id}/follow-ups")

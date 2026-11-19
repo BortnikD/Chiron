@@ -19,7 +19,7 @@ class AdminCreateAppointmentUseCase(
     private val log = LoggerFactory.getLogger(javaClass)
 
     fun create(actor: Actor, dto: CreateAppointmentDto): Appointment {
-        val appointment = createAppointmentUseCase.create(dto)
+        val appointment = createAppointmentUseCase.create(dto, actor.userId)
         notifyAppointmentUseCase.notifyChange(actor, before = null, after = appointment)
         log.info(
             "Admin {} ({}) created appointment {} for pet {} with veterinarian {} at {}, status {}, price {}",
@@ -30,7 +30,7 @@ class AdminCreateAppointmentUseCase(
             appointment.veterinarianId,
             appointment.startAt,
             appointment.status,
-            appointment.priceSnapshot,
+            appointment.estimatedTotal,
         )
         return appointment
     }

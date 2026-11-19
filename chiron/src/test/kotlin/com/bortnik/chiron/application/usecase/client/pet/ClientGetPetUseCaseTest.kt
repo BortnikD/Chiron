@@ -94,7 +94,8 @@ class ClientGetPetUseCaseTest {
         val selected = List(5) { pet() }
         val ids = selected.map { it.id }
         val filter = PetFilter(ownerId = actor.userId, isArchived = false)
-        val nextAppointment = PetNextAppointmentDto(UUID.randomUUID(), now, UUID.randomUUID())
+        val nextAppointment =
+            PetNextAppointmentDto(UUID.randomUUID(), now, listOf(UUID.randomUUID(), UUID.randomUUID()))
         `when`(pets.findAll(filter)).thenReturn(selected)
         `when`(summaries.findAll(actor.userId, ids, now)).thenReturn(
             mapOf(

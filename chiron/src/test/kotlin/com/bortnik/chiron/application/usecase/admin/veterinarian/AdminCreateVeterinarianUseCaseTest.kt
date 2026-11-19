@@ -3,9 +3,11 @@ package com.bortnik.chiron.application.usecase.admin.veterinarian
 import com.bortnik.chiron.application.security.Actor
 import com.bortnik.chiron.domain.dto.veterinarian.CreateVeterinarianDto
 import com.bortnik.chiron.domain.dto.veterinarian.VeterinarianDetailsDto
+import com.bortnik.chiron.domain.entities.Specialization
 import com.bortnik.chiron.domain.entities.User
 import com.bortnik.chiron.domain.entities.Veterinarian
 import com.bortnik.chiron.domain.entities.enums.UserRole
+import com.bortnik.chiron.domain.repositories.SpecializationRepository
 import com.bortnik.chiron.domain.repositories.UserRepository
 import com.bortnik.chiron.domain.repositories.VeterinarianRepository
 import org.junit.jupiter.api.Test
@@ -35,11 +37,15 @@ class AdminCreateVeterinarianUseCaseTest {
             createdAt = now,
             updatedAt = now,
         )
-        val dto = CreateVeterinarianDto(user.id, UUID.randomUUID(), experienceYears = 5)
+        val primary = Specialization(UUID.randomUUID(), "Therapy", "Therapy")
+        val extra = Specialization(UUID.randomUUID(), "Dentistry", "Dentistry")
+        val ids = listOf(primary.id, extra.id)
+        val dto = CreateVeterinarianDto(user.id, experienceYears = 5, specializationIds = ids)
         val veterinarian = Veterinarian(
             id = UUID.randomUUID(),
             userId = user.id,
-            specializationId = dto.specializationId,
+            specializationId = primary.id,
+            specializationIds = ids,
             experienceYears = dto.experienceYears,
             createdAt = now,
             updatedAt = now,
@@ -49,7 +55,9 @@ class AdminCreateVeterinarianUseCaseTest {
         `when`(users.findById(user.id)).thenReturn(user)
         `when`(veterinarians.findByUserId(user.id)).thenReturn(null)
         `when`(veterinarians.create(dto)).thenReturn(veterinarian)
-        val useCase = AdminCreateVeterinarianUseCase(veterinarians, users)
+        val specializations = mock(SpecializationRepository::class.java)
+        `when`(specializations.findAllByIds(ids)).thenReturn(listOf(extra, primary))
+        val useCase = AdminCreateVeterinarianUseCase(veterinarians, users, specializations)
 
         val result = useCase.create(Actor(UUID.randomUUID(), UserRole.ADMIN, "Admin"), dto)
 
