@@ -25,6 +25,9 @@ export type { PhoneInputProps } from './PhoneInput';
 export { AppointmentStatusBadge } from './AppointmentStatusBadge';
 export type { AppointmentStatusBadgeProps } from './AppointmentStatusBadge';
 
+export { AppointmentServiceBadge } from './AppointmentServiceBadge';
+export type { AppointmentServiceBadgeProps } from './AppointmentServiceBadge';
+
 export { ModalShell } from './ModalShell';
 export type { ModalShellProps } from './ModalShell';
 

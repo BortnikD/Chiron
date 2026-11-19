@@ -48,7 +48,14 @@ export function AppointmentDetailIsland({
 }: AppointmentDetailIslandProps) {
   const pet = petsMap[appointment.petId] || appointment.pet;
   const service = servicesMap[appointment.serviceId] || appointment.service;
-  const serviceName = service?.name || appointment.serviceName || 'Приём';
+  const servicesCount = appointment.services?.length || 1;
+  const primaryServiceName =
+    appointment.services?.[0]?.nameSnapshot || appointment.serviceName || service?.name || 'Приём';
+  const headerServiceName =
+    servicesCount > 1
+      ? `${primaryServiceName} (+${servicesCount - 1})`
+      : primaryServiceName;
+  const serviceName = headerServiceName;
   const petName = pet?.name || appointment.petName || 'Питомец';
   const speciesName =
     pet?.species?.name ||
@@ -60,7 +67,11 @@ export function AppointmentDetailIsland({
   const dateLabel = formatDateShort(appointment.startAt);
   const timeRange = `${formatSlotTime(appointment.startAt)}–${formatSlotTime(appointment.endAt)}`;
   const durationMin = computeDurationMinutes(appointment.startAt, appointment.endAt);
-  const price = appointment.priceSnapshot ?? appointment.price;
+  const price =
+    appointment.actualTotal ??
+    appointment.estimatedTotal ??
+    appointment.priceSnapshot ??
+    appointment.price;
 
   const parentAppt = appointment.followUpOf
     ? parentApptsMap[appointment.followUpOf]
@@ -139,7 +150,28 @@ export function AppointmentDetailIsland({
             </dd>
 
             <dt>Стоимость</dt>
-            <dd className="tnum">{price != null ? formatCurrency(price) : '—'}</dd>
+            <dd className="tnum font-bold">{price != null ? formatCurrency(price) : '—'}</dd>
+
+            {appointment.services && appointment.services.length > 1 && (
+              <>
+                <dt>Услуги ({appointment.services.length})</dt>
+                <dd>
+                  <ul style={{ margin: 0, paddingLeft: '18px', listStyleType: 'disc' }}>
+                    {appointment.services.map((s, idx) => (
+                      <li key={idx} className="small" style={{ margin: '4px 0' }}>
+                        <span style={{ fontWeight: 600 }}>{s.nameSnapshot}</span>
+                        <span className="muted"> — {formatCurrency(s.priceSnapshot)}</span>
+                        {s.isPerformed === true && (
+                          <span className="badge badge-success" style={{ marginLeft: '6px', fontSize: '10px', padding: '0 4px' }}>
+                            Оказана
+                          </span>
+                        )}
+                      </li>
+                    ))}
+                  </ul>
+                </dd>
+              </>
+            )}
 
             {appointment.followUpOf && (
               <>

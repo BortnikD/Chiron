@@ -5,7 +5,7 @@ import { Calendar, CalendarDays, Repeat, X } from 'lucide-react';
 import type { Appointment, Pet } from '@/modules/client/types';
 import type { AppointmentStatus } from '@/shared/types';
 import { PetAvatar } from '@/components/ui/EntityAvatar';
-import { DataTable, AppointmentStatusBadge, type DataTableColumn, type PaginationFooterProps } from '@/shared/components';
+import { DataTable, AppointmentStatusBadge, AppointmentServiceBadge, type DataTableColumn, type PaginationFooterProps } from '@/shared/components';
 import {
   APPOINTMENT_STATUS_META,
   formatCurrency,
@@ -148,11 +148,12 @@ export const VetAppointmentsTable: React.FC<VetAppointmentsTableProps> = ({
         key: 'service',
         title: 'Услуга',
         width: '1.6fr',
-        render: (a) => {
-          const serviceName =
-            a.serviceName || a.service?.name || servicesMap[a.serviceId] || 'Приём';
-          return <span>{serviceName}</span>;
-        },
+        render: (a) => (
+          <AppointmentServiceBadge
+            appointment={a}
+            fallbackName={servicesMap[a.serviceId] || 'Приём'}
+          />
+        ),
       },
       {
         key: 'status',
@@ -165,11 +166,14 @@ export const VetAppointmentsTable: React.FC<VetAppointmentsTableProps> = ({
         title: 'Цена',
         width: '0.8fr',
         align: 'right',
-        render: (a) => (
-          <span className="right tnum">
-            {formatCurrency(a.priceSnapshot ?? a.price ?? 0)}
-          </span>
-        ),
+        render: (a) => {
+          const price = a.actualTotal ?? a.estimatedTotal ?? a.priceSnapshot ?? a.price;
+          return (
+            <span className="right tnum">
+              {price != null ? formatCurrency(price) : '—'}
+            </span>
+          );
+        },
       },
     ],
     [petsMap, servicesMap, speciesMap]

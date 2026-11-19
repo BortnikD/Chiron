@@ -6,3 +6,4 @@ export * from './patch';
 export * from './doctorHelpers';
 export * from './env';
 export * from './petCache';
+export * from './appointmentNormalizer';

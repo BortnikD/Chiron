@@ -13,7 +13,7 @@ import {
 import type { Appointment, Pet } from '@/modules/client/types';
 import type { Service, Veterinarian } from '@/modules/clinic/types';
 import { PetAvatar } from '@/components/ui/EntityAvatar';
-import { PaginationFooter, AppointmentStatusBadge, Skeleton } from '@/shared/components';
+import { PaginationFooter, AppointmentStatusBadge, AppointmentServiceBadge, Skeleton } from '@/shared/components';
 import {
   APPOINTMENT_STATUS_META,
   formatCurrency,
@@ -185,7 +185,10 @@ export function AppointmentsList({
                 pet?.species?.name || pet?.speciesName || pet?.speciesId,
                 speciesMap
               );
-              const price = a.priceSnapshot ?? a.price;
+              const price = a.actualTotal ?? a.estimatedTotal ?? a.priceSnapshot ?? a.price;
+              const servicesCount = a.services?.length || 1;
+              const primaryServiceName =
+                a.services?.[0]?.nameSnapshot || a.serviceName || svc?.name || 'Услуга';
 
               return (
                 <button
@@ -218,7 +221,10 @@ export function AppointmentsList({
                     />
                     <span>{pet?.name || a.petName || 'Питомец'}</span>
                   </span>
-                  <span>{svc?.name || a.serviceName || 'Услуга'}</span>
+                  <AppointmentServiceBadge
+                    appointment={a}
+                    fallbackName={svc?.name || 'Услуга'}
+                  />
                   <span>{resolveVetName(a, vetsMap)}</span>
                   <span>
                     <AppointmentStatusBadge status={a.status} useShortLabel />

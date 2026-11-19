@@ -15,6 +15,7 @@ import {
   formatDateTimeCompact,
   formatSlotTime,
   getSpeciesTone,
+  getSpeciesStyle,
 } from '@/shared/lib';
 import { getDoctorDisplay } from '@/shared/lib';
 
@@ -52,7 +53,13 @@ export const AdminAppointmentDetailIsland: React.FC<AdminAppointmentDetailIsland
     pet?.speciesName ||
     speciesList.find((sp) => sp.id === pet?.speciesId)?.name ||
     '';
-  const serviceName = services.find((s) => s.id === appointment.serviceId)?.name || 'Услуга клиники';
+  const servicesCount = appointment.services?.length || 1;
+  const primaryName =
+    appointment.services?.[0]?.nameSnapshot ||
+    appointment.serviceName ||
+    services.find((s) => s.id === appointment.serviceId)?.name ||
+    'Услуга клиники';
+  const serviceName = servicesCount > 1 ? `${primaryName} (+${servicesCount - 1})` : primaryName;
   const rawVet = veterinarians.find((v) => v.id === appointment.veterinarianId);
   const vetName = getDoctorDisplay(rawVet).fullName;
   const owner = pet?.ownerId ? users.find((u) => u.id === pet.ownerId) : undefined;
@@ -77,6 +84,7 @@ export const AdminAppointmentDetailIsland: React.FC<AdminAppointmentDetailIsland
             iconSize={20}
             variant="full"
             className={`t-ava tone-${tone} detail-head-ava`}
+            style={getSpeciesStyle(pet?.speciesId, speciesList)}
           />
           <div className="col" style={{ gap: 2, minWidth: 0 }}>
             <span className="h2" style={{ wordBreak: 'break-word' }}>
@@ -137,9 +145,34 @@ export const AdminAppointmentDetailIsland: React.FC<AdminAppointmentDetailIsland
               {dtStart.date}, {dtStart.time}–{dtEnd.time}
             </dd>
             <dt>Цена</dt>
-            <dd className="tnum">
-              {formatCurrency(appointment.priceSnapshot || appointment.price)}
+            <dd className="tnum font-bold">
+              {formatCurrency(
+                appointment.actualTotal ??
+                  appointment.estimatedTotal ??
+                  appointment.priceSnapshot ??
+                  appointment.price
+              )}
             </dd>
+            {appointment.services && appointment.services.length > 1 && (
+              <>
+                <dt>Все услуги ({appointment.services.length})</dt>
+                <dd>
+                  <ul style={{ margin: 0, paddingLeft: '18px', listStyleType: 'disc' }}>
+                    {appointment.services.map((s, idx) => (
+                      <li key={idx} className="small" style={{ margin: '4px 0' }}>
+                        <span style={{ fontWeight: 600 }}>{s.nameSnapshot}</span>
+                        <span className="muted"> — {formatCurrency(s.priceSnapshot)}</span>
+                        {s.isPerformed === true && (
+                          <span className="badge badge-success" style={{ marginLeft: '6px', fontSize: '10px', padding: '0 4px' }}>
+                            Оказана
+                          </span>
+                        )}
+                      </li>
+                    ))}
+                  </ul>
+                </dd>
+              </>
+            )}
             {appointment.followUpOf && (
               <>
                 <dt>Повторный к</dt>
