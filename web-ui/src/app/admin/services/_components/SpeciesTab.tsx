@@ -5,7 +5,8 @@ import { Shapes, Plus, Edit2, Trash2, AlertCircle, X, ChevronDown, Check } from 
 import type { Service, ServiceSpecies, Species } from '@/modules/clinic/types';
 import { SpeciesIcon } from '@/components/ui/SpeciesIcon';
 import { ConfirmModal } from '@/shared/components';
-import { formatApiError, getSpeciesTone } from '@/shared/lib';
+import { ThemeSafeColorPicker } from '@/components/ui/ThemeSafeColorPicker';
+import { formatApiError, getSpeciesTone, getSpeciesStyle, DEFAULT_SPECIES_COLORS } from '@/shared/lib';
 
 export interface SpeciesTabProps {
   speciesList: Species[];
@@ -298,28 +299,19 @@ export const SpeciesTab: React.FC<SpeciesTabProps> = ({
             </div>
 
             {speciesList.map((sp) => {
-              const tone = getSpeciesTone(sp.iconKey || sp.name);
-              const customColor = sp.color;
+              const tone = getSpeciesTone(sp.name || sp.iconKey, speciesList);
+              const chipStyle = getSpeciesStyle(sp.id, speciesList);
               return (
                 <div key={sp.id} className="trow static">
                   <span className="row" style={{ gap: 8, alignItems: 'center' }}>
                     <span
                       className={`sp-chip tone-${tone}`}
-                      style={
-                        customColor
-                          ? ({
-                              '--tone': customColor,
-                              borderColor: `color-mix(in srgb, ${customColor} 45%, transparent)`,
-                              backgroundColor: `color-mix(in srgb, ${customColor} 14%, transparent)`,
-                            } as React.CSSProperties)
-                          : undefined
-                      }
+                      style={chipStyle}
                     >
                       <SpeciesIcon
                         species={sp.iconKey || tone}
                         size={14}
                         className="ic"
-                        style={customColor ? { color: customColor } : undefined}
                       />
                       <span>{sp.name}</span>
                     </span>
@@ -419,54 +411,33 @@ export const SpeciesTab: React.FC<SpeciesTabProps> = ({
                   />
                 </div>
 
-                <div className="form-grid" style={{ gridTemplateColumns: '1fr 1fr' }}>
-                  <div className="field">
-                    <label className="field-label" htmlFor="species-color-input">
-                      Цвет (HEX) <span className="small muted">(необязательно)</span>
-                    </label>
-                    <div className="row" style={{ gap: 6, alignItems: 'center' }}>
-                      <input
-                        type="color"
-                        value={
-                          speciesForm.color && /^#[0-9A-Fa-f]{6}$/.test(speciesForm.color)
-                            ? speciesForm.color
-                            : '#3B82F6'
-                        }
-                        onChange={(e) =>
-                          setSpeciesForm({ ...speciesForm, color: e.target.value.toUpperCase() })
-                        }
-                        style={{
-                          width: 36,
-                          height: 36,
-                          padding: 2,
-                          border: '1px solid var(--border)',
-                          borderRadius: 6,
-                          cursor: 'pointer',
-                        }}
-                      />
-                      <input
-                        id="species-color-input"
-                        className="input"
-                        maxLength={7}
-                        placeholder="#3B82F6"
-                        value={speciesForm.color}
-                        onChange={(e) =>
-                          setSpeciesForm({ ...speciesForm, color: e.target.value })
-                        }
-                      />
-                    </div>
-                  </div>
+                <div className="field">
+                  <label className="field-label" htmlFor="species-icon-input">
+                    Иконка <span className="small muted">(необязательно)</span>
+                  </label>
+                  <SpeciesIconSelect
+                    value={speciesForm.iconKey}
+                    onChange={(iconKey) => setSpeciesForm({ ...speciesForm, iconKey })}
+                    disabled={savingSpecies}
+                  />
+                </div>
 
-                  <div className="field">
-                    <label className="field-label" htmlFor="species-icon-input">
-                      Иконка <span className="small muted">(необязательно)</span>
-                    </label>
-                    <SpeciesIconSelect
-                      value={speciesForm.iconKey}
-                      onChange={(iconKey) => setSpeciesForm({ ...speciesForm, iconKey })}
-                      disabled={savingSpecies}
-                    />
-                  </div>
+                <div className="field">
+                  {(() => {
+                    const formDefaultTone = getSpeciesTone(speciesForm.name || speciesForm.iconKey);
+                    const formDefaultColor = DEFAULT_SPECIES_COLORS[formDefaultTone] || '#EDB345';
+                    return (
+                      <ThemeSafeColorPicker
+                        id="species-color-input"
+                        label="Цвет вида (HEX)"
+                        value={speciesForm.color}
+                        defaultColor={formDefaultColor}
+                        onChange={(hex) => setSpeciesForm({ ...speciesForm, color: hex })}
+                        onReset={() => setSpeciesForm({ ...speciesForm, color: '' })}
+                        previewLabel={speciesForm.name || 'Вид животного'}
+                      />
+                    );
+                  })()}
                 </div>
 
                 {saveError && (

@@ -4,6 +4,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { Tags, Plus, Edit2, Trash2, AlertCircle, X } from 'lucide-react';
 import type { Service, Specialization, Veterinarian } from '@/modules/clinic/types';
 import { ConfirmModal } from '@/shared/components';
+import { ThemeSafeColorPicker } from '@/components/ui/ThemeSafeColorPicker';
 import { formatApiError, registerSpecializationColors, getSpecStyle, getSpecTone } from '@/shared/lib';
 
 export interface SpecializationsTabProps {
@@ -275,38 +276,15 @@ export const SpecializationsTab: React.FC<SpecializationsTabProps> = ({
                 </div>
 
                 <div className="field">
-                  <label className="field-label" htmlFor="spec-color-input">
-                    Цвет (HEX) <span className="small muted">(необязательно)</span>
-                  </label>
-                  <div className="row" style={{ gap: 6, alignItems: 'center' }}>
-                    <input
-                      type="color"
-                      value={
-                        specForm.color && /^#[0-9A-Fa-f]{6}$/.test(specForm.color)
-                          ? specForm.color
-                          : '#10B981'
-                      }
-                      onChange={(e) =>
-                        setSpecForm({ ...specForm, color: e.target.value.toUpperCase() })
-                      }
-                      style={{
-                        width: 36,
-                        height: 36,
-                        padding: 2,
-                        border: '1px solid var(--border)',
-                        borderRadius: 6,
-                        cursor: 'pointer',
-                      }}
-                    />
-                    <input
-                      id="spec-color-input"
-                      className="input"
-                      maxLength={7}
-                      placeholder="#10B981"
-                      value={specForm.color}
-                      onChange={(e) => setSpecForm({ ...specForm, color: e.target.value })}
-                    />
-                  </div>
+                  <ThemeSafeColorPicker
+                    id="spec-color-input"
+                    label="Цвет специализации (HEX)"
+                    value={specForm.color}
+                    defaultColor="#10B981"
+                    onChange={(hex) => setSpecForm({ ...specForm, color: hex })}
+                    onReset={() => setSpecForm({ ...specForm, color: '' })}
+                    previewLabel={specForm.name || 'Специализация'}
+                  />
                 </div>
 
                 {saveError && (
