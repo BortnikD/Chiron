@@ -20,4 +20,5 @@ data class VeterinarianResponse(
     val createdAt: Instant,
     val updatedAt: Instant,
     val speciesIds: List<UUID> = emptyList(),
+    val specializationIds: List<UUID> = listOf(specializationId),
 )

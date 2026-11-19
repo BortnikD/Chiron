@@ -3,6 +3,7 @@ package com.bortnik.chiron.presentation.api.http.dto.request.veterinarian
 import com.bortnik.chiron.domain.utils.ValidationConstants.VeterinarianRules
 import jakarta.validation.constraints.Max
 import jakarta.validation.constraints.Min
+import jakarta.validation.constraints.NotNull
 import jakarta.validation.constraints.Size
 import org.openapitools.jackson.nullable.JsonNullable
 import java.util.UUID
@@ -25,4 +26,5 @@ data class UpdateVeterinarianRequest(
     )
     val experienceYears: Int? = null,
     val isActive: Boolean? = null,
+    val specializationIds: List<@NotNull UUID>? = null,
 )

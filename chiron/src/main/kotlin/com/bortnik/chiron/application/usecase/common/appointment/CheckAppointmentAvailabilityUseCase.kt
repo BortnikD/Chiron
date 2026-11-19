@@ -40,7 +40,7 @@ class CheckAppointmentAvailabilityUseCase(
                 to = to.atZone(clinicProperties.zoneId).toLocalDate(),
             ),
         ),
-        appointments = appointmentRepository.findOverlapping(veterinarianId, from, to),
+        appointments = appointmentRepository.findOverlappingIntervals(veterinarianId, from, to),
         zone = clinicProperties.zoneId,
         slotStepMin = clinicProperties.slotStepMin,
     )

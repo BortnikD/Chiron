@@ -9,7 +9,6 @@ import com.bortnik.chiron.domain.dto.notification.CreateNotificationDto
 import com.bortnik.chiron.domain.entities.enums.NotificationType
 import com.bortnik.chiron.domain.entities.enums.AppointmentStatus
 import com.bortnik.chiron.domain.repositories.PetRepository
-import com.bortnik.chiron.domain.repositories.ServiceRepository
 import com.bortnik.chiron.domain.repositories.UserRepository
 import com.bortnik.chiron.domain.repositories.VeterinarianRepository
 import com.bortnik.chiron.support.TestEntities.appointment
@@ -38,12 +37,11 @@ class NotifyAppointmentUseCaseTest {
     private val client = Actor(pet.ownerId, UserRole.CLIENT, "Client")
     private val veterinarianActor = Actor(user.id, UserRole.VETERINARIAN, "Veterinarian")
     private val pets = mock(PetRepository::class.java)
-    private val services = mock(ServiceRepository::class.java)
     private val vets = mock(VeterinarianRepository::class.java)
     private val users = mock(UserRepository::class.java)
     private val create = mock(CreateNotificationUseCase::class.java)
     private val clinic = ClinicProperties("Europe/Moscow", 15)
-    private val useCase = NotifyAppointmentUseCase(pets, services, vets, users, create, clinic)
+    private val useCase = NotifyAppointmentUseCase(pets, vets, users, create, clinic)
     private val fallback = CreateNotificationDto(pet.ownerId, type = notification.type, title = "Title", body = "Body")
 
     @Test
@@ -135,6 +133,46 @@ class NotifyAppointmentUseCaseTest {
     }
 
     @Test
+    fun `completed appointment correction notifies owner using snapshot names and actual amount`() {
+        allowContext()
+        `when`(create.create(any(CreateNotificationDto::class.java) ?: fallback)).thenReturn(notification)
+        val before = appointment.copy(
+            status = AppointmentStatus.COMPLETED,
+            services = appointment.services.map { it.copy(nameSnapshot = "Original examination", isPerformed = true) })
+        val after = before.copy(
+            services = before.services + before.services.single().copy(
+                serviceId = UUID.randomUUID(), nameSnapshot = "Vaccination", priceSnapshot = 50.0,
+                isPlanned = false, isPerformed = true,
+            )
+        )
+
+        useCase.notifyChange(veterinarianActor, before, after)
+
+        val captor = ArgumentCaptor.forClass(CreateNotificationDto::class.java)
+        verify(create).create(captor.capture() ?: fallback)
+        assertEquals(NotificationType.APPOINTMENT_SERVICES_UPDATED, captor.value.type)
+        assertEquals(pet.ownerId, captor.value.recipientId)
+        assertTrue(captor.value.body.contains("Original examination, Vaccination"))
+        assertTrue(captor.value.body.contains("150.00"))
+    }
+
+    @Test
+    fun `completion confirms services in a single completion notification with the actual amount`() {
+        allowContext()
+        `when`(create.create(any(CreateNotificationDto::class.java) ?: fallback)).thenReturn(notification)
+        val after = appointment.copy(
+            status = AppointmentStatus.COMPLETED,
+            services = appointment.services.map { it.copy(isPerformed = true) })
+
+        useCase.notifyChange(veterinarianActor, appointment, after)
+
+        val captor = ArgumentCaptor.forClass(CreateNotificationDto::class.java)
+        verify(create).create(captor.capture() ?: fallback)
+        assertEquals(NotificationType.APPOINTMENT_COMPLETED, captor.value.type)
+        assertTrue(captor.value.body.contains("100.00"))
+    }
+
+    @Test
     fun `schedule conflict is stored for all administrators including the actor`() {
         allowContext()
         val actorId = UUID.randomUUID()
@@ -183,7 +221,6 @@ class NotifyAppointmentUseCaseTest {
 
     private fun allowContext() {
         `when`(pets.findById(pet.id)).thenReturn(pet)
-        `when`(services.findById(service.id)).thenReturn(service)
         `when`(vets.findById(veterinarian.id)).thenReturn(veterinarian)
         `when`(users.findById(user.id)).thenReturn(user)
     }

@@ -61,7 +61,9 @@ class AdminAppointmentController(
         summary = "Create appointment",
         description = """
             The pet must not be archived, the veterinarian must be active and permitted to treat the pet's species,
-            the service must be active and available for the pet's species, and the slot must be available.
+            every selected service must be active, available for the pet's species and match the veterinarian specialization.
+            Prices are frozen by the server. endAt must match summed service durations plus the maximum buffer.
+            The entire slot must be available.
         """,
     )
     @PostMapping
@@ -77,6 +79,10 @@ class AdminAppointmentController(
             Allowed status transitions: PENDING -> CONFIRMED | CANCELLED; CONFIRMED -> COMPLETED | CANCELLED | NO_SHOW.
             COMPLETED, CANCELLED and NO_SHOW are terminal.
             Changing the veterinarian or the time re-runs the veterinarian and slot availability checks.
+            serviceIds replaces the plan before the visit; the server recalculates the occupied interval.
+            performedServiceIds is the complete set of services actually provided, including any additional services;
+            it is required when completing the visit and may be corrected during a started CONFIRMED or COMPLETED visit.
+            Actual-service changes keep the booked interval unchanged. CANCELLED and NO_SHOW visits cannot record services.
         """,
     )
     @PatchMapping("/{id}")

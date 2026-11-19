@@ -1,0 +1,26 @@
+ALTER TABLE notification
+    DROP CONSTRAINT notification_type_check,
+    ADD CONSTRAINT notification_type_check CHECK (type IN (
+                                                           'APPOINTMENT_BOOKED',
+                                                           'APPOINTMENT_CONFIRMED',
+                                                           'APPOINTMENT_CANCELLED',
+                                                           'APPOINTMENT_RESCHEDULED',
+                                                           'APPOINTMENT_NO_SHOW',
+                                                           'APPOINTMENT_COMPLETED',
+                                                           'APPOINTMENT_NOTES_UPDATED',
+                                                           'APPOINTMENT_SERVICES_UPDATED',
+                                                           'SCHEDULE_CONFLICT',
+                                                           'FOLLOW_UP_SCHEDULED',
+                                                           'APPOINTMENT_REMINDER',
+                                                           'VACCINATION_DUE',
+                                                           'VACCINATION_OVERDUE',
+                                                           'VACCINATION_CREATED',
+                                                           'VACCINATION_UPDATED',
+                                                           'VACCINATION_DELETED',
+                                                           'ACCOUNT_UPDATED',
+                                                           'PASSWORD_CHANGED',
+                                                           'PET_UPDATED',
+                                                           'PET_ARCHIVED',
+                                                           'PET_RESTORED',
+                                                           'ADMIN_MESSAGE'
+        ));

@@ -15,6 +15,7 @@ import org.jetbrains.exposed.v1.core.SortOrder
 import org.jetbrains.exposed.v1.core.andIfNotNull
 import org.jetbrains.exposed.v1.core.eq
 import org.jetbrains.exposed.v1.core.inSubQuery
+import org.jetbrains.exposed.v1.core.inList
 import org.jetbrains.exposed.v1.javatime.CurrentTimestampWithTimeZone
 import org.jetbrains.exposed.v1.jdbc.deleteWhere
 import org.jetbrains.exposed.v1.jdbc.insertReturning
@@ -48,6 +49,11 @@ class ExposedServiceRepository : ServiceRepository {
             ?.toService()
     }
 
+    override fun findAllByIds(ids: List<UUID>): List<Service> = exposedSql {
+        if (ids.isEmpty()) return@exposedSql emptyList()
+        ExposedServiceTable.selectAll().where { ExposedServiceTable.id inList ids }.map { it.toService() }
+    }
+
     override fun findAll(filter: ServiceFilter): List<Service> = exposedSql {
         ExposedServiceTable.selectAll()
             .where { filter.toCondition() }
@@ -79,8 +85,8 @@ class ExposedServiceRepository : ServiceRepository {
         .andIfNotNull(
             speciesId?.let {
                 ExposedServiceTable.id inSubQuery
-                    ExposedServiceSpeciesTable.select(ExposedServiceSpeciesTable.serviceId)
-                        .where { ExposedServiceSpeciesTable.speciesId eq it }
+                        ExposedServiceSpeciesTable.select(ExposedServiceSpeciesTable.serviceId)
+                            .where { ExposedServiceSpeciesTable.speciesId eq it }
             },
         )
         .andIfNotNull(isActive?.let { ExposedServiceTable.isActive eq it })

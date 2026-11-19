@@ -1,8 +1,10 @@
 package com.bortnik.chiron.application.usecase.common.appointment
 
 import com.bortnik.chiron.domain.dto.appointment.CreateAppointmentDto
+import com.bortnik.chiron.domain.entities.AppointmentService
 import com.bortnik.chiron.domain.entities.ServiceSpecies
 import com.bortnik.chiron.domain.entities.enums.AppointmentStatus
+import com.bortnik.chiron.domain.exceptions.ValidationException
 import com.bortnik.chiron.domain.exceptions.notfound.AppointmentNotFoundException
 import com.bortnik.chiron.domain.exceptions.rules.AppointmentPetMismatchException
 import com.bortnik.chiron.domain.exceptions.rules.AppointmentSlotUnavailableException
@@ -12,6 +14,7 @@ import com.bortnik.chiron.domain.exceptions.rules.ServiceInactiveException
 import com.bortnik.chiron.domain.exceptions.rules.ServiceNotAvailableForSpeciesException
 import com.bortnik.chiron.domain.exceptions.rules.VeterinarianInactiveException
 import com.bortnik.chiron.domain.exceptions.rules.VeterinarianNotPermittedForSpeciesException
+import com.bortnik.chiron.domain.exceptions.rules.VeterinarianServiceSpecializationMismatchException
 import com.bortnik.chiron.domain.repositories.AppointmentRepository
 import com.bortnik.chiron.domain.repositories.PetRepository
 import com.bortnik.chiron.domain.repositories.ServiceRepository
@@ -23,7 +26,9 @@ import com.bortnik.chiron.support.TestEntities.pet
 import com.bortnik.chiron.support.TestEntities.service
 import com.bortnik.chiron.support.TestEntities.veterinarian
 import org.junit.jupiter.api.Test
+import org.mockito.Mockito.anyList
 import org.mockito.Mockito.doThrow
+import org.mockito.Mockito.eq
 import org.mockito.Mockito.mock
 import org.mockito.Mockito.never
 import org.mockito.Mockito.verify
@@ -42,23 +47,72 @@ class CreateAppointmentUseCaseTest {
     private val permissions = mock(VeterinarianSpeciesPermissionRepository::class.java)
     private val availability = mock(CheckAppointmentAvailabilityUseCase::class.java)
     private val useCase =
-        CreateAppointmentUseCase(appointments, pets, veterinarians, services, species, permissions, availability)
+        CreateAppointmentUseCase(
+            appointments, pets, veterinarians, ResolveAppointmentServicesUseCase(services, species), permissions,
+            availability,
+        )
     private val dto = CreateAppointmentDto(
         veterinarian.id,
         pet.id,
-        service.id,
+        listOf(service.id),
         startAt = appointment.startAt,
         endAt = appointment.endAt,
-        priceSnapshot = 80.0,
     )
 
     @Test
-    fun `valid booking checks availability and preserves the price snapshot`() {
+    fun `booking under a secondary specialization checks availability and freezes species price and author`() {
         allowBooking()
-        `when`(appointments.create(dto)).thenReturn(appointment.copy(priceSnapshot = dto.priceSnapshot))
-        assertEquals(80.0, useCase.create(dto).priceSnapshot)
+        val primary = UUID.randomUUID()
+        `when`(veterinarians.findById(veterinarian.id)).thenReturn(
+            veterinarian.copy(
+                specializationId = primary,
+                specializationIds = listOf(primary, service.specializationId)
+            ),
+        )
+        `when`(species.findAllBySpeciesId(pet.speciesId)).thenReturn(
+            listOf(ServiceSpecies(service.id, pet.speciesId, price = 80.0)),
+        )
+        `when`(appointments.create(eq(dto) ?: dto, anyList())).thenAnswer {
+            appointment.copy(services = it.getArgument<List<AppointmentService>>(1))
+        }
+        val result = useCase.create(dto, pet.ownerId)
+        assertEquals(80.0, result.estimatedTotal)
+        assertEquals(pet.ownerId, result.services.single().addedBy)
         verify(availability).check(veterinarian.id, dto.startAt, dto.endAt, null)
-        verify(appointments).create(dto)
+        verify(appointments).create(eq(dto) ?: dto, anyList())
+    }
+
+    @Test
+    fun `booking rejects an end that does not match the shared service calculation`() {
+        allowBooking()
+        for (offset in listOf(-60L, 60L)) {
+            assertFailsWith<ValidationException> { useCase.create(dto.copy(endAt = dto.endAt.plusSeconds(offset))) }
+        }
+        verifyNoInteractions(appointments, availability)
+    }
+
+    @Test
+    fun `booking rejects a combined service duration longer than one day`() {
+        allowBooking()
+        val other = service.copy(id = UUID.randomUUID(), baseDurationMin = 600)
+        val ids = listOf(service.id, other.id)
+        `when`(services.findAllByIds(ids)).thenReturn(listOf(service.copy(baseDurationMin = 900), other))
+        `when`(species.findAllBySpeciesId(pet.speciesId)).thenReturn(ids.map { ServiceSpecies(it, pet.speciesId) })
+
+        assertFailsWith<ValidationException> { useCase.create(dto.copy(serviceIds = ids)) }
+        verifyNoInteractions(appointments, availability)
+    }
+
+    @Test
+    fun `booking doctor must match the selected service specialization`() {
+        allowBooking()
+        val other = UUID.randomUUID()
+        `when`(veterinarians.findById(veterinarian.id)).thenReturn(
+            veterinarian.copy(specializationId = other, specializationIds = listOf(other)),
+        )
+
+        assertFailsWith<VeterinarianServiceSpecializationMismatchException> { useCase.create(dto) }
+        verifyNoInteractions(appointments, availability)
     }
 
     @Test
@@ -78,10 +132,10 @@ class CreateAppointmentUseCaseTest {
     @Test
     fun `inactive service or unavailable species prevents booking`() {
         allowBooking()
-        `when`(services.findById(service.id)).thenReturn(service.copy(isActive = false))
+        `when`(services.findAllByIds(listOf(service.id))).thenReturn(listOf(service.copy(isActive = false)))
         assertFailsWith<ServiceInactiveException> { useCase.create(dto) }
-        `when`(services.findById(service.id)).thenReturn(service)
-        `when`(species.findById(service.id, pet.speciesId)).thenReturn(null)
+        `when`(services.findAllByIds(listOf(service.id))).thenReturn(listOf(service))
+        `when`(species.findAllBySpeciesId(pet.speciesId)).thenReturn(emptyList())
         assertFailsWith<ServiceNotAvailableForSpeciesException> { useCase.create(dto) }
         verifyNoInteractions(appointments, availability)
     }
@@ -110,7 +164,7 @@ class CreateAppointmentUseCaseTest {
             `when`(appointments.findById(appointment.id)).thenReturn(appointment.copy(status = status))
             assertFailsWith<FollowUpNotAllowedException> { useCase.create(followUp) }
         }
-        verify(appointments, never()).create(followUp)
+        verify(appointments, never()).create(eq(followUp) ?: followUp, anyList())
         verifyNoInteractions(availability)
     }
 
@@ -134,7 +188,8 @@ class CreateAppointmentUseCaseTest {
         }
         for (status in listOf(AppointmentStatus.CONFIRMED, AppointmentStatus.COMPLETED)) {
             `when`(appointments.findById(appointment.id)).thenReturn(appointment.copy(status = status))
-            `when`(appointments.create(followUp)).thenReturn(appointment.copy(followUpOf = appointment.id))
+            `when`(appointments.create(eq(followUp) ?: followUp, anyList()))
+                .thenReturn(appointment.copy(followUpOf = appointment.id))
             assertEquals(appointment.id, useCase.create(followUp).followUpOf)
         }
     }
@@ -142,8 +197,8 @@ class CreateAppointmentUseCaseTest {
     private fun allowBooking() {
         `when`(pets.findById(pet.id)).thenReturn(pet)
         `when`(veterinarians.findById(veterinarian.id)).thenReturn(veterinarian)
-        `when`(services.findById(service.id)).thenReturn(service)
-        `when`(species.findById(service.id, pet.speciesId)).thenReturn(ServiceSpecies(service.id, pet.speciesId))
+        `when`(services.findAllByIds(listOf(service.id))).thenReturn(listOf(service))
+        `when`(species.findAllBySpeciesId(pet.speciesId)).thenReturn(listOf(ServiceSpecies(service.id, pet.speciesId)))
         `when`(permissions.exists(veterinarian.id, pet.speciesId)).thenReturn(true)
     }
 }

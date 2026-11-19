@@ -1,6 +1,6 @@
 package com.bortnik.chiron.domain.utils
 
-import com.bortnik.chiron.domain.entities.Appointment
+import com.bortnik.chiron.domain.dto.appointment.AppointmentInterval
 import com.bortnik.chiron.domain.entities.ScheduleException
 import com.bortnik.chiron.domain.entities.WorkSchedule
 import com.bortnik.chiron.domain.entities.enums.AppointmentStatus
@@ -119,12 +119,11 @@ class VeterinarianAvailabilityTest {
     private companion object {
         val DATE: LocalDate = LocalDate.parse("2026-10-12")
         val VETERINARIAN_ID: UUID = UUID.randomUUID()
-        val CREATED_AT: Instant = Instant.parse("2026-01-01T00:00:00Z")
 
         fun availability(
             schedules: List<WorkSchedule> = emptyList(),
             exceptions: List<ScheduleException> = emptyList(),
-            appointments: List<Appointment> = emptyList(),
+            appointments: List<AppointmentInterval> = emptyList(),
         ) = VeterinarianAvailability(schedules, exceptions, appointments, ZoneOffset.UTC, slotStepMin = 15)
 
         fun at(time: String): Instant = DATE.atTime(LocalTime.parse(time)).toInstant(ZoneOffset.UTC)
@@ -152,17 +151,11 @@ class VeterinarianAvailabilityTest {
             endTime = end?.let { LocalTime.parse(it) },
         )
 
-        fun appointment(start: String, end: String, status: AppointmentStatus) = Appointment(
+        fun appointment(start: String, end: String, status: AppointmentStatus) = AppointmentInterval(
             id = UUID.randomUUID(),
-            veterinarianId = VETERINARIAN_ID,
-            petId = UUID.randomUUID(),
-            serviceId = UUID.randomUUID(),
             startAt = at(start),
             endAt = at(end),
             status = status,
-            priceSnapshot = 0.0,
-            createdAt = CREATED_AT,
-            updatedAt = CREATED_AT,
         )
     }
 }

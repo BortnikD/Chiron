@@ -1,6 +1,7 @@
 package com.bortnik.chiron.support
 
 import com.bortnik.chiron.domain.entities.Appointment
+import com.bortnik.chiron.domain.entities.AppointmentService
 import com.bortnik.chiron.domain.entities.Notification
 import com.bortnik.chiron.domain.entities.Pet
 import com.bortnik.chiron.domain.entities.Service
@@ -31,9 +32,13 @@ object TestEntities {
         UUID(0, 7), veterinarian.specializationId, "Visit", "Examination", 100.0, 30,
         bufferAfterMin = 15, createdAt = now, updatedAt = now,
     )
+    val appointmentService = AppointmentService(
+        service.id, service.name, service.basePrice, service.baseDurationMin, service.bufferAfterMin,
+        createdAt = now, updatedAt = now,
+    )
     val appointment = Appointment(
-        UUID(0, 8), veterinarian.id, pet.id, service.id, startAt = now.plusSeconds(3600),
-        endAt = now.plusSeconds(6300), status = AppointmentStatus.CONFIRMED, priceSnapshot = 100.0,
+        UUID(0, 8), veterinarian.id, pet.id, listOf(appointmentService), startAt = now.plusSeconds(3600),
+        endAt = now.plusSeconds(6300), status = AppointmentStatus.CONFIRMED,
         createdAt = now, updatedAt = now,
     )
     val vaccination = Vaccination(

@@ -42,7 +42,7 @@ fun PetDetailsDto.toResponse(photo: PhotoLinks? = null): ClientPetResponse = Cli
             appointmentsCount = it.appointmentsCount,
             vaccinationsCount = it.vaccinationsCount,
             nextAppointment = it.nextAppointment?.let { appointment ->
-                PetNextAppointmentResponse(appointment.id, appointment.startAt, appointment.serviceId)
+                PetNextAppointmentResponse(appointment.id, appointment.startAt, appointment.serviceIds)
             },
             nextVaccinationDueOn = it.nextVaccinationDueOn,
             hasOverdueVaccination = it.hasOverdueVaccination,

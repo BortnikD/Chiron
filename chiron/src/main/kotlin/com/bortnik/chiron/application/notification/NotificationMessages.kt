@@ -1,9 +1,11 @@
 package com.bortnik.chiron.application.notification
 
-import com.bortnik.chiron.domain.entities.enums.NotificationType
-import com.bortnik.chiron.domain.entities.enums.AppointmentStatus
 import com.bortnik.chiron.domain.entities.User
 import com.bortnik.chiron.domain.entities.Vaccination
+import com.bortnik.chiron.domain.entities.enums.AppointmentStatus
+import com.bortnik.chiron.domain.entities.enums.NotificationType
+import java.math.BigDecimal
+import java.math.RoundingMode
 import java.time.LocalDate
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
@@ -15,6 +17,10 @@ object NotificationMessages {
     private val DATE_FORMAT = DateTimeFormatter.ofPattern("dd.MM.yyyy")
     private val TIME_FORMAT = DateTimeFormatter.ofPattern("HH:mm")
 
+    fun appointmentServiceNames(names: List<String>): String =
+        names.take(3).joinToString(", ").ifEmpty { "услуги не оказаны" } +
+                if (names.size > 3) " и ещё ${names.size - 3} услуг" else ""
+
     fun forAppointment(
         type: NotificationType,
         details: AppointmentNotificationDetails,
@@ -23,10 +29,16 @@ object NotificationMessages {
         val start = details.startAt.atZone(zone)
         val summary = "${details.petName} — ${details.serviceName}, " +
                 "${DATE_FORMAT.format(start)} в ${TIME_FORMAT.format(start)}, врач ${details.veterinarianName}"
+        val total = details.actualTotal ?: details.estimatedTotal
+        val amountText = total?.let {
+            val label = if (details.actualTotal != null) "Фактическая стоимость" else "Плановая стоимость"
+            " $label: ${BigDecimal.valueOf(it).setScale(2, RoundingMode.HALF_UP).toPlainString()}."
+        }.orEmpty()
         val body = when (type) {
             NotificationType.APPOINTMENT_RESCHEDULED -> "Новое время: $summary."
-            NotificationType.APPOINTMENT_COMPLETED -> "$summary. Результаты приёма доступны в записи."
+            NotificationType.APPOINTMENT_COMPLETED -> "$summary. Результаты приёма доступны в записи.$amountText"
             NotificationType.APPOINTMENT_NOTES_UPDATED -> "$summary. Заметки к приёму изменены."
+            NotificationType.APPOINTMENT_SERVICES_UPDATED -> "$summary. Состав услуг изменён.$amountText"
             NotificationType.FOLLOW_UP_SCHEDULED -> "$summary. Статус записи: " + when (details.status) {
                 AppointmentStatus.PENDING -> "ожидает подтверждения."
                 AppointmentStatus.CONFIRMED -> "подтверждена."
@@ -101,6 +113,7 @@ object NotificationMessages {
         NotificationType.APPOINTMENT_NO_SHOW -> "Отмечена неявка на приём"
         NotificationType.APPOINTMENT_COMPLETED -> "Приём завершён"
         NotificationType.APPOINTMENT_NOTES_UPDATED -> "Заметки к приёму обновлены"
+        NotificationType.APPOINTMENT_SERVICES_UPDATED -> "Услуги приёма обновлены"
         NotificationType.SCHEDULE_CONFLICT -> "Требуется решение по записи на приём"
         NotificationType.FOLLOW_UP_SCHEDULED -> "Назначен повторный приём"
         NotificationType.APPOINTMENT_REMINDER -> "Напоминание о приёме"

@@ -55,13 +55,13 @@ class CheckAppointmentAvailabilityUseCaseTest {
             ),
         )
         `when`(exceptions.findAll(filter)).thenReturn(emptyList())
-        `when`(appointments.findOverlapping(veterinarianId, start, end)).thenReturn(emptyList())
+        `when`(appointments.findOverlappingIntervals(veterinarianId, start, end)).thenReturn(emptyList())
 
         useCase.check(veterinarianId, start, end)
 
         verify(schedules).findAllByVeterinarianId(veterinarianId)
         verify(exceptions).findAll(filter)
-        verify(appointments).findOverlapping(veterinarianId, start, end)
+        verify(appointments).findOverlappingIntervals(veterinarianId, start, end)
         verifyNoMoreInteractions(schedules, exceptions, appointments)
     }
 
@@ -77,6 +77,6 @@ class CheckAppointmentAvailabilityUseCaseTest {
                 veterinarianId = veterinarianId, from = date, to = date.plusDays(2),
             ),
         )
-        verify(appointments).findOverlapping(veterinarianId, from, to)
+        verify(appointments).findOverlappingIntervals(veterinarianId, from, to)
     }
 }

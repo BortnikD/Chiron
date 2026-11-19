@@ -38,8 +38,8 @@ class ClientAppointmentController(
     @Operation(
         summary = "List appointments of own pets",
         description = "All filters are optional and combined with AND. " +
-            "Sorted by start time and then id; direction is ASC by default or DESC for newest first. " +
-            "Sorting is applied before pagination.",
+                "Sorted by start time and then id; direction is ASC by default or DESC for newest first. " +
+                "Sorting is applied before pagination.",
     )
     @GetMapping
     fun findAll(
@@ -62,11 +62,11 @@ class ClientAppointmentController(
     @Operation(
         summary = "Book appointment for own pet",
         description = """
-            The appointment is created as PENDING. The price is taken from the service, using the species-specific
-            override when one exists. The pet must not be archived, the veterinarian must be active and permitted
-            to treat the pet's species, the service must be active and available for the species,
+            The appointment is created as PENDING. Prices are frozen per selected service using species-specific
+            overrides when present. The pet must not be archived, the veterinarian must be active and permitted
+            to treat the pet's species, every service must be active, available for the species and match the veterinarian specialization,
             and the slot must be available. startAt must be in the future; endAt must equal startAt plus
-            the species-specific service duration (or base duration) and the service buffer.
+            the sum of species-specific service durations (or base durations) and the maximum service buffer.
         """,
     )
     @PostMapping

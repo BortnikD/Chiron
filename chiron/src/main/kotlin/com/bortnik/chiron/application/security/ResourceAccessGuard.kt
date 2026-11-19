@@ -54,8 +54,12 @@ class ResourceAccessGuard(
         veterinarianRepository.findByUserId(actor.userId)
             ?: throw VeterinarianNotFoundException("userId", actor.userId)
 
-    fun requireAssignedAppointment(actor: Actor, appointmentId: UUID): Appointment {
-        val appointment = findAppointment(appointmentId)
+    fun requireAssignedAppointment(actor: Actor, appointmentId: UUID, forUpdate: Boolean = false): Appointment {
+        val appointment = if (forUpdate) {
+            appointmentRepository.findByIdForUpdate(appointmentId) ?: throw AppointmentNotFoundException(appointmentId)
+        } else {
+            findAppointment(appointmentId)
+        }
         if (appointment.veterinarianId != requireVeterinarian(actor).id) {
             deny(actor, "Appointment $appointmentId is not assigned to the current veterinarian")
         }

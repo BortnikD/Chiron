@@ -6,6 +6,7 @@ package com.bortnik.chiron.infrastructure.persistence.exceptions
  */
 enum class SqlError(val sqlState: String, val description: String) {
     UNIQUE_VIOLATION("23505", "Unique constraint violated"),
+    EXCLUSION_VIOLATION("23P01", "Overlapping appointment intervals"),
     FOREIGN_KEY_VIOLATION("23503", "Foreign key constraint violated"),
     NOT_NULL_VIOLATION("23502", "Not-null constraint violated"),
     CHECK_VIOLATION("23514", "Check constraint violated"),

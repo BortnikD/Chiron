@@ -80,6 +80,7 @@ object ValidationConstants {
     }
 
     object AppointmentRules {
+        const val MAX_SERVICES = 20
         const val CLIENT_COMMENT_MAX_LENGTH = 1000
         const val VET_NOTES_MAX_LENGTH = 4000
         const val CANCEL_REASON_MAX_LENGTH = 1000
