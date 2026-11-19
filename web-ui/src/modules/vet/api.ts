@@ -1,5 +1,12 @@
 import { api, tokenStorage } from '@/shared/api/client';
-import { fetchAllPages, isPhotoUrlFresh, mapWithConcurrency, petCache } from '@/shared/lib';
+import {
+  fetchAllPages,
+  isPhotoUrlFresh,
+  mapWithConcurrency,
+  petCache,
+  normalizeAppointment,
+  normalizeAppointmentPage,
+} from '@/shared/lib';
 import type { AppointmentStatus, Gender, PageResponse, PhotoLinks } from '@/shared/types';
 import type { Veterinarian } from '@/modules/clinic/types';
 import type {
@@ -162,13 +169,15 @@ export const vetApi = {
     if (opts.from) query.append('from', opts.from);
     if (opts.to) query.append('to', opts.to);
     if (opts.direction) query.append('direction', opts.direction);
-    return api.get<PageResponse<Appointment>>(`/api/v1/veterinarian/appointments?${query.toString()}`);
+    return api
+      .get<PageResponse<Appointment>>(`/api/v1/veterinarian/appointments?${query.toString()}`)
+      .then(normalizeAppointmentPage);
   },
 
   getAppointmentById: (id: string) =>
-    api.get<Appointment>(`/api/v1/veterinarian/appointments/${id}`),
+    api.get<Appointment>(`/api/v1/veterinarian/appointments/${id}`).then(normalizeAppointment),
 
-  updateAppointment: (
+  updateAppointment: async (
     id: string,
     data: {
       status?: AppointmentStatus;
@@ -176,12 +185,18 @@ export const vetApi = {
       notes?: string | null;
       cancelReason?: string | null;
       cancellationReason?: string | null;
+      serviceIds?: string[];
+      performedServiceIds?: string[];
+      endAt?: string;
     }
   ) => {
     const payload: {
       status?: AppointmentStatus;
       vetNotes?: string | null;
       cancelReason?: string | null;
+      serviceIds?: string[];
+      performedServiceIds?: string[];
+      endAt?: string;
     } = {};
 
     if (data.status !== undefined) payload.status = data.status;
@@ -189,12 +204,29 @@ export const vetApi = {
     else if (data.notes !== undefined) payload.vetNotes = data.notes;
     if (data.cancelReason !== undefined) payload.cancelReason = data.cancelReason;
     else if (data.cancellationReason !== undefined) payload.cancelReason = data.cancellationReason;
+    if (data.serviceIds !== undefined) payload.serviceIds = data.serviceIds;
+    if (data.performedServiceIds !== undefined) payload.performedServiceIds = data.performedServiceIds;
+    if (data.endAt !== undefined) payload.endAt = data.endAt;
 
-    return api.patch<Appointment>(`/api/v1/veterinarian/appointments/${id}`, payload);
+    return api
+      .patch<Appointment>(`/api/v1/veterinarian/appointments/${id}`, payload)
+      .then(normalizeAppointment);
   },
 
-  createFollowUp: (id: string, data: CreateFollowUpRequest) =>
-    api.post<Appointment>(`/api/v1/veterinarian/appointments/${id}/follow-ups`, data),
+  createFollowUp: (id: string, data: CreateFollowUpRequest | any) => {
+    const payload = {
+      ...data,
+      serviceIds:
+        Array.isArray(data.serviceIds) && data.serviceIds.length > 0
+          ? data.serviceIds
+          : data.serviceId
+          ? [data.serviceId]
+          : [],
+    };
+    return api
+      .post<Appointment>(`/api/v1/veterinarian/appointments/${id}/follow-ups`, payload)
+      .then(normalizeAppointment);
+  },
 
   getPatientPet: async (id: string): Promise<Pet> => {
     syncCacheToken();

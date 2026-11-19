@@ -17,7 +17,8 @@ export interface VetActiveAppointmentDrawerProps {
   onUpdateStatus: (
     apptId: string,
     status: AppointmentStatus,
-    cancelReason?: string | null
+    cancelReason?: string | null,
+    performedServiceIds?: string[]
   ) => Promise<void> | void;
   onSaveNotes: (apptId: string, notes: string | null) => Promise<void>;
   onCreateFollowUp: (apptId: string, data: CreateFollowUpRequest) => Promise<void>;

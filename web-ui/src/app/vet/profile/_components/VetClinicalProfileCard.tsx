@@ -9,7 +9,7 @@ import { SpeciesIcon } from '@/components/ui/SpeciesIcon';
 import { VetAvatar } from '@/components/ui/EntityAvatar';
 import { EntityPhotoControl } from '@/components/ui/EntityPhotoControl';
 import { getDoctorDisplay } from '@/shared/lib';
-import { getSpecTone, getSpeciesTone, pluralRu, toIdNameMap } from '@/shared/lib';
+import { getSpecTone, getSpeciesTone, getSpeciesStyle, pluralRu, toIdNameMap } from '@/shared/lib';
 
 export interface VetPracticeFormData {
   bio: string;
@@ -255,10 +255,11 @@ export function VetClinicalProfileCard({
               {permittedSpecies.length > 0 ? (
                 <div className="chips">
                   {permittedSpecies.map((sp) => {
-                    const spTone = getSpeciesTone(sp.name || sp.id, speciesMap);
+                    const spTone = getSpeciesTone(sp.name || sp.id, permittedSpecies);
+                    const style = getSpeciesStyle(sp.id, permittedSpecies);
                     return (
-                      <span key={sp.id} className={`sp-chip tone-${spTone}`}>
-                        <SpeciesIcon species={spTone} size={14} />
+                      <span key={sp.id} className={`sp-chip tone-${spTone}`} style={style}>
+                        <SpeciesIcon species={('iconKey' in sp ? sp.iconKey : undefined) || spTone} size={14} className="ic" />
                         {sp.name}
                       </span>
                     );
