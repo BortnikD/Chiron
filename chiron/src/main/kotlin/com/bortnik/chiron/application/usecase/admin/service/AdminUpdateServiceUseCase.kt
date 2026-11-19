@@ -4,7 +4,9 @@ import com.bortnik.chiron.application.security.Actor
 import com.bortnik.chiron.domain.dto.service.UpdateServiceDto
 import com.bortnik.chiron.domain.entities.Service as ServiceEntity
 import com.bortnik.chiron.domain.exceptions.notfound.ServiceNotFoundException
+import com.bortnik.chiron.domain.exceptions.notfound.SpecializationNotFoundException
 import com.bortnik.chiron.domain.repositories.ServiceRepository
+import com.bortnik.chiron.domain.repositories.SpecializationRepository
 import com.bortnik.chiron.domain.utils.validators.ServiceValidator
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
@@ -13,12 +15,18 @@ import java.util.UUID
 
 @Service
 @Transactional
-class AdminUpdateServiceUseCase(private val serviceRepository: ServiceRepository) {
+class AdminUpdateServiceUseCase(
+    private val serviceRepository: ServiceRepository,
+    private val specializationRepository: SpecializationRepository,
+) {
 
     private val log = LoggerFactory.getLogger(javaClass)
 
     fun update(actor: Actor, id: UUID, dto: UpdateServiceDto): ServiceEntity {
         ServiceValidator.validate(dto)
+        dto.specializationId?.let {
+            specializationRepository.findById(it) ?: throw SpecializationNotFoundException(it)
+        }
         val service = serviceRepository.update(id, dto) ?: throw ServiceNotFoundException(id)
         log.info(
             "Admin {} ({}) updated service {} '{}': base price {}, active {}",

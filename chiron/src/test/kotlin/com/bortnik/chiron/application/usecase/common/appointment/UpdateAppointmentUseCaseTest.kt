@@ -6,6 +6,7 @@ import com.bortnik.chiron.domain.dto.orElse
 import com.bortnik.chiron.domain.entities.AppointmentService
 import com.bortnik.chiron.domain.entities.ServiceSpecies
 import com.bortnik.chiron.domain.entities.enums.AppointmentStatus
+import com.bortnik.chiron.domain.exceptions.BusinessRuleViolationException
 import com.bortnik.chiron.domain.exceptions.ValidationException
 import com.bortnik.chiron.domain.exceptions.rules.AppointmentSlotUnavailableException
 import com.bortnik.chiron.domain.exceptions.rules.InvalidAppointmentStatusTransitionException
@@ -104,11 +105,11 @@ class UpdateAppointmentUseCaseTest {
             startAt = appointment.startAt.plusSeconds(900), endAt = appointment.endAt.plusSeconds(900),
         )
         useCase().update(appointment.id, moved, actorId)
-        verify(availability).check(veterinarian.id, moved.startAt!!, moved.endAt!!, appointment.id)
+        verify(availability).checkSchedule(veterinarian.id, moved.startAt!!, moved.endAt!!, appointment.id)
 
         val extended = stored.endAt.plusSeconds(900)
         useCase().update(appointment.id, UpdateAppointmentDto(endAt = extended), actorId)
-        verify(availability).check(veterinarian.id, stored.startAt, extended, appointment.id)
+        verify(availability).checkSchedule(veterinarian.id, stored.startAt, extended, appointment.id)
     }
 
     @Test
@@ -258,7 +259,7 @@ class UpdateAppointmentUseCaseTest {
 
         assertEquals(extended, result.endAt)
         assertEquals(30, result.durationMin)
-        verify(availability).check(veterinarian.id, appointment.startAt, extended, appointment.id)
+        verify(availability).checkSchedule(veterinarian.id, appointment.startAt, extended, appointment.id)
     }
 
     @Test
@@ -272,7 +273,7 @@ class UpdateAppointmentUseCaseTest {
         assertEquals(15, result.bufferAfterMin)
         assertEquals(appointment.startAt.plusSeconds(65 * 60), result.endAt)
         assertTrue(result.services.all { it.isPlanned })
-        verify(availability).check(veterinarian.id, result.startAt, result.endAt, appointment.id)
+        verify(availability).checkSchedule(veterinarian.id, result.startAt, result.endAt, appointment.id)
     }
 
     @Test
@@ -303,13 +304,30 @@ class UpdateAppointmentUseCaseTest {
     @Test
     fun `performed services cannot be recorded before the appointment starts or for invalid visit statuses`() {
         val dto = UpdateAppointmentDto(performedServiceIds = listOf(service.id))
-        assertFailsWith<ValidationException> { useCase().update(appointment.id, dto, actorId) }
+        assertFailsWith<BusinessRuleViolationException> { useCase().update(appointment.id, dto, actorId) }
         for (status in listOf(AppointmentStatus.PENDING, AppointmentStatus.CANCELLED, AppointmentStatus.NO_SHOW)) {
-            stored = appointment.copy(status = status)
-            assertFailsWith<ValidationException> {
+            stored = appointment.copy(
+                status = status,
+                cancelledBy = actorId.takeIf { status == AppointmentStatus.CANCELLED },
+                cancelledAt = now.takeIf { status == AppointmentStatus.CANCELLED },
+            )
+            assertFailsWith<BusinessRuleViolationException> {
                 useCase(appointment.startAt.plusSeconds(60)).update(appointment.id, dto, actorId)
             }
         }
+        verifyNoInteractions(availability)
+    }
+
+    @Test
+    fun `a completed appointment cannot be rescheduled`() {
+        stored = appointment.copy(status = AppointmentStatus.COMPLETED)
+        val dto = UpdateAppointmentDto(startAt = appointment.startAt.plusSeconds(900))
+
+        val error = assertFailsWith<BusinessRuleViolationException> {
+            useCase().update(appointment.id, dto, actorId)
+        }
+
+        assertEquals("startAt", error.errors.single().field)
         verifyNoInteractions(availability)
     }
 
@@ -326,7 +344,7 @@ class UpdateAppointmentUseCaseTest {
                 )
             } else UpdateAppointmentDto(status = status)
 
-            assertFailsWith<ValidationException> {
+            assertFailsWith<BusinessRuleViolationException> {
                 useCase(appointment.startAt.plusSeconds(60)).update(appointment.id, dto, actorId)
             }
             assertEquals(AppointmentStatus.CONFIRMED, stored.status)
@@ -361,7 +379,7 @@ class UpdateAppointmentUseCaseTest {
     fun `conflicting extension leaves the saved interval unchanged`() {
         val end = appointment.endAt.plusSeconds(900)
         doThrow(AppointmentSlotUnavailableException(veterinarian.id, appointment.startAt, end, "Occupied"))
-            .`when`(availability).check(veterinarian.id, appointment.startAt, end, appointment.id)
+            .`when`(availability).checkSchedule(veterinarian.id, appointment.startAt, end, appointment.id)
 
         assertFailsWith<AppointmentSlotUnavailableException> {
             useCase().update(appointment.id, UpdateAppointmentDto(endAt = end), actorId)

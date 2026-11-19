@@ -31,7 +31,8 @@ class AppointmentAvailabilityController(
         summary = "Check slot availability",
         description = """
             Returns true when the veterinarian can take the slot.
-            Otherwise responds with AppointmentSlotUnavailableException whose message contains the reason.
+            Returns 404 for an unknown veterinarian, 409 for an overlapping appointment,
+            and 422 for an inactive veterinarian or a slot outside the veterinarian's availability.
             endAt must be after startAt; invalid bounds return 400.
             A slot must start and end on the same day in the clinic time zone, start on the clinic slot grid,
             fit into the working hours (custom hours of a schedule exception take precedence over the weekly schedule),

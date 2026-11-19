@@ -19,8 +19,8 @@ class JwtActorResolver(
     // Takes the value of an Authorization header; null for a missing, malformed or expired token or a deleted user.
     fun resolve(authorizationHeader: String?): Actor? =
         authorizationHeader
-            ?.takeIf { it.startsWith(BEARER_PREFIX) }
-            ?.let { jwtTokenProvider.parseUserId(it.removePrefix(BEARER_PREFIX)) }
+            ?.takeIf { it.startsWith(BEARER_PREFIX, ignoreCase = true) }
+            ?.let { jwtTokenProvider.parseUserId(it.substring(BEARER_PREFIX.length).trimStart(' ')) }
             ?.let(::findUser)
             ?.toActor()
 

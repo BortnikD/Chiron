@@ -1,6 +1,7 @@
 package com.bortnik.chiron.infrastructure.security
 
 import com.bortnik.chiron.application.security.Actor
+import com.bortnik.chiron.infrastructure.persistence.exceptions.findStorageFailure
 import jakarta.servlet.FilterChain
 import jakarta.servlet.http.HttpServletRequest
 import jakarta.servlet.http.HttpServletResponse
@@ -9,10 +10,12 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.security.core.authority.SimpleGrantedAuthority
 import org.springframework.security.core.context.SecurityContextHolder
 import org.springframework.web.filter.OncePerRequestFilter
+import org.springframework.web.servlet.HandlerExceptionResolver
 
 // Not a Spring bean on purpose: Boot would otherwise register it a second time as a plain servlet filter.
 class JwtAuthenticationFilter(
     private val jwtActorResolver: JwtActorResolver,
+    private val exceptionResolver: HandlerExceptionResolver,
 ) : OncePerRequestFilter() {
 
     override fun doFilterInternal(
@@ -20,7 +23,13 @@ class JwtAuthenticationFilter(
         response: HttpServletResponse,
         filterChain: FilterChain,
     ) {
-        val actor = jwtActorResolver.resolve(request.getHeader(HttpHeaders.AUTHORIZATION))
+        val actor = try {
+            jwtActorResolver.resolve(request.getHeader(HttpHeaders.AUTHORIZATION))
+        } catch (ex: Exception) {
+            val storageFailure = ex.findStorageFailure() ?: throw ex
+            exceptionResolver.resolveException(request, response, null, storageFailure) ?: throw ex
+            return
+        }
 
         if (actor != null) {
             SecurityContextHolder.getContext().authentication =

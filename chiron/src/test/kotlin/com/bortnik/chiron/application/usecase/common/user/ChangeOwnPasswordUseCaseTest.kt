@@ -11,6 +11,7 @@ import com.bortnik.chiron.domain.entities.User
 import com.bortnik.chiron.domain.entities.enums.UserRole
 import com.bortnik.chiron.domain.exceptions.InvalidCredentialsException
 import com.bortnik.chiron.domain.exceptions.ValidationException
+import com.bortnik.chiron.domain.exceptions.rules.InvalidCurrentPasswordException
 import com.bortnik.chiron.domain.repositories.UserRepository
 import com.bortnik.chiron.infrastructure.security.JwtActorResolver
 import com.bortnik.chiron.infrastructure.security.jwt.JwtProperties
@@ -91,7 +92,7 @@ class ChangeOwnPasswordUseCaseTest {
         val before = user()
         `when`(repository.findById(before.id)).thenReturn(before)
 
-        assertFailsWith<InvalidCredentialsException> {
+        assertFailsWith<InvalidCurrentPasswordException> {
             useCase.change(before.toActor(), ChangePasswordDto("wrong-password", "new-password"))
         }
 
@@ -104,7 +105,7 @@ class ChangeOwnPasswordUseCaseTest {
     fun `current password exceeding the bcrypt byte limit is rejected without updating`() {
         val before = user()
         `when`(repository.findById(before.id)).thenReturn(before)
-        assertFailsWith<InvalidCredentialsException> {
+        assertFailsWith<InvalidCurrentPasswordException> {
             useCase.change(before.toActor(), ChangePasswordDto("\u00E9".repeat(37), "new-password"))
         }
 

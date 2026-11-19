@@ -19,6 +19,7 @@ import com.bortnik.chiron.domain.repositories.VeterinarianSpeciesPermissionRepos
 import com.bortnik.chiron.domain.utils.AppointmentStatusRules
 import com.bortnik.chiron.domain.utils.validators.AppointmentValidator
 import com.bortnik.chiron.domain.utils.validators.validateAll
+import com.bortnik.chiron.domain.utils.validators.validateBusinessRules
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import java.time.Clock
@@ -55,13 +56,15 @@ class UpdateAppointmentUseCase(
         if (!AppointmentStatusRules.canTransition(existing.status, status)) {
             throw InvalidAppointmentStatusTransitionException(id, existing.status, status)
         }
-        validateAll {
+        validateBusinessRules {
             ensure(
                 status !in setOf(AppointmentStatus.CANCELLED, AppointmentStatus.NO_SHOW) ||
                         existing.services.none { it.isPerformed == true },
                 "status",
                 "an appointment with performed services cannot be cancelled or marked as no-show",
             )
+        }
+        validateAll {
             ensure(
                 existing.status == AppointmentStatus.COMPLETED || status != AppointmentStatus.COMPLETED ||
                         dto.performedServiceIds != null,
@@ -71,7 +74,7 @@ class UpdateAppointmentUseCase(
         }
         var services = existing.services
         if (dto.serviceIds != null) {
-            validateAll {
+            validateBusinessRules {
                 ensure(
                     existing.status in setOf(AppointmentStatus.PENDING, AppointmentStatus.CONFIRMED) &&
                             now < existing.startAt,
@@ -99,7 +102,7 @@ class UpdateAppointmentUseCase(
         val rescheduled =
             veterinarianId != existing.veterinarianId || startAt != existing.startAt || endAt != existing.endAt
         if (rescheduled || dto.serviceIds != null) {
-            validateAll {
+            validateBusinessRules {
                 ensure(
                     existing.status in setOf(AppointmentStatus.PENDING, AppointmentStatus.CONFIRMED),
                     "startAt",
@@ -118,10 +121,9 @@ class UpdateAppointmentUseCase(
                         "endAt",
                         "a started appointment can only be extended",
                     )
-                } else {
-                    ensure(startAt > now, "startAt", "must be in the future")
                 }
             }
+            validateAll { ensure(now >= existing.startAt || startAt > now, "startAt", "must be in the future") }
             val veterinarian = veterinarianRepository.findById(veterinarianId)
                 ?: throw VeterinarianNotFoundException(veterinarianId)
             if (!veterinarian.isActive) throw VeterinarianInactiveException(veterinarian.id)
@@ -133,11 +135,11 @@ class UpdateAppointmentUseCase(
             val resolved =
                 resolveServices.resolvePlanned(services.filter { it.isPlanned }.map { it.serviceId }, pet.speciesId)
             veterinarian.requireSpecialization(resolved.specializationId)
-            checkAvailability.check(veterinarian.id, startAt, endAt, excludeAppointmentId = id)
+            checkAvailability.checkSchedule(veterinarian.id, startAt, endAt, excludeAppointmentId = id)
         }
 
         if (dto.performedServiceIds != null) {
-            validateAll {
+            validateBusinessRules {
                 ensure(
                     status in setOf(AppointmentStatus.CONFIRMED, AppointmentStatus.COMPLETED) && now >= startAt,
                     "performedServiceIds",

@@ -7,7 +7,9 @@ import com.bortnik.chiron.domain.dto.notification.CreateNotificationDto
 import com.bortnik.chiron.domain.entities.enums.NotificationType
 import com.bortnik.chiron.domain.entities.Pet
 import com.bortnik.chiron.domain.exceptions.notfound.PetNotFoundException
+import com.bortnik.chiron.domain.exceptions.notfound.SpeciesNotFoundException
 import com.bortnik.chiron.domain.repositories.PetRepository
+import com.bortnik.chiron.domain.repositories.SpeciesRepository
 import com.bortnik.chiron.domain.utils.validators.PetValidator
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
@@ -21,10 +23,14 @@ class UpdatePetUseCase(
     private val petRepository: PetRepository,
     private val clock: Clock,
     private val createNotification: CreateNotificationUseCase,
+    private val speciesRepository: SpeciesRepository,
 ) {
 
     fun update(existing: Pet, dto: UpdatePetDto, actorId: UUID): Pet {
         PetValidator.validate(dto, LocalDate.now(clock))
+        dto.speciesId?.takeIf { it != existing.speciesId }?.let {
+            speciesRepository.findById(it) ?: throw SpeciesNotFoundException(it)
+        }
         val updated = petRepository.update(existing.id, dto) ?: throw PetNotFoundException(existing.id)
         val type = when {
             existing.isArchived != updated.isArchived ->

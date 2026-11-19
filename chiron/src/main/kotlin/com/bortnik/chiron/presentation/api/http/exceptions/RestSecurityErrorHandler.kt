@@ -3,6 +3,7 @@ package com.bortnik.chiron.presentation.api.http.exceptions
 import jakarta.servlet.http.HttpServletRequest
 import jakarta.servlet.http.HttpServletResponse
 import org.slf4j.LoggerFactory
+import org.springframework.http.HttpHeaders
 import org.springframework.http.HttpStatus
 import org.springframework.http.MediaType
 import org.springframework.security.access.AccessDeniedException
@@ -22,7 +23,10 @@ class RestSecurityErrorHandler(private val jsonMapper: JsonMapper) : Authenticat
         request: HttpServletRequest,
         response: HttpServletResponse,
         authException: AuthenticationException,
-    ) = write(HttpStatus.UNAUTHORIZED, authException, request, response, "Authentication required")
+    ) {
+        response.setHeader(HttpHeaders.WWW_AUTHENTICATE, "Bearer")
+        write(HttpStatus.UNAUTHORIZED, authException, request, response, "Authentication required")
+    }
 
     override fun handle(
         request: HttpServletRequest,

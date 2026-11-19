@@ -7,6 +7,7 @@ import com.bortnik.chiron.domain.dto.notification.SendAdminMessageDto
 import com.bortnik.chiron.domain.entities.enums.NotificationType
 import com.bortnik.chiron.domain.entities.enums.UserRole
 import com.bortnik.chiron.domain.exceptions.AccessDeniedException
+import com.bortnik.chiron.domain.exceptions.BusinessRuleViolationException
 import com.bortnik.chiron.domain.exceptions.ValidationException
 import com.bortnik.chiron.domain.exceptions.notfound.AppointmentNotFoundException
 import com.bortnik.chiron.domain.exceptions.notfound.PetNotFoundException
@@ -136,7 +137,7 @@ class AdminSendMessageUseCaseTest {
             message.copy(appointmentId = appointment.id, vaccinationId = vaccination.id),
             message.copy(petId = pet.id, vaccinationId = vaccination.id),
         )) {
-            assertFailsWith<ValidationException> { useCase.send(admin, user.id, linked) }
+            assertFailsWith<BusinessRuleViolationException> { useCase.send(admin, user.id, linked) }
         }
         verifyNoInteractions(users, notifications)
     }

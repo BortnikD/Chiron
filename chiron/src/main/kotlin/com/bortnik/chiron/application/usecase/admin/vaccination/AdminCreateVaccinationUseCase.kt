@@ -1,6 +1,7 @@
 package com.bortnik.chiron.application.usecase.admin.vaccination
 
 import com.bortnik.chiron.application.security.Actor
+import com.bortnik.chiron.application.usecase.common.pet.GetPetUseCase
 import com.bortnik.chiron.application.usecase.common.vaccination.CreateVaccinationUseCase
 import com.bortnik.chiron.domain.dto.vaccination.CreateVaccinationDto
 import com.bortnik.chiron.domain.entities.Vaccination
@@ -10,11 +11,15 @@ import org.springframework.transaction.annotation.Transactional
 
 @Service
 @Transactional
-class AdminCreateVaccinationUseCase(private val createVaccinationUseCase: CreateVaccinationUseCase) {
+class AdminCreateVaccinationUseCase(
+    private val createVaccinationUseCase: CreateVaccinationUseCase,
+    private val getPetUseCase: GetPetUseCase,
+) {
 
     private val log = LoggerFactory.getLogger(javaClass)
 
     fun create(actor: Actor, dto: CreateVaccinationDto): Vaccination {
+        if (dto.appointmentId == null) getPetUseCase.findById(dto.petId)
         val vaccination = createVaccinationUseCase.create(dto, actor.userId)
         log.info(
             "Admin {} ({}) recorded vaccination {} '{}' for pet {}",

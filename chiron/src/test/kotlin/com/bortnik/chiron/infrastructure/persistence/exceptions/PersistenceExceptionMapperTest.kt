@@ -4,8 +4,10 @@ import org.junit.jupiter.api.Test
 import org.postgresql.util.PSQLException
 import org.postgresql.util.ServerErrorMessage
 import java.sql.SQLException
+import java.sql.SQLTransientConnectionException
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
+import kotlin.test.assertNull
 import kotlin.test.assertSame
 
 class PersistenceExceptionMapperTest {
@@ -60,8 +62,17 @@ class PersistenceExceptionMapperTest {
         assertIs<ConcurrencyException>(pgError("23P01", "conflicting appointment interval").toPersistenceException())
         assertIs<QueryTimeoutException>(pgError("57014", "canceling statement").toPersistenceException())
         assertIs<ConnectionException>(pgError("08006", "connection failure").toPersistenceException())
+        assertIs<ConnectionException>(pgError("08001", "connection refused").toPersistenceException())
+        assertIs<ConnectionException>(pgError("08003", "connection closed").toPersistenceException())
         assertIs<UnknownPersistenceException>(pgError("42P01", "relation does not exist").toPersistenceException())
         assertIs<UnknownPersistenceException>(SQLException("no state").toPersistenceException())
+    }
+
+    @Test
+    fun `wrapped connection failures are distinguished from other database errors`() {
+        val connectionFailure = SQLTransientConnectionException("pool timeout")
+        assertIs<ConnectionException>(IllegalStateException(connectionFailure).findStorageFailure())
+        assertNull(IllegalStateException(pgError("42P01", "relation does not exist")).findStorageFailure())
     }
 
     // Builds a PSQLException from PostgreSQL protocol fields: field code + value, NUL-separated.

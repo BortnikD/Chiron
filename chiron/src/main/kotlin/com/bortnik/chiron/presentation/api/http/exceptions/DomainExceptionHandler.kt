@@ -2,6 +2,7 @@ package com.bortnik.chiron.presentation.api.http.exceptions
 
 import com.bortnik.chiron.domain.exceptions.AccessDeniedException
 import com.bortnik.chiron.domain.exceptions.BusinessRuleViolationException
+import com.bortnik.chiron.domain.exceptions.ConflictException
 import com.bortnik.chiron.domain.exceptions.DomainException
 import com.bortnik.chiron.domain.exceptions.EntityAlreadyExistsException
 import com.bortnik.chiron.domain.exceptions.EntityNotFoundException
@@ -12,9 +13,11 @@ import com.bortnik.chiron.presentation.api.http.ApiResponse
 import com.bortnik.chiron.presentation.api.http.ApiViolation
 import com.bortnik.chiron.presentation.api.http.mappers.toApiViolation
 import jakarta.servlet.http.HttpServletRequest
+import jakarta.servlet.http.HttpServletResponse
 import org.slf4j.LoggerFactory
 import org.springframework.core.Ordered
 import org.springframework.core.annotation.Order
+import org.springframework.http.HttpHeaders
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.ExceptionHandler
@@ -42,16 +45,33 @@ class DomainExceptionHandler {
     ): ResponseEntity<ApiResponse<Nothing>> =
         respond(HttpStatus.CONFLICT, ex, request)
 
+    @ExceptionHandler(ConflictException::class)
+    fun handleConflict(ex: ConflictException, request: HttpServletRequest): ResponseEntity<ApiResponse<Nothing>> =
+        respond(HttpStatus.CONFLICT, ex, request, ex.errors.takeIf { it.isNotEmpty() }?.map { it.toApiViolation() })
+
     @ExceptionHandler(BusinessRuleViolationException::class)
     fun handleBusinessRule(
         ex: BusinessRuleViolationException,
         request: HttpServletRequest,
     ): ResponseEntity<ApiResponse<Nothing>> =
-        respond(HttpStatus.UNPROCESSABLE_ENTITY, ex, request)
+        respond(
+            HttpStatus.UNPROCESSABLE_ENTITY,
+            ex,
+            request,
+            ex.errors.takeIf { it.isNotEmpty() }?.map { it.toApiViolation() },
+        )
 
     @ExceptionHandler(UnauthenticatedException::class, InvalidCredentialsException::class)
-    fun handleUnauthenticated(ex: DomainException, request: HttpServletRequest): ResponseEntity<ApiResponse<Nothing>> =
-        respond(HttpStatus.UNAUTHORIZED, ex, request)
+    fun handleUnauthenticated(
+        ex: DomainException,
+        request: HttpServletRequest,
+        response: HttpServletResponse,
+    ): ResponseEntity<ApiResponse<Nothing>> {
+        if (ex is UnauthenticatedException) {
+            response.setHeader(HttpHeaders.WWW_AUTHENTICATE, "Bearer")
+        }
+        return respond(HttpStatus.UNAUTHORIZED, ex, request)
+    }
 
     @ExceptionHandler(AccessDeniedException::class)
     fun handleAccessDenied(ex: AccessDeniedException, request: HttpServletRequest): ResponseEntity<ApiResponse<Nothing>> =

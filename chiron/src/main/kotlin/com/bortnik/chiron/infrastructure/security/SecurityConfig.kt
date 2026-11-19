@@ -3,6 +3,7 @@ package com.bortnik.chiron.infrastructure.security
 import com.bortnik.chiron.domain.entities.enums.UserRole
 import com.bortnik.chiron.infrastructure.config.CorsProperties
 import com.bortnik.chiron.infrastructure.websocket.WebSocketConfig
+import org.springframework.beans.factory.annotation.Qualifier
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
 import org.springframework.core.env.Environment
@@ -21,6 +22,7 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 import org.springframework.web.cors.CorsConfiguration
 import org.springframework.web.cors.CorsConfigurationSource
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource
+import org.springframework.web.servlet.HandlerExceptionResolver
 
 @Configuration
 @EnableWebSecurity
@@ -34,6 +36,7 @@ class SecurityConfig {
         authenticationEntryPoint: AuthenticationEntryPoint,
         accessDeniedHandler: AccessDeniedHandler,
         environment: Environment,
+        @Qualifier("handlerExceptionResolver") exceptionResolver: HandlerExceptionResolver,
     ): SecurityFilterChain = http
         .cors { }
         .csrf { it.disable() }
@@ -64,7 +67,7 @@ class SecurityConfig {
             it.anyRequest().authenticated()
         }
         .addFilterBefore(
-            JwtAuthenticationFilter(jwtActorResolver),
+            JwtAuthenticationFilter(jwtActorResolver, exceptionResolver),
             UsernamePasswordAuthenticationFilter::class.java,
         )
         .build()

@@ -1,18 +1,25 @@
 package com.bortnik.chiron.presentation.api.http.exceptions
 
+import com.bortnik.chiron.domain.exceptions.rules.AppointmentSlotConflictException
 import com.bortnik.chiron.infrastructure.persistence.exceptions.ConcurrencyException
 import com.bortnik.chiron.infrastructure.persistence.exceptions.ConnectionException
 import com.bortnik.chiron.infrastructure.persistence.exceptions.ForeignKeyViolationException
 import com.bortnik.chiron.infrastructure.persistence.exceptions.InvalidDataException
 import com.bortnik.chiron.infrastructure.persistence.exceptions.PersistenceException
 import com.bortnik.chiron.infrastructure.persistence.exceptions.QueryTimeoutException
+import com.bortnik.chiron.infrastructure.persistence.exceptions.SqlError
 import com.bortnik.chiron.infrastructure.persistence.exceptions.UniqueViolationException
+import com.bortnik.chiron.infrastructure.persistence.exceptions.findStorageFailure
 import com.bortnik.chiron.presentation.api.http.ApiResponse
 import com.bortnik.chiron.presentation.api.http.ApiViolation
 import jakarta.servlet.http.HttpServletRequest
+import jakarta.servlet.http.HttpServletResponse
+import org.apache.tomcat.util.http.fileupload.FileUploadException
+import org.apache.tomcat.util.http.fileupload.MultipartStream.MalformedStreamException
 import org.slf4j.LoggerFactory
 import org.springframework.core.Ordered
 import org.springframework.core.annotation.Order
+import org.springframework.http.HttpHeaders
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
 import org.springframework.http.converter.HttpMessageNotReadableException
@@ -27,6 +34,7 @@ import org.springframework.web.bind.annotation.ExceptionHandler
 import org.springframework.web.bind.annotation.RestControllerAdvice
 import org.springframework.web.method.annotation.HandlerMethodValidationException
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException
+import org.springframework.web.multipart.MultipartException
 import org.springframework.web.server.ResponseStatusException
 import org.springframework.web.servlet.NoHandlerFoundException
 import org.springframework.web.servlet.resource.NoResourceFoundException
@@ -48,8 +56,12 @@ class GlobalExceptionHandler {
     fun handleMethodNotSupported(
         ex: HttpRequestMethodNotSupportedException,
         request: HttpServletRequest,
-    ): ResponseEntity<ApiResponse<Nothing>> =
-        respond(HttpStatus.METHOD_NOT_ALLOWED, ex, request, "Method ${ex.method} is not supported for this endpoint")
+    ): ResponseEntity<ApiResponse<Nothing>> {
+        val response = respond(
+            HttpStatus.METHOD_NOT_ALLOWED, ex, request, "Method ${ex.method} is not supported for this endpoint",
+        )
+        return ResponseEntity(response.body, ex.headers, response.statusCode)
+    }
 
     @ExceptionHandler(HttpMediaTypeNotSupportedException::class)
     fun handleMediaTypeNotSupported(
@@ -135,9 +147,12 @@ class GlobalExceptionHandler {
     @ExceptionHandler(AuthenticationException::class)
     fun handleAuthentication(
         ex: AuthenticationException,
-        request: HttpServletRequest
-    ): ResponseEntity<ApiResponse<Nothing>> =
-        respond(HttpStatus.UNAUTHORIZED, ex, request, "Authentication required")
+        request: HttpServletRequest,
+        response: HttpServletResponse,
+    ): ResponseEntity<ApiResponse<Nothing>> {
+        response.setHeader(HttpHeaders.WWW_AUTHENTICATE, "Bearer")
+        return respond(HttpStatus.UNAUTHORIZED, ex, request, "Authentication required")
+    }
 
     @ExceptionHandler(SecurityAccessDeniedException::class)
     fun handleAccessDenied(
@@ -149,6 +164,9 @@ class GlobalExceptionHandler {
     // Database details (constraint, table, SQL state) are logged but never exposed to the client.
     @ExceptionHandler(PersistenceException::class)
     fun handlePersistence(ex: PersistenceException, request: HttpServletRequest): ResponseEntity<ApiResponse<Nothing>> {
+        if (ex is ConcurrencyException && ex.sqlError == SqlError.EXCLUSION_VIOLATION) {
+            return respond(HttpStatus.CONFLICT, AppointmentSlotConflictException(ex), request)
+        }
         val (status, message) = when (ex) {
             is UniqueViolationException -> HttpStatus.CONFLICT to "Resource conflicts with an existing record"
             is ForeignKeyViolationException -> HttpStatus.CONFLICT to "Operation violates a reference to a related resource"
@@ -161,9 +179,19 @@ class GlobalExceptionHandler {
         return respond(status, ex, request, message)
     }
 
+    @ExceptionHandler(MultipartException::class)
+    fun handleMultipart(ex: MultipartException, request: HttpServletRequest): ResponseEntity<ApiResponse<Nothing>> =
+        when (ex.mostSpecificCause) {
+            is FileUploadException, is MalformedStreamException ->
+                respond(HttpStatus.BAD_REQUEST, ex, request, "Malformed multipart request")
+
+            else -> handleUnexpected(ex, request)
+        }
+
     @ExceptionHandler(Exception::class)
     fun handleUnexpected(ex: Exception, request: HttpServletRequest): ResponseEntity<ApiResponse<Nothing>> =
-        respond(HttpStatus.INTERNAL_SERVER_ERROR, ex, request, "Internal server error")
+        ex.findStorageFailure()?.let { handlePersistence(it, request) }
+            ?: respond(HttpStatus.INTERNAL_SERVER_ERROR, ex, request, "Internal server error")
 
     private fun respond(
         status: HttpStatus,

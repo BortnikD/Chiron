@@ -2,9 +2,13 @@ package com.bortnik.chiron.application.usecase.common.appointment
 
 import com.bortnik.chiron.application.config.ClinicProperties
 import com.bortnik.chiron.domain.dto.scheduleexception.ScheduleExceptionFilter
+import com.bortnik.chiron.domain.exceptions.notfound.VeterinarianNotFoundException
+import com.bortnik.chiron.domain.exceptions.rules.AppointmentSlotConflictException
 import com.bortnik.chiron.domain.exceptions.rules.AppointmentSlotUnavailableException
+import com.bortnik.chiron.domain.exceptions.rules.VeterinarianInactiveException
 import com.bortnik.chiron.domain.repositories.AppointmentRepository
 import com.bortnik.chiron.domain.repositories.ScheduleExceptionRepository
+import com.bortnik.chiron.domain.repositories.VeterinarianRepository
 import com.bortnik.chiron.domain.repositories.WorkScheduleRepository
 import com.bortnik.chiron.domain.utils.VeterinarianAvailability
 import com.bortnik.chiron.domain.utils.validators.validateAll
@@ -20,13 +24,22 @@ class CheckAppointmentAvailabilityUseCase(
     private val scheduleExceptionRepository: ScheduleExceptionRepository,
     private val appointmentRepository: AppointmentRepository,
     private val clinicProperties: ClinicProperties,
+    private val veterinarianRepository: VeterinarianRepository,
 ) {
 
     fun check(veterinarianId: UUID, startAt: Instant, endAt: Instant, excludeAppointmentId: UUID? = null) {
         validateAll { ensure(endAt > startAt, "endAt", "must be after startAt") }
+        val veterinarian = veterinarianRepository.findById(veterinarianId)
+            ?: throw VeterinarianNotFoundException(veterinarianId)
+        if (!veterinarian.isActive) throw VeterinarianInactiveException(veterinarianId)
+        checkSchedule(veterinarianId, startAt, endAt, excludeAppointmentId)
+    }
+
+    fun checkSchedule(veterinarianId: UUID, startAt: Instant, endAt: Instant, excludeAppointmentId: UUID? = null) {
         val reason = availabilityOf(veterinarianId, startAt, endAt)
-            .unavailabilityReason(startAt, endAt, excludeAppointmentId)
-        if (reason != null) throw AppointmentSlotUnavailableException(veterinarianId, startAt, endAt, reason)
+            .unavailabilityReason(startAt, endAt, excludeAppointmentId) ?: return
+        if (reason == VeterinarianAvailability.APPOINTMENT_OVERLAP) throw AppointmentSlotConflictException()
+        throw AppointmentSlotUnavailableException(veterinarianId, startAt, endAt, reason)
     }
 
     fun availabilityOf(

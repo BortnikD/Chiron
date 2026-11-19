@@ -6,7 +6,7 @@ import com.bortnik.chiron.application.usecase.common.appointment.ChangeAppointme
 import com.bortnik.chiron.application.usecase.common.notification.NotifyAppointmentUseCase
 import com.bortnik.chiron.domain.dto.appointment.UpdateAppointmentStatusDto
 import com.bortnik.chiron.domain.entities.Appointment
-import com.bortnik.chiron.domain.utils.validators.validateAll
+import com.bortnik.chiron.domain.utils.validators.validateBusinessRules
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
@@ -24,7 +24,7 @@ class VeterinarianUpdateAppointmentStatusUseCase(
 
     fun update(actor: Actor, id: UUID, dto: UpdateAppointmentStatusDto): Appointment {
         val appointment = accessGuard.requireAssignedAppointment(actor, id, forUpdate = true)
-        validateAll {
+        validateBusinessRules {
             ensure(
                 dto.endAt == null || dto.endAt >= appointment.endAt,
                 "endAt",

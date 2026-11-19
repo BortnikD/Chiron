@@ -1,6 +1,7 @@
 package com.bortnik.chiron.application.usecase.common.appointment
 
 import com.bortnik.chiron.domain.entities.ServiceSpecies
+import com.bortnik.chiron.domain.exceptions.BusinessRuleViolationException
 import com.bortnik.chiron.domain.exceptions.ValidationException
 import com.bortnik.chiron.domain.exceptions.notfound.ServiceNotFoundException
 import com.bortnik.chiron.domain.repositories.ServiceRepository
@@ -76,7 +77,7 @@ class ResolveAppointmentServicesUseCaseTest {
         `when`(services.findAllByIds(ids)).thenReturn(listOf(service, other.copy(specializationId = UUID.randomUUID())))
         `when`(overrides.findAllBySpeciesId(pet.speciesId)).thenReturn(ids.map { ServiceSpecies(it, pet.speciesId) })
 
-        val error = assertFailsWith<ValidationException> { useCase.resolvePlanned(ids, pet.speciesId) }
+        val error = assertFailsWith<BusinessRuleViolationException> { useCase.resolvePlanned(ids, pet.speciesId) }
 
         assertEquals(listOf("serviceIds"), error.errors.map { it.field })
     }

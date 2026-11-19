@@ -17,7 +17,7 @@ import com.bortnik.chiron.domain.repositories.PetRepository
 import com.bortnik.chiron.domain.repositories.UserRepository
 import com.bortnik.chiron.domain.repositories.VaccinationRepository
 import com.bortnik.chiron.domain.utils.validators.AdminMessageValidator
-import com.bortnik.chiron.domain.utils.validators.validateAll
+import com.bortnik.chiron.domain.utils.validators.validateBusinessRules
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
@@ -44,7 +44,7 @@ class AdminSendMessageUseCase(
         val vaccination = dto.vaccinationId?.let {
             vaccinationRepository.findById(it) ?: throw VaccinationNotFoundException(it)
         }
-        validateAll {
+        validateBusinessRules {
             ensure(
                 listOfNotNull(pet?.id, appointment?.petId, vaccination?.petId).distinct().size <= 1,
                 "petId",

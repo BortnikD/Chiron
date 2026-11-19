@@ -4,7 +4,7 @@ import com.bortnik.chiron.domain.dto.scheduleexception.CreateScheduleExceptionDt
 import com.bortnik.chiron.domain.dto.scheduleexception.UpdateScheduleExceptionDto
 import com.bortnik.chiron.domain.entities.ScheduleException
 import com.bortnik.chiron.domain.entities.enums.ScheduleExceptionType
-import com.bortnik.chiron.domain.exceptions.ValidationException
+import com.bortnik.chiron.domain.exceptions.ConflictException
 import org.junit.jupiter.api.Test
 import java.time.LocalDate
 import java.time.LocalTime
@@ -22,7 +22,7 @@ class ScheduleExceptionValidatorTest {
     @Test
     fun `custom hours cannot share even one date with another custom hours range`() {
         for (start in listOf(date.minusDays(1), date, date.plusDays(2))) {
-            val ex = assertFailsWith<ValidationException> {
+            val ex = assertFailsWith<ConflictException> {
                 ScheduleExceptionValidator.validate(create(start), listOf(existing))
             }
             assertEquals(listOf("startDate"), ex.errors.map { it.field })
@@ -59,13 +59,13 @@ class ScheduleExceptionValidatorTest {
     @Test
     fun `editing dates or converting absence to custom hours checks other records`() {
         val other = existing.copy(id = UUID.randomUUID(), startDate = date.plusDays(3), endDate = date.plusDays(4))
-        assertFailsWith<ValidationException> {
+        assertFailsWith<ConflictException> {
             ScheduleExceptionValidator.validate(
                 other, UpdateScheduleExceptionDto(startDate = date.plusDays(2)),
                 listOf(existing, other),
             )
         }
-        assertFailsWith<ValidationException> {
+        assertFailsWith<ConflictException> {
             ScheduleExceptionValidator.validate(
                 other.copy(type = ScheduleExceptionType.ABSENCE),
                 UpdateScheduleExceptionDto(type = ScheduleExceptionType.CUSTOM_HOURS, startDate = date),
