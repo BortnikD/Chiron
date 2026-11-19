@@ -1,9 +1,9 @@
 import React from 'react';
-import { CalendarOff, AlertCircle } from 'lucide-react';
+import { CalendarOff, AlertCircle, Check, UserCheck } from 'lucide-react';
 import type { Veterinarian, AvailableSlotResponse } from '@/modules/clinic/types';
-import { DatePicker } from '@/shared/components';
+import { DatePicker, Skeleton } from '@/shared/components';
 import { VetAvatar } from '@/components/ui/EntityAvatar';
-import { formatSlotTime } from '@/shared/lib';
+import { formatMoscowMonthDay, formatSlotTime, pluralRu } from '@/shared/lib';
 import { getDoctorDisplay } from '@/shared/lib';
 import type { GroupedDaySlots } from '../_hooks/useBookingSlots';
 
@@ -22,7 +22,12 @@ export interface StepSlotSelectionProps {
   slotsByDay: GroupedDaySlots[];
   selectedSlot: AvailableSlotResponse | null;
   onSelectSlot: (slot: AvailableSlotResponse) => void;
+  selectedSlotVetId?: string | null;
+  onSelectSlotVetId?: (vetId: string) => void;
   isAnyVet: boolean;
+  selectedVet?: Veterinarian | null;
+  initialSlot?: string | null;
+  onResetToAnyVet?: () => void;
   vetsMap: Record<string, Veterinarian>;
   specsMap: Record<string, string>;
 }
@@ -45,18 +50,54 @@ export const StepSlotSelection: React.FC<StepSlotSelectionProps> = ({
   slotsByDay,
   selectedSlot,
   onSelectSlot,
+  selectedSlotVetId,
+  onSelectSlotVetId,
   isAnyVet,
+  selectedVet,
+  initialSlot,
+  onResetToAnyVet,
   vetsMap,
   specsMap,
 }) => {
+  const selectedSlotVets = React.useMemo(() => {
+    if (!selectedSlot) return [];
+    return selectedSlot.veterinarianIds
+      .map((id) => vetsMap[id])
+      .filter((v): v is Veterinarian => Boolean(v));
+  }, [selectedSlot, vetsMap]);
+  const nearestSlot = React.useMemo(() => {
+    return availableSlots.length > 0 ? availableSlots[0] : null;
+  }, [availableSlots]);
+
   return (
     <div className="col" style={{ gap: '12px' }}>
       {conflictError && (
-        <div className="alert" role="alert">
-          <AlertCircle className="ic" />
-          <div>
-            <b>Слот недоступен.</b> {conflictError}
+        <div
+          className="alert alert-destructive row between items-center wrap"
+          role="alert"
+          style={{ gap: '10px' }}
+        >
+          <div className="row items-center" style={{ gap: '8px', flex: 1, minWidth: '220px' }}>
+            <AlertCircle className="ic" style={{ flexShrink: 0 }} />
+            <div>
+              <b>Время только что занято другим клиентом.</b> {conflictError}
+              {nearestSlot && (
+                <div style={{ marginTop: '2px', fontSize: '12.5px' }}>
+                  Ближайшее доступное окно: <b>{formatMoscowMonthDay(nearestSlot.startAt)} в {formatSlotTime(nearestSlot.startAt)}</b>
+                </div>
+              )}
+            </div>
           </div>
+          {nearestSlot && (
+            <button
+              type="button"
+              className="btn btn-primary btn-sm"
+              onClick={() => onSelectSlot(nearestSlot)}
+              style={{ whiteSpace: 'nowrap' }}
+            >
+              Выбрать {formatSlotTime(nearestSlot.startAt)}
+            </button>
+          )}
         </div>
       )}
 
@@ -103,10 +144,53 @@ export const StepSlotSelection: React.FC<StepSlotSelectionProps> = ({
         )}
       </div>
 
+      {initialSlot && !selectedSlot && !isAnyVet && selectedVet && (
+        <div
+          className="row between items-center wrap"
+          style={{
+            padding: '10px 14px',
+            background: 'color-mix(in srgb, var(--accent) 8%, var(--surface))',
+            border: '1px solid color-mix(in srgb, var(--accent) 30%, transparent)',
+            borderRadius: '8px',
+            fontSize: '13px',
+            gap: '10px',
+          }}
+        >
+          <div className="row items-center" style={{ gap: '8px', flex: 1, minWidth: '220px' }}>
+            <AlertCircle size={16} className="accent" style={{ flexShrink: 0 }} />
+            <span>
+              У врача <b>{selectedVet.fullName}</b> время {formatMoscowMonthDay(initialSlot)} в{' '}
+              <b>{formatSlotTime(initialSlot)}</b> недоступно. Выберите любое свободное окно ниже или вернитесь к «Любому врачу».
+            </span>
+          </div>
+          {onResetToAnyVet && (
+            <button
+              type="button"
+              className="btn btn-outline btn-sm"
+              onClick={onResetToAnyVet}
+              style={{ whiteSpace: 'nowrap' }}
+            >
+              Вернуться к «Любому врачу» ({formatSlotTime(initialSlot)})
+            </button>
+          )}
+        </div>
+      )}
+
       {loadingSlots ? (
-        <div className="empty">
-          <div className="spinner" />
-          <span className="small muted">Поиск свободных окон...</span>
+        <div className="col" style={{ gap: '16px', padding: '12px 0' }}>
+          {[1, 2, 3].map((d) => (
+            <div key={`day-skel-${d}`} className="col" style={{ gap: '8px' }}>
+              <div className="row items-center" style={{ gap: '8px' }}>
+                <Skeleton width="130px" height="16px" borderRadius="4px" />
+                <Skeleton width="60px" height="14px" borderRadius="4px" />
+              </div>
+              <div className="row wrap" style={{ gap: '8px' }}>
+                {[1, 2, 3, 4, 5, 6, 7, 8].map((s) => (
+                  <Skeleton key={s} width="64px" height="32px" borderRadius="8px" />
+                ))}
+              </div>
+            </div>
+          ))}
         </div>
       ) : slotsError ? (
         <div className="alert alert-destructive" role="alert">
@@ -188,6 +272,79 @@ export const StepSlotSelection: React.FC<StepSlotSelectionProps> = ({
               </div>
             </div>
           ))}
+
+          {selectedSlot && selectedSlotVets.length > 0 && isAnyVet && (
+            <div
+              className="card"
+              style={{
+                padding: '16px',
+                borderRadius: '12px',
+                background: 'var(--card)',
+                border: '1px solid var(--border)',
+                marginTop: '12px',
+              }}
+            >
+              <div className="row wrap between items-center" style={{ gap: '8px', marginBottom: '12px' }}>
+                <div className="col" style={{ gap: '2px' }}>
+                  <span className="cell-main" style={{ fontWeight: 600 }}>
+                    {selectedSlotVets.length > 1
+                      ? 'Выберите врача на выбранное время:'
+                      : 'Назначенный врач на это время:'}
+                  </span>
+                  <span className="small muted">
+                    {selectedSlotVets.length > 1
+                      ? `Свободно ${selectedSlotVets.length} ${pluralRu(selectedSlotVets.length, 'врач', 'врача', 'врачей')}. Выберите специалиста, к которому хотите записаться:`
+                      : 'Приём проведёт специалист клиники:'}
+                  </span>
+                </div>
+                <span className="badge badge-accent small">
+                  {formatSlotTime(selectedSlot.startAt)}–{formatSlotTime(selectedSlot.endAt)}
+                </span>
+              </div>
+
+              <div className="row wrap" style={{ gap: '10px' }}>
+                {selectedSlotVets.map((v) => {
+                  const isChosen = (selectedSlotVetId || selectedSlotVets[0].id) === v.id;
+                  const doc = getDoctorDisplay(v, specsMap);
+                  return (
+                    <button
+                      key={v.id}
+                      type="button"
+                      className={`btn ${isChosen ? 'btn-primary' : 'btn-outline'}`}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '10px',
+                        padding: '10px 14px',
+                        borderRadius: '8px',
+                        textAlign: 'left',
+                        flex: '1 1 min(240px, 100%)',
+                        justifyContent: 'flex-start',
+                      }}
+                      onClick={() => onSelectSlotVetId?.(v.id)}
+                    >
+                      <VetAvatar
+                        vet={v}
+                        initials={doc.initials}
+                        className="avatar avatar-sm"
+                        alt={doc.name}
+                      />
+                      <div className="col" style={{ gap: '1px', minWidth: 0, flex: 1 }}>
+                        <span style={{ fontWeight: 600, fontSize: '13px' }}>{doc.name}</span>
+                        <span
+                          className="small muted"
+                          style={{ fontSize: '11px', opacity: isChosen ? 0.9 : 0.7 }}
+                        >
+                          {doc.specName}
+                        </span>
+                      </div>
+                      {isChosen && <Check size={16} style={{ flexShrink: 0 }} />}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
         </>
       )}
     </div>

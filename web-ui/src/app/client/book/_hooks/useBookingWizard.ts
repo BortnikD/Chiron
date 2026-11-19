@@ -19,7 +19,8 @@ export function useBookingWizard(
   initialPetId?: string | null,
   initialSlot?: string | null,
   initialIntent?: string | null,
-  initialVaccine?: string | null
+  initialVaccine?: string | null,
+  initialSpeciesId?: string | null
 ) {
   const { toast } = useToast();
   const [step, setStepState] = useState<number>(1);
@@ -44,7 +45,8 @@ export function useBookingWizard(
     setStepState,
     initialPetId,
     initialSlot,
-    initialIntent
+    initialIntent,
+    initialSpeciesId
   );
 
   const isVaccination = isVaccinationService(data.selectedService);
@@ -149,10 +151,25 @@ export function useBookingWizard(
     return slots.selectedSlot.veterinarianIds[0] ?? null;
   }, [data.isAnyVet, data.selectedVet, slots.selectedSlot, slots.selectedSlotVetId]);
 
-  const doctorDisplay = useMemo(
-    () => resolveDoctorDisplayName(data.isAnyVet, data.selectedVet, data.specsMap),
-    [data.isAnyVet, data.selectedVet, data.specsMap]
-  );
+  const availableVetsForSlot = useMemo(() => {
+    if (!slots.selectedSlot) return [];
+    return slots.selectedSlot.veterinarianIds
+      .map((id) => data.vetsMap[id])
+      .filter(Boolean);
+  }, [slots.selectedSlot, data.vetsMap]);
+
+  const doctorDisplay = useMemo(() => {
+    if (!data.isAnyVet && data.selectedVet) {
+      return resolveDoctorDisplayName(false, data.selectedVet, data.specsMap);
+    }
+    if (data.isAnyVet) {
+      if (slots.selectedSlotVetId && data.vetsMap[slots.selectedSlotVetId]) {
+        return resolveDoctorDisplayName(false, data.vetsMap[slots.selectedSlotVetId], data.specsMap);
+      }
+      return 'Любой врач';
+    }
+    return resolveDoctorDisplayName(data.isAnyVet, data.selectedVet, data.specsMap);
+  }, [data.isAnyVet, data.selectedVet, slots.selectedSlotVetId, data.vetsMap, data.specsMap]);
 
   const handleConfirmBooking = useCallback(async () => {
     if (!data.selectedPet || !data.selectedService || !slots.selectedSlot) {
@@ -251,6 +268,7 @@ export function useBookingWizard(
     data,
     slots,
     resolvedVetId,
+    availableVetsForSlot,
     doctorDisplay,
     isVaccination,
     isVetPreselected: Boolean(

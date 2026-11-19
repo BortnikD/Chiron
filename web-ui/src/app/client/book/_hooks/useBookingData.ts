@@ -5,7 +5,7 @@ import { clientApi } from '@/modules/client/api';
 import { clinicApi } from '@/modules/clinic/api';
 import type { Pet } from '@/modules/client/types';
 import type { Service, Veterinarian, Specialization, Species } from '@/modules/clinic/types';
-import { formatApiError, toIdNameMap } from '@/shared/lib';
+import { formatApiError, registerSpecializationColors, toIdNameMap } from '@/shared/lib';
 import { useDictionaries } from '@/shared/hooks';
 
 const VACCINATION_SERVICE_ID = '5eed0003-0000-0000-0000-000000000002';
@@ -35,7 +35,8 @@ export function useBookingData(
   onSetStep: (step: number) => void,
   initialPetId?: string | null,
   initialSlot?: string | null,
-  initialIntent?: string | null
+  initialIntent?: string | null,
+  initialSpeciesId?: string | null
 ) {
   const {
     veterinarians: dictVets,
@@ -69,7 +70,7 @@ export function useBookingData(
   initialIntentRef.current = initialIntent;
   const initialServiceIdRef = useRef(initialServiceId);
   initialServiceIdRef.current = initialServiceId;
-  const initKey = `${initialServiceId ?? ''}|${initialVetId ?? ''}|${initialPetId ?? ''}|${initialSlot ?? ''}|${initialIntent ?? ''}`;
+  const initKey = `${initialServiceId ?? ''}|${initialVetId ?? ''}|${initialPetId ?? ''}|${initialSlot ?? ''}|${initialIntent ?? ''}|${initialSpeciesId ?? ''}`;
   const lastInitKeyRef = useRef<string | null>(null);
   const loadedSpeciesIdRef = useRef<string | null | undefined>(undefined);
   const selectedPetRef = useRef<Pet | null>(null);
@@ -90,6 +91,9 @@ export function useBookingData(
         if (cancelled) return;
         const vetsData = dictVets.length > 0 ? dictVets : await clinicApi.getVeterinarians();
         const specData = dictSpecializations.length > 0 ? dictSpecializations : await clinicApi.getSpecializations();
+        if (Array.isArray(specData)) {
+          registerSpecializationColors(specData);
+        }
         const spData = dictSpecies.length > 0 ? dictSpecies : await clinicApi.getSpecies();
         const rawPets = Array.isArray(petsData) ? petsData : [];
         const safePets = rawPets.slice().sort((a, b) => Number(a.isArchived) - Number(b.isArchived));
@@ -152,6 +156,15 @@ export function useBookingData(
             if (candidate && isSpeciesCompatible(candidate.speciesId)) {
               resolvedPet = candidate;
             } else if (!vetSpeciesFilter && !svcSpeciesFilter) {
+              resolvedPet = activePets[0] ?? null;
+            }
+          } else if (initialSpeciesId) {
+            const candidate = activePets.find((p) => p.speciesId === initialSpeciesId) ?? null;
+            if (candidate) {
+              resolvedPet = candidate;
+            } else if (vetSpeciesFilter || svcSpeciesFilter) {
+              resolvedPet = activePets.find((p) => isSpeciesCompatible(p.speciesId)) ?? null;
+            } else {
               resolvedPet = activePets[0] ?? null;
             }
           } else if (vetSpeciesFilter || svcSpeciesFilter) {
@@ -225,10 +238,10 @@ export function useBookingData(
           setIsAnyVet(true);
         }
 
-        // Если питомец был явно передан в URL (например, из карточки питомца или паспорта прививок):
+        // Если конкретный питомец был явно передан в URL (например, из карточки питомца `?petId=...`):
         // переходим сразу на следующий незаполненный шаг.
-        // Если же пользователь пришёл из каталога услуг (?serviceId=...) или врачей (?vetId=...) без petId —
-        // начинаем с Шага 1 (выбор питомца), а шаг услуги/врача автоматически пропустится далее!
+        // Если же переход был из каталога услуг (`?serviceId=...&slot=...`), то пользователя ВСЕГДА
+        // оставляем на Шаге 1 («Кого записываем?»), чтобы он мог выбрать или подтвердить нужного питомца.
         if (initialPetId && resolvedPet) {
           if (matchedService && (matchedVet || initialSlot)) {
             onSetStepRef.current(4);
@@ -307,6 +320,7 @@ export function useBookingData(
 
   return {
     pets,
+    setPets,
     services,
     veterinarians,
     specializations,

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { Suspense, useMemo } from 'react';
+import React, { Suspense, useMemo, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { CalendarPlus, AlertCircle } from 'lucide-react';
 import { useShellHeader } from '@/components/layout/AppShell';
@@ -14,12 +14,15 @@ import { StepConfirmation } from './_components/StepConfirmation';
 import { BookingSuccessView } from './_components/BookingSuccessView';
 import { BookingSummaryIsland } from './_components/BookingSummaryIsland';
 import { BookingWizardFooter } from './_components/BookingWizardFooter';
+import { QuickAddPetModal } from './_components/QuickAddPetModal';
+import { MobileBookingSummaryBar } from './_components/MobileBookingSummaryBar';
 
 function BookAppointmentContent() {
   useShellHeader({ crumbGroup: 'Кабинет', crumb: 'Записи', crumb2: 'Новая запись' });
 
   const router = useRouter();
   const searchParams = useSearchParams();
+  const [isQuickAddOpen, setIsQuickAddOpen] = useState(false);
   const {
     step,
     setStep,
@@ -34,6 +37,7 @@ function BookAppointmentContent() {
     data,
     slots,
     resolvedVetId,
+    availableVetsForSlot,
     doctorDisplay,
     isVaccination,
     isVetPreselected,
@@ -42,6 +46,7 @@ function BookAppointmentContent() {
     handleSelectPet,
     handleSelectService,
     handleSelectSlot,
+    handleSelectSlotVetId,
     handleConfirmBooking,
     handleNewBooking,
   } = useBookingWizard(
@@ -50,8 +55,14 @@ function BookAppointmentContent() {
     searchParams.get('petId'),
     searchParams.get('slot'),
     searchParams.get('intent'),
-    searchParams.get('vaccine')
+    searchParams.get('vaccine'),
+    searchParams.get('speciesId')
   );
+
+  const handlePetCreated = (newPet: Parameters<typeof handleSelectPet>[0]) => {
+    data.setPets((prev) => [newPet, ...prev]);
+    handleSelectPet(newPet);
+  };
 
   const selectedService = data.selectedService;
   const lockedDoctor = !data.isAnyVet && data.selectedVet ? data.selectedVet : null;
@@ -167,119 +178,134 @@ function BookAppointmentContent() {
                   </div>
                 </div>
               )}
-              {step === 1 && (
-                <StepPetSelection
-                  pets={data.pets}
-                  selectedPet={data.selectedPet}
-                  onSelectPet={handleSelectPet}
-                  speciesMap={data.speciesMap}
-                  loading={data.loadingData}
-                  allowedSpeciesIds={allowedSpeciesIds}
-                  doctorLabel={isVetPreselected ? doctorDisplay : undefined}
-                  serviceLabel={isServicePreselected ? selectedService?.name : undefined}
-                  onResetDoctorFilter={
-                    isVetPreselected
-                      ? () => {
-                          data.setIsAnyVet(true);
-                          data.setSelectedVet(null);
-                          if (!data.selectedPet) {
-                            const firstActive = data.pets.find((p) => !p.isArchived) ?? null;
-                            if (firstActive) {
-                              data.setSelectedPet(firstActive);
+              <div key={step} className="wz-step-content">
+                {step === 1 && (
+                  <StepPetSelection
+                    pets={data.pets}
+                    selectedPet={data.selectedPet}
+                    onSelectPet={handleSelectPet}
+                    speciesMap={data.speciesMap}
+                    loading={data.loadingData}
+                    allowedSpeciesIds={allowedSpeciesIds}
+                    doctorLabel={isVetPreselected ? doctorDisplay : undefined}
+                    serviceLabel={isServicePreselected ? selectedService?.name : undefined}
+                    onOpenQuickAdd={() => setIsQuickAddOpen(true)}
+                    onResetDoctorFilter={
+                      isVetPreselected
+                        ? () => {
+                            data.setIsAnyVet(true);
+                            data.setSelectedVet(null);
+                            if (!data.selectedPet) {
+                              const firstActive = data.pets.find((p) => !p.isArchived) ?? null;
+                              if (firstActive) {
+                                data.setSelectedPet(firstActive);
+                              }
                             }
+                            handleSelectSlot(null);
                           }
-                          handleSelectSlot(null);
-                        }
-                      : undefined
-                  }
-                  onResetServiceFilter={
-                    isServicePreselected ? handleResetServicePreselection : undefined
-                  }
-                />
-              )}
-              {step === 2 && (
-                <StepServiceSelection
-                  services={stepServices}
-                  specializations={data.specializations}
-                  selectedService={selectedService}
-                  onSelectService={handleSelectService}
-                  specsMap={data.specsMap}
-                  speciesName={data.selectedPet ? data.speciesMap[data.selectedPet.speciesId] : undefined}
-                  loading={data.loadingServices}
-                  lockedDoctorName={lockedDoctor ? doctorDisplay : null}
-                  lockedSpecializationName={
-                    lockedDoctor?.specializationId
-                      ? data.specsMap[lockedDoctor.specializationId] || null
-                      : null
-                  }
-                  onResetDoctorFilter={
-                    lockedDoctor
-                      ? () => {
-                          data.setIsAnyVet(true);
-                          data.setSelectedVet(null);
-                          handleSelectSlot(null);
-                        }
-                      : undefined
-                  }
-                />
-              )}
-              {step === 3 && (
-                <StepDoctorSelection
-                  veterinarians={data.veterinarians}
-                  serviceSpecializationId={selectedService?.specializationId}
-                  petSpeciesId={data.selectedPet?.speciesId}
-                  specsMap={data.specsMap}
-                  isAnyVet={data.isAnyVet}
-                  selectedVet={data.selectedVet}
-                  onSelectAnyVet={() => {
-                    data.setIsAnyVet(true);
-                    data.setSelectedVet(null);
-                    handleSelectSlot(null);
-                  }}
-                  onSelectVet={(v) => {
-                    data.setIsAnyVet(false);
-                    data.setSelectedVet(v);
-                    handleSelectSlot(null);
-                  }}
-                  lockedServiceName={isServicePreselected ? selectedService?.name : null}
-                  onResetServiceFilter={
-                    isServicePreselected ? handleResetServicePreselection : undefined
-                  }
-                />
-              )}
-              {step === 4 && (
-                <StepSlotSelection
-                  fromDate={slots.fromDate}
-                  todayStr={slots.todayStr}
-                  onFromDateChange={slots.onFromDateChange}
-                  horizonDays={slots.horizonDays}
-                  onHorizonDaysChange={slots.onHorizonDaysChange}
-                  durationInfoText={slots.durationInfoText}
-                  loadingSlots={slots.loadingSlots}
-                  slotsError={slots.slotsError}
-                  conflictError={slotConflictError}
-                  onRetrySlots={slots.reloadSlots}
-                  availableSlots={slots.availableSlots}
-                  slotsByDay={slots.slotsByDay}
-                  selectedSlot={slots.selectedSlot}
-                  onSelectSlot={handleSelectSlot}
-                  isAnyVet={data.isAnyVet}
-                  vetsMap={data.vetsMap}
-                  specsMap={data.specsMap}
-                />
-              )}
-              {step === 5 && (
-                <StepConfirmation
-                  pet={data.selectedPet}
-                  speciesName={data.selectedPet ? data.speciesMap[data.selectedPet.speciesId] || '' : ''}
-                  service={selectedService}
-                  doctorDisplay={doctorDisplay}
-                  selectedSlot={slots.selectedSlot}
-                  comment={comment}
-                  onCommentChange={setComment}
-                  isVaccination={isVaccination}
-                />
-              )}
+                        : undefined
+                    }
+                    onResetServiceFilter={
+                      isServicePreselected ? handleResetServicePreselection : undefined
+                    }
+                  />
+                )}
+                {step === 2 && (
+                  <StepServiceSelection
+                    services={stepServices}
+                    specializations={data.specializations}
+                    selectedService={selectedService}
+                    onSelectService={handleSelectService}
+                    specsMap={data.specsMap}
+                    speciesName={data.selectedPet ? data.speciesMap[data.selectedPet.speciesId] : undefined}
+                    loading={data.loadingServices}
+                    lockedDoctorName={lockedDoctor ? doctorDisplay : null}
+                    lockedSpecializationName={
+                      lockedDoctor?.specializationId
+                        ? data.specsMap[lockedDoctor.specializationId] || null
+                        : null
+                    }
+                    onResetDoctorFilter={
+                      lockedDoctor
+                        ? () => {
+                            data.setIsAnyVet(true);
+                            data.setSelectedVet(null);
+                            handleSelectSlot(null);
+                          }
+                        : undefined
+                    }
+                  />
+                )}
+                {step === 3 && (
+                  <StepDoctorSelection
+                    veterinarians={data.veterinarians}
+                    serviceSpecializationId={selectedService?.specializationId}
+                    petSpeciesId={data.selectedPet?.speciesId}
+                    specsMap={data.specsMap}
+                    isAnyVet={data.isAnyVet}
+                    selectedVet={data.selectedVet}
+                    selectedSlot={slots.selectedSlot}
+                    onSelectAnyVet={() => {
+                      data.setIsAnyVet(true);
+                      data.setSelectedVet(null);
+                    }}
+                    onSelectVet={(v) => {
+                      data.setIsAnyVet(false);
+                      data.setSelectedVet(v);
+                      if (slots.selectedSlot && slots.selectedSlot.veterinarianIds.includes(v.id)) {
+                        handleSelectSlotVetId(v.id);
+                      } else if (slots.selectedSlot) {
+                        handleSelectSlot(null);
+                      }
+                    }}
+                    lockedServiceName={isServicePreselected ? selectedService?.name : null}
+                    onResetServiceFilter={
+                      isServicePreselected ? handleResetServicePreselection : undefined
+                    }
+                  />
+                )}
+                {step === 4 && (
+                  <StepSlotSelection
+                    fromDate={slots.fromDate}
+                    todayStr={slots.todayStr}
+                    onFromDateChange={slots.onFromDateChange}
+                    horizonDays={slots.horizonDays}
+                    onHorizonDaysChange={slots.onHorizonDaysChange}
+                    durationInfoText={slots.durationInfoText}
+                    loadingSlots={slots.loadingSlots}
+                    slotsError={slots.slotsError}
+                    conflictError={slotConflictError}
+                    onRetrySlots={slots.reloadSlots}
+                    availableSlots={slots.availableSlots}
+                    slotsByDay={slots.slotsByDay}
+                    selectedSlot={slots.selectedSlot}
+                    onSelectSlot={handleSelectSlot}
+                    selectedSlotVetId={slots.selectedSlotVetId}
+                    onSelectSlotVetId={handleSelectSlotVetId}
+                    isAnyVet={data.isAnyVet}
+                    selectedVet={data.selectedVet}
+                    initialSlot={searchParams.get('slot')}
+                    onResetToAnyVet={() => {
+                      data.setIsAnyVet(true);
+                      data.setSelectedVet(null);
+                    }}
+                    vetsMap={data.vetsMap}
+                    specsMap={data.specsMap}
+                  />
+                )}
+                {step === 5 && (
+                  <StepConfirmation
+                    pet={data.selectedPet}
+                    speciesName={data.selectedPet ? data.speciesMap[data.selectedPet.speciesId] || '' : ''}
+                    service={selectedService}
+                    doctorDisplay={doctorDisplay}
+                    selectedSlot={slots.selectedSlot}
+                    comment={comment}
+                    onCommentChange={setComment}
+                    isVaccination={isVaccination}
+                  />
+                )}
+              </div>
             </div>
           )}
         </div>
@@ -308,9 +334,35 @@ function BookAppointmentContent() {
             onSubmit={handleConfirmBooking}
           />
         )}
+
+        <QuickAddPetModal
+          isOpen={isQuickAddOpen}
+          onClose={() => setIsQuickAddOpen(false)}
+          onPetCreated={handlePetCreated}
+          speciesList={data.speciesList}
+          allowedSpeciesIds={allowedSpeciesIds}
+        />
       </section>
 
-      <BookingSummaryIsland
+      <div className="mobile-hide-summary">
+        <BookingSummaryIsland
+          petName={data.selectedPet?.name}
+          speciesName={data.selectedPet ? data.speciesMap[data.selectedPet.speciesId] : undefined}
+          serviceName={selectedService?.name}
+          doctorDisplay={bookedVetDisplay || doctorDisplay}
+          selectedSlotStartAt={slots.selectedSlot?.startAt}
+          selectedSlotEndAt={slots.selectedSlot?.endAt}
+          serviceDurationMin={serviceDurationMin}
+          servicePrice={servicePrice}
+          availableVetsForSlot={availableVetsForSlot}
+          selectedSlotVetId={slots.selectedSlotVetId}
+          onSelectSlotVetId={handleSelectSlotVetId}
+          specsMap={data.specsMap}
+          showSlotVetPicker={step >= 4}
+        />
+      </div>
+
+      <MobileBookingSummaryBar
         petName={data.selectedPet?.name}
         speciesName={data.selectedPet ? data.speciesMap[data.selectedPet.speciesId] : undefined}
         serviceName={selectedService?.name}
@@ -319,6 +371,11 @@ function BookAppointmentContent() {
         selectedSlotEndAt={slots.selectedSlot?.endAt}
         serviceDurationMin={serviceDurationMin}
         servicePrice={servicePrice}
+        availableVetsForSlot={availableVetsForSlot}
+        selectedSlotVetId={slots.selectedSlotVetId}
+        onSelectSlotVetId={handleSelectSlotVetId}
+        specsMap={data.specsMap}
+        showSlotVetPicker={step >= 4}
       />
     </div>
   );

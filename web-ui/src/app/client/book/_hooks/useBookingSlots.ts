@@ -181,50 +181,48 @@ export function useBookingSlots(
         );
         setAvailableSlots(safeSlots);
 
-        let autoMatched: AvailableSlotResponse | null = null;
-        if (initialSlot && appliedSlotRef.current !== initialSlot) {
-          const targetMs = new Date(initialSlot).getTime();
-          autoMatched =
-            safeSlots.find(
+        const targetMs = initialSlot ? new Date(initialSlot).getTime() : NaN;
+        const initialMatched = initialSlot
+          ? safeSlots.find(
               (s) =>
                 s.startAt === initialSlot ||
                 (!Number.isNaN(targetMs) && new Date(s.startAt).getTime() === targetMs)
-            ) ?? null;
-          if (autoMatched) {
-            appliedSlotRef.current = initialSlot;
-          }
-        }
+            ) ?? null
+          : null;
 
-        if (autoMatched) {
-          setSelectedSlot(autoMatched);
-          setSelectedSlotVetId(
-            !isAnyVet && selectedVet && autoMatched.veterinarianIds.includes(selectedVet.id)
-              ? selectedVet.id
-              : autoMatched.veterinarianIds.length === 1
-              ? autoMatched.veterinarianIds[0]
-              : null
-          );
-        } else {
-          setSelectedSlot((prev) => {
-            if (!prev) {
-              setSelectedSlotVetId(null);
-              return null;
-            }
+        setSelectedSlot((prev) => {
+          // 1. Попробуем сохранить текущий выбранный слот (если он доступен в safeSlots)
+          if (prev) {
             const kept = safeSlots.find((s) => s.startAt === prev.startAt) ?? null;
-            if (!kept) {
-              setSelectedSlotVetId(null);
-              return null;
+            if (kept) {
+              setSelectedSlotVetId((prevVet) => {
+                if (!isAnyVet && selectedVet && kept.veterinarianIds.includes(selectedVet.id)) {
+                  return selectedVet.id;
+                }
+                if (prevVet && kept.veterinarianIds.includes(prevVet)) return prevVet;
+                return kept.veterinarianIds.length === 1 ? kept.veterinarianIds[0] : null;
+              });
+              return kept;
             }
-            setSelectedSlotVetId((prevVet) => {
-              if (!isAnyVet && selectedVet && kept.veterinarianIds.includes(selectedVet.id)) {
-                return selectedVet.id;
-              }
-              if (prevVet && kept.veterinarianIds.includes(prevVet)) return prevVet;
-              return kept.veterinarianIds.length === 1 ? kept.veterinarianIds[0] : null;
-            });
-            return kept;
-          });
-        }
+          }
+
+          // 2. Если текущий слот недоступен для нового врача, но initialSlot доступен
+          // (например, при переключении на «Любой врач» или врача, который свободен в initialSlot)
+          if (initialMatched) {
+            setSelectedSlotVetId(
+              !isAnyVet && selectedVet && initialMatched.veterinarianIds.includes(selectedVet.id)
+                ? selectedVet.id
+                : initialMatched.veterinarianIds.length === 1
+                ? initialMatched.veterinarianIds[0]
+                : null
+            );
+            return initialMatched;
+          }
+
+          // 3. Иначе слот недоступен
+          setSelectedSlotVetId(null);
+          return null;
+        });
       })
       .catch((err: unknown) => {
         if (cancelled || controller.signal.aborted) return;
@@ -269,9 +267,12 @@ export function useBookingSlots(
         );
         return;
       }
-      setSelectedSlotVetId(
-        slot.veterinarianIds.length === 1 ? slot.veterinarianIds[0] : null
-      );
+      setSelectedSlotVetId((prev) => {
+        if (prev && slot.veterinarianIds.includes(prev)) {
+          return prev;
+        }
+        return slot.veterinarianIds[0] ?? null;
+      });
     },
     [isAnyVet, selectedVet]
   );

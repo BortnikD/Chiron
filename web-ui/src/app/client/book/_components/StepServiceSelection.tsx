@@ -1,7 +1,8 @@
 import React, { useState, useMemo } from 'react';
 import { Clock, Check } from 'lucide-react';
 import type { Service, Specialization } from '@/modules/clinic/types';
-import { formatCurrency, getSpecTone } from '@/shared/lib';
+import { formatCurrency, getSpecColor, getSpecTone } from '@/shared/lib';
+import { Skeleton } from '@/shared/components';
 
 export interface StepServiceSelectionProps {
   services: Service[];
@@ -32,6 +33,14 @@ export const StepServiceSelection: React.FC<StepServiceSelectionProps> = ({
   onResetDoctorFilter,
 }) => {
   const [selectedSpecId, setSelectedSpecId] = useState<string>('ALL');
+
+  const specsById = useMemo(() => {
+    const map = new Map<string, Specialization>();
+    for (const s of specializations) {
+      if (s.id) map.set(s.id, s);
+    }
+    return map;
+  }, [specializations]);
 
   const activeSpecializations = useMemo(() => {
     const specIdsWithServices = new Set(services.map((s) => s.specializationId));
@@ -81,13 +90,35 @@ export const StepServiceSelection: React.FC<StepServiceSelectionProps> = ({
           </button>
           {activeSpecializations.map((spec) => {
             const count = services.filter((s) => s.specializationId === spec.id).length;
+            const specColor = spec.color || getSpecColor(spec.id, specializations);
+            const isTabSel = selectedSpecId === spec.id;
             return (
               <button
                 key={spec.id}
                 type="button"
-                className={`seg-item ${selectedSpecId === spec.id ? 'on' : ''}`}
+                className={`seg-item ${isTabSel ? 'on' : ''}`}
+                style={
+                  specColor && isTabSel
+                    ? {
+                        borderColor: specColor,
+                        color: 'var(--foreground)',
+                      }
+                    : undefined
+                }
                 onClick={() => setSelectedSpecId(spec.id)}
               >
+                {specColor && (
+                  <span
+                    style={{
+                      width: 8,
+                      height: 8,
+                      borderRadius: '50%',
+                      backgroundColor: specColor,
+                      display: 'inline-block',
+                      marginRight: 6,
+                    }}
+                  />
+                )}
                 {spec.name} ({count})
               </button>
             );
@@ -96,9 +127,21 @@ export const StepServiceSelection: React.FC<StepServiceSelectionProps> = ({
       )}
 
       {loading ? (
-        <div className="empty">
-          <div className="spinner" />
-          <span className="small muted">Загрузка услуг для выбранного вида...</span>
+        <div className="cards">
+          {[1, 2, 3, 4].map((i) => (
+            <div
+              key={`svc-book-skel-${i}`}
+              className="card static"
+              style={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: '10px' }}
+            >
+              <Skeleton width="80px" height="18px" borderRadius="10px" />
+              <Skeleton width="160px" height="18px" borderRadius="4px" />
+              <div className="row items-center between" style={{ marginTop: 'auto', paddingTop: '8px' }}>
+                <Skeleton width="60px" height="14px" borderRadius="4px" />
+                <Skeleton width="70px" height="15px" borderRadius="4px" />
+              </div>
+            </div>
+          ))}
         </div>
       ) : filteredServices.length === 0 ? (
         <div className="empty">
@@ -110,7 +153,9 @@ export const StepServiceSelection: React.FC<StepServiceSelectionProps> = ({
           {filteredServices.map((svc) => {
             const isSel = selectedService?.id === svc.id;
             const tone = getSpecTone(svc.specializationId);
-            const specName = specsMap[svc.specializationId] || 'Терапия';
+            const spec = specsById.get(svc.specializationId);
+            const specColor = spec?.color || getSpecColor(svc.specializationId, specializations);
+            const specName = specsMap[svc.specializationId] || spec?.name || 'Терапия';
             const duration = svc.effectiveDurationMin ?? svc.baseDurationMin ?? svc.durationMin ?? 30;
             const price = svc.effectivePrice ?? svc.basePrice ?? svc.price;
 
@@ -119,12 +164,42 @@ export const StepServiceSelection: React.FC<StepServiceSelectionProps> = ({
                 key={svc.id}
                 type="button"
                 className={`tcard tone-${tone} ${isSel ? 'sel' : ''}`}
+                style={
+                  specColor
+                    ? ({
+                        '--tone': specColor,
+                        ...(isSel
+                          ? {
+                              borderColor: specColor,
+                              boxShadow: `inset 0 0 0 1px ${specColor}`,
+                            }
+                          : {}),
+                      } as React.CSSProperties)
+                    : undefined
+                }
                 onClick={() => onSelectService(svc)}
               >
                 <div className="row between" style={{ gap: '8px' }}>
-                  <span className="t-badge">{specName}</span>
+                  <span
+                    className={`t-badge tone-${tone}`}
+                    style={
+                      specColor
+                        ? ({
+                            '--tone': specColor,
+                            backgroundColor: `color-mix(in srgb, ${specColor} 15%, transparent)`,
+                            color: specColor,
+                            borderColor: `color-mix(in srgb, ${specColor} 40%, transparent)`,
+                          } as React.CSSProperties)
+                        : undefined
+                    }
+                  >
+                    {specName}
+                  </span>
                   {isSel && (
-                    <span className="tcard-check">
+                    <span
+                      className="tcard-check"
+                      style={specColor ? { background: specColor } : undefined}
+                    >
                       <Check className="ic" />
                     </span>
                   )}
