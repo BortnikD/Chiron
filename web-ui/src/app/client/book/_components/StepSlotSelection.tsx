@@ -3,7 +3,7 @@ import { CalendarOff, AlertCircle, Check, UserCheck } from 'lucide-react';
 import type { Veterinarian, AvailableSlotResponse } from '@/modules/clinic/types';
 import { DatePicker, Skeleton } from '@/shared/components';
 import { VetAvatar } from '@/components/ui/EntityAvatar';
-import { formatMoscowMonthDay, formatSlotTime, pluralRu } from '@/shared/lib';
+import { formatMoscowMonthDay, formatSlotTime } from '@/shared/lib';
 import { getDoctorDisplay } from '@/shared/lib';
 import type { GroupedDaySlots } from '../_hooks/useBookingSlots';
 
@@ -272,79 +272,6 @@ export const StepSlotSelection: React.FC<StepSlotSelectionProps> = ({
               </div>
             </div>
           ))}
-
-          {selectedSlot && selectedSlotVets.length > 0 && isAnyVet && (
-            <div
-              className="card"
-              style={{
-                padding: '16px',
-                borderRadius: '12px',
-                background: 'var(--card)',
-                border: '1px solid var(--border)',
-                marginTop: '12px',
-              }}
-            >
-              <div className="row wrap between items-center" style={{ gap: '8px', marginBottom: '12px' }}>
-                <div className="col" style={{ gap: '2px' }}>
-                  <span className="cell-main" style={{ fontWeight: 600 }}>
-                    {selectedSlotVets.length > 1
-                      ? 'Выберите врача на выбранное время:'
-                      : 'Назначенный врач на это время:'}
-                  </span>
-                  <span className="small muted">
-                    {selectedSlotVets.length > 1
-                      ? `Свободно ${selectedSlotVets.length} ${pluralRu(selectedSlotVets.length, 'врач', 'врача', 'врачей')}. Выберите специалиста, к которому хотите записаться:`
-                      : 'Приём проведёт специалист клиники:'}
-                  </span>
-                </div>
-                <span className="badge badge-accent small">
-                  {formatSlotTime(selectedSlot.startAt)}–{formatSlotTime(selectedSlot.endAt)}
-                </span>
-              </div>
-
-              <div className="row wrap" style={{ gap: '10px' }}>
-                {selectedSlotVets.map((v) => {
-                  const isChosen = (selectedSlotVetId || selectedSlotVets[0].id) === v.id;
-                  const doc = getDoctorDisplay(v, specsMap);
-                  return (
-                    <button
-                      key={v.id}
-                      type="button"
-                      className={`btn ${isChosen ? 'btn-primary' : 'btn-outline'}`}
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '10px',
-                        padding: '10px 14px',
-                        borderRadius: '8px',
-                        textAlign: 'left',
-                        flex: '1 1 min(240px, 100%)',
-                        justifyContent: 'flex-start',
-                      }}
-                      onClick={() => onSelectSlotVetId?.(v.id)}
-                    >
-                      <VetAvatar
-                        vet={v}
-                        initials={doc.initials}
-                        className="avatar avatar-sm"
-                        alt={doc.name}
-                      />
-                      <div className="col" style={{ gap: '1px', minWidth: 0, flex: 1 }}>
-                        <span style={{ fontWeight: 600, fontSize: '13px' }}>{doc.name}</span>
-                        <span
-                          className="small muted"
-                          style={{ fontSize: '11px', opacity: isChosen ? 0.9 : 0.7 }}
-                        >
-                          {doc.specName}
-                        </span>
-                      </div>
-                      {isChosen && <Check size={16} style={{ flexShrink: 0 }} />}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-          )}
         </>
       )}
     </div>

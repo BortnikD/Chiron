@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { Clock, Check } from 'lucide-react';
+import { Clock, Check, X } from 'lucide-react';
 import type { Service, Specialization } from '@/modules/clinic/types';
 import { formatCurrency, getSpecColor, getSpecTone } from '@/shared/lib';
 import { Skeleton } from '@/shared/components';
@@ -8,7 +8,11 @@ export interface StepServiceSelectionProps {
   services: Service[];
   specializations: Specialization[];
   selectedService: Service | null;
+  selectedServices?: Service[];
   onSelectService: (service: Service) => void;
+  onToggleService?: (service: Service) => void;
+  onRemoveService?: (serviceId: string) => void;
+  onClearServices?: () => void;
   specsMap: Record<string, string>;
   speciesName?: string;
   loading?: boolean;
@@ -18,13 +22,17 @@ export interface StepServiceSelectionProps {
 }
 
 /**
- * Шаг 2: выбор услуги для вида выбранного питомца.
+ * Шаг 2: выбор одной или нескольких услуг (комплекса) для вида выбранного питомца.
  */
 export const StepServiceSelection: React.FC<StepServiceSelectionProps> = ({
   services,
   specializations,
   selectedService,
+  selectedServices = [],
   onSelectService,
+  onToggleService,
+  onRemoveService,
+  onClearServices,
   specsMap,
   speciesName,
   loading = false,
@@ -126,6 +134,110 @@ export const StepServiceSelection: React.FC<StepServiceSelectionProps> = ({
         </div>
       )}
 
+      {selectedServices.length > 0 && (
+        <div
+          className="card static"
+          style={{
+            padding: '12px 16px',
+            backgroundColor: 'var(--muted)',
+            border: '1px solid var(--border)',
+            borderRadius: '12px',
+          }}
+        >
+          <div className="row between wrap items-center" style={{ gap: '8px' }}>
+            <div className="col" style={{ gap: '2px' }}>
+              <div className="row items-center wrap" style={{ gap: '8px' }}>
+                <span style={{ fontWeight: 600, fontSize: '14px' }}>
+                  Выбранный комплекс ({selectedServices.length})
+                </span>
+                <span
+                  className="badge"
+                  style={{
+                    fontSize: '11px',
+                    padding: '1px 6px',
+                    backgroundColor: 'color-mix(in srgb, var(--primary) 20%, transparent)',
+                    color: 'var(--primary-text, var(--primary))',
+                  }}
+                >
+                  {specsMap[selectedServices[0].specializationId] || 'Специализация'}
+                </span>
+              </div>
+              <span className="small muted">
+                Общая длительность ~
+                {selectedServices.reduce(
+                  (sum, s) => sum + (s.effectiveDurationMin ?? s.baseDurationMin ?? 30),
+                  0
+                )}{' '}
+                мин · Итого:{' '}
+                {formatCurrency(
+                  selectedServices.reduce(
+                    (sum, s) => sum + (s.effectivePrice ?? s.basePrice ?? s.price ?? 0),
+                    0
+                  )
+                )}
+              </span>
+            </div>
+            {selectedServices.length > 1 && onClearServices && (
+              <button
+                type="button"
+                className="btn btn-ghost btn-sm"
+                onClick={onClearServices}
+                style={{ fontSize: '12px', height: '28px' }}
+              >
+                Сбросить выбор
+              </button>
+            )}
+          </div>
+
+          <div className="row wrap" style={{ gap: '6px', marginTop: '10px' }}>
+            {selectedServices.map((s, idx) => (
+              <span
+                key={s.id}
+                className="sp-chip"
+                style={{
+                  fontSize: '12px',
+                  padding: '3px 8px',
+                  backgroundColor: 'var(--card)',
+                  border: '1px solid var(--border)',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                }}
+              >
+                <span style={{ fontWeight: 600, color: 'var(--primary-text, var(--primary))' }}>
+                  {idx + 1}.
+                </span>
+                <span>{s.name}</span>
+                <span className="muted" style={{ fontSize: '11px' }}>
+                  {formatCurrency(s.effectivePrice ?? s.basePrice ?? s.price ?? 0)}
+                </span>
+                {onRemoveService && selectedServices.length > 1 && (
+                  <button
+                    type="button"
+                    aria-label={`Удалить ${s.name}`}
+                    style={{
+                      background: 'none',
+                      border: 'none',
+                      padding: '0 2px',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      color: 'var(--muted-foreground)',
+                    }}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onRemoveService(s.id);
+                    }}
+                  >
+                    <X size={12} />
+                  </button>
+                )}
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
+
       {loading ? (
         <div className="cards">
           {[1, 2, 3, 4].map((i) => (
@@ -151,7 +263,14 @@ export const StepServiceSelection: React.FC<StepServiceSelectionProps> = ({
       ) : (
         <div className="cards">
           {filteredServices.map((svc) => {
-            const isSel = selectedService?.id === svc.id;
+            const isSel =
+              selectedServices.length > 0
+                ? selectedServices.some((s) => s.id === svc.id)
+                : selectedService?.id === svc.id;
+            const selIndex = selectedServices.findIndex((s) => s.id === svc.id);
+            const isDifferentSpec =
+              selectedServices.length > 0 &&
+              selectedServices[0].specializationId !== svc.specializationId;
             const tone = getSpecTone(svc.specializationId);
             const spec = specsById.get(svc.specializationId);
             const specColor = spec?.color || getSpecColor(svc.specializationId, specializations);
@@ -177,7 +296,9 @@ export const StepServiceSelection: React.FC<StepServiceSelectionProps> = ({
                       } as React.CSSProperties)
                     : undefined
                 }
-                onClick={() => onSelectService(svc)}
+                onClick={() =>
+                  onToggleService ? onToggleService(svc) : onSelectService(svc)
+                }
               >
                 <div className="row between" style={{ gap: '8px' }}>
                   <span
@@ -200,7 +321,13 @@ export const StepServiceSelection: React.FC<StepServiceSelectionProps> = ({
                       className="tcard-check"
                       style={specColor ? { background: specColor } : undefined}
                     >
-                      <Check className="ic" />
+                      {selectedServices.length > 1 ? (
+                        <span style={{ fontSize: '11px', fontWeight: 700, color: '#fff' }}>
+                          {selIndex + 1}
+                        </span>
+                      ) : (
+                        <Check className="ic" />
+                      )}
                     </span>
                   )}
                 </div>
@@ -214,6 +341,14 @@ export const StepServiceSelection: React.FC<StepServiceSelectionProps> = ({
                     {price != null ? formatCurrency(price) : '—'}
                   </span>
                 </div>
+                {isDifferentSpec && (
+                  <span
+                    className="small muted"
+                    style={{ fontSize: '10px', marginTop: '2px', opacity: 0.8 }}
+                  >
+                    Другая специализация · сменит выбор
+                  </span>
+                )}
               </button>
             );
           })}

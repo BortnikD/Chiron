@@ -1,5 +1,5 @@
 import { api } from '@/shared/api/client';
-import { petCache } from '@/shared/lib';
+import { petCache, normalizeAppointment, normalizeAppointmentPage } from '@/shared/lib';
 import type { AppointmentStatus, PageResponse, PhotoLinks } from '@/shared/types';
 import type {
   Pet,
@@ -109,19 +109,34 @@ export const clientApi = {
     if (opts.from) params.append('from', opts.from);
     if (opts.to) params.append('to', opts.to);
     if (opts.direction) params.append('direction', opts.direction);
-    return api.get<PageResponse<Appointment>>(`/api/v1/client/appointments?${params.toString()}`);
+    return api
+      .get<PageResponse<Appointment>>(`/api/v1/client/appointments?${params.toString()}`)
+      .then(normalizeAppointmentPage);
   },
 
-  getAppointmentById: (id: string) => api.get<Appointment>(`/api/v1/client/appointments/${id}`),
+  getAppointmentById: (id: string) =>
+    api.get<Appointment>(`/api/v1/client/appointments/${id}`).then(normalizeAppointment),
 
-  bookAppointment: (data: BookAppointmentRequest) =>
-    api.post<Appointment>('/api/v1/client/appointments', data),
+  bookAppointment: (data: BookAppointmentRequest | any) => {
+    const payload = {
+      ...data,
+      serviceIds:
+        Array.isArray(data.serviceIds) && data.serviceIds.length > 0
+          ? data.serviceIds
+          : data.serviceId
+          ? [data.serviceId]
+          : [],
+    };
+    return api.post<Appointment>('/api/v1/client/appointments', payload).then(normalizeAppointment);
+  },
 
   cancelAppointment: (id: string, reason?: string) =>
-    api.post<Appointment>(
-      `/api/v1/client/appointments/${id}/cancel`,
-      reason ? { reason } : {}
-    ),
+    api
+      .post<Appointment>(
+        `/api/v1/client/appointments/${id}/cancel`,
+        reason ? { reason } : {}
+      )
+      .then(normalizeAppointment),
 
   getVaccinations: (arg?: string | ClientVaccinationsQuery) => {
     const params = new URLSearchParams();
@@ -139,5 +154,11 @@ export const clientApi = {
   getVaccinationById: (id: string) =>
     api.get<Vaccination>(`/api/v1/client/vaccinations/${id}`),
 
-  getSummary: () => api.get<ClientSummary>('/api/v1/client/summary'),
+  getSummary: () =>
+    api.get<ClientSummary>('/api/v1/client/summary').then((res) => {
+      if (res && res.nextAppointment) {
+        res.nextAppointment = normalizeAppointment(res.nextAppointment) as any;
+      }
+      return res;
+    }),
 };

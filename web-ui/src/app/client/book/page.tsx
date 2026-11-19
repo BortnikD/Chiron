@@ -66,18 +66,52 @@ function BookAppointmentContent() {
 
   const selectedService = data.selectedService;
   const lockedDoctor = !data.isAnyVet && data.selectedVet ? data.selectedVet : null;
-  const stepServices = lockedDoctor?.specializationId
-    ? data.services.filter((s) => s.specializationId === lockedDoctor.specializationId)
+  const lockedDoctorSpecIds = lockedDoctor
+    ? (lockedDoctor.specializationIds && lockedDoctor.specializationIds.length > 0
+        ? lockedDoctor.specializationIds
+        : lockedDoctor.specializationId
+        ? [lockedDoctor.specializationId]
+        : [])
+    : [];
+  const stepServices = lockedDoctorSpecIds.length > 0
+    ? data.services.filter((s) => lockedDoctorSpecIds.includes(s.specializationId))
     : data.services;
-  const serviceDurationMin = selectedService
-    ? selectedService.effectiveDurationMin ??
-      selectedService.baseDurationMin ??
-      selectedService.durationMin ??
-      null
-    : null;
-  const servicePrice = selectedService
-    ? selectedService.effectivePrice ?? selectedService.basePrice ?? selectedService.price ?? null
-    : null;
+  const selectedServices = data.selectedServices;
+  const serviceDurationMin =
+    selectedServices && selectedServices.length > 0
+      ? selectedServices.reduce(
+          (sum, s) =>
+            sum +
+            (s.effectiveDurationMin ??
+              s.baseDurationMin ??
+              s.durationMin ??
+              30),
+          0
+        )
+      : selectedService
+      ? selectedService.effectiveDurationMin ??
+        selectedService.baseDurationMin ??
+        selectedService.durationMin ??
+        null
+      : null;
+
+  const servicePrice =
+    selectedServices && selectedServices.length > 0
+      ? selectedServices.reduce(
+          (sum, s) =>
+            sum +
+            (s.effectivePrice ??
+              s.basePrice ??
+              s.price ??
+              0),
+          0
+        )
+      : selectedService
+      ? selectedService.effectivePrice ??
+        selectedService.basePrice ??
+        selectedService.price ??
+        null
+      : null;
 
   // Динамический список шагов: пропускает шаг «Услуга» (2), если услуга уже выбрана в каталоге,
   // и шаг «Врач» (3), если врач уже был выбран в каталоге.
@@ -147,7 +181,11 @@ function BookAppointmentContent() {
           {isSuccess ? (
             <BookingSuccessView
               petName={data.selectedPet?.name}
-              serviceName={selectedService?.name}
+              serviceName={
+                selectedServices && selectedServices.length > 1
+                  ? `Комплекс услуг (${selectedServices.length}): ${selectedServices.map((s) => s.name).join(', ')}`
+                  : selectedService?.name
+              }
               doctorDisplay={bookedVetDisplay || doctorDisplay}
               slotStartAt={slots.selectedSlot?.startAt}
               appointmentId={createdApptId}
@@ -215,7 +253,11 @@ function BookAppointmentContent() {
                     services={stepServices}
                     specializations={data.specializations}
                     selectedService={selectedService}
+                    selectedServices={data.selectedServices}
                     onSelectService={handleSelectService}
+                    onToggleService={data.toggleService}
+                    onRemoveService={data.removeService}
+                    onClearServices={data.clearServices}
                     specsMap={data.specsMap}
                     speciesName={data.selectedPet ? data.speciesMap[data.selectedPet.speciesId] : undefined}
                     loading={data.loadingServices}
@@ -298,6 +340,9 @@ function BookAppointmentContent() {
                     pet={data.selectedPet}
                     speciesName={data.selectedPet ? data.speciesMap[data.selectedPet.speciesId] || '' : ''}
                     service={selectedService}
+                    selectedServices={data.selectedServices}
+                    servicePrice={servicePrice}
+                    serviceDurationMin={serviceDurationMin}
                     doctorDisplay={doctorDisplay}
                     selectedSlot={slots.selectedSlot}
                     comment={comment}
@@ -349,6 +394,7 @@ function BookAppointmentContent() {
           petName={data.selectedPet?.name}
           speciesName={data.selectedPet ? data.speciesMap[data.selectedPet.speciesId] : undefined}
           serviceName={selectedService?.name}
+          selectedServices={data.selectedServices}
           doctorDisplay={bookedVetDisplay || doctorDisplay}
           selectedSlotStartAt={slots.selectedSlot?.startAt}
           selectedSlotEndAt={slots.selectedSlot?.endAt}
@@ -359,6 +405,7 @@ function BookAppointmentContent() {
           onSelectSlotVetId={handleSelectSlotVetId}
           specsMap={data.specsMap}
           showSlotVetPicker={step >= 4}
+          isAnyVet={data.isAnyVet}
         />
       </div>
 
@@ -366,6 +413,7 @@ function BookAppointmentContent() {
         petName={data.selectedPet?.name}
         speciesName={data.selectedPet ? data.speciesMap[data.selectedPet.speciesId] : undefined}
         serviceName={selectedService?.name}
+        selectedServices={data.selectedServices}
         doctorDisplay={bookedVetDisplay || doctorDisplay}
         selectedSlotStartAt={slots.selectedSlot?.startAt}
         selectedSlotEndAt={slots.selectedSlot?.endAt}

@@ -4,12 +4,13 @@ import React, { useState } from 'react';
 import { ChevronUp, ChevronDown, X, ReceiptText } from 'lucide-react';
 import { formatCurrency, formatSlotTime } from '@/shared/lib';
 import { BookingSummaryIsland } from './BookingSummaryIsland';
-import type { Veterinarian } from '@/modules/clinic/types';
+import type { Service, Veterinarian } from '@/modules/clinic/types';
 
 export interface MobileBookingSummaryBarProps {
   petName?: string;
   speciesName?: string;
   serviceName?: string;
+  selectedServices?: Service[];
   doctorDisplay: string;
   selectedSlotStartAt?: string | null;
   selectedSlotEndAt?: string | null;
@@ -26,14 +27,23 @@ export const MobileBookingSummaryBar: React.FC<MobileBookingSummaryBarProps> = (
   const [isOpen, setIsOpen] = useState(false);
 
   const hasAnyData = Boolean(
-    props.petName || props.serviceName || props.selectedSlotStartAt || props.servicePrice
+    props.petName ||
+      props.serviceName ||
+      (props.selectedServices && props.selectedServices.length > 0) ||
+      props.selectedSlotStartAt ||
+      props.servicePrice
   );
 
   if (!hasAnyData) return null;
 
+  const servicesLabel =
+    props.selectedServices && props.selectedServices.length > 1
+      ? `Услуги (${props.selectedServices.length})`
+      : props.serviceName;
+
   const shortSummary = [
     props.petName,
-    props.serviceName,
+    servicesLabel,
     props.selectedSlotStartAt ? formatSlotTime(props.selectedSlotStartAt) : null,
   ]
     .filter(Boolean)

@@ -52,6 +52,7 @@ export function useBookingData(
 
   const [selectedPet, setSelectedPet] = useState<Pet | null>(null);
   const [selectedService, setSelectedService] = useState<Service | null>(null);
+  const [selectedServices, setSelectedServices] = useState<Service[]>([]);
   const [serviceSpeciesIds, setServiceSpeciesIds] = useState<string[] | null>(null);
   const [isServiceLocked, setIsServiceLocked] = useState<boolean>(
     Boolean(initialServiceId || initialIntent === 'vaccination')
@@ -221,13 +222,21 @@ export function useBookingData(
 
         setSelectedPet(resolvedPet);
         setSelectedService(matchedService);
+        setSelectedServices(matchedService ? [matchedService] : []);
         setIsServiceLocked(Boolean(matchedService && (initialServiceId || initialIntent === 'vaccination')));
+
+        const vetHasSpec = (v: Veterinarian, specId?: string | null) => {
+          if (!specId) return true;
+          if (v.specializationIds && v.specializationIds.length > 0) {
+            return v.specializationIds.includes(specId);
+          }
+          return v.specializationId === specId;
+        };
 
         const matchedVet =
           rawMatchedVet &&
           rawMatchedVet.isActive !== false &&
-          (!matchedService?.specializationId ||
-            rawMatchedVet.specializationId === matchedService.specializationId)
+          vetHasSpec(rawMatchedVet, matchedService?.specializationId)
             ? rawMatchedVet
             : null;
         if (matchedVet) {
@@ -311,6 +320,45 @@ export function useBookingData(
     };
   }, [selectedSpeciesId]);
 
+  const toggleService = useCallback((svc: Service) => {
+    setSelectedServices((prev) => {
+      const exists = prev.some((s) => s.id === svc.id);
+      if (exists) {
+        const next = prev.filter((s) => s.id !== svc.id);
+        setSelectedService(next[0] || null);
+        return next;
+      }
+      // По правилу OpenAPI: все запланированные услуги одной записи должны относиться к одной специализации
+      if (prev.length > 0 && prev[0].specializationId !== svc.specializationId) {
+        // При клике на услугу другой специализации переключаем комплекс на новую услугу
+        setSelectedService(svc);
+        return [svc];
+      }
+      if (prev.length >= 20) return prev;
+      const next = [...prev, svc];
+      setSelectedService(next[0] || null);
+      return next;
+    });
+  }, []);
+
+  const selectSingleService = useCallback((svc: Service | null) => {
+    setSelectedService(svc);
+    setSelectedServices(svc ? [svc] : []);
+  }, []);
+
+  const removeService = useCallback((serviceId: string) => {
+    setSelectedServices((prev) => {
+      const next = prev.filter((s) => s.id !== serviceId);
+      setSelectedService(next[0] || null);
+      return next;
+    });
+  }, []);
+
+  const clearServices = useCallback(() => {
+    setSelectedServices([]);
+    setSelectedService(null);
+  }, []);
+
   const specsMap = useMemo(() => toIdNameMap(specializations), [specializations]);
   const speciesMap = useMemo(() => toIdNameMap(speciesList), [speciesList]);
   const vetsMap = useMemo(
@@ -329,6 +377,12 @@ export function useBookingData(
     setSelectedPet,
     selectedService,
     setSelectedService,
+    selectedServices,
+    setSelectedServices,
+    toggleService,
+    selectSingleService,
+    removeService,
+    clearServices,
     serviceSpeciesIds,
     setServiceSpeciesIds,
     isServiceLocked,
