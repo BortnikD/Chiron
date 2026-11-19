@@ -10,6 +10,7 @@ import {
   Clock,
 } from 'lucide-react';
 import { formatCurrency, getSpecTone, toIdNameMap } from '@/shared/lib';
+import { Skeleton } from '@/shared/components';
 import { SPECIALIZATION_NAMES_RU, getDoctorDisplay } from '@/shared/lib';
 import type { Service } from '@/modules/clinic/types';
 import type { LandingServicesSectionProps, PopularOffer } from './types';
@@ -108,7 +109,11 @@ export const LandingServicesSection: React.FC<LandingServicesSectionProps> = ({
               ))}
             </div>
           ) : (
-            <span className="small muted">Загрузка направлений клиники...</span>
+            <div className="ab-specs">
+              {[1, 2, 3, 4, 5, 6].map((i) => (
+                <div key={i} className="ab-spec skeleton" style={{ minHeight: '62px' }} />
+              ))}
+            </div>
           )}
         </div>
       </section>
@@ -149,7 +154,11 @@ export const LandingServicesSection: React.FC<LandingServicesSectionProps> = ({
                 ))}
               </div>
             ) : (
-              <span className="small muted">Загрузка популярных услуг...</span>
+              <div className="ab-offers">
+                {[1, 2, 3].map((i) => (
+                  <div key={i} className="ab-offer skeleton" style={{ minHeight: '135px' }} />
+                ))}
+              </div>
             )}
           </div>
         </section>

@@ -100,6 +100,15 @@ export const SPEC_TONES: Record<string, string> = {
   '5eed0002-0000-0000-0000-000000000006': 'prev',
 };
 
+export const DEFAULT_SPEC_COLORS: Record<string, string> = {
+  ther: '#3b82f6', // Синий (Терапия)
+  surg: '#ef4444', // Терракотово-красный (Хирургия)
+  dent: '#a855f7', // Фиолетовый (Стоматология)
+  derm: '#10b981', // Изумрудный (Дерматология)
+  opht: '#06b6d4', // Голубой (Офтальмология)
+  prev: '#f59e0b', // Янтарный (Профилактика)
+};
+
 const specColorRegistry = new Map<string, string>();
 
 export function registerSpecializationColors(
@@ -152,7 +161,14 @@ export function getSpecColor(
       }
     }
   }
-  return specColorRegistry.get(specId);
+  const fromRegistry = specColorRegistry.get(specId);
+  if (fromRegistry) return fromRegistry;
+
+  const tone = SPEC_TONES[specId];
+  if (tone && DEFAULT_SPEC_COLORS[tone]) {
+    return DEFAULT_SPEC_COLORS[tone];
+  }
+  return undefined;
 }
 
 export function getSpecStyle(

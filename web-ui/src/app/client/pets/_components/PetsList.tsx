@@ -5,6 +5,7 @@ import { PawPrint, Plus, Archive, Calendar, Syringe } from 'lucide-react';
 import type { Pet, Appointment, Vaccination } from '@/modules/client/types';
 import type { Service } from '@/modules/clinic/types';
 import { PetAvatar } from '@/components/ui/EntityAvatar';
+import { Skeleton, SkeletonCircle } from '@/shared/components';
 import {
   calculateAgeRu,
   formatDateRu,
@@ -59,9 +60,32 @@ export function PetsList({
 
       <div className="island-body">
         {loading && pets.length === 0 ? (
-          <div className="empty">
-            <div className="spinner" />
-            <span className="small muted">Загрузка питомцев…</span>
+          <div className="cards">
+            {[1, 2, 3, 4].map((i) => (
+              <div
+                key={`pet-skel-${i}`}
+                className="card static"
+                style={{
+                  padding: '16px',
+                  display: 'flex',
+                  gap: '14px',
+                  alignItems: 'flex-start',
+                }}
+              >
+                <SkeletonCircle size={52} />
+                <div className="col grow" style={{ gap: '8px' }}>
+                  <div className="row items-center between">
+                    <Skeleton width="110px" height="18px" borderRadius="4px" />
+                    <Skeleton width="60px" height="20px" borderRadius="12px" />
+                  </div>
+                  <Skeleton width="140px" height="13px" borderRadius="4px" />
+                  <div className="col" style={{ marginTop: '8px', gap: '6px' }}>
+                    <Skeleton width="100%" height="24px" borderRadius="6px" />
+                    <Skeleton width="90%" height="24px" borderRadius="6px" />
+                  </div>
+                </div>
+              </div>
+            ))}
           </div>
         ) : pets.length === 0 ? (
           archiveFilter === 'ARCHIVED' ? (

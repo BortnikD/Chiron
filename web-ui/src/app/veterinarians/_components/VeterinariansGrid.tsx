@@ -6,6 +6,7 @@ import { getDoctorDisplay } from '@/shared/lib';
 import { getSpecTone, getSpecStyle, getSpeciesTone, pluralRu } from '@/shared/lib';
 import { SpeciesIcon } from '@/components/ui/SpeciesIcon';
 import { VetAvatar } from '@/components/ui/EntityAvatar';
+import { Skeleton, SkeletonCircle } from '@/shared/components';
 import type { VeterinariansGridProps } from './types';
 
 export const VeterinariansGrid: React.FC<VeterinariansGridProps> = ({
@@ -30,23 +31,42 @@ export const VeterinariansGrid: React.FC<VeterinariansGridProps> = ({
         </span>
       </div>
       <div className="island-body">
-        {vets.length === 0 ? (
+        {loading && vets.length === 0 ? (
+          <div className="cards">
+            {[1, 2, 3, 4, 5, 6].map((i) => (
+              <div
+                key={`vet-skel-${i}`}
+                className="card static"
+                style={{
+                  padding: '16px',
+                  display: 'flex',
+                  gap: '14px',
+                  alignItems: 'flex-start',
+                  minHeight: '130px',
+                }}
+              >
+                <SkeletonCircle size={52} />
+                <div className="col grow" style={{ gap: '8px' }}>
+                  <Skeleton width="150px" height="18px" borderRadius="4px" />
+                  <Skeleton width="100px" height="18px" borderRadius="10px" />
+                  <div className="row" style={{ gap: '6px', marginTop: '4px' }}>
+                    <Skeleton width="60px" height="14px" borderRadius="4px" />
+                    <Skeleton width="40px" height="14px" borderRadius="4px" />
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : vets.length === 0 ? (
           <div className="empty">
             <div className="empty-art">
               <Stethoscope className="ic ic-40" />
             </div>
-            <span className="empty-title">
-              {loading ? 'Загрузка врачей...' : 'Нет врачей по фильтру'}
-            </span>
-            {loading ? (
-              <span>Получение списка врачей клиники...</span>
-            ) : (
-              hasFilters &&
-              onReset && (
-                <button type="button" className="btn btn-outline" onClick={onReset}>
-                  Сбросить фильтры
-                </button>
-              )
+            <span className="empty-title">Нет врачей по фильтру</span>
+            {hasFilters && onReset && (
+              <button type="button" className="btn btn-outline" onClick={onReset}>
+                Сбросить фильтры
+              </button>
             )}
           </div>
         ) : (

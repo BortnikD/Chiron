@@ -1,4 +1,5 @@
 import type { UserRole } from '@/shared/types';
+import type { Pet } from '@/modules/client/types';
 import type {
   Service,
   Specialization,
@@ -29,6 +30,7 @@ export interface ServicesGridProps {
   selectedService: Service | null;
   onSelectService: (service: Service) => void;
   specsMap: Record<string, string>;
+  specializations?: Specialization[];
   loading?: boolean;
   hasFilters?: boolean;
   onReset?: () => void;
@@ -48,4 +50,6 @@ export interface ServiceDetailIslandProps {
   loadingSlots?: boolean;
   isAuthenticated: boolean;
   role?: UserRole | null;
+  clientPets?: Pet[];
+  clientSpeciesIds?: Set<string>;
 }

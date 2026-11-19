@@ -49,6 +49,8 @@ function ServicesContent() {
     hasFilters,
     resetFilters,
     filteredServices,
+    clientPets,
+    clientSpeciesIds,
   } = useServicesCatalog(openParam, specParam, speciesParam, searchParam, sortParam);
 
   const content = (
@@ -87,6 +89,7 @@ function ServicesContent() {
             selectedService={selectedService}
             onSelectService={setSelectedService}
             specsMap={specsMap}
+            specializations={specializations}
             loading={loading}
             hasFilters={hasFilters}
             onReset={resetFilters}
@@ -108,6 +111,8 @@ function ServicesContent() {
             loadingSlots={loadingSlots}
             isAuthenticated={isAuthenticated}
             role={role}
+            clientPets={clientPets}
+            clientSpeciesIds={clientSpeciesIds}
           />
         )}
       </div>

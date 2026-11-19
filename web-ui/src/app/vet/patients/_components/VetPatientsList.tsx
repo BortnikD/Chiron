@@ -4,7 +4,7 @@ import React, { useMemo } from 'react';
 import type { Appointment, Pet } from '@/modules/client/types';
 import type { Species } from '@/modules/clinic/types';
 import { PetAvatar } from '@/components/ui/EntityAvatar';
-import { PaginationFooter } from '@/shared/components';
+import { PaginationFooter, Skeleton, SkeletonCircle } from '@/shared/components';
 import {
   calculateAgeRu,
   formatIsoDateDisplay,
@@ -172,9 +172,24 @@ export function VetPatientsList({
           )}
 
           {loading && patients.length === 0 && (
-            <div className="empty" style={{ padding: 24 }}>
-              <span className="spinner" aria-hidden="true" />
-              <span className="small muted">Загрузка пациентов…</span>
+            <div className="cards">
+              {[1, 2, 3, 4].map((i) => (
+                <div
+                  key={`vp-skel-${i}`}
+                  className="card static"
+                  style={{ padding: '16px', display: 'flex', gap: '14px', alignItems: 'flex-start' }}
+                >
+                  <SkeletonCircle size={48} />
+                  <div className="col grow" style={{ gap: '6px' }}>
+                    <Skeleton width="120px" height="18px" borderRadius="4px" />
+                    <Skeleton width="160px" height="13px" borderRadius="4px" />
+                    <div className="row" style={{ gap: '6px', marginTop: '6px' }}>
+                      <Skeleton width="70px" height="18px" borderRadius="10px" />
+                      <Skeleton width="50px" height="18px" borderRadius="10px" />
+                    </div>
+                  </div>
+                </div>
+              ))}
             </div>
           )}
         </div>
@@ -251,10 +266,29 @@ export function VetPatientsList({
           </div>
 
           {loading && patients.length === 0 && (
-            <div className="empty">
-              <span className="spinner" aria-hidden="true" />
-              <span className="small muted">Загрузка пациентов…</span>
-            </div>
+            Array.from({ length: 6 }).map((_, idx) => (
+              <div key={`vp-row-skel-${idx}`} className="trow static">
+                <span className="row items-center" style={{ gap: '8px' }}>
+                  <SkeletonCircle size={24} />
+                  <Skeleton width="110px" height="15px" borderRadius="4px" />
+                </span>
+                <span>
+                  <Skeleton width="80px" height="15px" borderRadius="4px" />
+                </span>
+                <span>
+                  <Skeleton width="100px" height="15px" borderRadius="4px" />
+                </span>
+                <span>
+                  <Skeleton width="50px" height="15px" borderRadius="4px" />
+                </span>
+                <span>
+                  <Skeleton width="90px" height="15px" borderRadius="4px" />
+                </span>
+                <span className="right">
+                  <Skeleton width="30px" height="15px" borderRadius="4px" style={{ marginLeft: 'auto' }} />
+                </span>
+              </div>
+            ))
           )}
 
           {patients.length === 0 && !loading && (

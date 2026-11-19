@@ -2,6 +2,9 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { clinicApi } from '@/modules/clinic/api';
+import { clientApi } from '@/modules/client/api';
+import type { Pet } from '@/modules/client/types';
+import { useAuth } from '@/providers';
 import type {
   AvailableSlotResponse,
   Service,
@@ -14,6 +17,7 @@ import {
   formatApiError,
   getMoscowTodayIso,
   getSpeciesTone,
+  registerSpecializationColors,
   toIdNameMap,
 } from '@/shared/lib';
 import { SPECIALIZATION_NAMES_RU } from '@/shared/lib';
@@ -44,6 +48,34 @@ export function useServicesCatalog(
   const [error, setError] = useState<string | null>(null);
   const [reloadTick, setReloadTick] = useState(0);
 
+  const { role, isAuthenticated } = useAuth();
+  const [clientPets, setClientPets] = useState<Pet[]>([]);
+
+  useEffect(() => {
+    if (!isAuthenticated || role !== 'CLIENT') {
+      setClientPets([]);
+      return;
+    }
+    let cancelled = false;
+    clientApi
+      .getPets()
+      .then((res) => {
+        if (!cancelled) {
+          setClientPets(Array.isArray(res) ? res : []);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setClientPets([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [isAuthenticated, role, reloadTick]);
+
+  const clientSpeciesIds = useMemo(() => {
+    return new Set(clientPets.filter((p) => !p.isArchived).map((p) => p.speciesId));
+  }, [clientPets]);
+
   const appliedOpenRef = useRef<string | null>(null);
   const appliedSpecRef = useRef<string | null>(null);
   const appliedSpeciesRef = useRef<string | null>(null);
@@ -59,7 +91,9 @@ export function useServicesCatalog(
     Promise.all([clinicApi.getSpecializations(), clinicApi.getSpecies()])
       .then(([spec, sp]) => {
         if (cancelled) return;
-        setSpecializations(Array.isArray(spec) ? spec : []);
+        const safeSpec = Array.isArray(spec) ? spec : [];
+        registerSpecializationColors(safeSpec);
+        setSpecializations(safeSpec);
         setSpeciesList(Array.isArray(sp) ? sp : []);
       })
       .catch((err: unknown) => {
@@ -183,6 +217,16 @@ export function useServicesCatalog(
         return;
       }
     }
+
+    // Если клиент авторизован и у него есть питомцы, отдаём предпочтение виду питомца клиента
+    if (role === 'CLIENT' && clientSpeciesIds.size > 0) {
+      const owned = serviceSpeciesList.find((item) => clientSpeciesIds.has(item.speciesId));
+      if (owned) {
+        setActiveSpeciesTab(owned.speciesId);
+        return;
+      }
+    }
+
     if (serviceSpeciesList.length > 0) {
       setActiveSpeciesTab((prev) =>
         serviceSpeciesList.some((item) => item.speciesId === prev)
@@ -194,7 +238,7 @@ export function useServicesCatalog(
         speciesList.some((item) => item.id === prev) ? prev : speciesList[0].id
       );
     }
-  }, [selectedServiceId, selectedSpecies, serviceSpeciesList, speciesList]);
+  }, [selectedServiceId, selectedSpecies, serviceSpeciesList, speciesList, role, clientSpeciesIds]);
 
   useEffect(() => {
     if (!selectedServiceId || !activeSpeciesTab) return;
@@ -406,5 +450,7 @@ export function useServicesCatalog(
     hasFilters,
     resetFilters,
     filteredServices,
+    clientPets,
+    clientSpeciesIds,
   };
 }
