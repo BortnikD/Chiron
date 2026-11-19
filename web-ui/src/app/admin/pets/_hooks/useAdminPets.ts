@@ -42,6 +42,8 @@ export function useAdminPets() {
     species: dictSpecies,
     services: dictServices,
     veterinarians: dictVets,
+    upsertPet,
+    upsertPets,
   } = useDictionaries();
 
   const [speciesList, setSpeciesList] = useState<Species[]>(() => dictSpecies);
@@ -111,6 +113,7 @@ export function useAdminPets() {
     debouncedKeys: ['search'],
     debounceMs: 250,
     onSuccess: async ({ items }) => {
+      upsertPets(items);
       // Подгрузка недостающих владельцев
       const missingOwnerIds = Array.from(
         new Set(items.map((p) => p.ownerId).filter((id): id is string => Boolean(id)))
@@ -225,11 +228,12 @@ export function useAdminPets() {
         }
       }
       toast('Питомец добавлен', created.name);
+      upsertPet(created);
       await resource.reload();
       setSelectedPet(created);
       return created;
     },
-    [resource, toast]
+    [resource, toast, upsertPet]
   );
 
   const updatePet = useCallback(
@@ -244,10 +248,11 @@ export function useAdminPets() {
         }
       }
       toast('Данные питомца обновлены');
+      upsertPet(updated);
       await resource.reload();
       return updated;
     },
-    [resource, toast]
+    [resource, toast, upsertPet]
   );
 
   const uploadPetPhoto = useCallback(

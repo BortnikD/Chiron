@@ -12,6 +12,11 @@ import type {
 } from './types';
 
 const DICT_CACHE_TTL_MS = 30_000;
+import {
+  clearSpeciesColorRegistry,
+  clearSpecializationColorRegistry,
+} from '@/shared/lib/constants';
+
 const dictCache = new Map<string, { ts: number; data: unknown }>();
 const inFlightDict = new Map<string, Promise<unknown>>();
 
@@ -39,6 +44,8 @@ function cachedGet<T>(key: string, fetcher: () => Promise<T>): Promise<T> {
 export function clearClinicDictionariesCache(): void {
   dictCache.clear();
   inFlightDict.clear();
+  clearSpeciesColorRegistry();
+  clearSpecializationColorRegistry();
 }
 
 export function invalidateWorkScheduleCache(vetId?: string): void {
@@ -56,6 +63,15 @@ export function invalidateWorkScheduleCache(vetId?: string): void {
   }
 }
 
+export function normalizeService(s: Service): Service {
+  return {
+    ...s,
+    price: s.effectivePrice ?? s.basePrice ?? s.price ?? 0,
+    durationMin: s.effectiveDurationMin ?? s.baseDurationMin ?? s.durationMin ?? 20,
+    isActive: s.isActive ?? (s as any).active ?? true,
+  };
+}
+
 // ─── Публичные справочники клиники и расписание ────────────
 
 export const clinicApi = {
@@ -65,10 +81,16 @@ export const clinicApi = {
     if (speciesId) params.append('speciesId', speciesId);
     const query = params.toString() ? `?${params.toString()}` : '';
     const url = `/api/v1/services${query}`;
-    return cachedGet<Service[]>(url, () => api.get<Service[]>(url));
+    return cachedGet<Service[]>(url, async () => {
+      const list = await api.get<Service[]>(url);
+      return Array.isArray(list) ? list.map(normalizeService) : [];
+    });
   },
 
-  getServiceById: (id: string) => api.get<Service>(`/api/v1/services/${id}`),
+  getServiceById: async (id: string) => {
+    const res = await api.get<Service>(`/api/v1/services/${id}`);
+    return res ? normalizeService(res) : res;
+  },
 
   getVeterinarians: (specializationId?: string, speciesId?: string) => {
     const params = new URLSearchParams();
@@ -129,7 +151,8 @@ export const clinicApi = {
   findAvailableSlots: (
     params: {
       speciesId: string;
-      serviceId: string;
+      serviceId?: string;
+      serviceIds?: string[] | string;
       from: string;
       to: string;
       veterinarianId?: string;
@@ -138,10 +161,26 @@ export const clinicApi = {
   ) => {
     const query = new URLSearchParams({
       speciesId: params.speciesId,
-      serviceId: params.serviceId,
       from: params.from,
       to: params.to,
     });
+
+    const sIds: string[] = Array.isArray(params.serviceIds)
+      ? params.serviceIds
+      : typeof params.serviceIds === 'string' && params.serviceIds
+      ? params.serviceIds.split(',').map((s) => s.trim()).filter(Boolean)
+      : params.serviceId
+      ? [params.serviceId]
+      : [];
+
+    for (const id of sIds) {
+      query.append('serviceIds', id);
+    }
+    // Also keep singular serviceId for older mock environments if present
+    if (params.serviceId && !query.has('serviceId')) {
+      query.append('serviceId', params.serviceId);
+    }
+
     if (params.veterinarianId) {
       query.append('veterinarianId', params.veterinarianId);
     }

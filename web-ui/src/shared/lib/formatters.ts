@@ -265,7 +265,7 @@ export function toIdNameMap<T extends { id: string; name: string }>(
   return map;
 }
 
-export type SpeciesTone = 'dog' | 'cat' | 'rab' | 'par' | 'pig' | 'fer';
+import type { SpeciesTone } from './constants';
 
 export function getSpeciesTone(
   speciesIdOrName?: string | null,
@@ -279,10 +279,8 @@ export function getSpeciesTone(
       const match = speciesMap.find(
         (s) => s.id === speciesIdOrName || s.name.toLowerCase() === speciesIdOrName.toLowerCase()
       );
-      if (match?.iconKey) {
-        resolved = match.iconKey;
-      } else {
-        resolved = match?.name || resolved;
+      if (match) {
+        resolved = match.name || match.iconKey || resolved;
       }
     } else {
       const recordMap = speciesMap as Record<string, string>;
@@ -479,6 +477,10 @@ export function formatApiError(err: unknown, fallback = 'Произошла ош
 
   if (rawName.includes('UserRoleMismatch')) {
     return 'Роль пользователя не соответствует требуемой для этого действия';
+  }
+
+  if (lowerMsg.includes('failed to fetch') || lowerMsg.includes('networkerror') || candidate.status === 0) {
+    return 'Не удалось связаться с сервером. Проверьте соединение с сетью.';
   }
 
   if (

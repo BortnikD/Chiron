@@ -3,7 +3,7 @@
 import React, { useMemo } from 'react';
 import { PawPrint } from 'lucide-react';
 import type { Pet } from '@/modules/client/types';
-import { calculateAgeRu, getSpeciesTone } from '@/shared/lib';
+import { calculateAgeRu, getSpeciesTone, getSpeciesStyle } from '@/shared/lib';
 import { DataTable, type DataTableColumn } from '@/shared/components';
 import { PetAvatar } from '@/components/ui/EntityAvatar';
 import type { PetsTableProps } from './types';
@@ -44,6 +44,7 @@ export const PetsTable: React.FC<PetsTableProps> = ({
                 tone={tone}
                 iconSize={14}
                 className={`t-ava sm tone-${tone}`}
+                style={getSpeciesStyle(p.speciesId, speciesList)}
                 alt={p.name}
               />
               <span className="col" style={{ gap: 0, textAlign: 'left', minWidth: 0 }}>

@@ -28,7 +28,9 @@ export interface AdminVetDetailIslandProps {
   onDeleteClick: () => void;
   onSaveProfile: (
     id: string,
-    data: Partial<Pick<Veterinarian, 'specializationId' | 'bio' | 'experienceYears' | 'isActive'>>
+    data: Partial<
+      Pick<Veterinarian, 'specializationId' | 'specializationIds' | 'bio' | 'experienceYears' | 'isActive'>
+    >
   ) => Promise<Veterinarian>;
   onUploadPhoto: (vetId: string, file: File) => Promise<void>;
   onDeletePhoto: (vetId: string) => Promise<void>;
@@ -60,11 +62,16 @@ export const AdminVetDetailIsland: React.FC<AdminVetDetailIslandProps> = ({
   const [activeTab, setActiveTab] = useState<'profile' | 'species' | 'schedule' | 'exceptions'>(
     defaultTab
   );
-  const [editForm, setEditForm] = useState({
-    specializationId: selectedVet.specializationId || '',
-    experienceYears: selectedVet.experienceYears || 0,
-    isActive: selectedVet.isActive,
-    bio: selectedVet.bio || '',
+  const [editForm, setEditForm] = useState<{
+    specializationIds: string[];
+    experienceYears: number;
+    isActive: boolean;
+    bio: string;
+  }>({
+    specializationIds: [],
+    experienceYears: 0,
+    isActive: true,
+    bio: '',
   });
 
   const [savingVet, setSavingVet] = useState(false);
@@ -72,25 +79,39 @@ export const AdminVetDetailIsland: React.FC<AdminVetDetailIslandProps> = ({
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const specsMap = useMemo(() => toIdNameMap(specializations), [specializations]);
-  const specOptions = useMemo<SearchComboboxOption[]>(
-    () =>
-      specializations.map((s) => ({
+
+  const docSpecIds = useMemo(() => {
+    if (selectedVet.specializationIds && selectedVet.specializationIds.length > 0) {
+      return selectedVet.specializationIds;
+    }
+    return selectedVet.specializationId ? [selectedVet.specializationId] : [];
+  }, [selectedVet]);
+
+  const availableSpecsToAdd = useMemo<SearchComboboxOption[]>(() => {
+    return specializations
+      .filter((s) => !editForm.specializationIds.includes(s.id))
+      .map((s) => ({
         value: s.id,
         label: s.name,
         hint: s.description || undefined,
-      })),
-    [specializations]
-  );
+      }));
+  }, [specializations, editForm.specializationIds]);
 
   const user = selectedVet.user || users.find((u) => u.id === selectedVet.userId);
   const doc = getDoctorDisplay({ ...selectedVet, user }, specsMap);
   const permittedSpeciesIds = vetPermMap[selectedVet.id] || [];
 
   useEffect(() => {
+    const specIds =
+      selectedVet.specializationIds && selectedVet.specializationIds.length > 0
+        ? selectedVet.specializationIds
+        : selectedVet.specializationId
+        ? [selectedVet.specializationId]
+        : [];
     setEditForm({
-      specializationId: selectedVet.specializationId || '',
+      specializationIds: specIds,
       experienceYears: selectedVet.experienceYears || 0,
-      isActive: selectedVet.isActive,
+      isActive: selectedVet.isActive ?? true,
       bio: selectedVet.bio || '',
     });
     setActiveTab(defaultTab);
@@ -105,6 +126,11 @@ export const AdminVetDetailIsland: React.FC<AdminVetDetailIslandProps> = ({
       setActiveTab('profile');
       return;
     }
+    if (editForm.specializationIds.length === 0) {
+      setErrorMessage('У врача должна быть выбрана хотя бы одна специализация');
+      setActiveTab('profile');
+      return;
+    }
 
     setSavingVet(true);
     setErrorMessage(null);
@@ -114,7 +140,8 @@ export const AdminVetDetailIsland: React.FC<AdminVetDetailIslandProps> = ({
         bio: editForm.bio,
         experienceYears: exp,
         isActive: editForm.isActive,
-        specializationId: editForm.specializationId || undefined,
+        specializationIds: editForm.specializationIds,
+        specializationId: editForm.specializationIds[0],
       });
       setSaveSuccess(true);
       setTimeout(() => setSaveSuccess(false), 2500);
@@ -141,13 +168,16 @@ export const AdminVetDetailIsland: React.FC<AdminVetDetailIslandProps> = ({
           <div className="col" style={{ gap: 4, minWidth: 0 }}>
             <span className="h2">{doc.fullName}</span>
             <div className="row" style={{ gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
-              {selectedVet.specializationId ? (
-                <span
-                  className={`t-badge tone-${getSpecTone(selectedVet.specializationId)}`}
-                  style={{ ...getSpecStyle(selectedVet.specializationId, specializations), height: '20px', fontSize: '11px' }}
-                >
-                  {doc.specName}
-                </span>
+              {docSpecIds.length > 0 ? (
+                docSpecIds.map((sid) => (
+                  <span
+                    key={sid}
+                    className={`t-badge tone-${getSpecTone(sid)}`}
+                    style={{ ...getSpecStyle(sid, specializations), height: '20px', fontSize: '11px' }}
+                  >
+                    {specsMap[sid] || 'Специализация'}
+                  </span>
+                ))
               ) : (
                 <span className="cell-sub">Специализация не указана</span>
               )}
@@ -189,17 +219,78 @@ export const AdminVetDetailIsland: React.FC<AdminVetDetailIslandProps> = ({
         {activeTab === 'profile' ? (
           <div className="col" style={{ gap: 14 }}>
             <div className="field">
-              <label className="field-label" htmlFor="vd-spec">
-                Специализация
-              </label>
-              <SearchCombobox
-                id="vd-spec"
-                value={editForm.specializationId}
-                options={specOptions}
-                onChange={(val) => setEditForm({ ...editForm, specializationId: val })}
-                placeholder="Выберите специализацию"
-                ariaLabel="Выберите специализацию"
-              />
+              <label className="field-label">Специализации врача</label>
+              {editForm.specializationIds.length > 0 && (
+                <div className="row wrap" style={{ gap: '6px', marginBottom: '8px' }}>
+                  {editForm.specializationIds.map((sid) => {
+                    const name = specsMap[sid] || 'Специализация';
+                    const tone = getSpecTone(sid);
+                    const specStyle = getSpecStyle(sid, specializations);
+                    return (
+                      <span
+                        key={sid}
+                        className={`t-badge tone-${tone} row items-center`}
+                        style={{
+                          ...specStyle,
+                          gap: '6px',
+                          paddingRight: '6px',
+                          fontSize: '12px',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                        }}
+                      >
+                        <span>{name}</span>
+                        <button
+                          type="button"
+                          className="btn btn-ghost btn-icon"
+                          style={{
+                            width: '16px',
+                            height: '16px',
+                            color: 'inherit',
+                            padding: 0,
+                            borderRadius: '50%',
+                            opacity: 0.8,
+                          }}
+                          onClick={() => {
+                            if (editForm.specializationIds.length <= 1) {
+                              setErrorMessage('У врача должна оставаться хотя бы одна специализация');
+                              return;
+                            }
+                            setEditForm({
+                              ...editForm,
+                              specializationIds: editForm.specializationIds.filter((id) => id !== sid),
+                            });
+                          }}
+                          title="Удалить специализацию"
+                        >
+                          <X size={12} />
+                        </button>
+                      </span>
+                    );
+                  })}
+                </div>
+              )}
+
+              {availableSpecsToAdd.length > 0 ? (
+                <SearchCombobox
+                  id="vd-spec-add"
+                  value=""
+                  options={availableSpecsToAdd}
+                  onChange={(val) => {
+                    if (val && !editForm.specializationIds.includes(val)) {
+                      setEditForm({
+                        ...editForm,
+                        specializationIds: [...editForm.specializationIds, val],
+                      });
+                      setErrorMessage(null);
+                    }
+                  }}
+                  placeholder="+ Добавить специализацию..."
+                  ariaLabel="Добавить специализацию"
+                />
+              ) : (
+                <span className="small muted">Все специализации клиники уже добавлены</span>
+              )}
             </div>
 
             <div className="form-grid">

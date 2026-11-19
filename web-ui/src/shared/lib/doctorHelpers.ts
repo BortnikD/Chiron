@@ -8,6 +8,7 @@ export interface DoctorDisplayInfo {
   fullName: string;
   initials: string;
   specName: string;
+  specNames: string[];
   title: string;
 }
 
@@ -36,6 +37,7 @@ export function getDoctorDisplay(
     } | null;
     specialization?: { name?: string | null } | null;
     specializationId?: string | null;
+    specializationIds?: string[] | null;
   } | null,
   specializationsMap?: Record<string, string>
 ): DoctorDisplayInfo {
@@ -45,6 +47,7 @@ export function getDoctorDisplay(
       fullName: 'Ветеринарный врач',
       initials: 'ВР',
       specName: 'Терапия',
+      specNames: ['Терапия'],
       title: 'Ветеринарный врач',
     };
   }
@@ -86,9 +89,21 @@ export function getDoctorDisplay(
   const rawSpec =
     vet.specialization?.name ||
     (vet.specializationId && specializationsMap?.[vet.specializationId]) ||
+    (vet.specializationIds?.[0] && specializationsMap?.[vet.specializationIds[0]]) ||
     'Терапия';
 
   const specName = SPECIALIZATION_NAMES_RU[rawSpec] || rawSpec;
+
+  const specNames: string[] =
+    vet.specializationIds && vet.specializationIds.length > 0
+      ? vet.specializationIds
+          .map((id) => {
+            const raw = specializationsMap?.[id] || id;
+            return SPECIALIZATION_NAMES_RU[raw] || raw;
+          })
+          .filter(Boolean)
+      : [specName];
+
   const title = vet.title || `Врач-${specName.toLowerCase()}`;
 
   return {
@@ -96,6 +111,7 @@ export function getDoctorDisplay(
     fullName,
     initials,
     specName,
+    specNames,
     title,
   };
 }

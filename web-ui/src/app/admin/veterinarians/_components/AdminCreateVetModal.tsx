@@ -6,7 +6,7 @@ import type { Veterinarian, Specialization } from '@/modules/clinic/types';
 import type { User } from '@/shared/types';
 import { SearchCombobox, type SearchComboboxOption } from '@/shared/components';
 import { EntityPhotoControl } from '@/components/ui/EntityPhotoControl';
-import { formatApiError } from '@/shared/lib';
+import { formatApiError, getSpecStyle, getSpecTone, toIdNameMap } from '@/shared/lib';
 import type { CreateVetInput } from '../_hooks/useAdminVeterinarians';
 
 export interface AdminCreateVetModalProps {
@@ -20,7 +20,7 @@ export interface AdminCreateVetModalProps {
 
 const INITIAL_FORM = {
   userId: '',
-  specializationId: '',
+  specializationIds: [] as string[],
   bio: '',
   experienceYears: 0,
   isActive: true,
@@ -39,6 +39,8 @@ export const AdminCreateVetModal: React.FC<AdminCreateVetModalProps> = ({
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
 
+  const specsMap = useMemo(() => toIdNameMap(specializations), [specializations]);
+
   const userOptions = useMemo<SearchComboboxOption[]>(
     () =>
       usersWithoutProfile.map((u) => ({
@@ -49,14 +51,16 @@ export const AdminCreateVetModal: React.FC<AdminCreateVetModalProps> = ({
     [usersWithoutProfile]
   );
 
-  const specOptions = useMemo<SearchComboboxOption[]>(
+  const availableSpecsToAdd = useMemo<SearchComboboxOption[]>(
     () =>
-      specializations.map((s) => ({
-        value: s.id,
-        label: s.name,
-        hint: s.description || undefined,
-      })),
-    [specializations]
+      specializations
+        .filter((s) => !createForm.specializationIds.includes(s.id))
+        .map((s) => ({
+          value: s.id,
+          label: s.name,
+          hint: s.description || undefined,
+        })),
+    [specializations, createForm.specializationIds]
   );
 
   useEffect(() => {
@@ -88,8 +92,8 @@ export const AdminCreateVetModal: React.FC<AdminCreateVetModalProps> = ({
 
   const handleCreateVet = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!createForm.userId || !createForm.specializationId) {
-      setCreateError('Выберите пользователя и специализацию');
+    if (!createForm.userId || createForm.specializationIds.length === 0) {
+      setCreateError('Выберите пользователя и хотя бы одну специализацию');
       return;
     }
     setCreating(true);
@@ -97,7 +101,8 @@ export const AdminCreateVetModal: React.FC<AdminCreateVetModalProps> = ({
     try {
       await onCreateVet({
         userId: createForm.userId,
-        specializationId: createForm.specializationId,
+        specializationId: createForm.specializationIds[0],
+        specializationIds: createForm.specializationIds,
         bio: createForm.bio,
         experienceYears: Number(createForm.experienceYears) || 0,
         isActive: createForm.isActive,
@@ -172,20 +177,76 @@ export const AdminCreateVetModal: React.FC<AdminCreateVetModalProps> = ({
             </div>
 
             <div className="field">
-              <label className="field-label" htmlFor="cr-vet-spec">
-                Специализация <span className="req">*</span>
+              <label className="field-label">
+                Специализации <span className="req">*</span>
               </label>
-              <SearchCombobox
-                id="cr-vet-spec"
-                value={createForm.specializationId}
-                options={specOptions}
-                onChange={(val) => {
-                  setCreateForm({ ...createForm, specializationId: val });
-                  setCreateError(null);
-                }}
-                placeholder="Выберите специализацию"
-                ariaLabel="Выберите специализацию"
-              />
+              {createForm.specializationIds.length > 0 && (
+                <div className="row wrap" style={{ gap: '6px', marginBottom: '8px' }}>
+                  {createForm.specializationIds.map((sid) => {
+                    const name = specsMap[sid] || 'Специализация';
+                    const tone = getSpecTone(sid);
+                    const specStyle = getSpecStyle(sid, specializations);
+                    return (
+                      <span
+                        key={sid}
+                        className={`t-badge tone-${tone} row items-center`}
+                        style={{
+                          ...specStyle,
+                          gap: '6px',
+                          paddingRight: '6px',
+                          fontSize: '12px',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                        }}
+                      >
+                        <span>{name}</span>
+                        <button
+                          type="button"
+                          className="btn btn-ghost btn-icon"
+                          style={{
+                            width: '16px',
+                            height: '16px',
+                            color: 'inherit',
+                            padding: 0,
+                            borderRadius: '50%',
+                            opacity: 0.8,
+                          }}
+                          onClick={() => {
+                            setCreateForm({
+                              ...createForm,
+                              specializationIds: createForm.specializationIds.filter((id) => id !== sid),
+                            });
+                          }}
+                          title="Удалить специализацию"
+                        >
+                          <X size={12} />
+                        </button>
+                      </span>
+                    );
+                  })}
+                </div>
+              )}
+
+              {availableSpecsToAdd.length > 0 ? (
+                <SearchCombobox
+                  id="cr-vet-spec"
+                  value=""
+                  options={availableSpecsToAdd}
+                  onChange={(val) => {
+                    if (val && !createForm.specializationIds.includes(val)) {
+                      setCreateForm({
+                        ...createForm,
+                        specializationIds: [...createForm.specializationIds, val],
+                      });
+                      setCreateError(null);
+                    }
+                  }}
+                  placeholder="+ Добавить специализацию..."
+                  ariaLabel="Добавить специализацию"
+                />
+              ) : (
+                <span className="small muted">Все доступные специализации выбраны</span>
+              )}
             </div>
 
             <div className="form-grid">

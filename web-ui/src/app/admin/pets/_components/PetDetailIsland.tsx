@@ -12,6 +12,7 @@ import {
   formatDateTimeCompact,
   formatIsoDateDisplay,
   getSpeciesTone,
+  getSpeciesStyle,
   getVaccinationDueInfo,
 } from '@/shared/lib';
 import { getDoctorDisplay } from '@/shared/lib';
@@ -61,13 +62,7 @@ export const PetDetailIsland: React.FC<PetDetailIslandProps> = ({
             species={tone}
             iconSize={20}
             className={`pet-ava tone-${tone} detail-head-ava`}
-            style={
-              pet.species?.color
-                ? ({
-                    '--tone': pet.species.color,
-                  } as React.CSSProperties)
-                : undefined
-            }
+            style={getSpeciesStyle(pet.speciesId, speciesList) || (pet.species?.color ? ({ '--tone': pet.species.color } as React.CSSProperties) : undefined)}
             variant="full"
           />
           <div className="col" style={{ gap: 0 }}>

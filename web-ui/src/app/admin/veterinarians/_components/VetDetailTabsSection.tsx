@@ -12,6 +12,7 @@ import {
   formatApiError,
   formatIsoDateDisplay,
   getSpeciesTone,
+  getSpeciesStyle,
 } from '@/shared/lib';
 
 export interface VetDetailTabsSectionProps {
@@ -101,15 +102,16 @@ export const VetDetailTabsSection: React.FC<VetDetailTabsSectionProps> = ({
           {speciesList.map((sp) => {
             const isPermitted = permittedSpeciesIds.includes(sp.id);
             const busy = togglingSpeciesId === sp.id;
-            const tone = getSpeciesTone(sp.name);
+            const tone = getSpeciesTone(sp.name, speciesList);
+            const style = getSpeciesStyle(sp.id, speciesList);
             return (
               <div
                 key={sp.id}
                 className="row between"
                 style={{ padding: '8px 0', borderBottom: '1px solid var(--border)' }}
               >
-                <span className={`sp-chip tone-${tone}`}>
-                  <SpeciesIcon species={tone} size={14} className="ic" />
+                <span className={`sp-chip tone-${tone}`} style={style}>
+                  <SpeciesIcon species={sp.iconKey || tone} size={14} className="ic" />
                   {sp.name}
                 </span>
                 <div className="row" style={{ gap: 10 }}>

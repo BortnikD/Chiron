@@ -58,7 +58,13 @@ export const ConsultationPrintSheet: React.FC<ConsultationPrintSheetProps> = ({
         <div>
           <div className="print-sheet-label">Сведения о приёме</div>
           <div><b>Врач:</b> {vetName}</div>
-          <div><b>Услуга:</b> {serviceName}</div>
+          {appointment.services && appointment.services.length > 1 ? (
+            <div>
+              <b>Услуги:</b> {appointment.services.map((s) => s.nameSnapshot).join(', ')}
+            </div>
+          ) : (
+            <div><b>Услуга:</b> {serviceName}</div>
+          )}
           <div><b>Статус:</b> {statusLabel}</div>
         </div>
       </div>

@@ -13,6 +13,7 @@ import {
   formatTime,
   getSpecTone,
   getSpeciesTone,
+  getSpeciesStyle,
   pluralRu,
 } from '@/shared/lib';
 import type { VeterinarianDetailIslandProps } from './types';
@@ -33,8 +34,19 @@ export const VeterinarianDetailIsland: React.FC<VeterinarianDetailIslandProps> =
 }) => {
   const { fullName, initials, specName } = getDoctorDisplay(vet, specsMap);
   const specTone = getSpecTone(vet.specializationId);
+  const vetSpecIds =
+    vet.specializationIds && vet.specializationIds.length > 0
+      ? vet.specializationIds
+      : vet.specializationId
+      ? [vet.specializationId]
+      : [];
+  const allSpecNames =
+    vetSpecIds
+      .map((id) => specsMap[id])
+      .filter(Boolean)
+      .join(', ') || specName;
   const vetServices = services.filter(
-    (s) => s.isActive !== false && s.specializationId === vet.specializationId
+    (s) => s.isActive !== false && vetSpecIds.includes(s.specializationId)
   );
 
   return (
@@ -55,7 +67,7 @@ export const VeterinarianDetailIsland: React.FC<VeterinarianDetailIslandProps> =
               {fullName}
             </span>
             <span className="cell-sub">
-              {specName} · стаж {vet.experienceYears}{' '}
+              {allSpecNames} · стаж {vet.experienceYears}{' '}
               {pluralRu(vet.experienceYears, 'год', 'года', 'лет')}
             </span>
           </div>
@@ -93,22 +105,15 @@ export const VeterinarianDetailIsland: React.FC<VeterinarianDetailIslandProps> =
                 permissions.map((spId) => {
                   const spName = speciesMap[spId] || 'Животное';
                   const sp = speciesList?.find((s) => s.id === spId);
-                  const spTone = getSpeciesTone(sp?.iconKey || spName);
-                  const customColor = sp?.color;
+                  const spTone = getSpeciesTone(sp?.name || sp?.iconKey || spName, speciesList);
+                  const style = getSpeciesStyle(spId, speciesList);
                   return (
                     <span
                       key={spId}
                       className={`sp-chip tone-${spTone}`}
-                      style={
-                        customColor
-                          ? ({
-                              '--tone': customColor,
-                              borderColor: customColor,
-                            } as React.CSSProperties)
-                          : undefined
-                      }
+                      style={style}
                     >
-                      <SpeciesIcon species={sp?.iconKey || spTone} size={14} />
+                      <SpeciesIcon species={sp?.iconKey || spTone} size={14} className="ic" />
                       {spName}
                     </span>
                   );

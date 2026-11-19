@@ -15,9 +15,12 @@ import {
   formatApiError,
   getMoscowTodayIso,
   getSpeciesTone,
+  registerSpecializationColors,
+  registerSpeciesColors,
   toIdNameMap,
 } from '@/shared/lib';
 import { SPECIALIZATION_NAMES_RU, getDoctorDisplay } from '@/shared/lib';
+import { useDictionaries } from '@/shared/hooks';
 
 export function useVeterinariansCatalog(
   specParam: string | null = null,
@@ -25,10 +28,19 @@ export function useVeterinariansCatalog(
   speciesParam: string | null = null,
   searchParam: string | null = null
 ) {
-  const [vets, setVets] = useState<Veterinarian[]>([]);
-  const [specializations, setSpecializations] = useState<Specialization[]>([]);
-  const [speciesList, setSpeciesList] = useState<Species[]>([]);
-  const [services, setServices] = useState<Service[]>([]);
+  const {
+    veterinarians: dictVets,
+    specializations: dictSpecs,
+    species: dictSpecies,
+    services: dictServices,
+  } = useDictionaries();
+
+  const [vets, setVets] = useState<Veterinarian[]>(() =>
+    (Array.isArray(dictVets) ? dictVets : []).filter((v) => v.isActive !== false)
+  );
+  const [specializations, setSpecializations] = useState<Specialization[]>(() => dictSpecs || []);
+  const [speciesList, setSpeciesList] = useState<Species[]>(() => dictSpecies || []);
+  const [services, setServices] = useState<Service[]>(() => dictServices || []);
   const [vetPermissions, setVetPermissions] = useState<Record<string, string[]>>({});
   const [selectedSpec, setSelectedSpec] = useState<string>(specParam || 'ALL');
   const [selectedSpecies, setSelectedSpecies] = useState<string>(speciesParam || 'ALL');
@@ -49,6 +61,7 @@ export function useVeterinariansCatalog(
     setReloadTick((tick) => tick + 1);
   }, []);
 
+
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
@@ -67,9 +80,12 @@ export function useVeterinariansCatalog(
         );
         const safeSpec = Array.isArray(specData) ? specData : [];
 
+        registerSpecializationColors(safeSpec);
         setVets(safeVets);
         setSpecializations(safeSpec);
-        setSpeciesList(Array.isArray(spList) ? spList : []);
+        const safeSp = Array.isArray(spList) ? spList : [];
+        registerSpeciesColors(safeSp);
+        setSpeciesList(safeSp);
         setServices(Array.isArray(svcData) ? svcData : []);
         setSelectedVet((prev) =>
           prev ? safeVets.find((item) => item.id === prev.id) ?? null : null

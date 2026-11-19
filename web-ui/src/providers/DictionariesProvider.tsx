@@ -2,12 +2,13 @@
 
 import React, { createContext, useContext, useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { clinicApi, clearClinicDictionariesCache } from '@/modules/clinic/api';
-import { registerSpecializationColors } from '@/shared/lib';
+import { registerSpecializationColors, registerSpeciesColors } from '@/shared/lib';
 import type {
   SpeciesResponse,
   SpecializationResponse,
   ServiceResponse,
   VeterinarianResponse,
+  Pet,
 } from '@/shared/types';
 
 export type DictionaryKey = 'species' | 'specializations' | 'services' | 'veterinarians';
@@ -17,18 +18,27 @@ export interface DictionariesContextValue {
   specializations: SpecializationResponse[];
   services: ServiceResponse[];
   veterinarians: VeterinarianResponse[];
+  pets: Pet[];
   speciesMap: Map<string, SpeciesResponse>;
   specializationsMap: Map<string, SpecializationResponse>;
   servicesMap: Map<string, ServiceResponse>;
   veterinariansMap: Map<string, VeterinarianResponse>;
+  petsMap: Map<string, Pet>;
   // Вспомогательные карты id -> name для быстрого поиска строк
   speciesRecordMap: Record<string, string>;
   specsRecordMap: Record<string, string>;
   servicesRecordMap: Record<string, string>;
+  petsRecordMap: Record<string, string>;
   loading: boolean;
   error: string | null;
   invalidateDictionaries: (keys?: DictionaryKey[]) => Promise<void>;
   refreshDictionaries: (keys?: DictionaryKey[]) => Promise<void>;
+  upsertVeterinarian: (vet: VeterinarianResponse) => void;
+  upsertService: (service: ServiceResponse) => void;
+  upsertSpecies: (species: SpeciesResponse) => void;
+  upsertSpecialization: (spec: SpecializationResponse) => void;
+  upsertPet: (pet: Pet) => void;
+  upsertPets: (pets: Pet[]) => void;
 }
 
 const DictionariesContext = createContext<DictionariesContextValue | null>(null);
@@ -39,6 +49,7 @@ const memoryCache: {
   specializations?: SpecializationResponse[];
   services?: ServiceResponse[];
   veterinarians?: VeterinarianResponse[];
+  pets?: Pet[];
 } = {};
 
 const inFlightPromises = new Map<DictionaryKey, Promise<unknown>>();
@@ -75,6 +86,7 @@ export function DictionariesProvider({ children }: { children: React.ReactNode }
   const [veterinarians, setVeterinarians] = useState<VeterinarianResponse[]>(
     () => memoryCache.veterinarians || []
   );
+  const [pets, setPets] = useState<Pet[]>(() => memoryCache.pets || []);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -91,7 +103,9 @@ export function DictionariesProvider({ children }: { children: React.ReactNode }
       if (keys.includes('species')) {
         promises.push(
           fetchDictionary('species', () => clinicApi.getSpecies()).then((res) => {
-            if (isMountedRef.current) setSpecies(Array.isArray(res) ? res : []);
+            const list = Array.isArray(res) ? res : [];
+            registerSpeciesColors(list);
+            if (isMountedRef.current) setSpecies(list);
           })
         );
       }
@@ -131,14 +145,6 @@ export function DictionariesProvider({ children }: { children: React.ReactNode }
     }
   }, []);
 
-  useEffect(() => {
-    isMountedRef.current = true;
-    void loadAll();
-    return () => {
-      isMountedRef.current = false;
-    };
-  }, [loadAll]);
-
   const invalidateDictionaries = useCallback(
     async (keys?: DictionaryKey[]) => {
       clearClinicDictionariesCache();
@@ -152,11 +158,83 @@ export function DictionariesProvider({ children }: { children: React.ReactNode }
     [loadAll]
   );
 
+  useEffect(() => {
+    isMountedRef.current = true;
+    void loadAll();
+
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, [loadAll]);
+
   const refreshDictionaries = useCallback(
     async (keys?: DictionaryKey[]) => {
       await invalidateDictionaries(keys);
     },
     [invalidateDictionaries]
+  );
+
+  const upsertVeterinarian = useCallback((vet: VeterinarianResponse) => {
+    if (!vet?.id) return;
+    setVeterinarians((prev) => {
+      const idx = prev.findIndex((v) => v.id === vet.id);
+      const next = idx >= 0 ? [...prev.slice(0, idx), vet, ...prev.slice(idx + 1)] : [...prev, vet];
+      memoryCache.veterinarians = next;
+      return next;
+    });
+  }, []);
+
+  const upsertService = useCallback((service: ServiceResponse) => {
+    if (!service?.id) return;
+    setServices((prev) => {
+      const idx = prev.findIndex((s) => s.id === service.id);
+      const next = idx >= 0 ? [...prev.slice(0, idx), service, ...prev.slice(idx + 1)] : [...prev, service];
+      memoryCache.services = next;
+      return next;
+    });
+  }, []);
+
+  const upsertSpecies = useCallback((sp: SpeciesResponse) => {
+    if (!sp?.id) return;
+    registerSpeciesColors([sp]);
+    setSpecies((prev) => {
+      const idx = prev.findIndex((s) => s.id === sp.id);
+      const next = idx >= 0 ? [...prev.slice(0, idx), sp, ...prev.slice(idx + 1)] : [...prev, sp];
+      memoryCache.species = next;
+      return next;
+    });
+  }, []);
+
+  const upsertSpecialization = useCallback((spec: SpecializationResponse) => {
+    if (!spec?.id) return;
+    registerSpecializationColors([spec]);
+    setSpecializations((prev) => {
+      const idx = prev.findIndex((s) => s.id === spec.id);
+      const next = idx >= 0 ? [...prev.slice(0, idx), spec, ...prev.slice(idx + 1)] : [...prev, spec];
+      memoryCache.specializations = next;
+      return next;
+    });
+  }, []);
+
+  const upsertPets = useCallback((newPets: Pet[]) => {
+    if (!Array.isArray(newPets) || newPets.length === 0) return;
+    setPets((prev) => {
+      const map = new Map(prev.map((p) => [p.id, p]));
+      for (const p of newPets) {
+        if (p?.id) map.set(p.id, p);
+      }
+      const next = Array.from(map.values());
+      memoryCache.pets = next;
+      return next;
+    });
+  }, []);
+
+  const upsertPet = useCallback(
+    (pet: Pet) => {
+      if (!pet?.id) return;
+      upsertPets([pet]);
+    },
+    [upsertPets]
   );
 
   const speciesMap = useMemo(() => {
@@ -191,6 +269,14 @@ export function DictionariesProvider({ children }: { children: React.ReactNode }
     return map;
   }, [veterinarians]);
 
+  const petsMap = useMemo(() => {
+    const map = new Map<string, Pet>();
+    for (const item of pets) {
+      if (item.id) map.set(item.id, item);
+    }
+    return map;
+  }, [pets]);
+
   const speciesRecordMap = useMemo(() => {
     const record: Record<string, string> = {};
     for (const s of species) {
@@ -215,40 +301,66 @@ export function DictionariesProvider({ children }: { children: React.ReactNode }
     return record;
   }, [services]);
 
+  const petsRecordMap = useMemo(() => {
+    const record: Record<string, string> = {};
+    for (const p of pets) {
+      if (p.id && p.name) record[p.id] = p.name;
+    }
+    return record;
+  }, [pets]);
+
   const value = useMemo<DictionariesContextValue>(
     () => ({
       species,
       specializations,
       services,
       veterinarians,
+      pets,
       speciesMap,
       specializationsMap,
       servicesMap,
       veterinariansMap,
+      petsMap,
       speciesRecordMap,
       specsRecordMap,
       servicesRecordMap,
+      petsRecordMap,
       loading,
       error,
       invalidateDictionaries,
       refreshDictionaries,
+      upsertVeterinarian,
+      upsertService,
+      upsertSpecies,
+      upsertSpecialization,
+      upsertPet,
+      upsertPets,
     }),
     [
       species,
       specializations,
       services,
       veterinarians,
+      pets,
       speciesMap,
       specializationsMap,
       servicesMap,
       veterinariansMap,
+      petsMap,
       speciesRecordMap,
       specsRecordMap,
       servicesRecordMap,
+      petsRecordMap,
       loading,
       error,
       invalidateDictionaries,
       refreshDictionaries,
+      upsertVeterinarian,
+      upsertService,
+      upsertSpecies,
+      upsertSpecialization,
+      upsertPet,
+      upsertPets,
     ]
   );
 

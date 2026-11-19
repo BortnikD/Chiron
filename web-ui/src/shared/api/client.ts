@@ -46,10 +46,16 @@ export async function request<T>(
     headers.set('Authorization', `Bearer ${token}`);
   }
 
-  const response = await fetch(endpoint, {
-    ...options,
-    headers,
-  });
+  let response: Response;
+  try {
+    response = await fetch(endpoint, {
+      ...options,
+      headers,
+    });
+  } catch (err: unknown) {
+    if (err instanceof ApiError) throw err;
+    throw new ApiError(0, 'Не удалось связаться с сервером (Failed to fetch). Повторите попытку.');
+  }
 
   if (response.status === 204) {
     return {} as T;

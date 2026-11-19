@@ -3,7 +3,7 @@
 import React from 'react';
 import { Stethoscope } from 'lucide-react';
 import { getDoctorDisplay } from '@/shared/lib';
-import { getSpecTone, getSpecStyle, getSpeciesTone, pluralRu } from '@/shared/lib';
+import { getSpecTone, getSpecStyle, getSpeciesTone, getSpeciesStyle, pluralRu } from '@/shared/lib';
 import { SpeciesIcon } from '@/components/ui/SpeciesIcon';
 import { VetAvatar } from '@/components/ui/EntityAvatar';
 import { Skeleton, SkeletonCircle } from '@/shared/components';
@@ -105,30 +105,41 @@ export const VeterinariansGrid: React.FC<VeterinariansGridProps> = ({
                     </span>
                   </div>
 
-                  <div className="row" style={{ gap: '6px' }}>
+                  <div className="row wrap" style={{ gap: '6px' }}>
                     {(() => {
-                      const spec =
-                        v.specialization ||
-                        (v.specializationId
-                          ? specializations?.find((s) => s.id === v.specializationId)
-                          : undefined);
-                      const specColor = spec?.color;
-                      return (
-                        <span
-                          className="t-badge"
-                          style={
-                            specColor
-                              ? {
-                                  color: specColor,
-                                  borderColor: `${specColor}40`,
-                                  backgroundColor: `${specColor}15`,
-                                }
-                              : undefined
-                          }
-                        >
-                          {specName}
-                        </span>
-                      );
+                      const allSpecIds =
+                        v.specializationIds && v.specializationIds.length > 0
+                          ? v.specializationIds
+                          : v.specializationId
+                          ? [v.specializationId]
+                          : [];
+
+                      if (allSpecIds.length === 0) {
+                        return <span className="t-badge">{specName}</span>;
+                      }
+
+                      return allSpecIds.map((sId) => {
+                        const spec = specializations?.find((s) => s.id === sId);
+                        const label = spec?.name || specName;
+                        const specColor = spec?.color;
+                        return (
+                          <span
+                            key={sId}
+                            className="t-badge"
+                            style={
+                              specColor
+                                ? {
+                                    color: specColor,
+                                    borderColor: `${specColor}40`,
+                                    backgroundColor: `${specColor}15`,
+                                  }
+                                : undefined
+                            }
+                          >
+                            {label}
+                          </span>
+                        );
+                      });
                     })()}
                   </div>
 
@@ -140,22 +151,15 @@ export const VeterinariansGrid: React.FC<VeterinariansGridProps> = ({
                         perms.map((spId) => {
                           const spName = speciesMap[spId] || 'Животное';
                           const sp = speciesList?.find((s) => s.id === spId);
-                          const spTone = getSpeciesTone(sp?.iconKey || spName);
-                          const customColor = sp?.color;
+                          const spTone = getSpeciesTone(sp?.name || sp?.iconKey || spName, speciesList);
+                          const style = getSpeciesStyle(spId, speciesList);
                           return (
                             <span
                               key={spId}
                               className={`sp-chip tone-${spTone}`}
-                              style={
-                                customColor
-                                  ? ({
-                                      '--tone': customColor,
-                                      borderColor: customColor,
-                                    } as React.CSSProperties)
-                                  : undefined
-                              }
+                              style={style}
                             >
-                              <SpeciesIcon species={sp?.iconKey || spTone} size={14} />
+                              <SpeciesIcon species={sp?.iconKey || spTone} size={14} className="ic" />
                               {spName}
                             </span>
                           );
