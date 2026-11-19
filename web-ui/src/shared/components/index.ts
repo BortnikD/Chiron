@@ -33,3 +33,6 @@ export type { UserRoleBadgeProps } from './UserRoleBadge';
 
 export { EmptyState } from './EmptyState';
 export type { EmptyStateProps } from './EmptyState';
+
+export { Skeleton, SkeletonCircle } from './Skeleton';
+export type { SkeletonProps } from './Skeleton';

@@ -2,6 +2,7 @@
 
 import React, { useMemo } from 'react';
 import { PaginationFooter, type PaginationFooterProps } from './PaginationFooter';
+import { Skeleton } from './Skeleton';
 
 export interface DataTableColumn<T> {
   key: string;
@@ -111,48 +112,65 @@ export function DataTable<T>({
             ))}
           </div>
 
-          {data.map((item, index) => {
-            const rowKey = keyExtractor ? keyExtractor(item, index) : (item as any)?.id || String(index);
-            const isSelected = selectedId === rowKey;
-            const isClickable = Boolean(onRowClick);
-
-            return (
-              <div
-                key={rowKey}
-                role={isClickable ? 'button' : undefined}
-                tabIndex={isClickable ? 0 : undefined}
-                className={`trow ${isSelected ? 'sel' : ''} ${!isClickable ? 'static' : ''} ${compact ? 'compact' : ''}`.trim()}
-                onClick={isClickable ? () => onRowClick?.(item) : undefined}
-                onKeyDown={
-                  isClickable
-                    ? (e) => {
-                        if (e.key === 'Enter' || e.key === ' ') {
-                          e.preventDefault();
-                          onRowClick?.(item);
-                        }
-                      }
-                    : undefined
-                }
-              >
-                {columns.map((col) => (
-                  <span
-                    key={col.key}
-                    className={`${col.align === 'right' ? 'right' : ''} ${col.className || ''}`.trim()}
-                  >
-                    {col.render(item, index)}
-                  </span>
-                ))}
+          {loading && data.length === 0 ? (
+            Array.from({ length: Math.min(paginationProps?.pageSize || 6, 8) }).map((_, rIdx) => (
+              <div key={`skel-row-${rIdx}`} className={`trow static ${compact ? 'compact' : ''}`}>
+                {columns.map((col, cIdx) => {
+                  const widths = ['65%', '85%', '50%', '75%', '40%', '90%'];
+                  const w = widths[(rIdx + cIdx) % widths.length];
+                  return (
+                    <span
+                      key={`skel-cell-${col.key}`}
+                      className={`${col.align === 'right' ? 'right' : ''} ${col.className || ''}`.trim()}
+                    >
+                      <Skeleton
+                        height="16px"
+                        width={col.align === 'right' ? '50px' : w}
+                        borderRadius="4px"
+                        style={{ display: 'inline-block' }}
+                      />
+                    </span>
+                  );
+                })}
               </div>
-            );
-          })}
-        </div>
+            ))
+          ) : (
+            data.map((item, index) => {
+              const rowKey = keyExtractor ? keyExtractor(item, index) : (item as any)?.id || String(index);
+              const isSelected = selectedId === rowKey;
+              const isClickable = Boolean(onRowClick);
 
-        {loading && data.length === 0 && (
-          <div className="empty">
-            <span className="spinner" aria-hidden="true" />
-            <span className="muted">Загрузка данных…</span>
-          </div>
-        )}
+              return (
+                <div
+                  key={rowKey}
+                  role={isClickable ? 'button' : undefined}
+                  tabIndex={isClickable ? 0 : undefined}
+                  className={`trow ${isSelected ? 'sel' : ''} ${!isClickable ? 'static' : ''} ${compact ? 'compact' : ''}`.trim()}
+                  onClick={isClickable ? () => onRowClick?.(item) : undefined}
+                  onKeyDown={
+                    isClickable
+                      ? (e) => {
+                          if (e.key === 'Enter' || e.key === ' ') {
+                            e.preventDefault();
+                            onRowClick?.(item);
+                          }
+                        }
+                      : undefined
+                  }
+                >
+                  {columns.map((col) => (
+                    <span
+                      key={col.key}
+                      className={`${col.align === 'right' ? 'right' : ''} ${col.className || ''}`.trim()}
+                    >
+                      {col.render(item, index)}
+                    </span>
+                  ))}
+                </div>
+              );
+            })
+          )}
+        </div>
 
         {!loading && data.length === 0 && (
           <div className="empty">

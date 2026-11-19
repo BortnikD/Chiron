@@ -4,7 +4,7 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/providers';
 import { notificationsApi } from '@/shared/api';
-import { useToast, UserRoleBadge, EmptyState } from '@/shared/components';
+import { useToast, UserRoleBadge, EmptyState, Skeleton, SkeletonCircle } from '@/shared/components';
 import { useAppShell } from '@/components/layout/AppShell';
 import {
   formatApiError,
@@ -398,9 +398,32 @@ export const NotificationsView: React.FC<NotificationsViewProps> = ({
               )}
 
               {loading ? (
-                <div className="empty">
-                  <span className="spinner" aria-hidden="true" />
-                  <span className="small muted">Загрузка уведомлений...</span>
+                <div className="col" style={{ gap: '8px' }}>
+                  {[1, 2, 3, 4, 5].map((i) => (
+                    <div
+                      key={`notif-skel-${i}`}
+                      style={{
+                        display: 'grid',
+                        gridTemplateColumns: 'auto 1fr auto',
+                        gap: '12px',
+                        alignItems: 'center',
+                        padding: '10px 12px',
+                        borderRadius: '10px',
+                        border: '1px solid var(--border)',
+                        background: 'var(--card)',
+                      }}
+                    >
+                      <SkeletonCircle size={34} />
+                      <div className="col" style={{ gap: '6px' }}>
+                        <div className="row items-center" style={{ gap: '8px' }}>
+                          <Skeleton width="90px" height="18px" borderRadius="10px" />
+                          <Skeleton width="130px" height="15px" borderRadius="4px" />
+                        </div>
+                        <Skeleton width="220px" height="13px" borderRadius="4px" />
+                      </div>
+                      <Skeleton width="40px" height="12px" borderRadius="4px" />
+                    </div>
+                  ))}
                 </div>
               ) : filteredInbox.length === 0 ? (
                 <div className="empty">
