@@ -1,10 +1,9 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { AlertCircle, X } from 'lucide-react';
 import type { User, UserRole } from '@/shared/types';
 import { formatApiError, getUtf8ByteLength } from '@/shared/lib';
-import { PhoneInput } from '@/shared/components';
+import { PhoneInput, ModalShell } from '@/shared/components';
 import type { CreateUserInput } from '../_hooks/useAdminUsers';
 
 export interface AdminCreateUserModalProps {
@@ -48,17 +47,6 @@ export const AdminCreateUserModal: React.FC<AdminCreateUserModalProps> = ({
       setCreating(false);
     }
   }, [isOpen]);
-
-  useEffect(() => {
-    if (!isOpen) return;
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && !creating) onClose();
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isOpen, creating, onClose]);
-
-  if (!isOpen) return null;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -107,39 +95,25 @@ export const AdminCreateUserModal: React.FC<AdminCreateUserModalProps> = ({
   };
 
   return (
-    <div
-      className="overlay"
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="create-user-title"
-      onClick={() => !creating && onClose()}
-    >
-      <div className="dialog" onClick={(e) => e.stopPropagation()}>
-        <div
-          className="dialog-head"
-          style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}
-        >
-          <div className="col" style={{ gap: 4 }}>
-            <span id="create-user-title" className="dialog-title">
-              Создать пользователя
-            </span>
-            <span className="dialog-desc">Регистрация нового пользователя в системе Chiron</span>
-          </div>
-          <button
-            type="button"
-            className="btn btn-ghost btn-icon btn-sm"
-            aria-label="Закрыть"
-            onClick={() => !creating && onClose()}
-          >
-            <X size={16} />
+    <ModalShell
+      isOpen={isOpen}
+      onClose={onClose}
+      title="Создать пользователя"
+      description="Регистрация нового пользователя в системе Chiron"
+      loading={creating}
+      error={createError}
+      onSubmit={handleSubmit}
+      footer={
+        <>
+          <button type="button" className="btn btn-outline" onClick={onClose} disabled={creating}>
+            Отмена
           </button>
-        </div>
-
-        <form
-          onSubmit={handleSubmit}
-          style={{ display: 'flex', flexDirection: 'column', minHeight: 0, flex: 1 }}
-        >
-          <div className="dialog-body">
+          <button type="submit" className="btn btn-primary" disabled={creating}>
+            {creating ? 'Создание…' : 'Создать'}
+          </button>
+        </>
+      }
+    >
             <div className="field">
               <span className="field-label">Роль</span>
               <div className="seg">
@@ -247,25 +221,6 @@ export const AdminCreateUserModal: React.FC<AdminCreateUserModalProps> = ({
                 />
               </div>
             </div>
-
-            {createError && (
-              <div className="alert alert-destructive" role="alert">
-                <AlertCircle size={16} className="ic" />
-                <div>{createError}</div>
-              </div>
-            )}
-          </div>
-
-          <div className="dialog-foot">
-            <button type="button" className="btn btn-outline" onClick={onClose} disabled={creating}>
-              Отмена
-            </button>
-            <button type="submit" className="btn btn-primary" disabled={creating}>
-              {creating ? 'Создание…' : 'Создать'}
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
+    </ModalShell>
   );
 };

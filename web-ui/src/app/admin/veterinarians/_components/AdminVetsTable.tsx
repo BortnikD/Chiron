@@ -4,7 +4,7 @@ import React, { useMemo } from 'react';
 import { Stethoscope } from 'lucide-react';
 import type { Veterinarian, Specialization, Species } from '@/modules/clinic/types';
 import type { User } from '@/shared/types';
-import { getSpecTone, getSpeciesTone, pluralRu, toIdNameMap } from '@/shared/lib';
+import { getSpecTone, getSpecStyle, getSpeciesTone, getSpeciesStyle, pluralRu, toIdNameMap } from '@/shared/lib';
 import { DataTable, type DataTableColumn } from '@/shared/components';
 import { SpeciesIcon } from '@/components/ui/SpeciesIcon';
 import { VetAvatar } from '@/components/ui/EntityAvatar';
@@ -46,12 +46,14 @@ export const AdminVetsTable: React.FC<AdminVetsTableProps> = ({
         render: (v) => {
           const doc = getDoctorDisplay({ ...v, user: v.user || usersMap[v.userId] }, specsMap);
           const tone = getSpecTone(v.specializationId);
+          const specStyle = getSpecStyle(v.specializationId, specializations);
           return (
             <span className="row" style={{ gap: 8, alignItems: 'center' }}>
               <VetAvatar
                 vet={v}
                 initials={doc.initials}
                 tone={tone}
+                style={specStyle}
                 className={`t-ava sm round tone-${tone}`}
                 alt={doc.fullName}
               />
@@ -63,12 +65,31 @@ export const AdminVetsTable: React.FC<AdminVetsTableProps> = ({
       {
         key: 'spec',
         title: 'Специализация',
-        width: '1fr',
+        width: '1.2fr',
         render: (v) => {
-          const doc = getDoctorDisplay({ ...v, user: v.user || usersMap[v.userId] }, specsMap);
-          const specName = v.specializationId ? doc.specName : 'Не указана';
-          const tone = getSpecTone(v.specializationId);
-          return <span className={`t-badge tone-${tone}`}>{specName}</span>;
+          const specIds =
+            v.specializationIds && v.specializationIds.length > 0
+              ? v.specializationIds
+              : v.specializationId
+              ? [v.specializationId]
+              : [];
+          if (specIds.length === 0) {
+            return <span className="small muted">Не указана</span>;
+          }
+          return (
+            <span className="row wrap" style={{ gap: '4px' }}>
+              {specIds.map((sid) => {
+                const sName = specsMap[sid] || 'Специализация';
+                const tone = getSpecTone(sid);
+                const specStyle = getSpecStyle(sid, specializations);
+                return (
+                  <span key={sid} className={`t-badge tone-${tone}`} style={specStyle}>
+                    {sName}
+                  </span>
+                );
+              })}
+            </span>
+          );
         },
       },
       {
@@ -95,10 +116,11 @@ export const AdminVetsTable: React.FC<AdminVetsTableProps> = ({
             <span className="chips">
               {permittedSpecies.length > 0 ? (
                 permittedSpecies.map((sp) => {
-                  const tone = getSpeciesTone(sp.name);
+                  const tone = getSpeciesTone(sp.name, speciesList);
+                  const style = getSpeciesStyle(sp.id, speciesList);
                   return (
-                    <span key={sp.id} className={`sp-chip tone-${tone}`}>
-                      <SpeciesIcon species={tone} size={14} className="ic" />
+                    <span key={sp.id} className={`sp-chip tone-${tone}`} style={style}>
+                      <SpeciesIcon species={sp.iconKey || tone} size={14} className="ic" />
                       {sp.name}
                     </span>
                   );
@@ -121,7 +143,7 @@ export const AdminVetsTable: React.FC<AdminVetsTableProps> = ({
         ),
       },
     ];
-  }, [usersMap, specsMap, speciesList, vetPermMap]);
+  }, [usersMap, specsMap, specializations, speciesList, vetPermMap]);
 
   return (
     <DataTable<Veterinarian>

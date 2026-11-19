@@ -9,6 +9,7 @@ export interface SearchComboboxOption {
   hint?: string;
   title?: string;
   disabled?: boolean;
+  avatar?: React.ReactNode;
 }
 
 export interface SearchComboboxProps {
@@ -121,13 +122,32 @@ export const SearchCombobox: React.FC<SearchComboboxProps> = ({
     }
   };
 
+  const showAvatarInInput = Boolean(selected?.avatar && !open);
+
   return (
     <div className="cb" ref={wrapRef}>
+      {showAvatarInInput && (
+        <span
+          style={{
+            position: 'absolute',
+            left: '8px',
+            top: '50%',
+            transform: 'translateY(-50%)',
+            pointerEvents: 'none',
+            zIndex: 2,
+            display: 'inline-flex',
+            alignItems: 'center',
+          }}
+        >
+          {selected?.avatar}
+        </span>
+      )}
       <input
         ref={inputRef}
         id={id}
         type="text"
         className={`input cb-input ${invalid ? 'invalid' : ''}`}
+        style={showAvatarInInput ? { paddingLeft: '38px' } : undefined}
         role="combobox"
         aria-autocomplete="list"
         aria-controls={listboxId}
@@ -184,6 +204,7 @@ export const SearchCombobox: React.FC<SearchComboboxProps> = ({
                   className={`menu-item ${isSelected ? 'on' : ''} ${idx === activeIdx ? 'active' : ''} ${
                     opt.disabled ? 'disabled' : ''
                   }`}
+                  style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 10px' }}
                   onMouseEnter={() => setActiveIdx(idx)}
                   onMouseDown={(e) => {
                     e.preventDefault();
@@ -191,14 +212,36 @@ export const SearchCombobox: React.FC<SearchComboboxProps> = ({
                     inputRef.current?.blur();
                   }}
                 >
-                  <span className="mi-label">{opt.label}</span>
-                  {opt.hint && <span className="small muted mi-hint">{opt.hint}</span>}
+                  {opt.avatar && (
+                    <span style={{ flex: 'none', display: 'inline-flex', alignItems: 'center' }}>
+                      {opt.avatar}
+                    </span>
+                  )}
+                  <span
+                    className="mi-label"
+                    style={{
+                      flex: 1,
+                      minWidth: 0,
+                      textAlign: 'left',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap',
+                    }}
+                  >
+                    {opt.label}
+                  </span>
+                  {opt.hint && (
+                    <span className="small muted mi-hint" style={{ flex: 'none' }}>
+                      {opt.hint}
+                    </span>
+                  )}
                   {isSelected && (
                     <Check
                       className="ic"
                       style={{
                         marginLeft: opt.hint ? '8px' : 'auto',
                         color: 'var(--primary-text)',
+                        flex: 'none',
                       }}
                     />
                   )}

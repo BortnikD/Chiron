@@ -3,9 +3,10 @@
 import React from 'react';
 import { Stethoscope } from 'lucide-react';
 import { getDoctorDisplay } from '@/shared/lib';
-import { getSpecTone, getSpeciesTone, pluralRu } from '@/shared/lib';
+import { getSpecTone, getSpecStyle, getSpeciesTone, getSpeciesStyle, pluralRu } from '@/shared/lib';
 import { SpeciesIcon } from '@/components/ui/SpeciesIcon';
 import { VetAvatar } from '@/components/ui/EntityAvatar';
+import { Skeleton, SkeletonCircle } from '@/shared/components';
 import type { VeterinariansGridProps } from './types';
 
 export const VeterinariansGrid: React.FC<VeterinariansGridProps> = ({
@@ -15,6 +16,8 @@ export const VeterinariansGrid: React.FC<VeterinariansGridProps> = ({
   specsMap,
   speciesMap,
   vetPermissions,
+  speciesList,
+  specializations,
   loading = false,
   hasFilters = false,
   onReset,
@@ -28,23 +31,42 @@ export const VeterinariansGrid: React.FC<VeterinariansGridProps> = ({
         </span>
       </div>
       <div className="island-body">
-        {vets.length === 0 ? (
+        {loading && vets.length === 0 ? (
+          <div className="cards">
+            {[1, 2, 3, 4, 5, 6].map((i) => (
+              <div
+                key={`vet-skel-${i}`}
+                className="card static"
+                style={{
+                  padding: '16px',
+                  display: 'flex',
+                  gap: '14px',
+                  alignItems: 'flex-start',
+                  minHeight: '130px',
+                }}
+              >
+                <SkeletonCircle size={52} />
+                <div className="col grow" style={{ gap: '8px' }}>
+                  <Skeleton width="150px" height="18px" borderRadius="4px" />
+                  <Skeleton width="100px" height="18px" borderRadius="10px" />
+                  <div className="row" style={{ gap: '6px', marginTop: '4px' }}>
+                    <Skeleton width="60px" height="14px" borderRadius="4px" />
+                    <Skeleton width="40px" height="14px" borderRadius="4px" />
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : vets.length === 0 ? (
           <div className="empty">
             <div className="empty-art">
               <Stethoscope className="ic ic-40" />
             </div>
-            <span className="empty-title">
-              {loading ? 'Загрузка врачей...' : 'Нет врачей по фильтру'}
-            </span>
-            {loading ? (
-              <span>Получение списка врачей клиники...</span>
-            ) : (
-              hasFilters &&
-              onReset && (
-                <button type="button" className="btn btn-outline" onClick={onReset}>
-                  Сбросить фильтры
-                </button>
-              )
+            <span className="empty-title">Нет врачей по фильтру</span>
+            {hasFilters && onReset && (
+              <button type="button" className="btn btn-outline" onClick={onReset}>
+                Сбросить фильтры
+              </button>
             )}
           </div>
         ) : (
@@ -52,6 +74,7 @@ export const VeterinariansGrid: React.FC<VeterinariansGridProps> = ({
             {vets.map((v) => {
               const isSel = selectedVet?.id === v.id;
               const tone = getSpecTone(v.specializationId);
+              const specStyle = getSpecStyle(v.specializationId, specializations);
               const { name, fullName, initials, specName } = getDoctorDisplay(v, specsMap);
               const perms = vetPermissions[v.id] || [];
 
@@ -60,6 +83,7 @@ export const VeterinariansGrid: React.FC<VeterinariansGridProps> = ({
                   key={v.id}
                   type="button"
                   className={`tcard tone-${tone} ${isSel ? 'sel' : ''}`}
+                  style={specStyle}
                   onClick={() => onSelectVet(v)}
                 >
                   <div className="tcard-head">
@@ -67,6 +91,7 @@ export const VeterinariansGrid: React.FC<VeterinariansGridProps> = ({
                       vet={v}
                       initials={initials}
                       tone={tone}
+                      style={specStyle}
                       className="t-ava lg round"
                       alt={fullName}
                     />
@@ -80,8 +105,42 @@ export const VeterinariansGrid: React.FC<VeterinariansGridProps> = ({
                     </span>
                   </div>
 
-                  <div className="row" style={{ gap: '6px' }}>
-                    <span className="t-badge">{specName}</span>
+                  <div className="row wrap" style={{ gap: '6px' }}>
+                    {(() => {
+                      const allSpecIds =
+                        v.specializationIds && v.specializationIds.length > 0
+                          ? v.specializationIds
+                          : v.specializationId
+                          ? [v.specializationId]
+                          : [];
+
+                      if (allSpecIds.length === 0) {
+                        return <span className="t-badge">{specName}</span>;
+                      }
+
+                      return allSpecIds.map((sId) => {
+                        const spec = specializations?.find((s) => s.id === sId);
+                        const label = spec?.name || specName;
+                        const specColor = spec?.color;
+                        return (
+                          <span
+                            key={sId}
+                            className="t-badge"
+                            style={
+                              specColor
+                                ? {
+                                    color: specColor,
+                                    borderColor: `${specColor}40`,
+                                    backgroundColor: `${specColor}15`,
+                                  }
+                                : undefined
+                            }
+                          >
+                            {label}
+                          </span>
+                        );
+                      });
+                    })()}
                   </div>
 
                   <span className="tcard-desc">{v.bio || '\u00A0'}</span>
@@ -91,10 +150,16 @@ export const VeterinariansGrid: React.FC<VeterinariansGridProps> = ({
                       {perms.length > 0 ? (
                         perms.map((spId) => {
                           const spName = speciesMap[spId] || 'Животное';
-                          const spTone = getSpeciesTone(spName);
+                          const sp = speciesList?.find((s) => s.id === spId);
+                          const spTone = getSpeciesTone(sp?.name || sp?.iconKey || spName, speciesList);
+                          const style = getSpeciesStyle(spId, speciesList);
                           return (
-                            <span key={spId} className={`sp-chip tone-${spTone}`}>
-                              <SpeciesIcon species={spTone} size={14} />
+                            <span
+                              key={spId}
+                              className={`sp-chip tone-${spTone}`}
+                              style={style}
+                            >
+                              <SpeciesIcon species={sp?.iconKey || spTone} size={14} className="ic" />
                               {spName}
                             </span>
                           );

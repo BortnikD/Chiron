@@ -19,7 +19,8 @@ export function useBookingWizard(
   initialPetId?: string | null,
   initialSlot?: string | null,
   initialIntent?: string | null,
-  initialVaccine?: string | null
+  initialVaccine?: string | null,
+  initialSpeciesId?: string | null
 ) {
   const { toast } = useToast();
   const [step, setStepState] = useState<number>(1);
@@ -44,7 +45,8 @@ export function useBookingWizard(
     setStepState,
     initialPetId,
     initialSlot,
-    initialIntent
+    initialIntent,
+    initialSpeciesId
   );
 
   const isVaccination = isVaccinationService(data.selectedService);
@@ -54,7 +56,8 @@ export function useBookingWizard(
     data.isAnyVet,
     data.selectedVet,
     initialSlot,
-    data.vetsMap
+    data.vetsMap,
+    data.selectedServices
   );
 
   const {
@@ -149,10 +152,26 @@ export function useBookingWizard(
     return slots.selectedSlot.veterinarianIds[0] ?? null;
   }, [data.isAnyVet, data.selectedVet, slots.selectedSlot, slots.selectedSlotVetId]);
 
-  const doctorDisplay = useMemo(
-    () => resolveDoctorDisplayName(data.isAnyVet, data.selectedVet, data.specsMap),
-    [data.isAnyVet, data.selectedVet, data.specsMap]
-  );
+  const availableVetsForSlot = useMemo(() => {
+    if (!slots.selectedSlot) return [];
+    return slots.selectedSlot.veterinarianIds
+      .map((id) => data.vetsMap[id])
+      .filter(Boolean);
+  }, [slots.selectedSlot, data.vetsMap]);
+
+  const doctorDisplay = useMemo(() => {
+    if (!data.isAnyVet && data.selectedVet) {
+      return resolveDoctorDisplayName(false, data.selectedVet, data.specsMap);
+    }
+    if (data.isAnyVet) {
+      const activeVetId = slots.selectedSlotVetId || slots.selectedSlot?.veterinarianIds[0];
+      if (activeVetId && data.vetsMap[activeVetId]) {
+        return resolveDoctorDisplayName(false, data.vetsMap[activeVetId], data.specsMap);
+      }
+      return 'Любой врач';
+    }
+    return resolveDoctorDisplayName(data.isAnyVet, data.selectedVet, data.specsMap);
+  }, [data.isAnyVet, data.selectedVet, slots.selectedSlot, slots.selectedSlotVetId, data.vetsMap, data.specsMap]);
 
   const handleConfirmBooking = useCallback(async () => {
     if (!data.selectedPet || !data.selectedService || !slots.selectedSlot) {
@@ -173,9 +192,17 @@ export function useBookingWizard(
     setError(null);
     setSlotConflictError(null);
     try {
+      const bookedServiceIds =
+        data.selectedServices && data.selectedServices.length > 0
+          ? data.selectedServices.map((s) => s.id)
+          : data.selectedService
+          ? [data.selectedService.id]
+          : [];
+
       const res = await clientApi.bookAppointment({
         petId: data.selectedPet.id,
-        serviceId: data.selectedService.id,
+        serviceId: bookedServiceIds[0],
+        serviceIds: bookedServiceIds,
         veterinarianId: resolvedVetId,
         startAt: slots.selectedSlot.startAt,
         endAt: slots.selectedSlot.endAt,
@@ -231,9 +258,12 @@ export function useBookingWizard(
     setSlotConflictError(null);
   }, [onSelectSlot]);
 
+  const hasSelectedService =
+    (data.selectedServices && data.selectedServices.length > 0) || Boolean(data.selectedService);
+
   const isNextDisabled =
     (step === 1 && (!data.selectedPet || data.selectedPet.isArchived || data.loadingData)) ||
-    (step === 2 && (data.loadingServices || !data.selectedService)) ||
+    (step === 2 && (data.loadingServices || !hasSelectedService)) ||
     (step === 3 && !data.isAnyVet && !data.selectedVet) ||
     (step === 4 && (!slots.selectedSlot || !resolvedVetId));
 
@@ -251,6 +281,7 @@ export function useBookingWizard(
     data,
     slots,
     resolvedVetId,
+    availableVetsForSlot,
     doctorDisplay,
     isVaccination,
     isVetPreselected: Boolean(

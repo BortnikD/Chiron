@@ -9,7 +9,7 @@ import type { Species } from '@/modules/clinic/types';
 import type { User } from '@/shared/types';
 import { useToast } from '@/shared/components';
 import { formatApiError, getMoscowTodayIso, addDaysIso } from '@/shared/lib';
-import { useResourceList } from '@/shared/hooks';
+import { useResourceList, useDictionaries } from '@/shared/hooks';
 import type { VaccinationStatusTone } from '../_components/types';
 
 export interface VaccinationSaveInput {
@@ -28,6 +28,7 @@ export interface AdminVaccinationsFiltersState {
 }
 
 export function useAdminVaccinations() {
+  const { species: dictSpecies, upsertPets } = useDictionaries();
   const searchParams = useSearchParams();
   const { toast } = useToast();
   const initialSel = searchParams.get('sel');
@@ -37,7 +38,7 @@ export function useAdminVaccinations() {
   const petsMapRef = useRef<Record<string, Pet>>({});
   petsMapRef.current = petsMap;
 
-  const [speciesList, setSpeciesList] = useState<Species[]>([]);
+  const [speciesList, setSpeciesList] = useState<Species[]>(() => dictSpecies || []);
   const [users, setUsers] = useState<User[]>([]);
   const [stats, setStats] = useState({ overdue: 0, soon: 0, total: 0 });
 
@@ -84,6 +85,7 @@ export function useAdminVaccinations() {
 
       const loadedPets = petsRes?.items || [];
       setPets(loadedPets);
+      upsertPets(loadedPets);
       const pMap: Record<string, Pet> = {};
       loadedPets.forEach((p) => {
         pMap[p.id] = p;
@@ -271,6 +273,7 @@ export function useAdminVaccinations() {
   return {
     vaccinations: resource.items,
     pets,
+    petsMap,
     petMap,
     speciesList,
     users,

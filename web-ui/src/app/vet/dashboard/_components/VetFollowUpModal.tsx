@@ -90,10 +90,16 @@ export const VetFollowUpModal: React.FC<VetFollowUpModalProps> = ({
 
   const availableServices = useMemo(() => {
     if (speciesServices.length > 0) return speciesServices;
+    const vetSpecIds =
+      vet?.specializationIds && vet.specializationIds.length > 0
+        ? vet.specializationIds
+        : vet?.specializationId
+        ? [vet.specializationId]
+        : [];
     return services.filter(
-      (s) => s.isActive !== false && (!vet?.specializationId || s.specializationId === vet.specializationId)
+      (s) => s.isActive !== false && (vetSpecIds.length === 0 || vetSpecIds.includes(s.specializationId))
     );
-  }, [speciesServices, services, vet?.specializationId]);
+  }, [speciesServices, services, vet?.specializationId, vet?.specializationIds]);
 
   useEffect(() => {
     if (!isOpen || availableServices.length === 0) return;
@@ -189,6 +195,7 @@ export const VetFollowUpModal: React.FC<VetFollowUpModalProps> = ({
     try {
       await onSubmit({
         serviceId: selectedServiceId || null,
+        serviceIds: selectedServiceId ? [selectedServiceId] : [],
         startAt: selectedSlot.startAt,
         endAt: selectedSlot.endAt,
       });

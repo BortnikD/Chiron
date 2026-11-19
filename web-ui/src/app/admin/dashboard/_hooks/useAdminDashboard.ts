@@ -98,6 +98,28 @@ export function useAdminDashboard() {
   const [error, setError] = useState<string | null>(null);
 
   const requestIdRef = useRef(0);
+  const totalsLoadedRef = useRef(false);
+
+  // Load lifetime totals (clients, pets) once on mount or when specifically requested
+  const loadLifetimeTotals = useCallback(async () => {
+    try {
+      const [clientsRes, petsRes] = await Promise.all([
+        adminApi.getUsers(0, 1, 'CLIENT'),
+        adminApi.getPets(0, 1),
+      ]);
+      setClientsTotal(clientsRes?.totalElements ?? 0);
+      setPetsTotal(petsRes?.totalElements ?? 0);
+      totalsLoadedRef.current = true;
+    } catch {
+      // Non-critical: lifetime counts gracefully remain at last known or 0
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!totalsLoadedRef.current) {
+      loadLifetimeTotals();
+    }
+  }, [loadLifetimeTotals]);
 
   // Sync state to URL
   useEffect(() => {
@@ -136,14 +158,12 @@ export function useAdminDashboard() {
     const toParam = to || undefined;
 
     try {
-      const [ovRes, timeRes, vetsRes, svcRes, spRes, clientsRes, petsRes] = await Promise.all([
+      const [ovRes, timeRes, vetsRes, svcRes, spRes] = await Promise.all([
         adminApi.getStatisticsOverview(fromParam, toParam),
         adminApi.getStatisticsTimeline(g, fromParam, toParam),
         adminApi.getStatisticsVeterinarians(fromParam, toParam),
         adminApi.getStatisticsServices(fromParam, toParam),
         adminApi.getStatisticsSpecies(fromParam, toParam),
-        adminApi.getUsers(0, 1, 'CLIENT'),
-        adminApi.getPets(0, 1),
       ]);
 
       if (reqId !== requestIdRef.current) return;
@@ -153,8 +173,6 @@ export function useAdminDashboard() {
       setVetsStats(Array.isArray(vetsRes) ? vetsRes : []);
       setServicesStats(Array.isArray(svcRes) ? svcRes : []);
       setSpeciesStats(Array.isArray(spRes) ? spRes : []);
-      setClientsTotal(clientsRes?.totalElements ?? 0);
-      setPetsTotal(petsRes?.totalElements ?? 0);
     } catch (err: unknown) {
       if (reqId !== requestIdRef.current) return;
       setError(formatApiError(err, 'Не удалось загрузить данные статистики с сервера.'));
@@ -173,8 +191,9 @@ export function useAdminDashboard() {
   }, [loadData, stFrom, stTo, gran]);
 
   const reload = useCallback(() => {
+    loadLifetimeTotals();
     loadData(stFrom, stTo, gran);
-  }, [loadData, stFrom, stTo, gran]);
+  }, [loadLifetimeTotals, loadData, stFrom, stTo, gran]);
 
   const handleSelectPeriod = useCallback((p: DashboardPeriod) => {
     setPeriod(p);
@@ -223,6 +242,7 @@ export function useAdminDashboard() {
     vetsStats,
     servicesStats,
     speciesStats,
+    overview,
     loading,
     error,
     reload,

@@ -29,6 +29,10 @@ export interface VaccinationFormModalProps {
   users?: User[];
 }
 
+const EMPTY_PETS: Pet[] = [];
+const EMPTY_SPECIES: Species[] = [];
+const EMPTY_USERS: User[] = [];
+
 export const VaccinationFormModal: React.FC<VaccinationFormModalProps> = ({
   isOpen,
   onClose,
@@ -39,9 +43,9 @@ export const VaccinationFormModal: React.FC<VaccinationFormModalProps> = ({
   petName,
   appointmentId,
   serviceName,
-  pets = [],
-  speciesList = [],
-  users = [],
+  pets = EMPTY_PETS,
+  speciesList = EMPTY_SPECIES,
+  users = EMPTY_USERS,
 }) => {
   const isEditing = Boolean(initialData);
   const todayIso = getMoscowTodayIso();
@@ -88,7 +92,14 @@ export const VaccinationFormModal: React.FC<VaccinationFormModalProps> = ({
       setNextDueOn('');
     }
     setError(null);
-  }, [isOpen, initialData, lockedPetId, pets, todayIso]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen, initialData?.id, lockedPetId]);
+
+  useEffect(() => {
+    if (isOpen && !effectivePetId && pets.length > 0) {
+      setPetId(pets[0].id);
+    }
+  }, [isOpen, effectivePetId, pets]);
 
   useEffect(() => {
     if (!isOpen) return;

@@ -1,8 +1,9 @@
 'use client';
 
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import Link from 'next/link';
-import { X, CalendarPlus, CalendarOff } from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import { X, CalendarPlus, CalendarOff, Check, AlertCircle, Plus } from 'lucide-react';
 import {
   DOW_SHORT,
   formatCurrency,
@@ -35,14 +36,54 @@ export function ServiceDetailIsland({
   loadingSlots = false,
   isAuthenticated,
   role,
+  clientPets,
+  clientSpeciesIds,
 }: ServiceDetailIslandProps) {
-  const detailSpeciesList = useMemo(
-    () =>
+  const router = useRouter();
+  const [selectedSlotStartAt, setSelectedSlotStartAt] = React.useState<string | null>(null);
+
+  const detailSpeciesList = useMemo(() => {
+    const list =
       serviceSpeciesList.length > 0
         ? speciesList.filter((sp) => serviceSpeciesList.some((ss) => ss.speciesId === sp.id))
-        : speciesList,
-    [serviceSpeciesList, speciesList]
+        : speciesList;
+
+    // Если клиент авторизован и у него есть питомцы:
+    // показываем в табах только те виды, которые есть у клиента среди его активных питомцев
+    if (role === 'CLIENT' && clientSpeciesIds && clientSpeciesIds.size > 0) {
+      const owned = list.filter((sp) => clientSpeciesIds.has(sp.id));
+      if (owned.length > 0) {
+        return owned;
+      }
+    }
+    return list;
+  }, [serviceSpeciesList, speciesList, role, clientSpeciesIds]);
+
+  const isSpeciesNotOwned = Boolean(
+    role === 'CLIENT' &&
+      clientSpeciesIds &&
+      clientSpeciesIds.size > 0 &&
+      activeSpeciesTab &&
+      !clientSpeciesIds.has(activeSpeciesTab)
   );
+
+  const matchingPets = useMemo(() => {
+    if (!clientPets || !activeSpeciesTab) return [];
+    return clientPets.filter((p) => !p.isArchived && p.speciesId === activeSpeciesTab);
+  }, [clientPets, activeSpeciesTab]);
+
+  const getBookUrl = (slotStartAt?: string | null) => {
+    const params = new URLSearchParams();
+    params.set('serviceId', service.id);
+    if (activeSpeciesTab) {
+      params.set('speciesId', activeSpeciesTab);
+    }
+    const targetSlot = slotStartAt || selectedSlotStartAt;
+    if (targetSlot) {
+      params.set('slot', targetSlot);
+    }
+    return `/client/book?${params.toString()}`;
+  };
 
   const groupedSlotDays = useMemo(() => {
     const byDate = new Map<string, AvailableSlotResponse[]>();
@@ -152,7 +193,10 @@ export function ServiceDetailIsland({
                     key={sp.id}
                     type="button"
                     className={`seg-item ${activeSpeciesTab === sp.id ? 'on' : ''}`}
-                    onClick={() => onSpeciesTabChange(sp.id)}
+                    onClick={() => {
+                      onSpeciesTabChange(sp.id);
+                      setSelectedSlotStartAt(null);
+                    }}
                   >
                     {sp.name}
                   </button>
@@ -160,69 +204,132 @@ export function ServiceDetailIsland({
               </div>
             </div>
 
-            {loadingSlots ? (
-              <span className="small muted">Загрузка свободных окон...</span>
-            ) : groupedSlotDays.length > 0 ? (
-              groupedSlotDays.map((day) => (
-                <div key={day.isoDate} className="col" style={{ gap: '6px' }}>
-                  <span className="small">
-                    <b style={{ fontWeight: 600 }}>
-                      {day.dow}, {day.label}
-                    </b>{' '}
-                    <span className="muted">
-                      · {day.totalCount} {pluralRu(day.totalCount, 'окно', 'окна', 'окон')}
-                    </span>
-                  </span>
-                  <div className="chips">
-                    {day.slots.map((slot) => {
-                      const timeStr = formatSlotTime(slot.startAt);
-                      if (!isAuthenticated) {
-                        const bookUrl = `/client/book?serviceId=${service.id}&slot=${encodeURIComponent(slot.startAt)}`;
-                        return (
-                          <Link
-                            key={slot.startAt}
-                            href={`/login?next=${encodeURIComponent(bookUrl)}`}
-                            className="slot"
-                            title="Войдите, чтобы записаться"
-                          >
-                            {timeStr}
-                          </Link>
-                        );
-                      }
-                      if (role === 'CLIENT') {
-                        return (
-                          <Link
-                            key={slot.startAt}
-                            href={`/client/book?serviceId=${service.id}&slot=${encodeURIComponent(slot.startAt)}`}
-                            className="slot"
-                            title="Записаться на это время"
-                          >
-                            {timeStr}
-                          </Link>
-                        );
-                      }
-                      return (
-                        <span
-                          key={slot.startAt}
-                          className="slot"
-                          style={{ cursor: 'default' }}
-                          title="Свободное окно"
-                        >
-                          {timeStr}
-                        </span>
-                      );
-                    })}
-                  </div>
-                </div>
-              ))
-            ) : (
-              <div className="empty" style={{ padding: '16px' }}>
-                <CalendarOff className="ic ic-20" />
-                <span>Нет свободных окон, попробуйте другой период</span>
+            {isSpeciesNotOwned ? (
+              <div
+                className="col"
+                style={{
+                  padding: '14px',
+                  borderRadius: '8px',
+                  background: 'var(--surface-sunken)',
+                  border: '1px solid var(--border)',
+                  gap: '8px',
+                  alignItems: 'flex-start',
+                }}
+              >
+                <span className="small muted">
+                  У вас пока нет питомцев подходящего вида для этой услуги.
+                </span>
+                <Link href="/client/pets?action=create" className="btn btn-outline btn-sm">
+                  Добавить питомца
+                </Link>
               </div>
-            )}
+            ) : (
+              <>
+                {matchingPets.length > 0 && (
+                  <span className="small muted" style={{ fontSize: '12px' }}>
+                    Ваш питомец:{' '}
+                    <b>
+                      {Array.from(
+                        new Set(
+                          matchingPets.map((p) =>
+                            p.breed ? `${p.name} (${p.breed})` : p.name
+                          )
+                        )
+                      ).join(', ')}
+                    </b>
+                  </span>
+                )}
 
-            <span className="small muted">Показаны 3 ближайших дня, первые 8 окон</span>
+                {selectedSlotStartAt && (
+                  <div
+                    className="row between items-center"
+                    style={{
+                      padding: '8px 12px',
+                      background: 'color-mix(in srgb, var(--primary) 12%, transparent)',
+                      border: '1px solid var(--primary)',
+                      borderRadius: '8px',
+                      fontSize: '12px',
+                      gap: '8px',
+                    }}
+                  >
+                    <span>
+                      Выбрано: <b>{formatSlotTime(selectedSlotStartAt)}</b> (вид:{' '}
+                      <b>{speciesMap[activeSpeciesTab] || 'Животное'}</b>)
+                    </span>
+                    <div className="row items-center" style={{ gap: '6px' }}>
+                      <button
+                        type="button"
+                        className="btn btn-primary btn-xs"
+                        onClick={() => {
+                          const url = getBookUrl(selectedSlotStartAt);
+                          router.push(!isAuthenticated ? `/login?next=${encodeURIComponent(url)}` : url);
+                        }}
+                      >
+                        Записаться
+                      </button>
+                      <button
+                        type="button"
+                        className="btn btn-ghost btn-xs"
+                        onClick={() => setSelectedSlotStartAt(null)}
+                        title="Сбросить выбор времени"
+                        style={{ padding: '2px 5px', height: 'auto' }}
+                      >
+                        <X size={13} />
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {loadingSlots ? (
+                  <span className="small muted">Загрузка свободных окон...</span>
+                ) : groupedSlotDays.length > 0 ? (
+                  groupedSlotDays.map((day) => (
+                    <div key={day.isoDate} className="col" style={{ gap: '6px' }}>
+                      <span className="small">
+                        <b style={{ fontWeight: 600 }}>
+                          {day.dow}, {day.label}
+                        </b>{' '}
+                        <span className="muted">
+                          · {day.totalCount} {pluralRu(day.totalCount, 'окно', 'окна', 'окон')}
+                        </span>
+                      </span>
+                      <div className="chips">
+                        {day.slots.map((slot) => {
+                          const timeStr = formatSlotTime(slot.startAt);
+                          const isSel = selectedSlotStartAt === slot.startAt;
+                          const bookUrl = getBookUrl(slot.startAt);
+
+                          return (
+                            <button
+                              key={slot.startAt}
+                              type="button"
+                              className={`slot ${isSel ? 'on' : ''}`}
+                              title={isSel ? 'Выбрано. Нажмите ещё раз для перехода к записи' : 'Выбрать это время'}
+                              onClick={() => {
+                                if (isSel) {
+                                  router.push(!isAuthenticated ? `/login?next=${encodeURIComponent(bookUrl)}` : bookUrl);
+                                } else {
+                                  setSelectedSlotStartAt(slot.startAt);
+                                }
+                              }}
+                            >
+                              {timeStr}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  ))
+                ) : (
+                  <div className="empty" style={{ padding: '16px' }}>
+                    <CalendarOff className="ic ic-20" />
+                    <span>Нет свободных окон, попробуйте другой период</span>
+                  </div>
+                )}
+
+                <span className="small muted">Показаны 3 ближайших дня, первые 8 окон</span>
+              </>
+            )}
           </div>
         </div>
       </div>
@@ -239,17 +346,27 @@ export function ServiceDetailIsland({
         </span>
         {!isAuthenticated ? (
           <Link
-            href={`/login?next=${encodeURIComponent(`/client/book?serviceId=${service.id}`)}`}
+            href={`/login?next=${encodeURIComponent(getBookUrl())}`}
             className="btn btn-primary"
           >
             <CalendarPlus className="ic" />
-            <span>Записаться</span>
+            <span>
+              {selectedSlotStartAt ? `Записаться на ${formatSlotTime(selectedSlotStartAt)}` : 'Записаться'}
+            </span>
           </Link>
         ) : role === 'CLIENT' ? (
-          <Link href={`/client/book?serviceId=${service.id}`} className="btn btn-primary">
-            <CalendarPlus className="ic" />
-            <span>Записаться</span>
-          </Link>
+          isSpeciesNotOwned ? (
+            <Link href="/client/pets?action=create" className="btn btn-outline btn-sm">
+              <span>Добавить питомца для записи</span>
+            </Link>
+          ) : (
+            <Link href={getBookUrl()} className="btn btn-primary">
+              <CalendarPlus className="ic" />
+              <span>
+                {selectedSlotStartAt ? `Записаться на ${formatSlotTime(selectedSlotStartAt)}` : 'Записаться'}
+              </span>
+            </Link>
+          )
         ) : role === 'ADMIN' ? (
           <Link href="/admin/services" className="btn btn-outline btn-sm">
             <span>Управление в админке</span>

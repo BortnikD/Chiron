@@ -17,6 +17,7 @@ import {
 } from '@/shared/lib';
 import { ConsultationPrintSheet } from '@/components/print/ConsultationPrintSheet';
 import { PetAvatar } from '@/components/ui/EntityAvatar';
+import { AppointmentServiceBadge } from '@/shared/components';
 import { PatientQuickViewModal } from '@/components/patients/PatientQuickViewModal';
 import { useAuth } from '@/providers';
 import { getDoctorDisplay } from '@/shared/lib';
@@ -26,6 +27,7 @@ import { getPetName } from './utils';
 import { VetDrawerNotesSection } from './VetDrawerNotesSection';
 import { VetFollowUpModal } from './VetFollowUpModal';
 import { VetCancelAppointmentModal } from './VetCancelAppointmentModal';
+import { VetAppointmentServicesSection } from './VetAppointmentServicesSection';
 
 const STATUS_ACTIONS: Array<{ to: AppointmentStatus; label: string; cls: string }> = [
   { to: 'CONFIRMED', label: 'Подтвердить', cls: 'btn-primary' },
@@ -125,9 +127,76 @@ export const VetActiveAppointmentDrawer: React.FC<VetActiveAppointmentDrawerProp
     }
     setStatusBusy(true);
     try {
-      await onUpdateStatus(appointment.id, to);
+      if (to === 'COMPLETED') {
+        const isStarted = Date.now() >= new Date(appointment.startAt).getTime();
+        if (!isStarted) {
+          throw new Error(
+            'Приём ещё не начался. Зафиксировать оказанные услуги и завершить приём по правилам клиники можно только после наступления времени записи.'
+          );
+        }
+        // Собираем id оказанных услуг: все запланированные, у которых isPerformed !== false
+        const performedIds =
+          appointment.services && appointment.services.length > 0
+            ? appointment.services
+                .filter((s) => s.isPerformed !== false)
+                .map((s) => s.serviceId)
+            : appointment.serviceId
+              ? [appointment.serviceId]
+              : [];
+        await onUpdateStatus(appointment.id, to, null, performedIds);
+      } else {
+        await onUpdateStatus(appointment.id, to);
+      }
+      if (onSelectAppointment) {
+        const refreshed = await vetApi.getAppointmentById(appointment.id);
+        onSelectAppointment(refreshed);
+      }
     } finally {
       setStatusBusy(false);
+    }
+  };
+
+  const handleUpdateServices = async (targetServiceIds: string[]) => {
+    const isStarted = Date.now() >= new Date(appointment.startAt).getTime();
+    let updated: Appointment;
+    if (isStarted || appointment.status === 'COMPLETED') {
+      updated = await vetApi.updateAppointment(appointment.id, { performedServiceIds: targetServiceIds });
+    } else {
+      updated = await vetApi.updateAppointment(appointment.id, { serviceIds: targetServiceIds });
+    }
+    if (onSelectAppointment) {
+      let refreshed = await vetApi.getAppointmentById(appointment.id).catch(() => updated);
+      if (!refreshed) refreshed = updated;
+      if (!refreshed.services || refreshed.services.length === 0) {
+        const mappedServices = targetServiceIds.map((sid, idx) => {
+          const cat = services.find((s) => s.id === sid);
+          const price = cat?.effectivePrice ?? cat?.basePrice ?? cat?.price ?? 0;
+          return {
+            serviceId: sid,
+            nameSnapshot:
+              cat?.name ||
+              (idx === 0 ? refreshed.serviceName || 'Основная услуга' : 'Дополнительная услуга'),
+            priceSnapshot: price,
+            durationMinSnapshot: cat?.durationMin ?? 20,
+            bufferAfterMinSnapshot: 10,
+            isPlanned: !isStarted ? true : idx === 0,
+            isPerformed: isStarted || refreshed.status === 'COMPLETED' ? true : null,
+            addedBy: null,
+            createdAt: refreshed.createdAt,
+            updatedBy: null,
+            updatedAt: new Date().toISOString(),
+          };
+        });
+        const total = mappedServices.reduce((sum, s) => sum + s.priceSnapshot, 0);
+        refreshed = {
+          ...refreshed,
+          services: mappedServices,
+          actualTotal: isStarted || refreshed.status === 'COMPLETED' ? total : null,
+          estimatedTotal: total,
+          price: total,
+        };
+      }
+      onSelectAppointment(refreshed);
     }
   };
 
@@ -182,9 +251,16 @@ export const VetActiveAppointmentDrawer: React.FC<VetActiveAppointmentDrawerProp
               className={`t-ava tone-${tone} detail-head-ava`}
             />
             <div className="col" style={{ gap: '2px', minWidth: 0 }}>
-              <span className="h2" style={{ wordBreak: 'break-word' }}>
-                {petName} — {serviceName}
-              </span>
+              <div className="row items-center wrap" style={{ gap: '6px', minWidth: 0 }}>
+                <span className="h2" style={{ wordBreak: 'break-word', margin: 0 }}>
+                  {petName} —
+                </span>
+                <AppointmentServiceBadge
+                  appointment={appointment}
+                  fallbackName={servicesMap[appointment.serviceId] || 'Приём'}
+                  style={{ fontSize: '1.25rem', fontWeight: 600 }}
+                />
+              </div>
               <span className="cell-sub tnum">
                 {formatDateShort(appointment.startAt)}, {formatSlotTime(appointment.startAt)}–
                 {formatSlotTime(appointment.endAt)}
@@ -240,16 +316,20 @@ export const VetActiveAppointmentDrawer: React.FC<VetActiveAppointmentDrawerProp
                 </button>{' '}
                 <span className="muted">· {speciesName}</span>
               </dd>
-              <dt>Услуга</dt>
-              <dd>{serviceName}</dd>
               <dt>Время</dt>
               <dd className="tnum">
                 {formatDateShort(appointment.startAt)}, {formatSlotTime(appointment.startAt)}–
                 {formatSlotTime(appointment.endAt)}
               </dd>
               <dt>Стоимость</dt>
-              <dd className="tnum">
-                {formatCurrency(appointment.priceSnapshot ?? appointment.price ?? 0)}
+              <dd className="tnum" style={{ fontWeight: 700 }}>
+                {formatCurrency(
+                  appointment.actualTotal ??
+                    appointment.estimatedTotal ??
+                    appointment.priceSnapshot ??
+                    appointment.price ??
+                    0
+                )}
               </dd>
               {appointment.followUpOf && (
                 <>
@@ -267,6 +347,19 @@ export const VetActiveAppointmentDrawer: React.FC<VetActiveAppointmentDrawerProp
                 </>
               )}
             </dl>
+
+            <div className="sep" />
+
+            <VetAppointmentServicesSection
+              appointment={appointment}
+              services={services}
+              vet={vet}
+              petSpeciesId={pet?.speciesId}
+              onUpdateServices={handleUpdateServices}
+              disabled={isFinal && appointment.status !== 'COMPLETED'}
+            />
+
+            <div className="sep" />
 
             <VetDrawerNotesSection
               appointment={appointment}

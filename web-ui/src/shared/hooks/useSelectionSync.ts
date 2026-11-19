@@ -56,16 +56,29 @@ export function useSelectionSync<T extends { id: string }>(options: UseSelection
   const syncToUrl = useCallback(
     (id: string | null) => {
       if (typeof window === 'undefined') return;
-      const url = new URL(window.location.href);
-      if (id) {
-        url.searchParams.set(paramKey, id);
-      } else {
-        url.searchParams.delete(paramKey);
-      }
-      const nextSearch = url.searchParams.toString();
-      const currentSearch = window.location.search.replace(/^\?/, '');
-      if (nextSearch !== currentSearch) {
-        window.history.replaceState(null, '', url.pathname + (nextSearch ? `?${nextSearch}` : '') + url.hash);
+      try {
+        const url = new URL(window.location.href);
+        const currentParam = url.searchParams.get(paramKey);
+        if (id) {
+          if (currentParam === id) return;
+          url.searchParams.set(paramKey, id);
+        } else {
+          if (!currentParam) return;
+          url.searchParams.delete(paramKey);
+        }
+        const nextSearch = url.searchParams.toString();
+        const currentSearch = window.location.search.replace(/^\?/, '');
+        if (nextSearch !== currentSearch) {
+          setTimeout(() => {
+            try {
+              window.history.replaceState(null, '', url.pathname + (nextSearch ? `?${nextSearch}` : '') + url.hash);
+            } catch {
+              // ignore
+            }
+          }, 0);
+        }
+      } catch {
+        // ignore
       }
     },
     [paramKey]
@@ -81,21 +94,29 @@ export function useSelectionSync<T extends { id: string }>(options: UseSelection
   const fetchByIdRef = useRef(fetchById);
   fetchByIdRef.current = fetchById;
 
+  const initialAppliedRef = useRef(false);
+  const isMountedRef = useRef(false);
+
   const setSelected = useCallback(
     (itemOrUpdater: T | null | ((prev: T | null) => T | null)) => {
       setSelectedState((prev) => {
         const next = typeof itemOrUpdater === 'function' ? itemOrUpdater(prev) : itemOrUpdater;
-        const nextId = next?.id ?? null;
-        persistId(nextId);
-        syncToUrl(nextId);
-        onSelect?.(next);
         return next;
       });
     },
-    [persistId, syncToUrl, onSelect]
+    []
   );
 
-  const initialAppliedRef = useRef(false);
+  // Синхронизируем изменения selected с URL и хранилищем вне фазы рендера
+  useEffect(() => {
+    if (!isMountedRef.current) return;
+    const nextId = selected?.id ?? null;
+    persistId(nextId);
+    if (nextId !== paramVal) {
+      syncToUrl(nextId);
+    }
+    onSelect?.(selected);
+  }, [selected, paramVal, persistId, syncToUrl, onSelect]);
 
   useEffect(() => {
     const targetId = paramVal || (!initialAppliedRef.current ? getStoredId() : null);
@@ -104,6 +125,7 @@ export function useSelectionSync<T extends { id: string }>(options: UseSelection
         setSelectedState(null);
         persistId(null);
       }
+      isMountedRef.current = true;
       return;
     }
 
@@ -113,19 +135,24 @@ export function useSelectionSync<T extends { id: string }>(options: UseSelection
     const found = itemsRef.current.find((i) => i.id === targetId);
     if (found) {
       setSelectedState(found);
-      syncToUrl(targetId);
       persistId(targetId);
+      if (targetId !== paramVal) {
+        syncToUrl(targetId);
+      }
     } else if (fetchByIdRef.current && (!selectedRef.current || selectedRef.current.id !== targetId)) {
       fetchByIdRef.current(targetId)
         .then((fetched) => {
           if (fetched) {
             setSelectedState(fetched);
-            syncToUrl(targetId);
             persistId(targetId);
+            if (targetId !== paramVal) {
+              syncToUrl(targetId);
+            }
           }
         })
         .catch(() => {});
     }
+    isMountedRef.current = true;
   }, [paramVal, getStoredId, syncToUrl, persistId]);
 
   return [selected, setSelected] as const;

@@ -13,12 +13,13 @@ import type { Appointment, Pet } from '@/modules/client/types';
 import type { Veterinarian, Service, Species } from '@/modules/clinic/types';
 import type { User } from '@/shared/types';
 import { PetAvatar } from '@/components/ui/EntityAvatar';
-import { DataTable, type DataTableColumn, type PaginationFooterProps } from '@/shared/components';
+import { DataTable, AppointmentStatusBadge, AppointmentServiceBadge, type DataTableColumn, type PaginationFooterProps } from '@/shared/components';
 import {
   APPOINTMENT_STATUS_META,
   formatCurrency,
   formatDateTimeCompact,
   getSpeciesTone,
+  getSpeciesStyle,
 } from '@/shared/lib';
 import { getDoctorDisplay } from '@/shared/lib';
 import { type ActiveFilterChip } from './utils';
@@ -114,6 +115,7 @@ export const AdminAppointmentsTable: React.FC<AdminAppointmentsTableProps> = ({
                 iconSize={14}
                 variant="thumb"
                 className={`t-ava xs tone-${tone}`}
+                style={getSpeciesStyle(p?.speciesId, speciesList)}
               />
               <span>{p?.name || 'Питомец'}</span>
             </span>
@@ -135,8 +137,13 @@ export const AdminAppointmentsTable: React.FC<AdminAppointmentsTableProps> = ({
         title: 'Услуга',
         width: '1.3fr',
         render: (a) => {
-          const serviceName = services.find((s) => s.id === a.serviceId)?.name || 'Услуга клиники';
-          return <span>{serviceName}</span>;
+          const catalogService = services.find((s) => s.id === a.serviceId);
+          return (
+            <AppointmentServiceBadge
+              appointment={a}
+              fallbackName={catalogService?.name}
+            />
+          );
         },
       },
       {
@@ -153,23 +160,17 @@ export const AdminAppointmentsTable: React.FC<AdminAppointmentsTableProps> = ({
         key: 'status',
         title: 'Статус',
         width: '1fr',
-        render: (a) => {
-          const sInfo = APPOINTMENT_STATUS_META[a.status] || {
-            label: a.status,
-            short: a.status,
-            cls: 'badge-outline',
-          };
-          return <span className={`badge st ${sInfo.cls}`}>{sInfo.short}</span>;
-        },
+        render: (a) => <AppointmentStatusBadge status={a.status} useShortLabel />,
       },
       {
         key: 'price',
         title: 'Цена',
         width: '0.75fr',
         align: 'right',
-        render: (a) => (
-          <span className="right tnum">{formatCurrency(a.priceSnapshot || a.price)}</span>
-        ),
+        render: (a) => {
+          const price = a.actualTotal ?? a.estimatedTotal ?? a.priceSnapshot ?? a.price;
+          return <span className="right tnum">{formatCurrency(price)}</span>;
+        },
       },
       {
         key: 'actions',
@@ -202,15 +203,28 @@ export const AdminAppointmentsTable: React.FC<AdminAppointmentsTableProps> = ({
                 <XCircle size={13} />
               </button>
             )}
-            <button
-              type="button"
-              className="btn btn-ghost btn-icon btn-xs text-destructive"
-              title="Удалить запись"
-              aria-label="Удалить"
-              onClick={() => onDelete(a)}
-            >
-              <Trash2 size={13} />
-            </button>
+            {a.status === 'CANCELLED' ? (
+              <button
+                type="button"
+                className="btn btn-ghost btn-icon btn-xs text-destructive"
+                title="Удалить запись"
+                aria-label="Удалить"
+                onClick={() => onDelete(a)}
+              >
+                <Trash2 size={13} />
+              </button>
+            ) : (
+              <button
+                type="button"
+                className="btn btn-ghost btn-icon btn-xs text-muted"
+                disabled
+                style={{ opacity: 0.35, cursor: 'not-allowed' }}
+                title="Удалить можно только предварительно отменённую запись"
+                aria-label="Удалить невозможно"
+              >
+                <Trash2 size={13} />
+              </button>
+            )}
           </span>
         ),
       },

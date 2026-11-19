@@ -82,9 +82,16 @@ function filterSlotsBySpecialization(
   if (!isAnyVet || !specializationId) return slots;
   const allVets = Object.values(vetsMap);
   if (allVets.length === 0) return slots;
-  const hasMatchingVet = allVets.some(
-    (v) => v.isActive !== false && v.specializationId === specializationId
-  );
+
+  const vetHasSpec = (v?: Veterinarian | null, specId?: string) => {
+    if (!v || v.isActive === false || !specId) return false;
+    if (v.specializationIds && v.specializationIds.length > 0) {
+      return v.specializationIds.includes(specId);
+    }
+    return v.specializationId === specId;
+  };
+
+  const hasMatchingVet = allVets.some((v) => vetHasSpec(v, specializationId));
   if (!hasMatchingVet) return slots;
 
   return slots
@@ -92,9 +99,7 @@ function filterSlotsBySpecialization(
       ...slot,
       veterinarianIds: slot.veterinarianIds.filter((id) => {
         const vet = vetsMap[id];
-        return Boolean(
-          vet && vet.isActive !== false && vet.specializationId === specializationId
-        );
+        return Boolean(vet && vetHasSpec(vet, specializationId));
       }),
     }))
     .filter((slot) => slot.veterinarianIds.length > 0);
@@ -109,7 +114,8 @@ export function useBookingSlots(
   isAnyVet: boolean,
   selectedVet: Veterinarian | null,
   initialSlot?: string | null,
-  vetsMap: Record<string, Veterinarian> = {}
+  vetsMap: Record<string, Veterinarian> = {},
+  selectedServices: Service[] = []
 ): BookingSlotsState {
   const todayStr = useMemo(() => getMoscowTodayIso(0), []);
   const [fromDate, setFromDate] = useState<string>(() => {
@@ -137,12 +143,18 @@ export function useBookingSlots(
   const petId = selectedPet?.id ?? null;
   const isPetArchived = Boolean(selectedPet?.isArchived);
   const speciesId = selectedPet?.speciesId ?? null;
-  const serviceId = selectedService?.id ?? null;
+  const serviceIds = useMemo(() => {
+    if (selectedServices.length > 0) return selectedServices.map((s) => s.id);
+    return selectedService ? [selectedService.id] : [];
+  }, [selectedServices, selectedService]);
+  const serviceIdsKey = serviceIds.join(',');
+
+  const serviceId = serviceIds[0] ?? null;
   const serviceSpecializationId = selectedService?.specializationId;
   const vetId = isAnyVet ? undefined : selectedVet?.id;
 
   useEffect(() => {
-    if (!petId || !speciesId || !serviceId || isPetArchived) {
+    if (!petId || !speciesId || serviceIds.length === 0 || isPetArchived) {
       setAvailableSlots([]);
       setSelectedSlot(null);
       setSelectedSlotVetId(null);
@@ -161,7 +173,8 @@ export function useBookingSlots(
       .findAvailableSlots(
         {
           speciesId,
-          serviceId,
+          serviceId: serviceIds[0],
+          serviceIds,
           veterinarianId: vetId,
           from: fromDate,
           to: toDate,
@@ -181,50 +194,48 @@ export function useBookingSlots(
         );
         setAvailableSlots(safeSlots);
 
-        let autoMatched: AvailableSlotResponse | null = null;
-        if (initialSlot && appliedSlotRef.current !== initialSlot) {
-          const targetMs = new Date(initialSlot).getTime();
-          autoMatched =
-            safeSlots.find(
+        const targetMs = initialSlot ? new Date(initialSlot).getTime() : NaN;
+        const initialMatched = initialSlot
+          ? safeSlots.find(
               (s) =>
                 s.startAt === initialSlot ||
                 (!Number.isNaN(targetMs) && new Date(s.startAt).getTime() === targetMs)
-            ) ?? null;
-          if (autoMatched) {
-            appliedSlotRef.current = initialSlot;
-          }
-        }
+            ) ?? null
+          : null;
 
-        if (autoMatched) {
-          setSelectedSlot(autoMatched);
-          setSelectedSlotVetId(
-            !isAnyVet && selectedVet && autoMatched.veterinarianIds.includes(selectedVet.id)
-              ? selectedVet.id
-              : autoMatched.veterinarianIds.length === 1
-              ? autoMatched.veterinarianIds[0]
-              : null
-          );
-        } else {
-          setSelectedSlot((prev) => {
-            if (!prev) {
-              setSelectedSlotVetId(null);
-              return null;
-            }
+        setSelectedSlot((prev) => {
+          // 1. Попробуем сохранить текущий выбранный слот (если он доступен в safeSlots)
+          if (prev) {
             const kept = safeSlots.find((s) => s.startAt === prev.startAt) ?? null;
-            if (!kept) {
-              setSelectedSlotVetId(null);
-              return null;
+            if (kept) {
+              setSelectedSlotVetId((prevVet) => {
+                if (!isAnyVet && selectedVet && kept.veterinarianIds.includes(selectedVet.id)) {
+                  return selectedVet.id;
+                }
+                if (prevVet && kept.veterinarianIds.includes(prevVet)) return prevVet;
+                return kept.veterinarianIds.length === 1 ? kept.veterinarianIds[0] : null;
+              });
+              return kept;
             }
-            setSelectedSlotVetId((prevVet) => {
-              if (!isAnyVet && selectedVet && kept.veterinarianIds.includes(selectedVet.id)) {
-                return selectedVet.id;
-              }
-              if (prevVet && kept.veterinarianIds.includes(prevVet)) return prevVet;
-              return kept.veterinarianIds.length === 1 ? kept.veterinarianIds[0] : null;
-            });
-            return kept;
-          });
-        }
+          }
+
+          // 2. Если текущий слот недоступен для нового врача, но initialSlot доступен
+          // (например, при переключении на «Любой врач» или врача, который свободен в initialSlot)
+          if (initialMatched) {
+            setSelectedSlotVetId(
+              !isAnyVet && selectedVet && initialMatched.veterinarianIds.includes(selectedVet.id)
+                ? selectedVet.id
+                : initialMatched.veterinarianIds.length === 1
+                ? initialMatched.veterinarianIds[0]
+                : null
+            );
+            return initialMatched;
+          }
+
+          // 3. Иначе слот недоступен
+          setSelectedSlotVetId(null);
+          return null;
+        });
       })
       .catch((err: unknown) => {
         if (cancelled || controller.signal.aborted) return;
@@ -246,6 +257,7 @@ export function useBookingSlots(
     isPetArchived,
     speciesId,
     serviceId,
+    serviceIdsKey,
     serviceSpecializationId,
     vetId,
     isAnyVet,
@@ -269,9 +281,12 @@ export function useBookingSlots(
         );
         return;
       }
-      setSelectedSlotVetId(
-        slot.veterinarianIds.length === 1 ? slot.veterinarianIds[0] : null
-      );
+      setSelectedSlotVetId((prev) => {
+        if (prev && slot.veterinarianIds.includes(prev)) {
+          return prev;
+        }
+        return slot.veterinarianIds[0] ?? null;
+      });
     },
     [isAnyVet, selectedVet]
   );
@@ -299,15 +314,21 @@ export function useBookingSlots(
   );
 
   const durationInfoText = useMemo(() => {
-    if (!selectedService) return undefined;
-    const dur =
-      selectedService.effectiveDurationMin ??
-      selectedService.baseDurationMin ??
-      selectedService.durationMin ??
-      30;
-    const buf = selectedService.bufferAfterMin ?? 10;
-    return `Шаг 15 мин · окно ${dur + buf} мин (приём ${dur} + буфер ${buf})`;
-  }, [selectedService]);
+    const list = selectedServices.length > 0 ? selectedServices : selectedService ? [selectedService] : [];
+    if (list.length === 0) return undefined;
+    const dur = list.reduce(
+      (sum, s) =>
+        sum +
+        (s.effectiveDurationMin ??
+          s.baseDurationMin ??
+          s.durationMin ??
+          30),
+      0
+    );
+    const buf = Math.max(...list.map((s) => s.bufferAfterMin ?? 10), 10);
+    const complexPrefix = list.length > 1 ? `Комплекс (${list.length} услуг) · ` : '';
+    return `${complexPrefix}окно ${dur + buf} мин (процедуры ${dur} мин + буфер ${buf} мин)`;
+  }, [selectedServices, selectedService]);
 
   return {
     todayStr,

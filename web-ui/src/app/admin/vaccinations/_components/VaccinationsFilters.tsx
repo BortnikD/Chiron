@@ -88,8 +88,8 @@ export const VaccinationsFilters: React.FC<VaccinationsFiltersProps> = ({
         </div>
       </div>
 
-      <div className="row" style={{ gap: 8, alignItems: 'flex-end', flexWrap: 'nowrap' }}>
-        <div className="field" style={{ width: '140px' }}>
+      <div className="row wrap" style={{ gap: 8, alignItems: 'flex-end', flex: '1 1 auto', minWidth: '220px' }}>
+        <div className="field" style={{ flex: '1 1 120px', minWidth: '100px' }}>
           <label className="field-label" htmlFor="vx-from">
             Ревакцинация с
           </label>
@@ -102,7 +102,7 @@ export const VaccinationsFilters: React.FC<VaccinationsFiltersProps> = ({
           />
         </div>
 
-        <div className="field" style={{ width: '140px' }}>
+        <div className="field" style={{ flex: '1 1 120px', minWidth: '100px' }}>
           <label className="field-label" htmlFor="vx-to">
             по
           </label>

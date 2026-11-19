@@ -66,6 +66,55 @@ export function getUserInitials(
   return fallback;
 }
 
+/**
+ * Форматирует полное имя пользователя (Фамилия Имя [Отчество]) с защитой от отсутствующих частей.
+ */
+export function formatUserFullName(
+  user?: {
+    firstName?: string | null;
+    lastName?: string | null;
+    middleName?: string | null;
+    fullName?: string | null;
+    email?: string | null;
+  } | null,
+  fallback = '—'
+): string {
+  if (!user) return fallback;
+  if (user.fullName) return user.fullName;
+  const parts = [user.lastName, user.firstName, user.middleName].filter(Boolean);
+  if (parts.length > 0) return parts.join(' ');
+  return user.email || fallback;
+}
+
+/**
+ * Группирует массив элементов по датам (Сегодня, Вчера, Ранее) в московском часовом поясе.
+ */
+export function groupItemsByDate<T extends { createdAt?: string | null }>(
+  list: T[]
+): { label: string; items: T[] }[] {
+  const today = getMoscowTodayIso(0);
+  const yesterday = getMoscowTodayIso(-1);
+
+  const groups: { label: string; items: T[] }[] = [
+    { label: 'Сегодня', items: [] },
+    { label: 'Вчера', items: [] },
+    { label: 'Ранее', items: [] },
+  ];
+
+  list.forEach((item) => {
+    const itemDate = item.createdAt ? getMoscowDateKey(item.createdAt) : '';
+    if (itemDate === today) {
+      groups[0].items.push(item);
+    } else if (itemDate === yesterday) {
+      groups[1].items.push(item);
+    } else {
+      groups[2].items.push(item);
+    }
+  });
+
+  return groups.filter((g) => g.items.length > 0);
+}
+
 export function formatCurrency(amount?: number | null): string {
   if (amount == null || Number.isNaN(amount)) return '0 ₽';
   return `${Math.round(amount).toLocaleString('ru-RU')} ₽`;
@@ -216,19 +265,23 @@ export function toIdNameMap<T extends { id: string; name: string }>(
   return map;
 }
 
-export type SpeciesTone = 'dog' | 'cat' | 'rab' | 'par' | 'pig' | 'fer';
+import type { SpeciesTone } from './constants';
 
 export function getSpeciesTone(
   speciesIdOrName?: string | null,
-  speciesMap?: Record<string, string> | ReadonlyArray<{ id: string; name: string }>
+  speciesMap?:
+    | Record<string, string>
+    | ReadonlyArray<{ id: string; name: string; iconKey?: string | null; color?: string | null }>
 ): SpeciesTone {
   let resolved = speciesIdOrName || '';
   if (speciesIdOrName && speciesMap) {
     if (Array.isArray(speciesMap)) {
-      const match = (speciesMap as ReadonlyArray<{ id: string; name: string }>).find(
-        (s) => s.id === speciesIdOrName
+      const match = speciesMap.find(
+        (s) => s.id === speciesIdOrName || s.name.toLowerCase() === speciesIdOrName.toLowerCase()
       );
-      resolved = match?.name || resolved;
+      if (match) {
+        resolved = match.name || match.iconKey || resolved;
+      }
     } else {
       const recordMap = speciesMap as Record<string, string>;
       if (recordMap[speciesIdOrName]) {
@@ -236,9 +289,11 @@ export function getSpeciesTone(
       }
     }
   }
-  const norm = resolved.toLowerCase();
+  const norm = resolved.toLowerCase().trim();
   if (
     norm === '5eed0001-0000-0000-0000-000000000001' ||
+    norm === 'dog' ||
+    norm === 'canine' ||
     norm.includes('соб') ||
     norm.includes('dog')
   ) {
@@ -246,6 +301,8 @@ export function getSpeciesTone(
   }
   if (
     norm === '5eed0001-0000-0000-0000-000000000002' ||
+    norm === 'cat' ||
+    norm === 'feline' ||
     norm.includes('кош') ||
     norm.includes('кот') ||
     norm.includes('cat')
@@ -254,6 +311,10 @@ export function getSpeciesTone(
   }
   if (
     norm === '5eed0001-0000-0000-0000-000000000004' ||
+    norm === 'pig' ||
+    norm === 'cavy' ||
+    norm === 'guinea_pig' ||
+    norm === 'guinea-pig' ||
     norm.includes('морск') ||
     norm.includes('свин') ||
     norm.includes('guinea') ||
@@ -263,6 +324,8 @@ export function getSpeciesTone(
   }
   if (
     norm === '5eed0001-0000-0000-0000-000000000005' ||
+    norm === 'fer' ||
+    norm === 'ferret' ||
     norm.includes('хорёк') ||
     norm.includes('хорек') ||
     norm.includes('ferret')
@@ -271,6 +334,8 @@ export function getSpeciesTone(
   }
   if (
     norm === '5eed0001-0000-0000-0000-000000000003' ||
+    norm === 'rab' ||
+    norm === 'rabbit' ||
     norm.includes('крол') ||
     norm.includes('rab')
   ) {
@@ -278,6 +343,9 @@ export function getSpeciesTone(
   }
   if (
     norm === '5eed0001-0000-0000-0000-000000000006' ||
+    norm === 'par' ||
+    norm === 'bird' ||
+    norm === 'parrot' ||
     norm.includes('попуг') ||
     norm.includes('птиц') ||
     norm.includes('bird') ||
@@ -409,6 +477,10 @@ export function formatApiError(err: unknown, fallback = 'Произошла ош
 
   if (rawName.includes('UserRoleMismatch')) {
     return 'Роль пользователя не соответствует требуемой для этого действия';
+  }
+
+  if (lowerMsg.includes('failed to fetch') || lowerMsg.includes('networkerror') || candidate.status === 0) {
+    return 'Не удалось связаться с сервером. Проверьте соединение с сетью.';
   }
 
   if (

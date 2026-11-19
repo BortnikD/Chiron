@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { Check, Plus, AlertCircle } from 'lucide-react';
 import type { Pet } from '@/modules/client/types';
 import { PetAvatar } from '@/components/ui/EntityAvatar';
+import { Skeleton, SkeletonCircle } from '@/shared/components';
 import { calculateAgeRu, getSpeciesTone } from '@/shared/lib';
 
 export interface StepPetSelectionProps {
@@ -16,6 +17,7 @@ export interface StepPetSelectionProps {
   serviceLabel?: string;
   onResetDoctorFilter?: () => void;
   onResetServiceFilter?: () => void;
+  onOpenQuickAdd?: () => void;
 }
 
 /**
@@ -32,6 +34,7 @@ export const StepPetSelection: React.FC<StepPetSelectionProps> = ({
   serviceLabel,
   onResetDoctorFilter,
   onResetServiceFilter,
+  onOpenQuickAdd,
 }) => {
   const allowedSet =
     Array.isArray(allowedSpeciesIds) && allowedSpeciesIds.length > 0
@@ -57,10 +60,17 @@ export const StepPetSelection: React.FC<StepPetSelectionProps> = ({
             </span>
           )}
         </div>
-        <Link href="/client/pets?action=create" className="btn btn-sm btn-outline">
-          <Plus className="ic" />
-          <span>Добавить питомца</span>
-        </Link>
+        {onOpenQuickAdd ? (
+          <button type="button" onClick={onOpenQuickAdd} className="btn btn-sm btn-outline">
+            <Plus className="ic" />
+            <span>Добавить питомца</span>
+          </button>
+        ) : (
+          <Link href="/client/pets?action=create" className="btn btn-sm btn-outline">
+            <Plus className="ic" />
+            <span>Добавить питомца</span>
+          </Link>
+        )}
       </div>
 
       {!loading && allowedSet && activePets.length > 0 && !hasCompatibleActivePet && (
@@ -106,18 +116,53 @@ export const StepPetSelection: React.FC<StepPetSelectionProps> = ({
       )}
 
       {loading ? (
-        <div className="empty">
-          <div className="spinner" />
-          <span className="small muted">Загрузка списка питомцев...</span>
+        <div className="cards">
+          {[1, 2, 3].map((i) => (
+            <div
+              key={`pet-book-skel-${i}`}
+              className="tcard static"
+              style={{ padding: '16px', display: 'flex', gap: '14px', alignItems: 'center' }}
+            >
+              <SkeletonCircle size={48} />
+              <div className="col grow" style={{ gap: '6px' }}>
+                <Skeleton width="100px" height="18px" borderRadius="4px" />
+                <Skeleton width="140px" height="13px" borderRadius="4px" />
+              </div>
+            </div>
+          ))}
         </div>
       ) : pets.length === 0 ? (
-        <div className="empty">
-          <span className="empty-title">У вас пока нет питомцев</span>
-          <span className="muted">Добавьте питомца в разделе «Питомцы», чтобы оформить запись на приём</span>
-          <Link href="/client/pets?action=create" className="btn btn-primary">
-            <Plus className="ic" />
-            <span>Добавить питомца</span>
-          </Link>
+        <div
+          className="empty"
+          style={{
+            padding: '36px 20px',
+            background: 'var(--surface-sunken)',
+            borderRadius: '12px',
+            border: '1px dashed var(--border)',
+          }}
+        >
+          <span className="empty-title" style={{ fontSize: '18px' }}>
+            У вас пока нет добавленных питомцев
+          </span>
+          <span className="muted" style={{ maxWidth: '420px', textAlign: 'center', lineHeight: 1.5 }}>
+            Добавьте вашего любимца прямо сейчас — это займёт меньше минуты, и вы сможете сразу продолжить запись.
+          </span>
+          {onOpenQuickAdd ? (
+            <button
+              type="button"
+              onClick={onOpenQuickAdd}
+              className="btn btn-primary"
+              style={{ marginTop: '8px' }}
+            >
+              <Plus className="ic" />
+              <span>Добавить первого питомца</span>
+            </button>
+          ) : (
+            <Link href="/client/pets?action=create" className="btn btn-primary" style={{ marginTop: '8px' }}>
+              <Plus className="ic" />
+              <span>Добавить питомца</span>
+            </Link>
+          )}
         </div>
       ) : (
         <div className="cards">
@@ -151,6 +196,7 @@ export const StepPetSelection: React.FC<StepPetSelectionProps> = ({
                     <span className="tcard-title">{p.name}</span>
                     <span className="cell-sub">
                       {spName}
+                      {p.breed ? ` (${p.breed})` : ''}
                       {ageLabel !== '—' ? ` · ${ageLabel}` : ''}
                     </span>
                     {p.isArchived ? (

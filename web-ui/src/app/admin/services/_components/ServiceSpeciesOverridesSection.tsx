@@ -4,7 +4,8 @@ import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { AlertCircle, Check, Trash2, Plus, Edit2 } from 'lucide-react';
 import type { Service, Species, ServiceSpecies } from '@/modules/clinic/types';
 import { SearchCombobox, type SearchComboboxOption } from '@/shared/components';
-import { formatApiError, formatCurrency, toIdNameMap } from '@/shared/lib';
+import { SpeciesIcon } from '@/components/ui/SpeciesIcon';
+import { formatApiError, formatCurrency, getSpeciesTone, getSpeciesStyle, toIdNameMap } from '@/shared/lib';
 
 export interface ServiceSpeciesOverridesSectionProps {
   service: Service;
@@ -112,9 +113,19 @@ export const ServiceSpeciesOverridesSection: React.FC<ServiceSpeciesOverridesSec
           <span />
         </div>
 
-        {serviceLinks.map((l, index) => (
-          <div key={l.speciesId} className="trow static" style={{ padding: '6px 0' }}>
-            <span className="cell-main">{speciesMap[l.speciesId] || '—'}</span>
+        {serviceLinks.map((l, index) => {
+          const spName = speciesMap[l.speciesId] || '—';
+          const sp = speciesList.find((s) => s.id === l.speciesId);
+          const tone = getSpeciesTone(sp?.name || spName, speciesList);
+          const chipStyle = getSpeciesStyle(l.speciesId, speciesList);
+          return (
+            <div key={l.speciesId} className="trow static" style={{ padding: '6px 0' }}>
+              <span className="cell-main">
+                <span className={`sp-chip tone-${tone}`} style={chipStyle}>
+                  <SpeciesIcon species={sp?.iconKey || tone} size={14} className="ic" />
+                  {spName}
+                </span>
+              </span>
             <input
               className="input input-sm"
               type="number"
@@ -169,7 +180,8 @@ export const ServiceSpeciesOverridesSection: React.FC<ServiceSpeciesOverridesSec
               </button>
             </span>
           </div>
-        ))}
+          );
+        })}
       </div>
 
       {unattachedOptions.length > 0 && (

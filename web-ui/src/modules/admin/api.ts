@@ -1,6 +1,6 @@
 import { api } from '@/shared/api/client';
 import { invalidateWorkScheduleCache } from '@/modules/clinic/api';
-import { petCache } from '@/shared/lib';
+import { petCache, normalizeAppointment, normalizeAppointmentPage } from '@/shared/lib';
 import type {
   AppointmentStatus,
   Gender,
@@ -9,6 +9,7 @@ import type {
   PhotoLinks,
   StatisticsGranularity,
   CreateServiceRequest,
+  AppNotification,
 } from '@/shared/types';
 import type {
   Veterinarian,
@@ -119,20 +120,34 @@ export const adminApi = {
     if (filter?.serviceId) params.append('serviceId', filter.serviceId);
     if (filter?.from) params.append('from', filter.from);
     if (filter?.to) params.append('to', filter.to);
-    return api.get<PageResponse<Appointment>>(
-      `/api/v1/admin/appointments?${params.toString()}`,
-      options
-    );
+    return api
+      .get<PageResponse<Appointment>>(
+        `/api/v1/admin/appointments?${params.toString()}`,
+        options
+      )
+      .then(normalizeAppointmentPage);
   },
 
   getAppointmentById: (id: string) =>
-    api.get<Appointment>(`/api/v1/admin/appointments/${id}`),
+    api.get<Appointment>(`/api/v1/admin/appointments/${id}`).then(normalizeAppointment),
 
-  createAppointment: (data: AdminCreateAppointmentRequest) =>
-    api.post<Appointment>('/api/v1/admin/appointments', data),
+  createAppointment: (data: AdminCreateAppointmentRequest | any) => {
+    const payload = {
+      ...data,
+      serviceIds:
+        Array.isArray(data.serviceIds) && data.serviceIds.length > 0
+          ? data.serviceIds
+          : data.serviceId
+          ? [data.serviceId]
+          : [],
+    };
+    return api.post<Appointment>('/api/v1/admin/appointments', payload).then(normalizeAppointment);
+  },
 
-  updateAppointment: (id: string, data: AdminUpdateAppointmentRequest) =>
-    api.patch<Appointment>(`/api/v1/admin/appointments/${id}`, data),
+  updateAppointment: async (id: string, data: AdminUpdateAppointmentRequest | any) => {
+    const payload = { ...data };
+    return api.patch<Appointment>(`/api/v1/admin/appointments/${id}`, payload).then(normalizeAppointment);
+  },
 
   deleteAppointment: (id: string) =>
     api.delete<void>(`/api/v1/admin/appointments/${id}`),
@@ -294,15 +309,29 @@ export const adminApi = {
 
   createVeterinarian: (data: {
     userId: string;
-    specializationId: string;
+    specializationId?: string;
+    specializationIds?: string[];
     bio?: string | null;
     experienceYears: number;
     isActive: boolean;
-  }) => api.post<Veterinarian>('/api/v1/admin/veterinarians', data),
+  }) => {
+    const payload = {
+      ...data,
+      specializationIds:
+        data.specializationIds && data.specializationIds.length > 0
+          ? data.specializationIds
+          : data.specializationId
+          ? [data.specializationId]
+          : [],
+    };
+    return api.post<Veterinarian>('/api/v1/admin/veterinarians', payload);
+  },
 
   updateVeterinarian: (
     id: string,
-    data: Partial<Pick<Veterinarian, 'specializationId' | 'bio' | 'experienceYears' | 'isActive'>>
+    data: Partial<
+      Pick<Veterinarian, 'specializationId' | 'specializationIds' | 'bio' | 'experienceYears' | 'isActive'>
+    >
   ) => api.patch<Veterinarian>(`/api/v1/admin/veterinarians/${id}`, data),
 
   uploadVeterinarianPhoto: (id: string, file: File) => {
@@ -335,15 +364,23 @@ export const adminApi = {
   deleteService: (id: string) =>
     api.delete<void>(`/api/v1/admin/services/${id}`),
 
-  createSpecies: (name: string) => api.post<Species>('/api/v1/admin/species', { name }),
+  createSpecies: (data: { name: string; color?: string | null; iconKey?: string | null } | string) => {
+    const payload = typeof data === 'string' ? { name: data } : data;
+    return api.post<Species>('/api/v1/admin/species', payload);
+  },
 
-  updateSpecies: (id: string, name: string) =>
-    api.patch<Species>(`/api/v1/admin/species/${id}`, { name }),
+  updateSpecies: (
+    id: string,
+    data: { name?: string; color?: string | null; iconKey?: string | null } | string
+  ) => {
+    const payload = typeof data === 'string' ? { name: data } : data;
+    return api.patch<Species>(`/api/v1/admin/species/${id}`, payload);
+  },
 
   deleteSpecies: (id: string) =>
     api.delete<void>(`/api/v1/admin/species/${id}`),
 
-  createSpecialization: (data: { name: string; description: string }) =>
+  createSpecialization: (data: { name: string; description?: string; color?: string | null }) =>
     api.post<Specialization>('/api/v1/admin/specializations', data),
 
   updateSpecialization: (id: string, data: Partial<Specialization>) =>
@@ -391,4 +428,17 @@ export const adminApi = {
     const query = params.toString() ? `?${params.toString()}` : '';
     return api.get<SpeciesStatistics[]>(`/api/v1/admin/statistics/species${query}`);
   },
+
+  // ─── Персональные уведомления пользователям ──────────────────
+  sendNotification: (
+    recipientId: number | string,
+    data: {
+      title: string;
+      body: string;
+      appointmentId?: string | number | null;
+      petId?: string | number | null;
+      vaccinationId?: string | number | null;
+    }
+  ) =>
+    api.post<AppNotification>(`/api/v1/admin/notifications/users/${recipientId}`, data),
 };

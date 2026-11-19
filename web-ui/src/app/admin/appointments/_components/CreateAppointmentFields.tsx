@@ -6,8 +6,8 @@ import type { Appointment, Pet } from '@/modules/client/types';
 import type { Veterinarian, Service } from '@/modules/clinic/types';
 import type { AppointmentStatus, User } from '@/shared/types';
 import { DatePicker, SearchCombobox, type SearchComboboxOption } from '@/shared/components';
-import { APPOINTMENT_STATUS_META, formatCurrency, formatDateTimeCompact } from '@/shared/lib';
-import { getDoctorDisplay } from '@/shared/lib';
+import { VetAvatar } from '@/components/ui/EntityAvatar';
+import { APPOINTMENT_STATUS_META, formatCurrency, formatDateTimeCompact, getDoctorDisplay, getSpecStyle, getSpecTone } from '@/shared/lib';
 
 export interface CreateAppointmentFormState {
   veterinarianId: string;
@@ -101,6 +101,17 @@ export const CreateAppointmentFields: React.FC<CreateAppointmentFieldsProps> = (
           label: d.fullName,
           hint: d.specName,
           disabled,
+          avatar: (
+            <VetAvatar
+              vet={v}
+              initials={d.initials}
+              tone={getSpecTone(v.specializationId)}
+              style={getSpecStyle(v.specializationId)}
+              variant="thumb"
+              className="t-ava xs round"
+              alt={d.fullName}
+            />
+          ),
           title: !v.isActive
             ? 'Профиль врача неактивен'
             : noSpecies

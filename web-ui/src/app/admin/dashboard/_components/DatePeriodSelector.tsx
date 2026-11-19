@@ -5,13 +5,14 @@ import { DatePicker } from '@/shared/components';
 import { formatIsoDateDisplay } from '@/shared/lib';
 import type { DatePeriodSelectorProps } from './types';
 
-export function DatePeriodSelector({
+export const DatePeriodSelector = React.memo(function DatePeriodSelector({
   period,
   onSelectPeriod,
   stFrom,
   stTo,
   onFromChange,
   onToChange,
+  loading,
 }: DatePeriodSelectorProps) {
   const rangeLabel = useMemo(() => {
     if (stFrom && stTo) {
@@ -23,7 +24,11 @@ export function DatePeriodSelector({
   }, [stFrom, stTo]);
 
   return (
-    <section className="island filters" style={{ flex: 'none' }} aria-label="Период">
+    <section
+      className="island filters"
+      style={{ flex: 'none', position: 'relative' }}
+      aria-label="Период"
+    >
       <div className="field" style={{ width: 'auto' }}>
         <span className="field-label">Период</span>
         <div className="seg">
@@ -88,6 +93,19 @@ export function DatePeriodSelector({
       <span className="small muted" style={{ paddingBottom: '8px' }}>
         {rangeLabel}
       </span>
+
+      {loading && (
+        <div
+          className="dash-shimmer"
+          style={{
+            position: 'absolute',
+            bottom: 0,
+            left: 0,
+            right: 0,
+            borderRadius: '0 0 var(--radius) var(--radius)',
+          }}
+        />
+      )}
     </section>
   );
-}
+});

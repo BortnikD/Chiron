@@ -13,6 +13,7 @@ import {
 import type { Pet, Appointment, Vaccination } from '@/modules/client/types';
 import type { Service, Veterinarian } from '@/modules/clinic/types';
 import { PetAvatar } from '@/components/ui/EntityAvatar';
+import { Skeleton } from '@/shared/components';
 import { EntityPhotoControl } from '@/components/ui/EntityPhotoControl';
 import { SpeciesIcon } from '@/components/ui/SpeciesIcon';
 import { getDoctorDisplay } from '@/shared/lib';
@@ -90,13 +91,22 @@ export function PetDetailIsland({
             tone={tone}
             iconSize={20}
             className={`pet-ava tone-${tone} detail-head-ava`}
-            style={{ color: 'var(--tone)', background: 'color-mix(in srgb, var(--tone, var(--muted-foreground)) 16%, transparent)' }}
+            style={
+              pet.species?.color
+                ? ({
+                    '--tone': pet.species.color,
+                    color: 'var(--tone)',
+                    background: 'color-mix(in srgb, var(--tone, var(--muted-foreground)) 16%, transparent)',
+                  } as React.CSSProperties)
+                : { color: 'var(--tone)', background: 'color-mix(in srgb, var(--tone, var(--muted-foreground)) 16%, transparent)' }
+            }
             alt={pet.name}
           />
           <div className="col" style={{ gap: 0, minWidth: 0 }}>
             <span className="h2">{pet.name}</span>
             <span className="cell-sub">
-              {spName} · {age}
+              {spName}
+              {pet.breed ? ` (${pet.breed})` : ''} · {age}
             </span>
           </div>
         </div>
@@ -202,6 +212,12 @@ export function PetDetailIsland({
             <dl className="kv" style={{ margin: 0 }}>
               <dt>Вид</dt>
               <dd>{spName}</dd>
+              {pet.breed && (
+                <>
+                  <dt>Порода</dt>
+                  <dd>{pet.breed}</dd>
+                </>
+              )}
               <dt>Пол</dt>
               <dd>{pet.gender === 'MALE' ? 'Самец' : 'Самка'}</dd>
               <dt>Дата рождения</dt>
@@ -225,9 +241,26 @@ export function PetDetailIsland({
         {detailTab === 'APPTS' && (
           <div className="col" style={{ gap: '2px', margin: '0 -10px' }}>
             {loadingAppts && petAppts.length === 0 ? (
-              <div className="empty" style={{ padding: '24px' }}>
-                <div className="spinner" />
-                <span className="small muted">Загрузка истории записей…</span>
+              <div className="col" style={{ gap: '8px', padding: '12px 10px' }}>
+                {[1, 2, 3].map((i) => (
+                  <div
+                    key={`hist-skel-${i}`}
+                    style={{
+                      padding: '10px 12px',
+                      borderRadius: '8px',
+                      border: '1px solid var(--border)',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '6px',
+                    }}
+                  >
+                    <div className="row items-center between">
+                      <Skeleton width="120px" height="14px" borderRadius="4px" />
+                      <Skeleton width="60px" height="18px" borderRadius="10px" />
+                    </div>
+                    <Skeleton width="160px" height="12px" borderRadius="4px" />
+                  </div>
+                ))}
               </div>
             ) : petAppts.length === 0 ? (
               <div className="empty" style={{ padding: '24px' }}>

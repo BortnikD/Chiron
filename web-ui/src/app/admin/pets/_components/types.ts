@@ -21,6 +21,7 @@ export interface CreatePetFormData {
   birthDate: string;
   weightKg: string;
   notes: string;
+  breed?: string | null;
 }
 
 export interface EditPetFormData {
@@ -31,6 +32,7 @@ export interface EditPetFormData {
   weightKg: string;
   notes: string;
   isArchived: boolean;
+  breed?: string | null;
 }
 
 export interface AddVaccinationFormData {

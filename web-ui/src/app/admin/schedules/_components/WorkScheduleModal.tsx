@@ -5,8 +5,8 @@ import { X, AlertCircle } from 'lucide-react';
 import type { WorkSchedule } from '@/modules/admin/types';
 import type { Veterinarian } from '@/modules/clinic/types';
 import { FilterDropdown, type FilterDropdownOption } from '@/shared/components';
-import { DOW_FULL, DOW_ORDER, DOW_TO_INDEX, formatApiError, timeToMinutes } from '@/shared/lib';
-import { getDoctorDisplay } from '@/shared/lib';
+import { VetAvatar } from '@/components/ui/EntityAvatar';
+import { DOW_FULL, DOW_ORDER, DOW_TO_INDEX, formatApiError, timeToMinutes, getDoctorDisplay, getSpecStyle, getSpecTone } from '@/shared/lib';
 import type { WorkScheduleSavePayload } from './types';
 
 export interface WorkScheduleModalProps {
@@ -51,6 +51,17 @@ export const WorkScheduleModal: React.FC<WorkScheduleModalProps> = ({
           value: v.id,
           label: doc.fullName,
           hint: doc.specName,
+          avatar: (
+            <VetAvatar
+              vet={v}
+              initials={doc.initials}
+              tone={getSpecTone(v.specializationId)}
+              style={getSpecStyle(v.specializationId)}
+              variant="thumb"
+              className="t-ava xs round"
+              alt={doc.fullName}
+            />
+          ),
         };
       }),
     [vets, specsMap]

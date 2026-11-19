@@ -7,14 +7,15 @@ import type { Appointment, Pet } from '@/modules/client/types';
 import type { Veterinarian, Service, Species } from '@/modules/clinic/types';
 import type { User } from '@/shared/types';
 import { PetAvatar } from '@/components/ui/EntityAvatar';
+import { AppointmentStatusBadge } from '@/shared/components';
 import {
-  APPOINTMENT_STATUS_META,
   canTransitionAppointmentStatus,
   formatCurrency,
   formatDateShort,
   formatDateTimeCompact,
   formatSlotTime,
   getSpeciesTone,
+  getSpeciesStyle,
 } from '@/shared/lib';
 import { getDoctorDisplay } from '@/shared/lib';
 
@@ -52,7 +53,13 @@ export const AdminAppointmentDetailIsland: React.FC<AdminAppointmentDetailIsland
     pet?.speciesName ||
     speciesList.find((sp) => sp.id === pet?.speciesId)?.name ||
     '';
-  const serviceName = services.find((s) => s.id === appointment.serviceId)?.name || 'Услуга клиники';
+  const servicesCount = appointment.services?.length || 1;
+  const primaryName =
+    appointment.services?.[0]?.nameSnapshot ||
+    appointment.serviceName ||
+    services.find((s) => s.id === appointment.serviceId)?.name ||
+    'Услуга клиники';
+  const serviceName = servicesCount > 1 ? `${primaryName} (+${servicesCount - 1})` : primaryName;
   const rawVet = veterinarians.find((v) => v.id === appointment.veterinarianId);
   const vetName = getDoctorDisplay(rawVet).fullName;
   const owner = pet?.ownerId ? users.find((u) => u.id === pet.ownerId) : undefined;
@@ -63,11 +70,6 @@ export const AdminAppointmentDetailIsland: React.FC<AdminAppointmentDetailIsland
     '—';
   const dtStart = formatDateTimeCompact(appointment.startAt);
   const dtEnd = formatDateTimeCompact(appointment.endAt);
-  const sInfo = APPOINTMENT_STATUS_META[appointment.status] || {
-    label: appointment.status,
-    short: appointment.status,
-    cls: 'badge-outline',
-  };
 
   const tone = getSpeciesTone(pet?.species?.name || speciesName || pet?.speciesId || 'cat', speciesList);
 
@@ -82,6 +84,7 @@ export const AdminAppointmentDetailIsland: React.FC<AdminAppointmentDetailIsland
             iconSize={20}
             variant="full"
             className={`t-ava tone-${tone} detail-head-ava`}
+            style={getSpeciesStyle(pet?.speciesId, speciesList)}
           />
           <div className="col" style={{ gap: 2, minWidth: 0 }}>
             <span className="h2" style={{ wordBreak: 'break-word' }}>
@@ -105,7 +108,7 @@ export const AdminAppointmentDetailIsland: React.FC<AdminAppointmentDetailIsland
       <div className="island-body" style={{ paddingTop: 14 }}>
         <div className="col" style={{ gap: 16 }}>
           <div className="row wrap" style={{ gap: 8 }}>
-            <span className={`badge st ${sInfo.cls}`}>{sInfo.label}</span>
+            <AppointmentStatusBadge status={appointment.status} />
             {appointment.followUpOf && (
               <span className="badge badge-accent">Повторный приём</span>
             )}
@@ -142,9 +145,34 @@ export const AdminAppointmentDetailIsland: React.FC<AdminAppointmentDetailIsland
               {dtStart.date}, {dtStart.time}–{dtEnd.time}
             </dd>
             <dt>Цена</dt>
-            <dd className="tnum">
-              {formatCurrency(appointment.priceSnapshot || appointment.price)}
+            <dd className="tnum font-bold">
+              {formatCurrency(
+                appointment.actualTotal ??
+                  appointment.estimatedTotal ??
+                  appointment.priceSnapshot ??
+                  appointment.price
+              )}
             </dd>
+            {appointment.services && appointment.services.length > 1 && (
+              <>
+                <dt>Все услуги ({appointment.services.length})</dt>
+                <dd>
+                  <ul style={{ margin: 0, paddingLeft: '18px', listStyleType: 'disc' }}>
+                    {appointment.services.map((s, idx) => (
+                      <li key={idx} className="small" style={{ margin: '4px 0' }}>
+                        <span style={{ fontWeight: 600 }}>{s.nameSnapshot}</span>
+                        <span className="muted"> — {formatCurrency(s.priceSnapshot)}</span>
+                        {s.isPerformed === true && (
+                          <span className="badge badge-success" style={{ marginLeft: '6px', fontSize: '10px', padding: '0 4px' }}>
+                            Оказана
+                          </span>
+                        )}
+                      </li>
+                    ))}
+                  </ul>
+                </dd>
+              </>
+            )}
             {appointment.followUpOf && (
               <>
                 <dt>Повторный к</dt>
@@ -185,14 +213,27 @@ export const AdminAppointmentDetailIsland: React.FC<AdminAppointmentDetailIsland
       </div>
 
       <div className="island-foot">
-        <button
-          type="button"
-          className="btn btn-destructive-outline btn-sm"
-          onClick={() => onDelete(appointment)}
-        >
-          <Trash2 size={14} />
-          Удалить
-        </button>
+        {appointment.status === 'CANCELLED' ? (
+          <button
+            type="button"
+            className="btn btn-destructive-outline btn-sm"
+            onClick={() => onDelete(appointment)}
+          >
+            <Trash2 size={14} />
+            Удалить
+          </button>
+        ) : (
+          <button
+            type="button"
+            className="btn btn-ghost btn-sm"
+            disabled
+            style={{ opacity: 0.45, cursor: 'not-allowed' }}
+            title="Удалить можно только предварительно отменённую запись"
+          >
+            <Trash2 size={14} />
+            Удалить
+          </button>
+        )}
         {appointment.status !== 'CANCELLED' &&
           canTransitionAppointmentStatus(appointment.status, 'CANCELLED') && (
             <button

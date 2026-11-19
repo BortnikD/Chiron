@@ -44,14 +44,14 @@ function AdminVaccinationsContent() {
           </div>
         )}
 
-        <VaccinationsStats
-          totalCount={vm.stats.total}
-          overdueCount={vm.stats.overdue}
-          soonCount={vm.stats.soon}
-        />
-
         <div className="content-row">
           <div className="content-col grow">
+            <VaccinationsStats
+              totalCount={vm.stats.total}
+              overdueCount={vm.stats.overdue}
+              soonCount={vm.stats.soon}
+            />
+
             <VaccinationsFilters
               search={vm.search}
               onSearchChange={vm.setSearch}
@@ -71,6 +71,7 @@ function AdminVaccinationsContent() {
             <VaccinationsTable
               data={vm.vaccinations}
               pets={vm.pets}
+              petsMap={vm.petsMap}
               speciesList={vm.speciesList}
               selectedId={vm.selectedVaccination?.id ?? null}
               loading={vm.loading}
@@ -85,7 +86,11 @@ function AdminVaccinationsContent() {
           {vm.selectedVaccination && (
             <VaccinationDetailIsland
               vaccination={vm.selectedVaccination}
-              pet={vm.petMap.get(vm.selectedVaccination.petId)}
+              pet={
+                vm.petMap.get(vm.selectedVaccination.petId) ||
+                vm.petsMap[vm.selectedVaccination.petId] ||
+                vm.pets.find((p) => p.id === vm.selectedVaccination?.petId)
+              }
               speciesList={vm.speciesList}
               onClose={() => vm.setSelectedVaccination(null)}
               onEdit={vm.handleOpenEdit}

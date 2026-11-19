@@ -5,14 +5,17 @@ import { CalendarDays, RefreshCw, Pencil, Trash2, Plus } from 'lucide-react';
 import type { WorkSchedule } from '@/modules/admin/types';
 import type { Veterinarian } from '@/modules/clinic/types';
 import { SearchCombobox, type SearchComboboxOption } from '@/shared/components';
+import { VetAvatar } from '@/components/ui/EntityAvatar';
 import {
   DOW_SHORT,
   DOW_FULL,
   DOW_ORDER,
   timeToMinutes,
   formatDurationMinutes,
+  getDoctorDisplay,
+  getSpecStyle,
+  getSpecTone,
 } from '@/shared/lib';
-import { getDoctorDisplay } from '@/shared/lib';
 
 export interface WeeklyScheduleMatrixProps {
   vets: Veterinarian[];
@@ -66,6 +69,17 @@ export const WeeklyScheduleMatrix: React.FC<WeeklyScheduleMatrixProps> = ({
           value: v.id,
           label: doc.fullName,
           hint: doc.specName,
+          avatar: (
+            <VetAvatar
+              vet={v}
+              initials={doc.initials}
+              tone={getSpecTone(v.specializationId)}
+              style={getSpecStyle(v.specializationId)}
+              variant="thumb"
+              className="t-ava xs round"
+              alt={doc.fullName}
+            />
+          ),
         };
       }),
     [vets, specsMap]

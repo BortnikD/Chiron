@@ -4,13 +4,17 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { Tags, Plus, Edit2, Trash2, AlertCircle, X } from 'lucide-react';
 import type { Service, Specialization, Veterinarian } from '@/modules/clinic/types';
 import { ConfirmModal } from '@/shared/components';
-import { formatApiError } from '@/shared/lib';
+import { ThemeSafeColorPicker } from '@/components/ui/ThemeSafeColorPicker';
+import { formatApiError, registerSpecializationColors, getSpecStyle, getSpecTone } from '@/shared/lib';
 
 export interface SpecializationsTabProps {
   specializations: Specialization[];
   services: Service[];
   veterinarians: Veterinarian[];
-  onSaveSpecialization: (data: { name: string; description: string }, id?: string) => Promise<void>;
+  onSaveSpecialization: (
+    data: { name: string; description: string; color?: string | null },
+    id?: string
+  ) => Promise<void>;
   onDeleteSpecialization: (id: string) => Promise<void>;
 }
 
@@ -21,8 +25,12 @@ export const SpecializationsTab: React.FC<SpecializationsTabProps> = ({
   onSaveSpecialization,
   onDeleteSpecialization,
 }) => {
+  useEffect(() => {
+    registerSpecializationColors(specializations);
+  }, [specializations]);
+
   const [isSpecModalOpen, setIsSpecModalOpen] = useState(false);
-  const [specForm, setSpecForm] = useState({ id: '', name: '', description: '' });
+  const [specForm, setSpecForm] = useState({ id: '', name: '', description: '', color: '' });
   const [savingSpec, setSavingSpec] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
 
@@ -62,6 +70,11 @@ export const SpecializationsTab: React.FC<SpecializationsTabProps> = ({
       setSaveError('Введите название специализации');
       return;
     }
+    const trimmedColor = specForm.color.trim();
+    if (trimmedColor && !/^#[0-9A-Fa-f]{6}$/.test(trimmedColor)) {
+      setSaveError('Цвет должен быть в формате HEX (#RRGGBB)');
+      return;
+    }
     if (
       specializations.some(
         (z) => z.id !== specForm.id && z.name.toLowerCase() === trimmedName.toLowerCase()
@@ -77,11 +90,12 @@ export const SpecializationsTab: React.FC<SpecializationsTabProps> = ({
         {
           name: trimmedName,
           description: specForm.description.trim(),
+          color: trimmedColor || null,
         },
         specForm.id || undefined
       );
       setIsSpecModalOpen(false);
-      setSpecForm({ id: '', name: '', description: '' });
+      setSpecForm({ id: '', name: '', description: '', color: '' });
     } catch (err: unknown) {
       setSaveError(formatApiError(err, 'Ошибка сохранения специализации'));
     } finally {
@@ -115,7 +129,7 @@ export const SpecializationsTab: React.FC<SpecializationsTabProps> = ({
             type="button"
             className="btn btn-primary btn-sm"
             onClick={() => {
-              setSpecForm({ id: '', name: '', description: '' });
+              setSpecForm({ id: '', name: '', description: '', color: '' });
               setSaveError(null);
               setIsSpecModalOpen(true);
             }}
@@ -138,12 +152,27 @@ export const SpecializationsTab: React.FC<SpecializationsTabProps> = ({
               <span />
             </div>
 
-            {specializations.map((sp) => (
-              <div key={sp.id} className="trow static">
-                <span className="cell-main">{sp.name}</span>
-                <span className="muted small">{sp.description || '—'}</span>
-                <span className="right tnum">{vetCounts[sp.id] || 0}</span>
-                <span className="right tnum">{serviceCounts[sp.id] || 0}</span>
+            {specializations.map((sp) => {
+              const tone = getSpecTone(sp.id);
+              const specStyle = getSpecStyle(sp.id, specializations);
+              return (
+                <div key={sp.id} className="trow static">
+                  <span className="row" style={{ gap: 8, alignItems: 'center' }}>
+                    <span
+                      className={`t-badge tone-${tone}`}
+                      style={{
+                        ...specStyle,
+                        height: '24px',
+                        padding: '0 10px',
+                        fontSize: '12.5px',
+                      }}
+                    >
+                      {sp.name}
+                    </span>
+                  </span>
+                  <span className="muted small">{sp.description || '—'}</span>
+                  <span className="right tnum">{vetCounts[sp.id] || 0}</span>
+                  <span className="right tnum">{serviceCounts[sp.id] || 0}</span>
                 <span className="row-actions right">
                   <button
                     type="button"
@@ -151,7 +180,12 @@ export const SpecializationsTab: React.FC<SpecializationsTabProps> = ({
                     aria-label={`Изменить специализацию «${sp.name}»`}
                     title="Изменить"
                     onClick={() => {
-                      setSpecForm({ id: sp.id, name: sp.name, description: sp.description || '' });
+                      setSpecForm({
+                        id: sp.id,
+                        name: sp.name,
+                        description: sp.description || '',
+                        color: sp.color || '',
+                      });
                       setSaveError(null);
                       setIsSpecModalOpen(true);
                     }}
@@ -172,7 +206,8 @@ export const SpecializationsTab: React.FC<SpecializationsTabProps> = ({
                   </button>
                 </span>
               </div>
-            ))}
+            );
+          })}
           </div>
         </div>
       </section>
@@ -238,6 +273,18 @@ export const SpecializationsTab: React.FC<SpecializationsTabProps> = ({
                     }
                   />
                   <span className="field-hint">{specForm.description.length} / 2000</span>
+                </div>
+
+                <div className="field">
+                  <ThemeSafeColorPicker
+                    id="spec-color-input"
+                    label="Цвет специализации (HEX)"
+                    value={specForm.color}
+                    defaultColor="#10B981"
+                    onChange={(hex) => setSpecForm({ ...specForm, color: hex })}
+                    onReset={() => setSpecForm({ ...specForm, color: '' })}
+                    previewLabel={specForm.name || 'Специализация'}
+                  />
                 </div>
 
                 {saveError && (

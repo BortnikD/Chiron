@@ -4,6 +4,7 @@ import { AlertCircle, RefreshCw } from 'lucide-react';
 import { useShellHeader } from '@/components/layout/AppShell';
 import { useAdminDashboard } from './_hooks/useAdminDashboard';
 import { DatePeriodSelector } from './_components/DatePeriodSelector';
+import { DashboardSkeleton } from './_components/DashboardSkeleton';
 import { KpiMetricsGrid } from './_components/KpiMetricsGrid';
 import { TimelineChart } from './_components/TimelineChart';
 import { StatusDistributionIsland } from './_components/StatusDistributionIsland';
@@ -32,6 +33,7 @@ export default function AdminDashboardPage() {
     vetsStats,
     servicesStats,
     speciesStats,
+    overview,
     loading,
     error,
     reload,
@@ -61,36 +63,42 @@ export default function AdminDashboardPage() {
         stTo={stTo}
         onFromChange={handleFromChange}
         onToChange={handleToChange}
+        loading={loading}
       />
 
-      {loading && (
-        <div className="island" style={{ flex: 'none', padding: '12px 16px' }}>
-          <div className="row" style={{ gap: '10px', alignItems: 'center' }}>
-            <span className="spinner" aria-hidden="true" />
-            <span className="small muted">Загружаем статистику клиники...</span>
+      {loading && !overview ? (
+        <DashboardSkeleton />
+      ) : (
+        <div
+          className="col"
+          style={{
+            gap: 'var(--gap)',
+            opacity: loading ? 0.65 : 1,
+            pointerEvents: loading ? 'none' : 'auto',
+            transition: 'opacity 0.15s ease',
+          }}
+        >
+          <KpiMetricsGrid stats={stats} />
+
+          <div className="dash-2col">
+            <TimelineChart
+              timeline={timeline}
+              metric={metric}
+              onMetricChange={setMetric}
+              granularity={gran}
+              onGranularityChange={setGran}
+            />
+            <StatusDistributionIsland stats={stats} />
+          </div>
+
+          <TopVeterinariansIsland vetsStats={vetsStats} />
+
+          <div className="dash-2col">
+            <TopServicesIsland servicesStats={servicesStats} />
+            <SpeciesDistributionIsland speciesStats={speciesStats} />
           </div>
         </div>
       )}
-
-      <KpiMetricsGrid stats={stats} />
-
-      <div className="dash-2col">
-        <TimelineChart
-          timeline={timeline}
-          metric={metric}
-          onMetricChange={setMetric}
-          granularity={gran}
-          onGranularityChange={setGran}
-        />
-        <StatusDistributionIsland stats={stats} />
-      </div>
-
-      <TopVeterinariansIsland vetsStats={vetsStats} />
-
-      <div className="dash-2col">
-        <TopServicesIsland servicesStats={servicesStats} />
-        <SpeciesDistributionIsland speciesStats={speciesStats} />
-      </div>
     </div>
   );
 }

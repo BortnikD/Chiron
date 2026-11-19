@@ -5,7 +5,8 @@ import Link from 'next/link';
 import { X, Edit2, Trash2 } from 'lucide-react';
 import type { Vaccination, Pet } from '@/modules/client/types';
 import type { Species } from '@/modules/clinic/types';
-import { formatIsoDateDisplay } from '@/shared/lib';
+import { PetAvatar } from '@/components/ui/EntityAvatar';
+import { formatIsoDateDisplay, getSpeciesTone, getSpeciesStyle } from '@/shared/lib';
 import { calculateVaccinationStatus } from './utils';
 
 export interface VaccinationDetailIslandProps {
@@ -41,18 +42,34 @@ export const VaccinationDetailIsland: React.FC<VaccinationDetailIslandProps> = (
   const adminDate = formatIsoDateDisplay(adminRaw ? adminRaw.slice(0, 10) : null);
   const nextDue = nextDueRaw ? formatIsoDateDisplay(nextDueRaw.slice(0, 10)) : null;
   const status = calculateVaccinationStatus(nextDueRaw);
+  const tone = getSpeciesTone(pet?.species?.name || speciesName || pet?.speciesId, speciesList);
+  const style =
+    getSpeciesStyle(pet?.speciesId, speciesList) ||
+    (pet?.species?.color ? ({ '--tone': pet.species.color } as React.CSSProperties) : undefined);
 
   return (
     <section className="island detail-island" aria-label="Детали вакцинации">
       <div className="island-head">
-        <div className="col" style={{ gap: 2 }}>
-          <span className="h2" style={{ wordBreak: 'break-word' }}>
-            {vaxName}
-          </span>
-          <span className="cell-sub tnum">
-            {petName}
-            {speciesName ? ` (${speciesName})` : ''}
-          </span>
+        <div className="row" style={{ minWidth: 0, gap: 12, alignItems: 'center' }}>
+          <PetAvatar
+            pet={pet}
+            tone={tone}
+            species={tone}
+            iconSize={20}
+            variant="full"
+            className={`pet-ava tone-${tone} detail-head-ava`}
+            style={style}
+            alt={petName}
+          />
+          <div className="col" style={{ gap: 2, minWidth: 0 }}>
+            <span className="h2" style={{ wordBreak: 'break-word' }}>
+              {vaxName}
+            </span>
+            <span className="cell-sub tnum">
+              {petName}
+              {speciesName ? ` (${speciesName})` : ''}
+            </span>
+          </div>
         </div>
         <button
           type="button"

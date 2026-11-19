@@ -8,7 +8,7 @@ import { useDictionaries } from '@/shared/hooks';
 import type { WorkSchedule, ScheduleException } from '@/modules/admin/types';
 import type { Specialization, Veterinarian } from '@/modules/clinic/types';
 import { useToast } from '@/shared/components';
-import { fetchAllPages, formatApiError, toIdNameMap } from '@/shared/lib';
+import { fetchAllPages, formatApiError, getMoscowTodayIso, toIdNameMap } from '@/shared/lib';
 import {
   buildDeleteConfirmMeta,
   buildExceptionCreatePayload,
@@ -81,10 +81,14 @@ export function useAdminSchedules() {
   }, [dictSpecializations]);
 
   const [selectedVetId, setSelectedVetIdState] = useState<string>(() => vetParam || getStoredValue(SCHEDULE_VET_STORAGE_KEY));
-  const [excVetFilter, setExcVetFilterState] = useState<string>(() => vetParam || getStoredValue(SCHEDULE_VET_STORAGE_KEY));
+  const [excVetFilter, setExcVetFilterState] = useState<string>(() => (tabParam === 'exc' && vetParam && vetParam !== 'ALL' ? vetParam : ''));
   const [excTypeFilter, setExcTypeFilterState] = useState<string>(() => typeParam || getStoredValue(EXC_TYPE_STORAGE_KEY));
-  const [excFromFilter, setExcFromFilterState] = useState<string>(() => fromParam || getStoredValue(EXC_FROM_STORAGE_KEY));
-  const [excToFilter, setExcToFilterState] = useState<string>(() => toParam || getStoredValue(EXC_TO_STORAGE_KEY));
+  const [excFromFilter, setExcFromFilterState] = useState<string>(
+    () => fromParam || getStoredValue(EXC_FROM_STORAGE_KEY) || getMoscowTodayIso(-1)
+  );
+  const [excToFilter, setExcToFilterState] = useState<string>(
+    () => toParam || getStoredValue(EXC_TO_STORAGE_KEY) || getMoscowTodayIso(6)
+  );
 
   const syncSchedulesToUrl = useCallback(
     (
@@ -121,7 +125,12 @@ export function useAdminSchedules() {
       const nextSearch = url.searchParams.toString();
       const currentSearch = window.location.search.replace(/^\?/, '');
       if (nextSearch !== currentSearch) {
-        window.history.replaceState(null, '', url.pathname + (nextSearch ? `?${nextSearch}` : '') + url.hash);
+        // Run asynchronously to avoid React setState-in-render conflict
+        setTimeout(() => {
+          if (typeof window !== 'undefined') {
+            window.history.replaceState(null, '', url.pathname + (nextSearch ? `?${nextSearch}` : '') + url.hash);
+          }
+        }, 0);
       }
     },
     []
@@ -139,7 +148,7 @@ export function useAdminSchedules() {
   const setActiveTab = useCallback(
     (tab: 'sched' | 'exc') => {
       setActiveTabState(tab);
-      const vetToSync = tab === 'sched' ? selectedVetId : (excVetFilter || selectedVetId);
+      const vetToSync = tab === 'sched' ? selectedVetId : (excVetFilter && excVetFilter !== 'ALL' ? excVetFilter : '');
       syncSchedulesToUrl(tab, vetToSync, excTypeFilter, excFromFilter, excToFilter);
     },
     [selectedVetId, excVetFilter, excTypeFilter, excFromFilter, excToFilter, syncSchedulesToUrl]
@@ -147,9 +156,8 @@ export function useAdminSchedules() {
 
   const setExcVetFilter = useCallback(
     (vetId: string) => {
-      const cleanVetId = vetId === 'ALL' ? '' : vetId;
+      const cleanVetId = !vetId || vetId === 'ALL' ? '' : vetId;
       setExcVetFilterState(cleanVetId);
-      persistValue(SCHEDULE_VET_STORAGE_KEY, cleanVetId);
       syncSchedulesToUrl(activeTab, cleanVetId, excTypeFilter, excFromFilter, excToFilter);
     },
     [activeTab, excTypeFilter, excFromFilter, excToFilter, syncSchedulesToUrl]
@@ -183,15 +191,16 @@ export function useAdminSchedules() {
   );
 
   const resetExcFilters = useCallback(() => {
+    const defaultFrom = getMoscowTodayIso(-1);
+    const defaultTo = getMoscowTodayIso(6);
     setExcVetFilterState('');
     setExcTypeFilterState('');
-    setExcFromFilterState('');
-    setExcToFilterState('');
-    persistValue(SCHEDULE_VET_STORAGE_KEY, '');
+    setExcFromFilterState(defaultFrom);
+    setExcToFilterState(defaultTo);
     persistValue(EXC_TYPE_STORAGE_KEY, '');
-    persistValue(EXC_FROM_STORAGE_KEY, '');
-    persistValue(EXC_TO_STORAGE_KEY, '');
-    syncSchedulesToUrl(activeTab, '', '', '', '');
+    persistValue(EXC_FROM_STORAGE_KEY, defaultFrom);
+    persistValue(EXC_TO_STORAGE_KEY, defaultTo);
+    syncSchedulesToUrl(activeTab, '', '', defaultFrom, defaultTo);
   }, [activeTab, syncSchedulesToUrl]);
   const [schedules, setSchedules] = useState<WorkSchedule[]>([]);
   const [loadingSchedule, setLoadingSchedule] = useState(false);
@@ -255,15 +264,18 @@ export function useAdminSchedules() {
     setLoadingVets(true);
     setVetsError(null);
     try {
-      const vetUsers = await fetchAllPages(
-        (p, s) => adminApi.getUsers(p, s, 'VETERINARIAN'),
-        { pageSize: 100, maxPages: 20, concurrency: 4 }
-      );
+      const [baseVets, vetUsers] = await Promise.all([
+        clinicApi.getVeterinarians().catch(() => adminApi.getVeterinarians()),
+        fetchAllPages(
+          (p, s) => adminApi.getUsers(p, s, 'VETERINARIAN'),
+          { pageSize: 100, maxPages: 10, concurrency: 4 }
+        ).catch(() => []),
+      ]);
       if (reqId !== vetsReqIdRef.current) return;
-      const baseVets = dictVets.length > 0 ? dictVets : await adminApi.getVeterinarians();
-      const list = (Array.isArray(baseVets) ? baseVets : []).map((v) =>
-        v.user ? v : { ...v, user: vetUsers.find((u) => u.id === v.userId) }
-      );
+      const list = (Array.isArray(baseVets) ? baseVets : []).map((v) => ({
+        ...v,
+        user: v.user || vetUsers.find((u) => u.id === v.userId) || undefined,
+      }));
       setVets(list);
       if (list.length > 0) {
         setSelectedVetIdState((prev) => {
@@ -277,22 +289,17 @@ export function useAdminSchedules() {
               ? stored
               : list[0].id;
           persistValue(SCHEDULE_VET_STORAGE_KEY, candidate);
-          syncSchedulesToUrl(activeTab, candidate, excTypeFilter, excFromFilter, excToFilter);
           return candidate;
         });
 
-        setExcVetFilterState((prev) => {
-          const stored = getStoredValue(SCHEDULE_VET_STORAGE_KEY);
-          const candidate =
-            vetParam && list.some((v) => v.id === vetParam)
-              ? vetParam
-              : prev && list.some((v) => v.id === prev)
-              ? prev
-              : stored && list.some((v) => v.id === stored)
-              ? stored
-              : '';
-          return candidate;
-        });
+        if (activeTab === 'exc') {
+          setExcVetFilterState((prev) => {
+            if (vetParam && vetParam !== 'ALL' && list.some((v) => v.id === vetParam)) {
+              return vetParam;
+            }
+            return prev && prev !== 'ALL' && list.some((v) => v.id === prev) ? prev : '';
+          });
+        }
       }
     } catch (err: unknown) {
       if (reqId !== vetsReqIdRef.current) return;

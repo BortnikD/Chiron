@@ -8,14 +8,16 @@ import type { WorkSchedule, ScheduleException } from '@/modules/admin/types';
 import type { Veterinarian, Specialization, Species } from '@/modules/clinic/types';
 import type { User } from '@/shared/types';
 import { useToast } from '@/shared/components';
-import { fetchAllPages, formatApiError, toIdNameMap } from '@/shared/lib';
+import { useDictionaries } from '@/shared/hooks';
+import { fetchAllPages, formatApiError, registerSpecializationColors, registerSpeciesColors, toIdNameMap } from '@/shared/lib';
 import { getDoctorDisplay } from '@/shared/lib';
 
 export type VetActiveFilter = 'ALL' | 'ACTIVE' | 'INACTIVE';
 
 export interface CreateVetInput {
   userId: string;
-  specializationId: string;
+  specializationId?: string;
+  specializationIds?: string[];
   bio?: string;
   experienceYears: number;
   isActive: boolean;
@@ -23,12 +25,18 @@ export interface CreateVetInput {
 }
 
 export type UpdateVetInput = Partial<
-  Pick<Veterinarian, 'specializationId' | 'bio' | 'experienceYears' | 'isActive'>
+  Pick<Veterinarian, 'specializationId' | 'specializationIds' | 'bio' | 'experienceYears' | 'isActive'>
 >;
 
 export function useAdminVeterinarians() {
   const searchParams = useSearchParams();
   const { toast } = useToast();
+  const {
+    upsertVeterinarian,
+    species: dictSpecies,
+    specializations: dictSpecs,
+    invalidateDictionaries,
+  } = useDictionaries();
   const initialSel = searchParams.get('sel');
   const initialUserId = searchParams.get('userId');
 
@@ -38,8 +46,8 @@ export function useAdminVeterinarians() {
 
   const [veterinarians, setVeterinarians] = useState<Veterinarian[]>([]);
   const [users, setUsers] = useState<User[]>([]);
-  const [specializations, setSpecializations] = useState<Specialization[]>([]);
-  const [speciesList, setSpeciesList] = useState<Species[]>([]);
+  const [specializations, setSpecializations] = useState<Specialization[]>(() => dictSpecs || []);
+  const [speciesList, setSpeciesList] = useState<Species[]>(() => dictSpecies || []);
   const [vetPermMap, setVetPermMap] = useState<Record<string, string[]>>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -132,8 +140,12 @@ export function useAdminVeterinarians() {
 
       setVeterinarians(vets);
       setUsers(vetUsers);
-      setSpecializations(Array.isArray(specsData) ? specsData : []);
-      setSpeciesList(Array.isArray(speciesData) ? speciesData : []);
+      const safeSpecs = Array.isArray(specsData) ? specsData : [];
+      registerSpecializationColors(safeSpecs);
+      setSpecializations(safeSpecs);
+      const safeSpecies = Array.isArray(speciesData) ? speciesData : [];
+      registerSpeciesColors(safeSpecies);
+      setSpeciesList(safeSpecies);
       setVetPermMap(Object.fromEntries(permEntries));
 
       if (initialSel && appliedSelRef.current !== initialSel) {
@@ -165,6 +177,7 @@ export function useAdminVeterinarians() {
 
   useEffect(() => {
     void loadData();
+
     return () => {
       loadReqIdRef.current += 1;
     };
@@ -252,6 +265,9 @@ export function useAdminVeterinarians() {
     async (data: CreateVetInput): Promise<Veterinarian> => {
       const { photoFile, ...payload } = data;
       let created = await adminApi.createVeterinarian(payload);
+      if (data.specializationIds) {
+        created = { ...created, specializationIds: data.specializationIds };
+      }
       if (photoFile) {
         try {
           const links = await adminApi.uploadVeterinarianPhoto(created.id, photoFile);
@@ -265,24 +281,43 @@ export function useAdminVeterinarians() {
         }
       }
       setPreferredDetailTab('species');
+      upsertVeterinarian(created);
+      void invalidateDictionaries(['veterinarians']);
       await loadData();
       setSelectedVet(created);
       setPrefillUserId('');
       toast('Профиль врача создан', 'Выдайте допуски к видам и задайте расписание');
       return created;
     },
-    [loadData, toast]
+    [loadData, toast, upsertVeterinarian, invalidateDictionaries]
   );
 
   const updateVeterinarian = useCallback(
     async (id: string, data: UpdateVetInput): Promise<Veterinarian> => {
       const updated = await adminApi.updateVeterinarian(id, data);
+      const specIds =
+        data.specializationIds ??
+        updated.specializationIds ??
+        (updated.specializationId ? [updated.specializationId] : []);
+      const merged: Veterinarian = {
+        ...updated,
+        specializationIds: specIds,
+      };
+      upsertVeterinarian(merged);
+      void invalidateDictionaries(['veterinarians']);
       await loadData();
-      setSelectedVet((prev) => (prev?.id === id ? updated : prev));
+      if (data.specializationIds) {
+        setVeterinarians((prev) =>
+          prev.map((v) => (v.id === id ? { ...v, specializationIds: data.specializationIds } : v))
+        );
+        setSelectedVet((prev) => (prev?.id === id ? { ...prev, ...merged } : prev));
+      } else {
+        setSelectedVet((prev) => (prev?.id === id ? merged : prev));
+      }
       toast('Профиль врача сохранён');
-      return updated;
+      return merged;
     },
-    [loadData, toast]
+    [loadData, toast, upsertVeterinarian, invalidateDictionaries]
   );
 
   const uploadVetPhoto = useCallback(
@@ -364,6 +399,7 @@ export function useAdminVeterinarians() {
       await adminApi.deleteVeterinarian(selectedVet.id);
       setIsDeleteConfirmOpen(false);
       setSelectedVet(null);
+      void invalidateDictionaries(['veterinarians']);
       await loadData();
       toast('Профиль врача удалён');
     } catch (err: unknown) {
@@ -371,7 +407,7 @@ export function useAdminVeterinarians() {
     } finally {
       setDeleting(false);
     }
-  }, [selectedVet, loadData, toast]);
+  }, [selectedVet, loadData, toast, invalidateDictionaries]);
 
   return {
     vets: filteredVets,

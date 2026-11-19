@@ -9,6 +9,7 @@ export interface FilterDropdownOption {
   hint?: string;
   title?: string;
   disabled?: boolean;
+  avatar?: React.ReactNode;
 }
 
 export interface FilterDropdownProps {
@@ -87,10 +88,19 @@ export const FilterDropdown: React.FC<FilterDropdownProps> = ({
         aria-expanded={open}
         aria-controls={listboxId}
         aria-label={ariaLabel}
+        style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}
         onClick={() => !disabled && setOpen((prev) => !prev)}
       >
-        <span className={!selected ? 'muted' : undefined}>{selected ? selected.label : placeholder}</span>
-        <ChevronDown className="ic" />
+        <span className="row" style={{ gap: 8, alignItems: 'center', minWidth: 0, overflow: 'hidden' }}>
+          {selected?.avatar}
+          <span
+            className={!selected ? 'muted' : undefined}
+            style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+          >
+            {selected ? selected.label : placeholder}
+          </span>
+        </span>
+        <ChevronDown className="ic" style={{ flex: 'none' }} />
       </button>
 
       {open && (
@@ -123,20 +133,43 @@ export const FilterDropdown: React.FC<FilterDropdownProps> = ({
                   title={opt.title}
                   disabled={opt.disabled}
                   className={`menu-item ${isSelected ? 'on' : ''} ${opt.disabled ? 'disabled' : ''}`}
+                  style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 10px' }}
                   onClick={() => {
                     if (opt.disabled) return;
                     onChange(opt.value);
                     setOpen(false);
                   }}
                 >
-                  <span className="mi-label">{opt.label}</span>
-                  {opt.hint && <span className="small muted mi-hint">{opt.hint}</span>}
+                  {opt.avatar && (
+                    <span style={{ flex: 'none', display: 'inline-flex', alignItems: 'center' }}>
+                      {opt.avatar}
+                    </span>
+                  )}
+                  <span
+                    className="mi-label"
+                    style={{
+                      flex: 1,
+                      minWidth: 0,
+                      textAlign: 'left',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap',
+                    }}
+                  >
+                    {opt.label}
+                  </span>
+                  {opt.hint && (
+                    <span className="small muted mi-hint" style={{ flex: 'none' }}>
+                      {opt.hint}
+                    </span>
+                  )}
                   {isSelected && (
                     <Check
                       className="ic"
                       style={{
                         marginLeft: opt.hint ? '8px' : 'auto',
                         color: 'var(--primary-text)',
+                        flex: 'none',
                       }}
                     />
                   )}

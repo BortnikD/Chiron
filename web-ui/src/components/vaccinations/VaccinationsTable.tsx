@@ -108,9 +108,14 @@ export const VaccinationsTable: React.FC<SharedVaccinationsTableProps> = ({
         title: 'Дата введения',
         width: '1fr',
         render: (v) => (
-          <span className="tabular">
-            {formatIsoDateDisplay(v.administeredOn || v.administeredAt)}
-          </span>
+          <div className="col gap-1 items-start">
+            <span className="cell-sub mobile-only muted" style={{ fontSize: '11px' }}>
+              Введена:
+            </span>
+            <span className="tabular">
+              {formatIsoDateDisplay(v.administeredOn || v.administeredAt)}
+            </span>
+          </div>
         ),
       },
       {
@@ -123,6 +128,9 @@ export const VaccinationsTable: React.FC<SharedVaccinationsTableProps> = ({
           const status = getVaccinationDueInfo(dueIso);
           return (
             <div className="col gap-1 items-start">
+              <span className="cell-sub mobile-only muted" style={{ fontSize: '11px' }}>
+                Повторить:
+              </span>
               <span className="tabular">{formatIsoDateDisplay(dueIso)}</span>
               <span className={`pill small ${status.cls}`}>{status.label}</span>
             </div>

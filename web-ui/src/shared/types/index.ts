@@ -44,7 +44,27 @@ export interface PageResponse<T> {
 
 // ─── OpenAPI DTOs: Responses ───────────────────────────────────────
 
-export type AppointmentResponse = Schemas['AppointmentResponse'];
+export interface AppointmentServiceResponse {
+  serviceId: string;
+  nameSnapshot: string;
+  priceSnapshot: number;
+  durationMinSnapshot?: number | null;
+  bufferAfterMinSnapshot?: number | null;
+  isPlanned: boolean;
+  isPerformed?: boolean | null;
+  addedBy?: string | null;
+  createdAt: string;
+  updatedBy?: string | null;
+  updatedAt: string;
+}
+
+export type AppointmentResponse = Schemas['AppointmentResponse'] & {
+  services?: AppointmentServiceResponse[];
+  estimatedTotal?: number;
+  actualTotal?: number | null;
+  durationMin?: number | null;
+  bufferAfterMin?: number | null;
+};
 export type PetResponse = Schemas['PetResponse'] & {
   /** Алиас для обратной совместимости со свойством archived */
   isArchived?: boolean;
@@ -70,7 +90,9 @@ export type ClientPetResponse = Omit<Schemas['ClientPetResponse'], 'summary'> & 
   summary?: PetSummaryResponse | null;
 };
 export type PetSummaryResponse = Schemas['PetSummaryResponse'];
-export type PetNextAppointmentResponse = Schemas['PetNextAppointmentResponse'];
+export type PetNextAppointmentResponse = Schemas['PetNextAppointmentResponse'] & {
+  serviceIds?: string[];
+};
 export type VaccinationResponse = Schemas['VaccinationResponse'] & {
   vaccineName?: string;
   administeredAt?: string;
@@ -83,6 +105,8 @@ export type VeterinarianResponse = Schemas['VeterinarianResponse'] & {
   isActive?: boolean;
   specialization?: SpecializationResponse;
   user?: UserResponse;
+  specializationIds?: string[];
+  speciesIds?: string[];
 };
 export type ServiceResponse = Schemas['ServiceResponse'] & {
   /** Алиас для обратной совместимости со свойством active */
@@ -120,12 +144,26 @@ export type PageResponseScheduleExceptionResponse = Schemas['PageResponseSchedul
 
 export type CreateVaccinationRequest = Schemas['CreateVaccinationRequest'];
 export type UpdateVaccinationRequest = Partial<Schemas['UpdateVaccinationRequest']>;
-export type CreateAppointmentRequest = Schemas['CreateAppointmentRequest'];
-export type UpdateAppointmentRequest = Partial<Schemas['UpdateAppointmentRequest']>;
-export type ClientCreateAppointmentRequest = Schemas['ClientCreateAppointmentRequest'];
+export type CreateAppointmentRequest = Schemas['CreateAppointmentRequest'] & {
+  serviceIds?: string[];
+};
+export type UpdateAppointmentRequest = Partial<Schemas['UpdateAppointmentRequest']> & {
+  serviceIds?: string[];
+  performedServiceIds?: string[];
+  endAt?: string;
+};
+export type ClientCreateAppointmentRequest = Schemas['ClientCreateAppointmentRequest'] & {
+  serviceIds?: string[];
+};
 export type CancelAppointmentRequest = Schemas['CancelAppointmentRequest'];
-export type VeterinarianCreateFollowUpRequest = Schemas['VeterinarianCreateFollowUpRequest'];
-export type VeterinarianUpdateAppointmentRequest = Partial<Schemas['VeterinarianUpdateAppointmentRequest']>;
+export type VeterinarianCreateFollowUpRequest = Schemas['VeterinarianCreateFollowUpRequest'] & {
+  serviceIds?: string[];
+};
+export type VeterinarianUpdateAppointmentRequest = Partial<Schemas['VeterinarianUpdateAppointmentRequest']> & {
+  serviceIds?: string[];
+  performedServiceIds?: string[];
+  endAt?: string;
+};
 export type VeterinarianUpdateProfileRequest = Partial<Schemas['VeterinarianUpdateProfileRequest']>;
 export type CreatePetRequest = Schemas['CreatePetRequest'];
 export type ClientCreatePetRequest = Schemas['ClientCreatePetRequest'];
@@ -134,9 +172,12 @@ export type UpdatePetRequest = Partial<Schemas['UpdatePetRequest']> & {
 };
 export type CreateUserRequest = Schemas['CreateUserRequest'];
 export type UpdateUserRequest = Partial<Schemas['UpdateUserRequest']>;
-export type CreateVeterinarianRequest = Schemas['CreateVeterinarianRequest'];
+export type CreateVeterinarianRequest = Schemas['CreateVeterinarianRequest'] & {
+  specializationIds?: string[];
+};
 export type UpdateVeterinarianRequest = Partial<Schemas['UpdateVeterinarianRequest']> & {
   isActive?: boolean;
+  specializationIds?: string[];
 };
 export type CreateWorkScheduleRequest = Schemas['CreateWorkScheduleRequest'];
 export type UpdateWorkScheduleRequest = Partial<Schemas['UpdateWorkScheduleRequest']>;

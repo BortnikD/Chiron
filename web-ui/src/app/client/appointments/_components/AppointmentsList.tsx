@@ -13,7 +13,7 @@ import {
 import type { Appointment, Pet } from '@/modules/client/types';
 import type { Service, Veterinarian } from '@/modules/clinic/types';
 import { PetAvatar } from '@/components/ui/EntityAvatar';
-import { PaginationFooter } from '@/shared/components';
+import { PaginationFooter, AppointmentStatusBadge, AppointmentServiceBadge, Skeleton } from '@/shared/components';
 import {
   APPOINTMENT_STATUS_META,
   formatCurrency,
@@ -111,12 +111,7 @@ export function AppointmentsList({
       )}
 
       <div className="table-wrap">
-        {loading && appointments.length === 0 ? (
-          <div className="empty">
-            <div className="spinner" />
-            <span className="small muted">Загрузка записей...</span>
-          </div>
-        ) : appointments.length === 0 ? (
+        {!loading && appointments.length === 0 ? (
           <div className="empty">
             <div className="empty-art">
               <CalendarDays className="ic ic-40" />
@@ -159,7 +154,30 @@ export function AppointmentsList({
               <span className="right">Цена</span>
             </div>
 
-            {appointments.map((a) => {
+            {loading && appointments.length === 0
+              ? Array.from({ length: 6 }).map((_, idx) => (
+                  <div key={`appt-skel-${idx}`} className="trow static">
+                    <span>
+                      <Skeleton width="130px" height="15px" borderRadius="4px" />
+                    </span>
+                    <span>
+                      <Skeleton width="70px" height="15px" borderRadius="4px" />
+                    </span>
+                    <span>
+                      <Skeleton width="120px" height="15px" borderRadius="4px" />
+                    </span>
+                    <span>
+                      <Skeleton width="90px" height="15px" borderRadius="4px" />
+                    </span>
+                    <span>
+                      <Skeleton width="75px" height="20px" borderRadius="12px" />
+                    </span>
+                    <span className="right">
+                      <Skeleton width="55px" height="15px" borderRadius="4px" style={{ marginLeft: 'auto' }} />
+                    </span>
+                  </div>
+                ))
+              : appointments.map((a) => {
               const isSel = selectedAppointment?.id === a.id;
               const pet = petsMap[a.petId] || a.pet;
               const svc = servicesMap[a.serviceId] || a.service;
@@ -167,10 +185,10 @@ export function AppointmentsList({
                 pet?.species?.name || pet?.speciesName || pet?.speciesId,
                 speciesMap
               );
-              const meta = APPOINTMENT_STATUS_META[a.status];
-              const statusShort = meta?.short || a.status;
-              const statusLabel = meta?.label || a.status;
-              const price = a.priceSnapshot ?? a.price;
+              const price = a.actualTotal ?? a.estimatedTotal ?? a.priceSnapshot ?? a.price;
+              const servicesCount = a.services?.length || 1;
+              const primaryServiceName =
+                a.services?.[0]?.nameSnapshot || a.serviceName || svc?.name || 'Услуга';
 
               return (
                 <button
@@ -203,12 +221,13 @@ export function AppointmentsList({
                     />
                     <span>{pet?.name || a.petName || 'Питомец'}</span>
                   </span>
-                  <span>{svc?.name || a.serviceName || 'Услуга'}</span>
+                  <AppointmentServiceBadge
+                    appointment={a}
+                    fallbackName={svc?.name || 'Услуга'}
+                  />
                   <span>{resolveVetName(a, vetsMap)}</span>
                   <span>
-                    <span className={`badge st badge-${a.status}`} title={statusLabel}>
-                      {statusShort}
-                    </span>
+                    <AppointmentStatusBadge status={a.status} useShortLabel />
                   </span>
                   <span className="right tnum">
                     {price != null ? formatCurrency(price) : '—'}

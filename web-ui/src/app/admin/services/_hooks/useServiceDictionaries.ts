@@ -2,6 +2,7 @@
 
 import { useCallback } from 'react';
 import { adminApi } from '@/modules/admin/api';
+import { clearClinicDictionariesCache } from '@/modules/clinic/api';
 import { useToast } from '@/shared/components';
 import { useDictionaries } from '@/shared/hooks';
 
@@ -10,21 +11,28 @@ export function useServiceDictionaries(loadData: () => Promise<void>) {
   const { invalidateDictionaries } = useDictionaries();
 
   const createSpecies = useCallback(
-    async (name: string): Promise<void> => {
-      await adminApi.createSpecies(name);
+    async (data: { name: string; color?: string | null; iconKey?: string | null } | string): Promise<void> => {
+      await adminApi.createSpecies(data);
+      clearClinicDictionariesCache();
       await invalidateDictionaries(['species']);
       await loadData();
+      const name = typeof data === 'string' ? data : data.name;
       toast('Вид добавлен', name);
     },
     [invalidateDictionaries, loadData, toast]
   );
 
   const updateSpecies = useCallback(
-    async (id: string, name: string): Promise<void> => {
-      await adminApi.updateSpecies(id, name);
+    async (
+      id: string,
+      data: { name?: string; color?: string | null; iconKey?: string | null } | string
+    ): Promise<void> => {
+      await adminApi.updateSpecies(id, data);
+      clearClinicDictionariesCache();
       await invalidateDictionaries(['species']);
       await loadData();
-      toast('Вид переименован', name);
+      const name = typeof data === 'string' ? data : data.name;
+      toast('Вид обновлён', name);
     },
     [invalidateDictionaries, loadData, toast]
   );
@@ -32,6 +40,7 @@ export function useServiceDictionaries(loadData: () => Promise<void>) {
   const deleteSpecies = useCallback(
     async (id: string): Promise<void> => {
       await adminApi.deleteSpecies(id);
+      clearClinicDictionariesCache();
       await invalidateDictionaries(['species']);
       await loadData();
       toast('Вид удалён');
@@ -40,9 +49,13 @@ export function useServiceDictionaries(loadData: () => Promise<void>) {
   );
 
   const saveSpecialization = useCallback(
-    async (data: { name: string; description: string }, id?: string): Promise<void> => {
+    async (
+      data: { name: string; description?: string; color?: string | null },
+      id?: string
+    ): Promise<void> => {
       if (id) await adminApi.updateSpecialization(id, data);
       else await adminApi.createSpecialization(data);
+      clearClinicDictionariesCache();
       await invalidateDictionaries(['specializations']);
       await loadData();
       toast('Специализация сохранена', data.name);

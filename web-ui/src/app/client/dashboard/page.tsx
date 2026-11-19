@@ -11,11 +11,14 @@ import { ClientAppointmentsIsland } from './_components/ClientAppointmentsIsland
 import { ClientQuickActions } from './_components/ClientQuickActions';
 import { ClientVaccinationsIsland } from './_components/ClientVaccinationsIsland';
 import { ClientNotificationsIsland } from './_components/ClientNotificationsIsland';
+import { ClientDashboardSkeleton } from './_components/ClientDashboardSkeleton';
 
 export default function ClientDashboardPage() {
   useShellHeader({ crumbGroup: 'Кабинет', crumb: 'Главная' });
   const { user } = useAuth();
   const {
+    summary,
+    loading,
     pets,
     appointments,
     vaccinations,
@@ -35,6 +38,10 @@ export default function ClientDashboardPage() {
     nextApptService,
     nextApptVet,
   } = useClientDashboard();
+
+  if (loading && !summary) {
+    return <ClientDashboardSkeleton />;
+  }
 
   return (
     <div className="content-row">

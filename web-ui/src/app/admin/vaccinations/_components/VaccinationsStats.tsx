@@ -18,59 +18,48 @@ export const VaccinationsStats: React.FC<VaccinationsStatsProps> = ({
   soonCount,
 }) => {
   return (
-    <div
-      style={{
-        display: 'grid',
-        gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-        gap: '12px',
-      }}
-    >
-      <div className="card" style={{ padding: '16px' }}>
-        <span className="small muted">Всего записей в реестре</span>
-        <div className="row between" style={{ alignItems: 'baseline', marginTop: '4px' }}>
-          <span className="title-md tnum">{totalCount}</span>
-          <Syringe className="ic muted" style={{ width: '20px', height: '20px' }} />
-        </div>
+    <div className="kpi-grid">
+      <div className="island kpi">
+        <span className="kpi-label">
+          <Syringe className="ic" />
+          Всего записей в реестре
+        </span>
+        <span className="kpi-value">{totalCount}</span>
+        <span className="kpi-sub">в журнале клиники</span>
       </div>
 
-      <div className="card" style={{ padding: '16px' }}>
-        <span className="small muted">Просрочено</span>
-        <div className="row between" style={{ alignItems: 'baseline', marginTop: '4px' }}>
-          <span
-            className="title-md tnum"
-            style={{ color: overdueCount > 0 ? 'var(--st-noshow-fg)' : undefined }}
-          >
-            {overdueCount}
-          </span>
+      <div className="island kpi">
+        <span className="kpi-label">
           <AlertTriangle
             className="ic"
-            style={{
-              width: '20px',
-              height: '20px',
-              color: overdueCount > 0 ? 'var(--st-noshow-fg)' : 'var(--muted-foreground)',
-            }}
+            style={{ color: overdueCount > 0 ? 'var(--st-noshow-fg)' : undefined }}
           />
-        </div>
+          Просрочено
+        </span>
+        <span
+          className="kpi-value"
+          style={{ color: overdueCount > 0 ? 'var(--st-noshow-fg)' : undefined }}
+        >
+          {overdueCount}
+        </span>
+        <span className="kpi-sub">требуется ревакцинация</span>
       </div>
 
-      <div className="card" style={{ padding: '16px' }}>
-        <span className="small muted">Срок в ближайшие 30 дней</span>
-        <div className="row between" style={{ alignItems: 'baseline', marginTop: '4px' }}>
-          <span
-            className="title-md tnum"
-            style={{ color: soonCount > 0 ? 'var(--st-pending-fg)' : undefined }}
-          >
-            {soonCount}
-          </span>
+      <div className="island kpi">
+        <span className="kpi-label">
           <Clock
             className="ic"
-            style={{
-              width: '20px',
-              height: '20px',
-              color: soonCount > 0 ? 'var(--st-pending-fg)' : 'var(--muted-foreground)',
-            }}
+            style={{ color: soonCount > 0 ? 'var(--st-pending-fg)' : undefined }}
           />
-        </div>
+          Срок в ближайшие 30 дней
+        </span>
+        <span
+          className="kpi-value"
+          style={{ color: soonCount > 0 ? 'var(--st-pending-fg)' : undefined }}
+        >
+          {soonCount}
+        </span>
+        <span className="kpi-sub">плановый период</span>
       </div>
     </div>
   );

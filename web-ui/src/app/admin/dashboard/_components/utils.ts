@@ -37,6 +37,7 @@ export function computeKpiStats(
   return {
     revenue: formatCurrency(rev),
     expected: formatCurrency(exp),
+    totalPossible: formatCurrency(totalPossible),
     recvW,
     expW,
     recvPct,
@@ -51,14 +52,16 @@ export function computeKpiStats(
         value: pct(cancelled, total),
         count: `${cancelled} ${pluralRu(cancelled, 'запись', 'записи', 'записей')}`,
         w: total ? `${((cancelled / total) * 100).toFixed(1)}%` : '0%',
-        color: ST_COLORS.CANCELLED,
+        color: 'oklch(0.68 0.16 32)', // Мягкий терракотовый
+        countNum: cancelled,
       },
       {
         label: 'Неявки',
         value: pct(noShow, total),
         count: `${noShow} ${pluralRu(noShow, 'запись', 'записи', 'записей')}`,
         w: total ? `${((noShow / total) * 100).toFixed(1)}%` : '0%',
-        color: ST_COLORS.NO_SHOW,
+        color: 'oklch(0.74 0.14 58)', // Тёплый персиковый
+        countNum: noShow,
       },
       {
         label: 'Повторные приёмы',
@@ -66,6 +69,7 @@ export function computeKpiStats(
         count: `${followUps} ${pluralRu(followUps, 'запись', 'записи', 'записей')}`,
         w: total ? `${((followUps / total) * 100).toFixed(1)}%` : '0%',
         color: 'var(--primary)',
+        countNum: followUps,
       },
     ],
     newClients,

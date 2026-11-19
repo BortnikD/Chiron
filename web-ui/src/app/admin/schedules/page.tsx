@@ -31,8 +31,11 @@ function AdminSchedulesContent() {
     if (s.activeTab === 'sched') {
       return s.selectedVetId ? s.selectedVetName : undefined;
     }
-    return s.excVetName || undefined;
-  }, [s.activeTab, s.selectedVetId, s.selectedVetName, s.excVetName]);
+    if (s.excVetFilter && s.excVetFilter !== 'ALL') {
+      return s.excVetName || undefined;
+    }
+    return undefined;
+  }, [s.activeTab, s.selectedVetId, s.selectedVetName, s.excVetFilter, s.excVetName]);
 
   useShellHeader({
     crumbGroup: 'Персонал',
@@ -43,7 +46,7 @@ function AdminSchedulesContent() {
 
   return (
     <>
-      <div className="content-col grow" style={{ gap: '10px' }}>
+      <div className={s.activeTab === 'exc' ? 'scroll-col grow' : 'content-col grow'} style={{ gap: '10px' }}>
         {s.error && (
           <div className="alert alert-destructive" role="alert" style={{ alignItems: 'center' }}>
             <AlertCircle className="ic" />
@@ -55,7 +58,7 @@ function AdminSchedulesContent() {
           </div>
         )}
 
-        <section className="island" style={{ padding: '8px 16px' }}>
+        <section className="island" style={{ padding: '8px 16px', flex: 'none' }}>
           <div className="seg" role="tablist" aria-label="Разделы расписания">
             <button
               type="button"

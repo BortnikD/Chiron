@@ -28,12 +28,18 @@ export function useVetAppointmentActions(options: {
   const { toast } = useToast();
 
   const handleUpdateStatus = useCallback(
-    async (apptId: string, status: AppointmentStatus, cancelReason?: string | null) => {
+    async (
+      apptId: string,
+      status: AppointmentStatus,
+      cancelReason?: string | null,
+      performedServiceIds?: string[]
+    ) => {
       onStatusError?.(null);
       try {
         const updated = await vetApi.updateAppointment(apptId, {
           status,
           ...(status === 'CANCELLED' ? { cancelReason: cancelReason ?? null } : {}),
+          ...(performedServiceIds ? { performedServiceIds } : {}),
         });
         const freshItems = await reloadAppointments(true);
         if (!isMountedRef.current) return;

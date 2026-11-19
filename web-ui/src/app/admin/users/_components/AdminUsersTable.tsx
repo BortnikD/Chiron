@@ -3,8 +3,8 @@
 import React, { useMemo } from 'react';
 import { Users } from 'lucide-react';
 import type { User } from '@/shared/types';
-import { DataTable, type DataTableColumn, type PaginationFooterProps } from '@/shared/components';
-import { USER_ROLE_META, formatDateShort, formatPhoneDisplay, getUserInitials } from '@/shared/lib';
+import { DataTable, UserRoleBadge, type DataTableColumn, type PaginationFooterProps } from '@/shared/components';
+import { formatDateShort, formatPhoneDisplay, formatUserFullName, getUserInitials } from '@/shared/lib';
 
 export interface AdminUsersTableProps {
   users: User[];
@@ -47,7 +47,7 @@ export const AdminUsersTable: React.FC<AdminUsersTableProps> = ({
             <span className={`t-ava sm round tone-${u.role}`}>
               {getUserInitials(u, 'ПЛ')}
             </span>
-            <span className="cell-main">{u.fullName || `${u.firstName} ${u.lastName}`}</span>
+            <span className="cell-main">{formatUserFullName(u)}</span>
           </span>
         ),
       },
@@ -71,10 +71,7 @@ export const AdminUsersTable: React.FC<AdminUsersTableProps> = ({
         key: 'role',
         title: 'Роль',
         width: '0.9fr',
-        render: (u) => {
-          const rInfo = USER_ROLE_META[u.role] || { label: u.role, cls: 'badge-outline' };
-          return <span className={`t-badge tone-${u.role}`}>{rInfo.label}</span>;
-        },
+        render: (u) => <UserRoleBadge role={u.role} />,
       },
       {
         key: 'created',

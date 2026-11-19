@@ -1644,7 +1644,28 @@ export interface components {
             /** Format: uuid */
             id: string;
             /** @enum {string} */
-            type: "APPOINTMENT_BOOKED" | "APPOINTMENT_CONFIRMED" | "APPOINTMENT_CANCELLED" | "APPOINTMENT_RESCHEDULED" | "APPOINTMENT_NO_SHOW" | "FOLLOW_UP_SCHEDULED" | "APPOINTMENT_REMINDER" | "VACCINATION_DUE";
+            type:
+                | "APPOINTMENT_BOOKED"
+                | "APPOINTMENT_CONFIRMED"
+                | "APPOINTMENT_CANCELLED"
+                | "APPOINTMENT_RESCHEDULED"
+                | "APPOINTMENT_NO_SHOW"
+                | "APPOINTMENT_COMPLETED"
+                | "APPOINTMENT_NOTES_UPDATED"
+                | "SCHEDULE_CONFLICT"
+                | "FOLLOW_UP_SCHEDULED"
+                | "APPOINTMENT_REMINDER"
+                | "VACCINATION_DUE"
+                | "VACCINATION_OVERDUE"
+                | "VACCINATION_CREATED"
+                | "VACCINATION_UPDATED"
+                | "VACCINATION_DELETED"
+                | "ACCOUNT_UPDATED"
+                | "PASSWORD_CHANGED"
+                | "PET_UPDATED"
+                | "PET_ARCHIVED"
+                | "PET_RESTORED"
+                | "ADMIN_MESSAGE";
             title: string;
             body: string;
             /** Format: uuid */
@@ -1679,6 +1700,7 @@ export interface components {
             /** @enum {string} */
             gender?: "MALE" | "FEMALE";
             notes?: string | null;
+            breed?: string | null;
         };
         ApiResponsePetResponse: {
             success: boolean;
@@ -1711,6 +1733,7 @@ export interface components {
             /** Format: date-time */
             updatedAt: string;
             archived: boolean;
+            breed: string | null;
         };
         ClientCreateAppointmentRequest: {
             /** Format: uuid */
@@ -1878,6 +1901,8 @@ export interface components {
         };
         CreateSpeciesRequest: {
             name: string;
+            color?: string | null;
+            iconKey?: string | null;
         };
         ApiResponseSpeciesResponse: {
             success: boolean;
@@ -1890,10 +1915,13 @@ export interface components {
             /** Format: uuid */
             id: string;
             name: string;
+            color: string | null;
+            iconKey: string | null;
         };
         CreateSpecializationRequest: {
             name: string;
             description?: string;
+            color?: string | null;
         };
         ApiResponseSpecializationResponse: {
             success: boolean;
@@ -1907,6 +1935,7 @@ export interface components {
             id: string;
             name: string;
             description: string;
+            color: string | null;
         };
         CreateServiceRequest: {
             /** Format: uuid */
@@ -2028,6 +2057,7 @@ export interface components {
             /** @enum {string} */
             gender?: "MALE" | "FEMALE";
             notes?: string | null;
+            breed?: string | null;
         };
         CreateAppointmentRequest: {
             /** Format: uuid */
@@ -2085,6 +2115,7 @@ export interface components {
             gender: "MALE" | "FEMALE" | null;
             notes: string | null;
             archived: boolean;
+            breed?: string | null;
         };
         UpdateWorkScheduleRequest: {
             /** Format: time-local */
@@ -2105,11 +2136,14 @@ export interface components {
             active: boolean;
         };
         UpdateSpeciesRequest: {
-            name: string | null;
+            name?: string | null;
+            color?: string | null;
+            iconKey?: string | null;
         };
         UpdateSpecializationRequest: {
-            name: string | null;
-            description: string | null;
+            name?: string | null;
+            description?: string | null;
+            color?: string | null;
         };
         UpdateServiceSpeciesRequest: {
             /** Format: int32 */
@@ -2363,6 +2397,7 @@ export interface components {
             /** Format: date-time */
             updatedAt: string;
             archived: boolean;
+            breed: string | null;
             summary: components["schemas"]["PetSummaryResponse"] | null;
         };
         PetNextAppointmentResponse: {

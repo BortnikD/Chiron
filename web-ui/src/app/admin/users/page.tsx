@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { AlertCircle, Stethoscope } from 'lucide-react';
 import { useShellHeader } from '@/components/layout/AppShell';
 import { ConfirmModal } from '@/shared/components';
+import { formatUserFullName } from '@/shared/lib';
 import { useAdminUsers } from './_hooks/useAdminUsers';
 import { AdminUsersFilters } from './_components/AdminUsersFilters';
 import { AdminUsersTable } from './_components/AdminUsersTable';
@@ -15,7 +16,7 @@ import { AdminEditUserModal } from './_components/AdminEditUserModal';
 function AdminUsersContent() {
   const vm = useAdminUsers();
   const selectedName = vm.selectedUser
-    ? vm.selectedUser.fullName || `${vm.selectedUser.firstName} ${vm.selectedUser.lastName}`
+    ? formatUserFullName(vm.selectedUser)
     : undefined;
 
   useShellHeader({

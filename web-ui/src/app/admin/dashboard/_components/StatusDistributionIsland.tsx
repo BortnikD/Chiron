@@ -1,90 +1,203 @@
 'use client';
 
-import React, { useMemo } from 'react';
-import { StatusDistributionIslandProps } from './types';
+import React, { useState, useMemo } from 'react';
+import type { StatusDistributionIslandProps } from './types';
 
-export function StatusDistributionIsland({ stats }: StatusDistributionIslandProps) {
-  // Donut conic gradient string
-  const donutGradient = useMemo(() => {
-    if (!stats.total) return 'var(--muted)';
+export const StatusDistributionIsland = React.memo(function StatusDistributionIsland({ stats }: StatusDistributionIslandProps) {
+  const [hoveredLabel, setHoveredLabel] = useState<string | null>(null);
+
+  const radius = 54;
+  const circumference = 2 * Math.PI * radius;
+
+  // Рассчитываем SVG-сегменты с четкими стыками (без круглых наплывов)
+  const segments = useMemo(() => {
+    if (!stats.total || stats.total === 0) return [];
     let acc = 0;
-    const total = stats.total;
-    const segs = stats.byStatus.map((item) => {
-      const from = acc;
-      acc += (item.count / total) * 100;
-      return `${item.color} ${from.toFixed(2)}% ${acc.toFixed(2)}%`;
+    const gap = stats.byStatus.filter((s) => s.count > 0).length > 1 ? 2 : 0;
+
+    return stats.byStatus.map((item) => {
+      const pctValue = (item.count / stats.total) * 100;
+      const strokeLength = (pctValue / 100) * circumference;
+      const strokeOffset = -(acc / 100) * circumference;
+      acc += pctValue;
+      return {
+        ...item,
+        pctValue,
+        strokeLength: Math.max(0.5, strokeLength - gap),
+        strokeOffset,
+      };
     });
-    return `conic-gradient(${segs.join(', ')})`;
-  }, [stats]);
+  }, [stats, circumference]);
+
+  const activeItem = useMemo(() => {
+    if (!hoveredLabel) return null;
+    return segments.find((s) => s.label === hoveredLabel) || null;
+  }, [hoveredLabel, segments]);
 
   return (
     <section className="island" aria-label="Записи по статусам">
       <div className="island-head">
         <span className="island-title">Записи по статусам</span>
       </div>
+
       <div className="island-body">
-        <div className="row" style={{ gap: '18px', alignItems: 'center', flexWrap: 'wrap' }}>
-          {/* Conic gradient Donut */}
+        <div className="row" style={{ gap: '20px', alignItems: 'center', flexWrap: 'wrap' }}>
+          {/* Четкий интерактивный SVG Donut Chart */}
           <div
             style={{
+              position: 'relative',
               width: '148px',
               height: '148px',
-              borderRadius: '50%',
-              background: donutGradient,
+              flex: 'none',
               display: 'grid',
               placeItems: 'center',
-              flex: 'none',
             }}
-            role="img"
-            aria-label="Распределение записей по статусам"
           >
+            <svg
+              width="148"
+              height="148"
+              viewBox="0 0 148 148"
+              style={{ transform: 'rotate(-90deg)', overflow: 'visible' }}
+            >
+              {segments.length === 0 ? (
+                <circle
+                  cx="74"
+                  cy="74"
+                  r={radius}
+                  fill="none"
+                  stroke="var(--muted)"
+                  strokeWidth="18"
+                />
+              ) : (
+                segments.map((s) => {
+                  const isHovered = hoveredLabel === s.label;
+                  return (
+                    <circle
+                      key={s.label}
+                      cx="74"
+                      cy="74"
+                      r={radius}
+                      fill="none"
+                      stroke={s.color}
+                      strokeWidth={isHovered ? 24 : 18}
+                      strokeDasharray={`${s.strokeLength} ${circumference}`}
+                      strokeDashoffset={s.strokeOffset}
+                      strokeLinecap="butt"
+                      style={{
+                        cursor: 'pointer',
+                        transition: 'stroke-width 0.15s ease, opacity 0.15s ease',
+                        opacity: hoveredLabel && !isHovered ? 0.35 : 1,
+                      }}
+                      onMouseEnter={() => setHoveredLabel(s.label)}
+                      onMouseLeave={() => setHoveredLabel(null)}
+                    />
+                  );
+                })
+              )}
+            </svg>
+
+            {/* Центр кольца: информативно отображает наведённый статус */}
             <div
               style={{
-                width: '96px',
-                height: '96px',
+                position: 'absolute',
+                width: '88px',
+                height: '88px',
                 borderRadius: '50%',
                 background: 'var(--card)',
-                display: 'grid',
-                placeItems: 'center',
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                justifyContent: 'center',
                 textAlign: 'center',
+                pointerEvents: 'none',
               }}
             >
-              <div className="col" style={{ gap: 0, alignItems: 'center' }}>
-                <span className="kpi-value" style={{ fontSize: '22px' }}>
-                  {stats.total}
-                </span>
-                <span className="small muted">записей</span>
-              </div>
+              {activeItem ? (
+                <div className="col" style={{ gap: '1px', alignItems: 'center' }}>
+                  <span
+                    style={{
+                      fontSize: '22px',
+                      color: activeItem.color,
+                      fontWeight: 750,
+                      lineHeight: 1,
+                    }}
+                  >
+                    {activeItem.count}
+                  </span>
+                  <span
+                    style={{
+                      fontSize: '11px',
+                      fontWeight: 650,
+                      color: 'var(--foreground)',
+                      maxWidth: '80px',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap',
+                    }}
+                  >
+                    {activeItem.label}
+                  </span>
+                  <span className="small muted" style={{ fontSize: '10.5px' }}>
+                    {activeItem.pct}
+                  </span>
+                </div>
+              ) : (
+                <div className="col" style={{ gap: 0, alignItems: 'center' }}>
+                  <span className="kpi-value" style={{ fontSize: '22px' }}>
+                    {stats.total}
+                  </span>
+                  <span className="small muted" style={{ fontSize: '11.5px' }}>записей</span>
+                </div>
+              )}
             </div>
           </div>
 
-          {/* Статусы справа */}
-          <div className="col" style={{ gap: '8px', flex: 1, minWidth: '140px' }}>
-            {stats.byStatus.map((b) => (
-              <div key={b.label} className="row between small">
-                <span className="row" style={{ gap: '8px', alignItems: 'center' }}>
-                  <i
-                    style={{
-                      width: '10px',
-                      height: '10px',
-                      borderRadius: '3px',
-                      background: b.color,
-                      display: 'inline-block',
-                    }}
-                  />
-                  <span>{b.label}</span>
-                </span>
-                <span className="tnum cell-main">
-                  {b.count}{' '}
-                  <span className="muted" style={{ fontWeight: 400 }}>
-                    {b.pct}
+          {/* Легенда статусов справа — ничего не перекрывается */}
+          <div className="col" style={{ gap: '6px', flex: 1, minWidth: '150px' }}>
+            {segments.map((b) => {
+              const isHovered = hoveredLabel === b.label;
+              return (
+                <div
+                  key={b.label}
+                  className="row between small"
+                  style={{
+                    padding: '4px 8px',
+                    borderRadius: '6px',
+                    cursor: 'pointer',
+                    transition: 'background 0.12s ease',
+                    background: isHovered
+                      ? 'color-mix(in srgb, var(--primary) 12%, var(--muted))'
+                      : 'transparent',
+                  }}
+                  onMouseEnter={() => setHoveredLabel(b.label)}
+                  onMouseLeave={() => setHoveredLabel(null)}
+                >
+                  <span className="row" style={{ gap: '8px', alignItems: 'center' }}>
+                    <i
+                      style={{
+                        width: '10px',
+                        height: '10px',
+                        borderRadius: '3px',
+                        background: b.color,
+                        display: 'inline-block',
+                        transform: isHovered ? 'scale(1.25)' : 'none',
+                        transition: 'transform 0.12s ease',
+                      }}
+                    />
+                    <span style={{ fontWeight: isHovered ? 650 : 500 }}>{b.label}</span>
                   </span>
-                </span>
-              </div>
-            ))}
+                  <span className="tnum cell-main" style={{ fontWeight: isHovered ? 700 : 500 }}>
+                    {b.count}{' '}
+                    <span className="muted" style={{ fontWeight: 400 }}>
+                      {b.pct}
+                    </span>
+                  </span>
+                </div>
+              );
+            })}
           </div>
         </div>
       </div>
     </section>
   );
-}
+});

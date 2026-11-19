@@ -302,7 +302,7 @@ export function AppTopbar({
               Настройки
             </Link>
 
-            <Link href="/" className="menu-item" onClick={onCloseUserMenu}>
+            <Link href="/about" className="menu-item" onClick={onCloseUserMenu}>
               <Info className="ic" />
               О клинике
             </Link>

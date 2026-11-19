@@ -77,11 +77,20 @@ export function VetPatientDetailIsland({
             iconSize={20}
             variant="full"
             className={`t-ava tone-${tone} detail-head-ava`}
+            style={
+              patient.species?.color
+                ? ({
+                    '--tone': patient.species.color,
+                  } as React.CSSProperties)
+                : undefined
+            }
           />
           <div className="col" style={{ gap: 0 }}>
             <span className="h2">{patient.name}</span>
             <span className="cell-sub">
-              {speciesName} · {patient.gender === 'MALE' ? 'Самец' : 'Самка'} ·{' '}
+              {speciesName}
+              {patient.breed ? ` (${patient.breed})` : ''} ·{' '}
+              {patient.gender === 'MALE' ? 'Самец' : 'Самка'} ·{' '}
               {calculateAgeRu(patient.birthDate)}
             </span>
           </div>
@@ -132,6 +141,12 @@ export function VetPatientDetailIsland({
             <dl className="kv" style={{ margin: 0 }}>
               <dt>Вид</dt>
               <dd>{speciesName}</dd>
+              {patient.breed && (
+                <>
+                  <dt>Порода</dt>
+                  <dd>{patient.breed}</dd>
+                </>
+              )}
               <dt>Пол</dt>
               <dd>{patient.gender === 'MALE' ? 'Самец' : 'Самка'}</dd>
               <dt>Дата рождения</dt>

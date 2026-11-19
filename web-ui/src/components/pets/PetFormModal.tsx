@@ -27,6 +27,7 @@ export interface PetFormData {
   birthDate?: string | null;
   weightKg?: number | null;
   notes?: string | null;
+  breed?: string | null;
   isArchived?: boolean;
 }
 
@@ -42,12 +43,17 @@ export interface PetFormModalProps {
   onDeletePhoto?: (petId: string) => Promise<void>;
 }
 
+const EMPTY_USERS: User[] = [];
+
+const normalizeGender = (g?: string | null): Gender =>
+  String(g || '').toUpperCase() === 'FEMALE' ? 'FEMALE' : 'MALE';
+
 export const PetFormModal: React.FC<PetFormModalProps> = ({
   isOpen,
   mode,
   pet,
   speciesList,
-  users = [],
+  users = EMPTY_USERS,
   onClose,
   onSubmit,
   onUploadPhoto,
@@ -62,6 +68,7 @@ export const PetFormModal: React.FC<PetFormModalProps> = ({
   const [gender, setGender] = useState<Gender>('MALE');
   const [birthDate, setBirthDate] = useState('');
   const [weightKg, setWeightKg] = useState('');
+  const [breed, setBreed] = useState('');
   const [notes, setNotes] = useState('');
   const [isArchived, setIsArchived] = useState(false);
   const [pendingPhotoFile, setPendingPhotoFile] = useState<File | null>(null);
@@ -91,9 +98,10 @@ export const PetFormModal: React.FC<PetFormModalProps> = ({
       setName(pet.name || '');
       setOwnerId(pet.ownerId || '');
       setSpeciesId(pet.speciesId || speciesList[0]?.id || '');
-      setGender(pet.gender || 'MALE');
+      setGender(normalizeGender(pet.gender));
       setBirthDate(pet.birthDate ? pet.birthDate.slice(0, 10) : '');
       setWeightKg(pet.weightKg != null ? String(pet.weightKg) : '');
+      setBreed(pet.breed || '');
       setNotes(pet.notes || '');
       setIsArchived(Boolean(pet.isArchived ?? pet.archived));
       setPendingPhotoFile(null);
@@ -106,12 +114,20 @@ export const PetFormModal: React.FC<PetFormModalProps> = ({
       setGender('MALE');
       setBirthDate('');
       setWeightKg('');
+      setBreed('');
       setNotes('');
       setIsArchived(false);
       setPendingPhotoFile(null);
     }
     setError(null);
-  }, [isOpen, pet, speciesList, users]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen, pet?.id]);
+
+  useEffect(() => {
+    if (isOpen && !speciesId && speciesList.length > 0) {
+      setSpeciesId(pet?.speciesId || speciesList[0].id);
+    }
+  }, [isOpen, speciesId, speciesList, pet?.speciesId]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -158,6 +174,7 @@ export const PetFormModal: React.FC<PetFormModalProps> = ({
         birthDate: birthDate || null,
         weightKg: parsedWeight,
         notes: notes.trim() || null,
+        breed: breed.trim() || null,
         isArchived,
       };
 
@@ -169,6 +186,7 @@ export const PetFormModal: React.FC<PetFormModalProps> = ({
           birthDate: pet.birthDate ? pet.birthDate.slice(0, 10) : null,
           weightKg: pet.weightKg != null ? pet.weightKg : null,
           notes: pet.notes || null,
+          breed: pet.breed || null,
           isArchived: Boolean(pet.isArchived ?? pet.archived),
         };
         const current = {
@@ -178,6 +196,7 @@ export const PetFormModal: React.FC<PetFormModalProps> = ({
           birthDate: birthDate || null,
           weightKg: parsedWeight,
           notes: notes.trim() || null,
+          breed: breed.trim() || null,
           isArchived,
         };
         const patch = buildPatchPayload(initial, current);
@@ -299,18 +318,52 @@ export const PetFormModal: React.FC<PetFormModalProps> = ({
             </div>
           </div>
 
+          {/* Порода */}
+          <div className="field">
+            <label className="field-label" htmlFor="pet-breed">
+              Порода <span className="small muted" style={{ fontWeight: 'normal' }}>(необязательно)</span>
+            </label>
+            <input
+              id="pet-breed"
+              type="text"
+              className="input"
+              value={breed}
+              onChange={(e) => setBreed(e.target.value)}
+              placeholder="Например: Мейн-кун, Золотистый ретривер"
+              maxLength={100}
+              disabled={saving}
+            />
+          </div>
+
           {/* Пол, Вес, Дата рождения */}
           <div className="form-grid" style={{ gridTemplateColumns: 'repeat(3, minmax(0, 1fr))' }}>
             <div className="field">
               <label className="field-label">
                 Пол <span className="req">*</span>
               </label>
-              <div className="seg" role="radiogroup">
+              <div
+                className="seg"
+                role="radiogroup"
+                aria-label="Пол питомца"
+                style={{
+                  display: 'flex',
+                  height: '36px',
+                  boxSizing: 'border-box',
+                  padding: '3px',
+                  width: '100%',
+                }}
+              >
                 <button
                   type="button"
                   role="radio"
                   aria-checked={gender === 'MALE'}
-                  className={`seg-btn ${gender === 'MALE' ? 'active' : ''}`}
+                  className={`seg-item ${gender === 'MALE' ? 'on' : ''}`}
+                  style={{
+                    flex: 1,
+                    justifyContent: 'center',
+                    cursor: saving ? 'not-allowed' : 'pointer',
+                    userSelect: 'none',
+                  }}
                   onClick={() => setGender('MALE')}
                   disabled={saving}
                 >
@@ -320,7 +373,13 @@ export const PetFormModal: React.FC<PetFormModalProps> = ({
                   type="button"
                   role="radio"
                   aria-checked={gender === 'FEMALE'}
-                  className={`seg-btn ${gender === 'FEMALE' ? 'active' : ''}`}
+                  className={`seg-item ${gender === 'FEMALE' ? 'on' : ''}`}
+                  style={{
+                    flex: 1,
+                    justifyContent: 'center',
+                    cursor: saving ? 'not-allowed' : 'pointer',
+                    userSelect: 'none',
+                  }}
                   onClick={() => setGender('FEMALE')}
                   disabled={saving}
                 >

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { AlertCircle } from 'lucide-react';
 import type { Pet } from '@/modules/client/types';
 import type { Service, AvailableSlotResponse } from '@/modules/clinic/types';
@@ -8,6 +8,9 @@ export interface StepConfirmationProps {
   pet: Pet | null;
   speciesName: string;
   service: Service | null;
+  selectedServices?: Service[];
+  servicePrice?: number | null;
+  serviceDurationMin?: number | null;
   doctorDisplay: string;
   selectedSlot: AvailableSlotResponse | null;
   comment: string;
@@ -42,16 +45,50 @@ export const StepConfirmation: React.FC<StepConfirmationProps> = ({
   pet,
   speciesName,
   service,
+  selectedServices = [],
+  servicePrice,
+  serviceDurationMin,
   doctorDisplay,
   selectedSlot,
   comment,
   onCommentChange,
   isVaccination = false,
 }) => {
-  const effectivePrice = service?.effectivePrice ?? service?.basePrice ?? service?.price;
-  const whenLabel = selectedSlot
-    ? `${formatDateShort(selectedSlot.startAt)}, ${formatSlotTime(selectedSlot.startAt)}–${formatSlotTime(selectedSlot.endAt)}`
-    : '—';
+  const isMulti = selectedServices.length > 1;
+  const totalPrice =
+    servicePrice ??
+    (isMulti
+      ? selectedServices.reduce(
+          (sum, s) => sum + (s.effectivePrice ?? s.basePrice ?? s.price ?? 0),
+          0
+        )
+      : service?.effectivePrice ?? service?.basePrice ?? service?.price);
+
+  const totalDuration =
+    serviceDurationMin ??
+    (isMulti
+      ? selectedServices.reduce(
+          (sum, s) =>
+            sum + (s.effectiveDurationMin ?? s.baseDurationMin ?? s.durationMin ?? 30),
+          0
+        )
+      : service?.effectiveDurationMin ?? service?.baseDurationMin ?? service?.durationMin);
+
+  const whenLabel = useMemo(() => {
+    if (!selectedSlot) return '—';
+    const startStr = formatSlotTime(selectedSlot.startAt);
+    let endStr = formatSlotTime(selectedSlot.endAt);
+    if (totalDuration && selectedSlot.startAt) {
+      const startMs = new Date(selectedSlot.startAt).getTime();
+      const endMs = new Date(selectedSlot.endAt).getTime();
+      const slotDurMin = Math.round((endMs - startMs) / 60000);
+      if (slotDurMin !== totalDuration) {
+        const expectedEndMs = startMs + totalDuration * 60000;
+        endStr = formatSlotTime(new Date(expectedEndMs).toISOString());
+      }
+    }
+    return `${formatDateShort(selectedSlot.startAt)}, ${startStr}–${endStr}`;
+  }, [selectedSlot, totalDuration]);
   const activePreset = isVaccination ? getSelectedVaccinePreset(comment) : null;
 
   return (
@@ -60,15 +97,55 @@ export const StepConfirmation: React.FC<StepConfirmationProps> = ({
       <dl className="kv" style={{ margin: 0 }}>
         <dt>Питомец</dt>
         <dd>{pet ? `${pet.name}${speciesName ? ` · ${speciesName}` : ''}` : '—'}</dd>
-        <dt>Услуга</dt>
-        <dd>{service?.name || '—'}</dd>
+
+        <dt>{isMulti ? `Услуги (${selectedServices.length})` : 'Услуга'}</dt>
+        <dd>
+          {isMulti ? (
+            <div className="col" style={{ gap: '6px', width: '100%' }}>
+              {selectedServices.map((s, idx) => (
+                <div
+                  key={s.id}
+                  className="row between"
+                  style={{
+                    gap: '12px',
+                    padding: '6px 10px',
+                    backgroundColor: 'var(--card-subtle, rgba(255, 255, 255, 0.03))',
+                    borderRadius: '6px',
+                    border: '1px solid var(--border)',
+                  }}
+                >
+                  <span style={{ fontSize: '13px' }}>
+                    <b style={{ marginRight: '6px', color: 'var(--primary-text, var(--primary))' }}>
+                      {idx + 1}.
+                    </b>
+                    {s.name}
+                  </span>
+                  <span className="tnum" style={{ fontSize: '13px', fontWeight: 600 }}>
+                    {formatCurrency(s.effectivePrice ?? s.basePrice ?? s.price ?? 0)}
+                  </span>
+                </div>
+              ))}
+            </div>
+          ) : (
+            service?.name || '—'
+          )}
+        </dd>
+
         <dt>Врач</dt>
         <dd>{doctorDisplay}</dd>
+
         <dt>Дата и время</dt>
         <dd className="tnum">{whenLabel}</dd>
-        <dt>Стоимость</dt>
-        <dd className="cell-main tnum">
-          {effectivePrice != null ? formatCurrency(effectivePrice) : '—'}
+
+        <dt>Длительность</dt>
+        <dd className="tnum">{totalDuration ? `${totalDuration} мин` : '—'}</dd>
+
+        <dt>Итоговая стоимость</dt>
+        <dd
+          className="cell-main tnum"
+          style={{ fontSize: '18px', fontWeight: 700, color: 'var(--primary)' }}
+        >
+          {totalPrice != null ? formatCurrency(totalPrice) : '—'}
         </dd>
       </dl>
 

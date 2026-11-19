@@ -7,6 +7,7 @@ import { useVetDashboard } from './_hooks/useVetDashboard';
 import { VetDayTimelineIsland } from './_components/VetDayTimelineIsland';
 import { VetDashboardSideColumn } from './_components/VetDashboardSideColumn';
 import { VetActiveAppointmentDrawer } from './_components/VetActiveAppointmentDrawer';
+import { VetDashboardSkeleton } from './_components/VetDashboardSkeleton';
 
 function VetDashboardContent() {
   const searchParams = useSearchParams();
@@ -38,6 +39,10 @@ function VetDashboardContent() {
     handleCreateFollowUp,
     handleCreateVaccination,
   } = useVetDashboard(initialSelId);
+
+  if (loading && appointments.length === 0) {
+    return <VetDashboardSkeleton />;
+  }
 
   return (
     <div className="content-col grow">
@@ -125,15 +130,7 @@ function VetDashboardContent() {
 
 export default function VetDashboardPage() {
   return (
-    <Suspense
-      fallback={
-        <div className="content-col grow">
-          <div className="island p-12 text-center text-xs text-[var(--muted-foreground)]">
-            Загрузка смены...
-          </div>
-        </div>
-      }
-    >
+    <Suspense fallback={<VetDashboardSkeleton />}>
       <VetDashboardContent />
     </Suspense>
   );
