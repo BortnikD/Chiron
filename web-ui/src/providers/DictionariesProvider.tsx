@@ -31,8 +31,10 @@ export interface DictionariesContextValue {
   petsRecordMap: Record<string, string>;
   loading: boolean;
   error: string | null;
+  failedKeys: DictionaryKey[];
   invalidateDictionaries: (keys?: DictionaryKey[]) => Promise<void>;
   refreshDictionaries: (keys?: DictionaryKey[]) => Promise<void>;
+  retryFailed: () => Promise<void>;
   upsertVeterinarian: (vet: VeterinarianResponse) => void;
   upsertService: (service: ServiceResponse) => void;
   upsertSpecies: (species: SpeciesResponse) => void;
@@ -89,51 +91,72 @@ export function DictionariesProvider({ children }: { children: React.ReactNode }
   const [pets, setPets] = useState<Pet[]>(() => memoryCache.pets || []);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [failedKeys, setFailedKeys] = useState<DictionaryKey[]>([]);
 
   const isMountedRef = useRef(true);
 
   const loadAll = useCallback(async (keysToFetch?: DictionaryKey[]) => {
     const keys = keysToFetch || ['species', 'specializations', 'services', 'veterinarians'];
     setLoading(true);
-    setError(null);
 
     try {
-      const promises: Promise<unknown>[] = [];
+      const tasks: { key: DictionaryKey; promise: Promise<void> }[] = [];
 
       if (keys.includes('species')) {
-        promises.push(
-          fetchDictionary('species', () => clinicApi.getSpecies()).then((res) => {
+        tasks.push({
+          key: 'species',
+          promise: fetchDictionary('species', () => clinicApi.getSpecies()).then((res) => {
             const list = Array.isArray(res) ? res : [];
             registerSpeciesColors(list);
             if (isMountedRef.current) setSpecies(list);
-          })
-        );
+          }),
+        });
       }
       if (keys.includes('specializations')) {
-        promises.push(
-          fetchDictionary('specializations', () => clinicApi.getSpecializations()).then((res) => {
+        tasks.push({
+          key: 'specializations',
+          promise: fetchDictionary('specializations', () => clinicApi.getSpecializations()).then((res) => {
             const list = Array.isArray(res) ? res : [];
             registerSpecializationColors(list);
             if (isMountedRef.current) setSpecializations(list);
-          })
-        );
+          }),
+        });
       }
       if (keys.includes('services')) {
-        promises.push(
-          fetchDictionary('services', () => clinicApi.getServices()).then((res) => {
+        tasks.push({
+          key: 'services',
+          promise: fetchDictionary('services', () => clinicApi.getServices()).then((res) => {
             if (isMountedRef.current) setServices(Array.isArray(res) ? res : []);
-          })
-        );
+          }),
+        });
       }
       if (keys.includes('veterinarians')) {
-        promises.push(
-          fetchDictionary('veterinarians', () => clinicApi.getVeterinarians()).then((res) => {
+        tasks.push({
+          key: 'veterinarians',
+          promise: fetchDictionary('veterinarians', () => clinicApi.getVeterinarians()).then((res) => {
             if (isMountedRef.current) setVeterinarians(Array.isArray(res) ? res : []);
-          })
-        );
+          }),
+        });
       }
 
-      await Promise.all(promises);
+      const results = await Promise.allSettled(tasks.map((t) => t.promise));
+      const newlyFailed: DictionaryKey[] = [];
+      results.forEach((res, idx) => {
+        if (res.status === 'rejected') {
+          newlyFailed.push(tasks[idx].key);
+        }
+      });
+
+      if (isMountedRef.current) {
+        setFailedKeys(newlyFailed);
+        if (newlyFailed.length === tasks.length && tasks.length > 0) {
+          setError('Не удалось загрузить данные клиники. Повторите попытку.');
+        } else if (newlyFailed.length > 0) {
+          setError('Часть данных клиники временно недоступна');
+        } else {
+          setError(null);
+        }
+      }
     } catch (err: unknown) {
       if (isMountedRef.current) {
         setError(err instanceof Error ? err.message : 'Ошибка загрузки справочников');
@@ -144,6 +167,14 @@ export function DictionariesProvider({ children }: { children: React.ReactNode }
       }
     }
   }, []);
+
+  const retryFailed = useCallback(async () => {
+    if (failedKeys.length === 0) {
+      await loadAll();
+    } else {
+      await loadAll(failedKeys);
+    }
+  }, [failedKeys, loadAll]);
 
   const invalidateDictionaries = useCallback(
     async (keys?: DictionaryKey[]) => {
@@ -327,8 +358,10 @@ export function DictionariesProvider({ children }: { children: React.ReactNode }
       petsRecordMap,
       loading,
       error,
+      failedKeys,
       invalidateDictionaries,
       refreshDictionaries,
+      retryFailed,
       upsertVeterinarian,
       upsertService,
       upsertSpecies,
@@ -353,8 +386,10 @@ export function DictionariesProvider({ children }: { children: React.ReactNode }
       petsRecordMap,
       loading,
       error,
+      failedKeys,
       invalidateDictionaries,
       refreshDictionaries,
+      retryFailed,
       upsertVeterinarian,
       upsertService,
       upsertSpecies,

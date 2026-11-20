@@ -6,6 +6,9 @@ import {
   CalendarCheck,
   CheckCheck,
   ChevronRight,
+  ChevronLeft,
+  ChevronDown,
+  ChevronUp,
   Stethoscope,
   X,
 } from 'lucide-react';
@@ -69,6 +72,24 @@ export const VetDashboardSideColumn: React.FC<VetDashboardSideColumnProps> = ({
   const visiblePending = showAllPending ? pendingAppointments : pendingAppointments.slice(0, 8);
   const [cancelTarget, setCancelTarget] = useState<Appointment | null>(null);
   const [cancelError, setCancelError] = useState<string | null>(null);
+  const [isCollapsed, setIsCollapsed] = useState<boolean>(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        return localStorage.getItem('vet-dashboard-side-collapsed') === 'true';
+      } catch {
+        return false;
+      }
+    }
+    return false;
+  });
+  const [isNextCollapsed, setIsNextCollapsed] = useState<boolean>(false);
+
+  const handleToggleCollapse = (collapsed: boolean) => {
+    setIsCollapsed(collapsed);
+    try {
+      localStorage.setItem('vet-dashboard-side-collapsed', String(collapsed));
+    } catch {}
+  };
 
   const nextPet = nextAppointment
     ? nextAppointment.pet || petsMap[nextAppointment.petId] || null
@@ -134,97 +155,253 @@ export const VetDashboardSideColumn: React.FC<VetDashboardSideColumnProps> = ({
     }
   };
 
+  if (isCollapsed) {
+    return (
+      <aside
+        className="island side-dock-rail"
+        aria-label="Боковая панель свернута"
+        onClick={() => handleToggleCollapse(false)}
+        title="Нажмите, чтобы развернуть панель"
+        style={{
+          width: '46px',
+          flex: 'none',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          gap: '14px',
+          padding: '12px 6px',
+          cursor: 'pointer',
+          borderRadius: 'var(--radius)',
+          border: '1px solid var(--border)',
+          background: 'var(--card)',
+          transition: 'background 0.15s ease',
+        }}
+      >
+        <button
+          type="button"
+          className="btn btn-ghost btn-icon btn-sm"
+          aria-label="Развернуть боковую панель"
+          onClick={(e) => {
+            e.stopPropagation();
+            handleToggleCollapse(false);
+          }}
+          title="Развернуть боковую панель"
+          style={{ width: '32px', height: '32px' }}
+        >
+          <ChevronLeft size={18} />
+        </button>
+
+        {pendingAppointments.length > 0 && (
+          <div
+            className="col items-center"
+            style={{ gap: '10px', width: '100%' }}
+            title={`Ожидают подтверждения: ${pendingAppointments.length}`}
+          >
+            <div
+              style={{
+                position: 'relative',
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                width: '32px',
+                height: '32px',
+                borderRadius: '8px',
+                background: 'color-mix(in srgb, var(--primary) 16%, transparent)',
+                color: 'var(--primary)',
+              }}
+            >
+              <CalendarCheck size={18} />
+              <span
+                style={{
+                  position: 'absolute',
+                  top: '-4px',
+                  right: '-4px',
+                  background: 'var(--primary)',
+                  color: 'var(--primary-foreground)',
+                  fontSize: '10px',
+                  fontWeight: 700,
+                  borderRadius: '999px',
+                  padding: '1px 5px',
+                  lineHeight: 1.2,
+                  boxShadow: '0 1px 3px rgba(0,0,0,0.35)',
+                }}
+              >
+                {pendingAppointments.length}
+              </span>
+            </div>
+            <span
+              style={{
+                writingMode: 'vertical-rl',
+                transform: 'rotate(180deg)',
+                fontSize: '11px',
+                fontWeight: 650,
+                color: 'var(--foreground)',
+                letterSpacing: '0.4px',
+                whiteSpace: 'nowrap',
+                marginTop: '6px',
+                opacity: 0.85,
+              }}
+            >
+              Ожидают подтверждения ({pendingAppointments.length})
+            </span>
+          </div>
+        )}
+
+        {nextAppointment && (
+          <div
+            className="col items-center"
+            style={{ gap: '6px', width: '100%', marginTop: 'auto' }}
+            title={`Ближайший приём: ${formatSlotTime(nextAppointment.startAt)} (${getPetName(nextAppointment, petsMap)})`}
+          >
+            <div
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                width: '32px',
+                height: '32px',
+                borderRadius: '8px',
+                background: 'var(--muted)',
+                color: 'var(--foreground)',
+              }}
+            >
+              <Stethoscope size={18} />
+            </div>
+            <span
+              style={{
+                writingMode: 'vertical-rl',
+                transform: 'rotate(180deg)',
+                fontSize: '11px',
+                fontWeight: 700,
+                color: 'var(--primary)',
+              }}
+            >
+              {formatSlotTime(nextAppointment.startAt)}
+            </span>
+          </div>
+        )}
+      </aside>
+    );
+  }
+
   return (
     <>
-      <div className="content-col w-full md:w-[340px] xl:w-[400px] flex-none">
+      <div className="content-col flex-none" style={{ width: '380px', maxWidth: '100%' }}>
         <section className="island" style={{ flex: 'none' }} aria-label="Ближайший приём">
           <div className="island-head">
-            <span className="island-title">
+            <span
+              className="island-title"
+              style={{ cursor: 'pointer', userSelect: 'none' }}
+              onClick={() => setIsNextCollapsed(!isNextCollapsed)}
+              title={isNextCollapsed ? 'Развернуть карточку' : 'Свернуть карточку'}
+            >
               <Stethoscope className="ic" />
               Ближайший приём
             </span>
-            <span className="small muted">{nextInLabel}</span>
+            <div className="row items-center" style={{ gap: '6px' }}>
+              {nextInLabel !== '—' && <span className="small muted">{nextInLabel}</span>}
+              <button
+                type="button"
+                className="btn btn-ghost btn-icon btn-sm"
+                aria-label={isNextCollapsed ? 'Развернуть ближайший приём' : 'Свернуть ближайший приём'}
+                title={isNextCollapsed ? 'Развернуть карточку' : 'Свернуть карточку'}
+                onClick={() => setIsNextCollapsed(!isNextCollapsed)}
+              >
+                {isNextCollapsed ? <ChevronDown size={15} /> : <ChevronUp size={15} />}
+              </button>
+              <button
+                type="button"
+                className="btn btn-ghost btn-icon btn-sm"
+                aria-label="Свернуть боковую панель"
+                title="Свернуть боковую панель"
+                onClick={() => handleToggleCollapse(true)}
+              >
+                <ChevronRight size={16} />
+              </button>
+            </div>
           </div>
 
-          {nextAppointment ? (
-            <div className="col" style={{ gap: '14px', padding: '0 16px 16px' }}>
-              <div className="row">
-                <PetAvatar
-                  pet={nextPet}
-                  tone={nextTone}
-                  species={nextTone}
-                  iconSize={26}
-                  variant="full"
-                  className={`t-ava tone-${nextTone}`}
-                  style={{ width: '56px', height: '56px', borderRadius: '16px' }}
-                />
-                <div className="col" style={{ gap: '2px' }}>
-                  <span style={{ fontSize: '20px', fontWeight: 650 }}>
-                    {getPetName(nextAppointment, petsMap)}
+          {!isNextCollapsed && (
+            nextAppointment ? (
+              <div className="col" style={{ gap: '14px', padding: '0 16px 16px' }}>
+                <div className="row">
+                  <PetAvatar
+                    pet={nextPet}
+                    tone={nextTone}
+                    species={nextTone}
+                    iconSize={26}
+                    variant="full"
+                    className={`t-ava tone-${nextTone}`}
+                    style={{ width: '56px', height: '56px', borderRadius: '16px' }}
+                  />
+                  <div className="col" style={{ gap: '2px' }}>
+                    <span style={{ fontSize: '20px', fontWeight: 650 }}>
+                      {getPetName(nextAppointment, petsMap)}
+                    </span>
+                    <span className="muted">
+                      {nextSpeciesName} · {calculateAgeRu(nextPet?.birthDate)} ·{' '}
+                      {formatWeightRu(nextPet?.weightKg)}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="row between">
+                  <span className="kpi-value accent" style={{ fontSize: '30px' }}>
+                    {formatSlotTime(nextAppointment.startAt)}
                   </span>
-                  <span className="muted">
-                    {nextSpeciesName} · {calculateAgeRu(nextPet?.birthDate)} ·{' '}
-                    {formatWeightRu(nextPet?.weightKg)}
+                  <span className={`badge st badge-${nextAppointment.status}`}>
+                    {APPOINTMENT_STATUS_META[nextAppointment.status]?.label || nextAppointment.status}
                   </span>
                 </div>
-              </div>
 
-              <div className="row between">
-                <span className="kpi-value accent" style={{ fontSize: '30px' }}>
-                  {formatSlotTime(nextAppointment.startAt)}
+                <span className="cell-main">
+                  {nextAppointment.serviceName ||
+                    nextAppointment.service?.name ||
+                    servicesMap[nextAppointment.serviceId] ||
+                    'Приём'}{' '}
+                  <span className="muted" style={{ fontWeight: 400 }}>
+                    · до {formatSlotTime(nextAppointment.endAt)}
+                  </span>
                 </span>
-                <span className={`badge st badge-${nextAppointment.status}`}>
-                  {APPOINTMENT_STATUS_META[nextAppointment.status]?.label || nextAppointment.status}
-                </span>
-              </div>
 
-              <span className="cell-main">
-                {nextAppointment.serviceName ||
-                  nextAppointment.service?.name ||
-                  servicesMap[nextAppointment.serviceId] ||
-                  'Приём'}{' '}
-                <span className="muted" style={{ fontWeight: 400 }}>
-                  · до {formatSlotTime(nextAppointment.endAt)}
-                </span>
-              </span>
+                {nextAppointment.clientComment && (
+                  <div className="note">«{nextAppointment.clientComment}»</div>
+                )}
 
-              {nextAppointment.clientComment && (
-                <div className="note">«{nextAppointment.clientComment}»</div>
-              )}
+                {nextPet?.notes && (
+                  <div className="alert alert-info">
+                    <AlertCircle className="ic" />
+                    <div>{nextPet.notes}</div>
+                  </div>
+                )}
 
-              {nextPet?.notes && (
-                <div className="alert alert-info">
-                  <AlertCircle className="ic" />
-                  <div>{nextPet.notes}</div>
-                </div>
-              )}
-
-              <div className="row wrap" style={{ gap: '6px' }}>
-                {nextActions.map((b) => (
+                <div className="row wrap" style={{ gap: '6px' }}>
+                  {nextActions.map((b) => (
+                    <button
+                      key={b.to}
+                      type="button"
+                      className={`btn ${b.cls}`}
+                      disabled={busyId === nextAppointment.id}
+                      onClick={() => void handleQuickStatus(nextAppointment, b.to)}
+                    >
+                      {b.label}
+                    </button>
+                  ))}
                   <button
-                    key={b.to}
                     type="button"
-                    className={`btn ${b.cls}`}
-                    disabled={busyId === nextAppointment.id}
-                    onClick={() => void handleQuickStatus(nextAppointment, b.to)}
+                    className="btn btn-ghost"
+                    onClick={() => onSelectAppointment(nextAppointment)}
                   >
-                    {b.label}
+                    Открыть
+                    <ChevronRight className="ic" />
                   </button>
-                ))}
-                <button
-                  type="button"
-                  className="btn btn-ghost"
-                  onClick={() => onSelectAppointment(nextAppointment)}
-                >
-                  Открыть
-                  <ChevronRight className="ic" />
-                </button>
+                </div>
               </div>
-            </div>
-          ) : (
-            <div className="empty" style={{ padding: '24px 16px' }}>
-              <span>{loading ? 'Загрузка…' : 'Ближайших приёмов на сегодня нет'}</span>
-            </div>
+            ) : (
+              <div className="empty" style={{ padding: '24px 16px' }}>
+                <span>{loading ? 'Загрузка…' : 'Ближайших приёмов на сегодня нет'}</span>
+              </div>
+            )
           )}
         </section>
 
@@ -235,6 +412,15 @@ export const VetDashboardSideColumn: React.FC<VetDashboardSideColumnProps> = ({
               Ожидают подтверждения{' '}
               <span className="count">{pendingAppointments.length}</span>
             </span>
+            <button
+              type="button"
+              className="btn btn-ghost btn-icon btn-sm"
+              aria-label="Свернуть боковую панель"
+              title="Свернуть боковую панель"
+              onClick={() => handleToggleCollapse(true)}
+            >
+              <ChevronRight size={16} />
+            </button>
           </div>
           <div className="island-body" style={{ padding: '0 8px 8px' }}>
             {pendingAppointments.length === 0 ? (

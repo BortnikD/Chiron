@@ -260,6 +260,7 @@ export function useClientAppointments(initialSelectedId?: string | null) {
     servicesMap,
     vetsMap,
     speciesMap,
+    speciesList,
     parentApptsMap,
     tab: resource.filters.tab,
     setTab,

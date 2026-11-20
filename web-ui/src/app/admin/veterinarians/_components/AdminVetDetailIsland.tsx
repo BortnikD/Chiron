@@ -93,6 +93,7 @@ export const AdminVetDetailIsland: React.FC<AdminVetDetailIslandProps> = ({
       .map((s) => ({
         value: s.id,
         label: s.name,
+        description: s.description || undefined,
         hint: s.description || undefined,
       }));
   }, [specializations, editForm.specializationIds]);
@@ -155,6 +156,15 @@ export const AdminVetDetailIsland: React.FC<AdminVetDetailIslandProps> = ({
 
   return (
     <section className="island detail-island" style={{ width: 460 }} aria-label="Врач">
+      <button
+        type="button"
+        className="detail-pinned-close"
+        aria-label="Закрыть"
+        onClick={onClose}
+      >
+        <X size={16} />
+      </button>
+
       <div className="island-head">
         <div className="row" style={{ alignItems: 'center', gap: 12 }}>
           <VetAvatar
@@ -185,14 +195,6 @@ export const AdminVetDetailIsland: React.FC<AdminVetDetailIslandProps> = ({
             </div>
           </div>
         </div>
-        <button
-          type="button"
-          className="btn btn-ghost btn-icon btn-sm"
-          aria-label="Закрыть"
-          onClick={onClose}
-        >
-          <X size={16} />
-        </button>
       </div>
 
       <div className="tabs-line">

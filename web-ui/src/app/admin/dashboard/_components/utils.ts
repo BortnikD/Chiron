@@ -8,6 +8,63 @@ export function pct(a: number, b: number): string {
   return `${(Math.round((a / b) * 1000) / 10).toString().replace('.', ',')}%`;
 }
 
+/**
+ * Расчёт длин дуг SVG Donut Chart с гарантированным минимальным размером
+ * для малых ненулевых долей (чтобы 0.4% или 1% не превращались в микро-щель в 0.5px,
+ * а оставались четко видимыми и кликабельными сегментами, сохраняя общую сумму в 360°).
+ */
+export function computeDonutArcs(
+  values: number[],
+  circumference: number,
+  minArc = 14
+): number[] {
+  const n = values.length;
+  const arcs = new Array(n).fill(0);
+  const active = values
+    .map((v, i) => ({ v: Math.max(0, v), i }))
+    .filter((e) => e.v > 0);
+
+  if (!active.length) return arcs;
+  if (active.length === 1) {
+    arcs[active[0].i] = circumference;
+    return arcs;
+  }
+
+  // Ограничиваем minArc, чтобы сумма минимальных дуг не превышала 40% длины окружности
+  const effectiveMin = Math.min(minArc, (circumference * 0.4) / active.length);
+  const pool = [...active];
+  let remC = circumference;
+  let remVal = pool.reduce((sum, e) => sum + e.v, 0);
+
+  // Итеративно выявляем сегменты, чья естественная доля меньше effectiveMin,
+  // фиксируем их на effectiveMin и пересчитываем оставшуюся длину окружности
+  while (pool.length > 0) {
+    let allocated = false;
+    for (let idx = pool.length - 1; idx >= 0; idx--) {
+      const e = pool[idx];
+      const prop = (e.v / remVal) * remC;
+      if (prop < effectiveMin) {
+        arcs[e.i] = effectiveMin;
+        remC -= effectiveMin;
+        remVal -= e.v;
+        pool.splice(idx, 1);
+        allocated = true;
+        break;
+      }
+    }
+    if (!allocated) break;
+  }
+
+  // Оставшуюся длину окружности пропорционально распределяем между крупными сегментами
+  if (pool.length > 0 && remVal > 0) {
+    for (const e of pool) {
+      arcs[e.i] = (e.v / remVal) * remC;
+    }
+  }
+
+  return arcs;
+}
+
 export function computeKpiStats(
   overview: OverviewStatistics | null,
   clientsTotal = 0,

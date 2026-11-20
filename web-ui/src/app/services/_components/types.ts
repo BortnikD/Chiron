@@ -32,8 +32,10 @@ export interface ServicesGridProps {
   specsMap: Record<string, string>;
   specializations?: Specialization[];
   loading?: boolean;
+  error?: string | null;
   hasFilters?: boolean;
   onReset?: () => void;
+  onReload?: () => void;
   isAuthenticated?: boolean;
 }
 

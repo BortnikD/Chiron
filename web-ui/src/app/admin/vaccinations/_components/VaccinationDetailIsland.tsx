@@ -49,6 +49,15 @@ export const VaccinationDetailIsland: React.FC<VaccinationDetailIslandProps> = (
 
   return (
     <section className="island detail-island" aria-label="Детали вакцинации">
+      <button
+        type="button"
+        className="detail-pinned-close"
+        aria-label="Закрыть"
+        onClick={onClose}
+      >
+        <X size={16} />
+      </button>
+
       <div className="island-head">
         <div className="row" style={{ minWidth: 0, gap: 12, alignItems: 'center' }}>
           <PetAvatar
@@ -71,14 +80,6 @@ export const VaccinationDetailIsland: React.FC<VaccinationDetailIslandProps> = (
             </span>
           </div>
         </div>
-        <button
-          type="button"
-          className="btn btn-ghost btn-icon btn-sm"
-          aria-label="Закрыть"
-          onClick={onClose}
-        >
-          <X size={16} />
-        </button>
       </div>
 
       <div className="island-body" style={{ paddingTop: 14 }}>

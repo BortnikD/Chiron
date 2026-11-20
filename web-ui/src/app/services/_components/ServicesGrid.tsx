@@ -13,8 +13,10 @@ export function ServicesGrid({
   specsMap,
   specializations,
   loading = false,
+  error = null,
   hasFilters = false,
   onReset,
+  onReload,
   isAuthenticated = false,
 }: ServicesGridProps) {
   return (
@@ -33,28 +35,34 @@ export function ServicesGrid({
             {[1, 2, 3, 4, 5, 6].map((i) => (
               <div
                 key={`svc-skel-${i}`}
-                className="card static"
-                style={{
-                  padding: '16px',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: '12px',
-                  minHeight: '140px',
-                }}
+                className="card static p-md col gap-md min-h-140"
               >
                 <div className="row items-center between">
                   <Skeleton width="80px" height="20px" borderRadius="12px" />
                 </div>
-                <div className="col" style={{ gap: '6px' }}>
+                <div className="col gap-xs">
                   <Skeleton width="160px" height="18px" borderRadius="4px" />
                   <Skeleton width="220px" height="13px" borderRadius="4px" />
                 </div>
-                <div className="row items-center between" style={{ marginTop: 'auto', paddingTop: '8px' }}>
+                <div className="row items-center between mt-auto pt-sm">
                   <Skeleton width="70px" height="14px" borderRadius="4px" />
                   <Skeleton width="90px" height="16px" borderRadius="4px" />
                 </div>
               </div>
             ))}
+          </div>
+        ) : error ? (
+          <div className="empty">
+            <div className="empty-art">
+              <ClipboardList className="ic ic-40 text-danger" />
+            </div>
+            <span className="empty-title">Не удалось загрузить каталог услуг</span>
+            <span className="small muted">Сервер временно недоступен или произошла ошибка связи</span>
+            {onReload && (
+              <button type="button" className="btn btn-primary btn-sm mt-sm" onClick={onReload}>
+                Повторить попытку
+              </button>
+            )}
           </div>
         ) : services.length === 0 ? (
           <div className="empty">

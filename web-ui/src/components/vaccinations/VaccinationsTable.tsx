@@ -79,9 +79,9 @@ export const VaccinationsTable: React.FC<SharedVaccinationsTableProps> = ({
                 pet={pet ?? { name: petName }}
                 className="t-ava round"
               />
-              <span className="pet-cell-info">
-                <span className="pet-cell-name">{petName}</span>
-                {pet?.breed && <span className="small muted truncate">{pet.breed}</span>}
+              <span className="col gap-0 min-w-0" style={{ textAlign: 'left' }}>
+                <span className="cell-main truncate">{petName}</span>
+                {pet?.breed && <span className="cell-sub truncate text-xs">{pet.breed}</span>}
               </span>
             </span>
           );

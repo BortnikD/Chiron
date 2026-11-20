@@ -27,19 +27,18 @@ export function AdminSentMessageDetailIsland({
   if (!message) {
     return (
       <section className="island detail-island" aria-label="Детали сообщения">
-        <div className="empty" style={{ height: '100%', minHeight: '360px', justifyContent: 'center' }}>
+        <div className="empty h-full min-h-360 justify-center">
           <div className="empty-art">
             <Send className="ic ic-40" />
           </div>
           <span className="empty-title">Выберите отправленное сообщение</span>
-          <span className="small muted" style={{ maxWidth: '280px', textAlign: 'center' }}>
+          <span className="small muted max-w-280 text-center">
             Нажмите на любое сообщение из списка слева, чтобы посмотреть текст и данные получателя
           </span>
           {onComposeNew && (
             <button
               type="button"
-              className="btn btn-primary btn-sm"
-              style={{ marginTop: '12px' }}
+              className="btn btn-primary btn-sm mt-md"
               onClick={onComposeNew}
             >
               <Mail size={15} />
@@ -65,100 +64,56 @@ export function AdminSentMessageDetailIsland({
 
   return (
     <section className="island detail-island" aria-label="Детали отправленного сообщения">
+      <button
+        type="button"
+        className="detail-pinned-close"
+        onClick={onClose}
+        aria-label="Закрыть"
+      >
+        <X size={16} />
+      </button>
+
       {/* Шапка островка */}
       <div className="island-head">
-        <div className="row middle" style={{ gap: '10px', minWidth: 0 }}>
-          <div
-            style={{
-              width: '32px',
-              height: '32px',
-              borderRadius: '8px',
-              background: 'var(--accent)',
-              display: 'grid',
-              placeItems: 'center',
-              color: 'var(--primary)',
-              flex: 'none',
-            }}
-          >
+        <div className="row middle gap-base min-w-0">
+          <div className="notif-ic bg-accent text-primary">
             <Send size={16} />
           </div>
-          <div className="col" style={{ gap: '2px', minWidth: 0 }}>
-            <span style={{ fontWeight: 600, fontSize: '13.5px' }}>Отправленное сообщение</span>
-            <span className="small muted" style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '11px' }}>
+          <div className="col gap-xs min-w-0">
+            <span className="text-sm font-semibold">Отправленное сообщение</span>
+            <span className="small muted inline-flex items-center gap-xs text-xs">
               <Clock size={11} />
               {formattedDate}
             </span>
           </div>
         </div>
-
-        <button
-          type="button"
-          className="btn btn-ghost btn-icon btn-sm"
-          onClick={onClose}
-          aria-label="Закрыть"
-        >
-          <X size={16} />
-        </button>
       </div>
 
       {/* Тело островка */}
-      <div
-        className="island-body"
-        style={{
-          padding: '16px',
-          display: 'flex',
-          flexDirection: 'column',
-          gap: '16px',
-          overflowY: 'auto',
-          flex: 1,
-        }}
-      >
+      <div className="island-body p-island col gap-xl">
         {/* Карточка получателя */}
-        <div className="col" style={{ gap: '6px' }}>
-          <span className="small muted" style={{ fontWeight: 600 }}>
+        <div className="col gap-sm">
+          <span className="small muted font-semibold">
             Получатель сообщения
           </span>
-          <div
-            className="row middle"
-            style={{
-              padding: '10px 12px',
-              borderRadius: '10px',
-              border: '1px solid var(--border)',
-              background: 'var(--muted)',
-              gap: '10px',
-            }}
-          >
-            <div
-              style={{
-                width: '34px',
-                height: '34px',
-                borderRadius: '50%',
-                background: 'var(--card)',
-                display: 'grid',
-                placeItems: 'center',
-                fontWeight: 700,
-                fontSize: '13px',
-                border: '1px solid var(--border)',
-                color: 'var(--primary)',
-                flex: 'none',
-              }}
-            >
+          <div className="row middle p-2 gap-base bg-muted border rounded-lg">
+            <div className="initial-avatar">
               {initialLetter}
             </div>
-            <div className="col" style={{ gap: '2px', minWidth: 0, flex: 1 }}>
-              <div className="row middle" style={{ gap: '6px' }}>
-                <span style={{ fontWeight: 600, fontSize: '13.5px' }}>{message.recipientName}</span>
+            <div className="col gap-xs min-w-0 flex-1">
+              <div className="row middle gap-sm">
+                <span className="text-sm font-semibold">{message.recipientName}</span>
                 <UserRoleBadge role={message.recipientRole} short />
               </div>
-              <div className="row wrap middle muted" style={{ gap: '8px', fontSize: '11px' }}>
+              <div className="row wrap middle muted gap-md text-xs">
                 {message.recipientPhone && (
-                  <span className="row middle" style={{ gap: '4px' }}>
+                  <span className="row middle gap-xs">
                     <Phone size={11} />
                     {message.recipientPhone}
                   </span>
                 )}
                 {message.recipientEmail && (
-                  <span className="row middle" style={{ gap: '4px' }}>
+                  <span className="row middle gap-xs">
                     <Mail size={11} />
                     {message.recipientEmail}
                   </span>
@@ -169,57 +124,23 @@ export function AdminSentMessageDetailIsland({
         </div>
 
         {/* Тема */}
-        <div className="col" style={{ gap: '4px' }}>
+        <div className="col gap-xs">
           <span className="small muted">Тема сообщения</span>
-          <div
-            style={{
-              fontSize: '14.5px',
-              fontWeight: 600,
-              color: 'var(--foreground)',
-              padding: '8px 10px',
-              background: 'var(--card)',
-              border: '1px solid var(--border)',
-              borderRadius: '8px',
-            }}
-          >
+          <div className="message-subject-box">
             {message.title}
           </div>
         </div>
 
         {/* Текст */}
-        <div className="col" style={{ gap: '4px', flex: 1 }}>
+        <div className="col gap-xs flex-1">
           <span className="small muted">Текст сообщения</span>
-          <div
-            style={{
-              padding: '12px 14px',
-              borderRadius: '8px',
-              background: 'var(--card)',
-              border: '1px solid var(--border)',
-              fontSize: '13px',
-              lineHeight: 1.55,
-              whiteSpace: 'pre-wrap',
-              wordBreak: 'break-word',
-              color: 'var(--foreground)',
-              minHeight: '80px',
-            }}
-          >
+          <div className="message-content-box">
             {message.body}
           </div>
         </div>
 
         {/* Статус доставки */}
-        <div
-          className="row middle"
-          style={{
-            padding: '8px 12px',
-            borderRadius: '8px',
-            background: 'color-mix(in srgb, var(--primary) 10%, transparent)',
-            border: '1px solid color-mix(in srgb, var(--primary) 30%, transparent)',
-            gap: '8px',
-            color: 'var(--primary)',
-            fontSize: '12px',
-          }}
-        >
+        <div className="row middle delivery-status-banner">
           <CheckCheck size={16} />
           <span>Доставлено в личный кабинет получателя</span>
         </div>
@@ -227,11 +148,10 @@ export function AdminSentMessageDetailIsland({
 
       {/* Подвал островка */}
       {onComposeNew && (
-        <div className="island-foot" style={{ padding: '12px 16px' }}>
+        <div className="island-foot p-sm">
           <button
             type="button"
-            className="btn btn-primary btn-sm"
-            style={{ width: '100%', justifyContent: 'center' }}
+            className="btn btn-primary btn-sm w-full justify-center"
             onClick={onComposeNew}
           >
             <Mail size={15} />

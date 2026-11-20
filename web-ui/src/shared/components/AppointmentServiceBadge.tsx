@@ -50,19 +50,24 @@ export const AppointmentServiceBadge = React.memo(function AppointmentServiceBad
 
   return (
     <span
-      className={`row ${className}`}
+      className={`service-badge-wrap ${className}`.trim()}
       style={{
+        display: 'inline-flex',
         alignItems: 'center',
         gap: '6px',
+        maxWidth: '100%',
         minWidth: 0,
-        display: 'inline-flex',
+        verticalAlign: 'middle',
         ...style,
       }}
+      title={tooltip || primaryName}
     >
       <span
         style={{
-          textOverflow: 'ellipsis',
+          flex: '0 1 auto',
+          minWidth: 0,
           overflow: 'hidden',
+          textOverflow: 'ellipsis',
           whiteSpace: 'nowrap',
         }}
       >
@@ -70,13 +75,15 @@ export const AppointmentServiceBadge = React.memo(function AppointmentServiceBad
       </span>
       {extraCount > 0 && (
         <span
-          className="badge"
+          className="badge badge-accent"
           style={{
-            fontSize: '10px',
+            fontSize: '10.5px',
             padding: '1px 5px',
-            backgroundColor: 'color-mix(in srgb, var(--primary) 15%, transparent)',
+            height: '18px',
+            lineHeight: 1,
+            backgroundColor: 'color-mix(in srgb, var(--primary) 18%, transparent)',
             color: 'var(--primary-text, var(--primary))',
-            fontWeight: 600,
+            fontWeight: 700,
             flexShrink: 0,
             whiteSpace: 'nowrap',
           }}

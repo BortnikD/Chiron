@@ -68,6 +68,15 @@ export function VetPatientDetailIsland({
 
   return (
     <section className="island detail-island xl:w-[440px]" aria-label="Карточка пациента">
+      <button
+        type="button"
+        className="detail-pinned-close"
+        aria-label="Закрыть"
+        onClick={onClose}
+      >
+        <X size={16} />
+      </button>
+
       <div className="island-head">
         <div className="row">
           <PetAvatar
@@ -95,14 +104,6 @@ export function VetPatientDetailIsland({
             </span>
           </div>
         </div>
-        <button
-          type="button"
-          className="btn btn-ghost btn-icon btn-sm"
-          aria-label="Закрыть"
-          onClick={onClose}
-        >
-          <X size={16} />
-        </button>
       </div>
 
       <div className="tabs-line" role="tablist">

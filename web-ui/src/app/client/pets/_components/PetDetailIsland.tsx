@@ -84,6 +84,15 @@ export function PetDetailIsland({
       style={{ flex: 'none' }}
       aria-label="Карточка питомца"
     >
+      <button
+        type="button"
+        className="detail-pinned-close"
+        aria-label="Закрыть"
+        onClick={onClose}
+      >
+        <X className="ic" />
+      </button>
+
       <div className="island-head">
         <div className="row">
           <PetAvatar
@@ -110,14 +119,6 @@ export function PetDetailIsland({
             </span>
           </div>
         </div>
-        <button
-          type="button"
-          className="btn btn-ghost btn-icon btn-sm"
-          aria-label="Закрыть"
-          onClick={onClose}
-        >
-          <X className="ic" />
-        </button>
       </div>
 
       <div className="row wrap" style={{ gap: '6px', padding: '0 16px 12px' }}>

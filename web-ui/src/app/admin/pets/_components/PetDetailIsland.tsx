@@ -54,6 +54,15 @@ export const PetDetailIsland: React.FC<PetDetailIslandProps> = ({
 
   return (
     <section className="island detail-island" aria-label="Питомец">
+      <button
+        type="button"
+        className="detail-pinned-close"
+        aria-label="Закрыть"
+        onClick={onClose}
+      >
+        <X size={16} />
+      </button>
+
       <div className="island-head">
         <div className="row">
           <PetAvatar
@@ -75,14 +84,6 @@ export const PetDetailIsland: React.FC<PetDetailIslandProps> = ({
             </span>
           </div>
         </div>
-        <button
-          type="button"
-          className="btn btn-ghost btn-icon btn-sm"
-          aria-label="Закрыть"
-          onClick={onClose}
-        >
-          <X size={16} />
-        </button>
       </div>
 
       <div className="row wrap" style={{ gap: 6, padding: '0 16px 12px' }}>

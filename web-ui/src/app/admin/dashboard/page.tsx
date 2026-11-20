@@ -1,16 +1,33 @@
 'use client';
 
+import dynamic from 'next/dynamic';
 import { AlertCircle, RefreshCw } from 'lucide-react';
 import { useShellHeader } from '@/components/layout/AppShell';
 import { useAdminDashboard } from './_hooks/useAdminDashboard';
 import { DatePeriodSelector } from './_components/DatePeriodSelector';
 import { DashboardSkeleton } from './_components/DashboardSkeleton';
 import { KpiMetricsGrid } from './_components/KpiMetricsGrid';
-import { TimelineChart } from './_components/TimelineChart';
-import { StatusDistributionIsland } from './_components/StatusDistributionIsland';
-import { TopVeterinariansIsland } from './_components/TopVeterinariansIsland';
-import { TopServicesIsland } from './_components/TopServicesIsland';
-import { SpeciesDistributionIsland } from './_components/SpeciesDistributionIsland';
+
+const TimelineChart = dynamic(
+  () => import('./_components/TimelineChart').then((m) => m.TimelineChart),
+  { ssr: false, loading: () => <div className="island chart-island-minh" /> }
+);
+const StatusDistributionIsland = dynamic(
+  () => import('./_components/StatusDistributionIsland').then((m) => m.StatusDistributionIsland),
+  { ssr: false, loading: () => <div className="island empty-minh-220" /> }
+);
+const TopVeterinariansIsland = dynamic(
+  () => import('./_components/TopVeterinariansIsland').then((m) => m.TopVeterinariansIsland),
+  { ssr: false, loading: () => <div className="island empty-minh-220" /> }
+);
+const TopServicesIsland = dynamic(
+  () => import('./_components/TopServicesIsland').then((m) => m.TopServicesIsland),
+  { ssr: false, loading: () => <div className="island empty-minh-220" /> }
+);
+const SpeciesDistributionIsland = dynamic(
+  () => import('./_components/SpeciesDistributionIsland').then((m) => m.SpeciesDistributionIsland),
+  { ssr: false, loading: () => <div className="island empty-minh-220" /> }
+);
 
 /**
  * Главная страница дашборда администратора клиники.

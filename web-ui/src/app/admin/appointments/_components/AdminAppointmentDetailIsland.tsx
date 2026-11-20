@@ -74,9 +74,18 @@ export const AdminAppointmentDetailIsland: React.FC<AdminAppointmentDetailIsland
   const tone = getSpeciesTone(pet?.species?.name || speciesName || pet?.speciesId || 'cat', speciesList);
 
   return (
-    <section className="island detail-island" style={{ width: 440 }} aria-label="Запись">
+    <section className="island detail-island" aria-label="Запись">
+      <button
+        type="button"
+        className="detail-pinned-close"
+        aria-label="Закрыть"
+        onClick={onClose}
+      >
+        <X size={16} />
+      </button>
+
       <div className="island-head">
-        <div className="row" style={{ minWidth: 0, gap: 12, alignItems: 'center' }}>
+        <div className="row" style={{ minWidth: 0, gap: 12 }}>
           <PetAvatar
             pet={pet}
             tone={tone}
@@ -95,14 +104,6 @@ export const AdminAppointmentDetailIsland: React.FC<AdminAppointmentDetailIsland
             </span>
           </div>
         </div>
-        <button
-          type="button"
-          className="btn btn-ghost btn-icon btn-sm"
-          aria-label="Закрыть"
-          onClick={onClose}
-        >
-          <X size={16} />
-        </button>
       </div>
 
       <div className="island-body" style={{ paddingTop: 14 }}>
@@ -137,7 +138,15 @@ export const AdminAppointmentDetailIsland: React.FC<AdminAppointmentDetailIsland
               )}
             </dd>
             <dt>Врач</dt>
-            <dd>{vetName}</dd>
+            <dd>
+              {rawVet ? (
+                <Link href={`/admin/veterinarians?sel=${rawVet.id}`} className="linkish">
+                  {vetName}
+                </Link>
+              ) : (
+                vetName
+              )}
+            </dd>
             <dt>Услуга</dt>
             <dd>{serviceName}</dd>
             <dt>Время</dt>
@@ -153,26 +162,6 @@ export const AdminAppointmentDetailIsland: React.FC<AdminAppointmentDetailIsland
                   appointment.price
               )}
             </dd>
-            {appointment.services && appointment.services.length > 1 && (
-              <>
-                <dt>Все услуги ({appointment.services.length})</dt>
-                <dd>
-                  <ul style={{ margin: 0, paddingLeft: '18px', listStyleType: 'disc' }}>
-                    {appointment.services.map((s, idx) => (
-                      <li key={idx} className="small" style={{ margin: '4px 0' }}>
-                        <span style={{ fontWeight: 600 }}>{s.nameSnapshot}</span>
-                        <span className="muted"> — {formatCurrency(s.priceSnapshot)}</span>
-                        {s.isPerformed === true && (
-                          <span className="badge badge-success" style={{ marginLeft: '6px', fontSize: '10px', padding: '0 4px' }}>
-                            Оказана
-                          </span>
-                        )}
-                      </li>
-                    ))}
-                  </ul>
-                </dd>
-              </>
-            )}
             {appointment.followUpOf && (
               <>
                 <dt>Повторный к</dt>
@@ -180,6 +169,96 @@ export const AdminAppointmentDetailIsland: React.FC<AdminAppointmentDetailIsland
               </>
             )}
           </dl>
+
+          {appointment.services && appointment.services.length > 1 && (
+            <div className="col" style={{ gap: '6px' }}>
+              <span className="section-title">
+                Состав услуг ({appointment.services.length})
+              </span>
+              <div
+                style={{
+                  border: '1px solid var(--border)',
+                  borderRadius: 'var(--radius)',
+                  overflow: 'hidden',
+                  background: 'color-mix(in srgb, var(--card) 60%, transparent)',
+                }}
+              >
+                {appointment.services.map((s, idx) => (
+                  <div
+                    key={idx}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      padding: '8px 12px',
+                      gap: '12px',
+                      borderBottom:
+                        idx < appointment.services!.length - 1
+                          ? '1px solid var(--border)'
+                          : 'none',
+                    }}
+                  >
+                    <div className="col" style={{ gap: '2px', minWidth: 0, flex: 1 }}>
+                      <div className="row items-center" style={{ gap: '8px' }}>
+                        <span style={{ fontSize: '13.5px', fontWeight: 600, color: 'var(--foreground)' }}>
+                          {s.nameSnapshot}
+                        </span>
+                        {s.isPerformed === true ? (
+                          <span
+                            className="badge badge-success"
+                            style={{ fontSize: '10px', height: '18px', padding: '0 6px' }}
+                          >
+                            Оказана
+                          </span>
+                        ) : s.isPerformed === false ? (
+                          <span
+                            className="badge badge-outline"
+                            style={{ fontSize: '10px', height: '18px', padding: '0 6px' }}
+                          >
+                            Не оказана
+                          </span>
+                        ) : null}
+                      </div>
+                      {s.durationMinSnapshot ? (
+                        <span className="cell-sub text-xs">
+                          {s.durationMinSnapshot} мин
+                        </span>
+                      ) : null}
+                    </div>
+                    <div
+                      className="tnum font-bold text-sm"
+                      style={{ flexShrink: 0, color: 'var(--foreground)' }}
+                    >
+                      {formatCurrency(s.priceSnapshot)}
+                    </div>
+                  </div>
+                ))}
+                <div
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    padding: '8px 12px',
+                    background: 'color-mix(in srgb, var(--muted) 40%, transparent)',
+                    borderTop: '1px solid var(--border)',
+                  }}
+                >
+                  <span className="small muted">Итого по услугам:</span>
+                  <span
+                    className="tnum font-bold text-sm"
+                    style={{ color: 'var(--primary-text, var(--primary))' }}
+                  >
+                    {formatCurrency(
+                      appointment.actualTotal ??
+                        appointment.estimatedTotal ??
+                        appointment.priceSnapshot ??
+                        appointment.price
+                    )}
+                  </span>
+                </div>
+              </div>
+            </div>
+          )}
 
           <div className="col" style={{ gap: 6 }}>
             <span className="section-title">Комментарий клиента</span>

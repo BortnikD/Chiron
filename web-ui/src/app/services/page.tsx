@@ -91,8 +91,10 @@ function ServicesContent() {
             specsMap={specsMap}
             specializations={specializations}
             loading={loading}
+            error={error}
             hasFilters={hasFilters}
             onReset={resetFilters}
+            onReload={reload}
             isAuthenticated={isAuthenticated}
           />
         </div>

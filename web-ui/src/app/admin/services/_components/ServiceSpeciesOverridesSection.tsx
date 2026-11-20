@@ -105,11 +105,11 @@ export const ServiceSpeciesOverridesSection: React.FC<ServiceSpeciesOverridesSec
         {formatCurrency(service.basePrice)}). Сохранение пустого поля отправляет null.
       </span>
 
-      <div className="dtable keep-table" style={{ '--cols': '0.9fr 1fr 1fr 70px' } as React.CSSProperties}>
+      <div className="dtable keep-table" style={{ '--cols': '0.85fr 1.15fr 1fr 68px' } as React.CSSProperties}>
         <div className="thead" style={{ padding: 0 }}>
           <span>Вид</span>
-          <span>Длительность</span>
-          <span>Цена</span>
+          <span>Длительность, мин</span>
+          <span>Цена, ₽</span>
           <span />
         </div>
 

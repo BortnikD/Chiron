@@ -44,16 +44,69 @@ export function ModalShell({
   style,
 }: ModalShellProps) {
   const dialogRef = useRef<HTMLDivElement>(null);
+  const previousActiveElementRef = useRef<HTMLElement | null>(null);
 
+  // Focus trap & Escape key
   useEffect(() => {
-    if (!isOpen || !closeOnEscape) return;
+    if (!isOpen) return;
+
+    // Сохраняем фокус перед открытием диалога
+    if (typeof document !== 'undefined' && document.activeElement instanceof HTMLElement) {
+      previousActiveElementRef.current = document.activeElement;
+    }
+
+    const dialogEl = dialogRef.current;
+    if (dialogEl) {
+      const focusable = dialogEl.querySelectorAll<HTMLElement>(
+        'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+      );
+      if (focusable.length > 0) {
+        // Фокусируемся на первом интерактивном элементе с небольшой задержкой для плавности
+        requestAnimationFrame(() => {
+          focusable[0]?.focus();
+        });
+      }
+    }
+
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && !loading) {
+      if (e.key === 'Escape' && closeOnEscape && !loading) {
         onClose();
+        return;
+      }
+
+      if (e.key === 'Tab' && dialogRef.current) {
+        const focusable = Array.from(
+          dialogRef.current.querySelectorAll<HTMLElement>(
+            'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+          )
+        );
+
+        if (focusable.length === 0) {
+          e.preventDefault();
+          return;
+        }
+
+        const first = focusable[0];
+        const last = focusable[focusable.length - 1];
+
+        if (e.shiftKey && document.activeElement === first) {
+          e.preventDefault();
+          last.focus();
+        } else if (!e.shiftKey && document.activeElement === last) {
+          e.preventDefault();
+          first.focus();
+        }
       }
     };
+
     window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      // Возвращаем фокус на сохранённый элемент
+      if (previousActiveElementRef.current && typeof previousActiveElementRef.current.focus === 'function') {
+        previousActiveElementRef.current.focus();
+      }
+    };
   }, [isOpen, closeOnEscape, loading, onClose]);
 
   if (!isOpen) return null;
@@ -86,11 +139,8 @@ export function ModalShell({
         style={style}
         onClick={(e) => e.stopPropagation()}
       >
-        <div
-          className="dialog-head"
-          style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}
-        >
-          <div className="col" style={{ gap: 4 }}>
+        <div className="dialog-head flex-row between items-start">
+          <div className="col gap-xs">
             <span className="dialog-title">{title}</span>
             {description && <span className="dialog-desc">{description}</span>}
           </div>
@@ -106,7 +156,7 @@ export function ModalShell({
         </div>
 
         {error && (
-          <div className="alert alert-destructive" style={{ margin: '8px 20px 0' }} role="alert">
+          <div className="alert alert-destructive mt-xs mx-md" role="alert">
             <AlertCircle size={16} className="ic flex-none" />
             <div>{error}</div>
           </div>
@@ -115,7 +165,7 @@ export function ModalShell({
         {onSubmit ? (
           <form
             onSubmit={onSubmit}
-            style={{ display: 'flex', flexDirection: 'column', minHeight: 0, flex: 1 }}
+            className="form-vertical"
           >
             {bodyAndFoot}
           </form>

@@ -3,7 +3,7 @@
 import React, { useState, useMemo } from 'react';
 import { Shapes } from 'lucide-react';
 import { formatCurrency, pluralRu } from '@/shared/lib';
-import { pct } from './utils';
+import { pct, computeDonutArcs } from './utils';
 import type { SpeciesDistributionIslandProps } from './types';
 
 const CHART_COLORS = ['var(--chart-1)', 'var(--chart-2)', 'var(--chart-3)', 'var(--chart-4)', 'var(--chart-5, #eab308)'];
@@ -29,19 +29,36 @@ export const SpeciesDistributionIsland = React.memo(function SpeciesDistribution
     }));
 
     const totalRevNum = list.reduce((acc, sp) => acc + sp.rev, 0);
-    const gap = list.length > 1 ? 2 : 0;
+    const activeCount = list.filter((sp) => sp.rev > 0).length;
+    const gap = activeCount > 1 ? 2.5 : 0;
+    const arcs = computeDonutArcs(
+      list.map((sp) => sp.rev),
+      circumference,
+      17 // радиус 62, circumference 389.56 => гарантированная дуга 17px, штрих 14.5px ~ 13.4°
+    );
 
     let acc = 0;
-    const segments = list.map((sp) => {
+    const segments = list.map((sp, idx) => {
       const sharePct = totalRevNum > 0 ? (sp.rev / totalRevNum) * 100 : 0;
-      const strokeLength = (sharePct / 100) * circumference;
-      const strokeOffset = -(acc / 100) * circumference;
-      acc += sharePct;
+      const arc = arcs[idx] || 0;
+
+      if (arc <= 0 || sp.rev <= 0) {
+        return {
+          ...sp,
+          sharePct,
+          strokeLength: 0,
+          strokeOffset: 0,
+        };
+      }
+
+      const strokeLength = Math.max(1, arc - gap);
+      const strokeOffset = -acc;
+      acc += arc;
 
       return {
         ...sp,
         sharePct,
-        strokeLength: Math.max(0.5, strokeLength - gap),
+        strokeLength,
         strokeOffset,
       };
     });
@@ -78,30 +95,21 @@ export const SpeciesDistributionIsland = React.memo(function SpeciesDistribution
 
       <div className="island-body">
         {speciesData.rows.length === 0 ? (
-          <div className="empty" style={{ padding: '24px 12px' }}>
+          <div className="empty p-lg">
             <Shapes className="ic ic-40" />
             <span className="empty-title">Нет статистики по видам за период</span>
           </div>
         ) : (
-          <div className="col" style={{ gap: '18px', alignItems: 'center' }}>
+          <div className="col gap-lg items-center">
             {/* Четкий SVG Donut */}
-            <div
-              style={{
-                position: 'relative',
-                width: '168px',
-                height: '168px',
-                flex: 'none',
-                display: 'grid',
-                placeItems: 'center',
-              }}
-            >
+            <div className="donut-wrapper">
               <svg
                 width="168"
                 height="168"
                 viewBox="0 0 168 168"
-                style={{ transform: 'rotate(-90deg)', overflow: 'visible' }}
+                className="donut-svg"
               >
-                {speciesData.segments.length === 0 ? (
+                {speciesData.segments.length === 0 || speciesData.segments.every((s) => s.strokeLength === 0) ? (
                   <circle
                     cx="84"
                     cy="84"
@@ -112,6 +120,7 @@ export const SpeciesDistributionIsland = React.memo(function SpeciesDistribution
                   />
                 ) : (
                   speciesData.segments.map((s) => {
+                    if (s.strokeLength <= 0) return null;
                     const isHovered = hoveredId === s.id;
                     return (
                       <circle
@@ -139,24 +148,9 @@ export const SpeciesDistributionIsland = React.memo(function SpeciesDistribution
               </svg>
 
               {/* Центр кольца: детальная информация без перекрытия списка */}
-              <div
-                style={{
-                  position: 'absolute',
-                  width: '104px',
-                  height: '104px',
-                  borderRadius: '50%',
-                  background: 'var(--card)',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  textAlign: 'center',
-                  pointerEvents: 'none',
-                  padding: '4px',
-                }}
-              >
+              <div className="donut-center">
                 {activeItem ? (
-                  <div className="col" style={{ gap: '1px', alignItems: 'center' }}>
+                  <div className="col gap-2xs items-center">
                     <span
                       style={{
                         fontSize: '14.5px',
@@ -171,39 +165,33 @@ export const SpeciesDistributionIsland = React.memo(function SpeciesDistribution
                     >
                       {activeItem.name}
                     </span>
-                    <span style={{ fontSize: '12px', fontWeight: 700, color: 'var(--foreground)' }}>
+                    <span className="text-xs font-bold text-fg">
                       {activeItem.revenue}
                     </span>
-                    <span className="small muted" style={{ fontSize: '10.5px' }}>
+                    <span className="small muted text-2xs">
                       {activeItem.share}
                     </span>
                   </div>
                 ) : (
-                  <div className="col" style={{ gap: 0, alignItems: 'center' }}>
-                    <span className="kpi-value" style={{ fontSize: '17px' }}>
+                  <div className="col gap-0 items-center">
+                    <span className="kpi-value text-lg">
                       {speciesData.totalRev}
                     </span>
-                    <span className="small muted" style={{ fontSize: '11px' }}>выручка</span>
+                    <span className="small muted text-xs">выручка</span>
                   </div>
                 )}
               </div>
             </div>
 
             {/* Список видов — чистый и без наложения */}
-            <div className="col" style={{ gap: '6px', width: '100%' }}>
+            <div className="col gap-xs w-full">
               {speciesData.rows.map((r) => {
                 const isHovered = hoveredId === r.id;
                 return (
                   <div
                     key={r.id}
-                    className="row between"
+                    className="donut-row"
                     style={{
-                      gap: '10px',
-                      alignItems: 'center',
-                      padding: '6px 8px',
-                      borderRadius: '8px',
-                      cursor: 'pointer',
-                      transition: 'background 0.12s ease',
                       background: isHovered
                         ? 'color-mix(in srgb, var(--primary) 12%, var(--muted))'
                         : 'transparent',
@@ -211,28 +199,23 @@ export const SpeciesDistributionIsland = React.memo(function SpeciesDistribution
                     onMouseEnter={() => setHoveredId(r.id)}
                     onMouseLeave={() => setHoveredId(null)}
                   >
-                    <div className="row" style={{ gap: '10px', alignItems: 'center', minWidth: 0 }}>
+                    <div className="row gap-sm items-center min-w-0">
                       <i
+                        className="donut-color-dot"
                         style={{
-                          width: '10px',
-                          height: '10px',
-                          borderRadius: '3px',
                           background: r.color,
-                          display: 'inline-block',
-                          flex: 'none',
                           transform: isHovered ? 'scale(1.25)' : 'none',
-                          transition: 'transform 0.12s ease',
                         }}
                       />
-                      <div className="col" style={{ gap: 0 }}>
-                        <span className="cell-main" style={{ fontWeight: isHovered ? 700 : 500 }}>
+                      <div className="col gap-0">
+                        <span className={`cell-main ${isHovered ? 'font-bold' : 'font-medium'}`}>
                           {r.name}
                         </span>
                         <span className="cell-sub">{r.sub}</span>
                       </div>
                     </div>
-                    <div className="col" style={{ gap: 0, alignItems: 'flex-end', flexShrink: 0 }}>
-                      <span className="tnum cell-main" style={{ fontWeight: isHovered ? 700 : 500 }}>
+                    <div className="col gap-0 items-end shrink-0">
+                      <span className={`tnum cell-main ${isHovered ? 'font-bold' : 'font-medium'}`}>
                         {r.revenue}
                       </span>
                       <span className="cell-sub tnum">{r.share}</span>

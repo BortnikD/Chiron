@@ -81,7 +81,7 @@ export const AdminAppointmentsTable: React.FC<AdminAppointmentsTableProps> = ({
       {
         key: 'startAt',
         title: 'Дата и время ↑',
-        width: '1.45fr',
+        width: 'minmax(115px, 1.1fr)',
         render: (a) => {
           const dt = formatDateTimeCompact(a.startAt);
           return (
@@ -102,7 +102,7 @@ export const AdminAppointmentsTable: React.FC<AdminAppointmentsTableProps> = ({
       {
         key: 'pet',
         title: 'Питомец',
-        width: '1.1fr',
+        width: 'minmax(95px, 0.95fr)',
         render: (a) => {
           const p = pets.find((item) => item.id === a.petId);
           const tone = getSpeciesTone(p?.species?.name || p?.speciesName || p?.speciesId, speciesList);
@@ -117,7 +117,7 @@ export const AdminAppointmentsTable: React.FC<AdminAppointmentsTableProps> = ({
                 className={`t-ava xs tone-${tone}`}
                 style={getSpeciesStyle(p?.speciesId, speciesList)}
               />
-              <span>{p?.name || 'Питомец'}</span>
+              <span className="truncate">{p?.name || 'Питомец'}</span>
             </span>
           );
         },
@@ -125,17 +125,21 @@ export const AdminAppointmentsTable: React.FC<AdminAppointmentsTableProps> = ({
       {
         key: 'owner',
         title: 'Владелец',
-        width: '1fr',
+        width: 'minmax(95px, 0.95fr)',
         render: (a) => {
           const p = pets.find((item) => item.id === a.petId);
           const ownerName = (p?.ownerId && users.find((u) => u.id === p.ownerId)?.fullName) || '—';
-          return <span className="muted">{ownerName}</span>;
+          return (
+            <span className="muted truncate" title={ownerName}>
+              {ownerName}
+            </span>
+          );
         },
       },
       {
         key: 'service',
         title: 'Услуга',
-        width: '1.3fr',
+        width: 'minmax(140px, 1.5fr)',
         render: (a) => {
           const catalogService = services.find((s) => s.id === a.serviceId);
           return (
@@ -149,23 +153,27 @@ export const AdminAppointmentsTable: React.FC<AdminAppointmentsTableProps> = ({
       {
         key: 'vet',
         title: 'Врач',
-        width: '1fr',
+        width: 'minmax(115px, 1.1fr)',
         render: (a) => {
           const rawVet = veterinarians.find((v) => v.id === a.veterinarianId);
-          const vetName = getDoctorDisplay(rawVet).fullName;
-          return <span>{vetName}</span>;
+          const doc = getDoctorDisplay(rawVet);
+          return (
+            <span className="truncate" title={doc.fullName}>
+              {doc.name}
+            </span>
+          );
         },
       },
       {
         key: 'status',
         title: 'Статус',
-        width: '1fr',
+        width: 'minmax(95px, 0.95fr)',
         render: (a) => <AppointmentStatusBadge status={a.status} useShortLabel />,
       },
       {
         key: 'price',
         title: 'Цена',
-        width: '0.75fr',
+        width: 'minmax(70px, 0.7fr)',
         align: 'right',
         render: (a) => {
           const price = a.actualTotal ?? a.estimatedTotal ?? a.priceSnapshot ?? a.price;

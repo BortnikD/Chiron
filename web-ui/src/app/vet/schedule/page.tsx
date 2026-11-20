@@ -70,40 +70,32 @@ function VetScheduleContent() {
       )}
 
       <div className="content-row">
-        <div
-          className={
-            hasDetail
-              ? 'flex-1 flex flex-col lg:flex-row xl:flex-col 2xl:flex-row gap-2 min-w-0 min-h-0'
-              : 'flex-1 flex flex-col lg:flex-row gap-2 min-w-0 min-h-0'
-          }
-        >
-          <VetWeeklyScheduleTable
-            loading={loading}
-            schedules={schedules}
-            exceptions={exceptions}
-            appointments={appointments}
-            servicesMap={servicesMap}
-            petsMap={petsMap}
-            todayIso={nowTime.dateIso}
-            nowMinutes={nowTime.minutes}
-            selectedAppt={selectedAppt}
-            onSelectAppt={handleSelectAppt}
-            onSelectException={handleSelectException}
-            weekOffset={weekOffset}
-            onPrevWeek={goPrevWeek}
-            onNextWeek={goNextWeek}
-            onCurrentWeek={goCurrentWeek}
-          />
+        <VetWeeklyScheduleTable
+          loading={loading}
+          schedules={schedules}
+          exceptions={exceptions}
+          appointments={appointments}
+          servicesMap={servicesMap}
+          petsMap={petsMap}
+          todayIso={nowTime.dateIso}
+          nowMinutes={nowTime.minutes}
+          selectedAppt={selectedAppt}
+          onSelectAppt={handleSelectAppt}
+          onSelectException={handleSelectException}
+          weekOffset={weekOffset}
+          onPrevWeek={goPrevWeek}
+          onNextWeek={goNextWeek}
+          onCurrentWeek={goCurrentWeek}
+        />
 
-          <VetExceptionsList
-            exceptions={exceptions}
-            schedules={schedules}
-            selectedException={selectedException}
-            onSelectException={handleSelectException}
-            loading={loading}
-            hasDetail={hasDetail}
-          />
-        </div>
+        <VetExceptionsList
+          exceptions={exceptions}
+          schedules={schedules}
+          selectedException={selectedException}
+          onSelectException={handleSelectException}
+          loading={loading}
+          hasDetail={hasDetail}
+        />
 
         {selectedAppt ? (
           <VetActiveAppointmentDrawer

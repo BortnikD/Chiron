@@ -27,6 +27,15 @@ export const VetScheduleDetailIsland: React.FC<VetScheduleDetailIslandProps> = (
 
   return (
     <section className="island detail-island xl:w-[380px]" aria-label="Детали исключения">
+      <button
+        type="button"
+        className="detail-pinned-close"
+        aria-label="Закрыть"
+        onClick={onClose}
+      >
+        <X className="ic" />
+      </button>
+
       <div className="island-head">
         <div className="col" style={{ gap: '2px', minWidth: 0 }}>
           <span className="h2" style={{ wordBreak: 'break-word' }}>
@@ -34,14 +43,6 @@ export const VetScheduleDetailIsland: React.FC<VetScheduleDetailIslandProps> = (
           </span>
           <span className="cell-sub tnum">{rangeText}</span>
         </div>
-        <button
-          type="button"
-          className="btn btn-ghost btn-icon btn-sm"
-          aria-label="Закрыть"
-          onClick={onClose}
-        >
-          <X className="ic" />
-        </button>
       </div>
 
       <div className="island-body">

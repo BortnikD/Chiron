@@ -166,19 +166,20 @@ export const ServiceDetailIsland: React.FC<ServiceDetailIslandProps> = ({
 
   return (
     <section className="island detail-island" style={{ width: 480 }} aria-label="Услуга">
+      <button
+        type="button"
+        className="detail-pinned-close"
+        aria-label="Закрыть"
+        onClick={onClose}
+      >
+        <X size={16} />
+      </button>
+
       <div className="island-head">
         <div className="col" style={{ gap: 2 }}>
           <span className="h2">{service.name}</span>
           <span className="cell-sub">{specsMap[service.specializationId] || '—'}</span>
         </div>
-        <button
-          type="button"
-          className="btn btn-ghost btn-icon btn-sm"
-          aria-label="Закрыть"
-          onClick={onClose}
-        >
-          <X size={16} />
-        </button>
       </div>
 
       <div className="tabs-line">

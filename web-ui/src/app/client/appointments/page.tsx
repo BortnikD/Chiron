@@ -106,6 +106,7 @@ function AppointmentsContent() {
           servicesMap={state.servicesMap}
           veterinariansMap={state.vetsMap}
           speciesMap={state.speciesMap}
+          speciesList={state.speciesList}
           parentApptsMap={state.parentApptsMap}
           currentUserId={state.currentUserId}
           onSelectFollowUpParent={state.selectAppointmentById}

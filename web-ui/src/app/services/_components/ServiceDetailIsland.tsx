@@ -111,6 +111,15 @@ export function ServiceDetailIsland({
 
   return (
     <section className="island detail-island" aria-label="Услуга">
+      <button
+        type="button"
+        className="detail-pinned-close"
+        aria-label="Закрыть"
+        onClick={onClose}
+      >
+        <X className="ic" />
+      </button>
+
       <div className="island-head">
         <div className="col" style={{ gap: '2px', minWidth: 0 }}>
           <span className="h2" style={{ wordBreak: 'break-word' }}>
@@ -120,14 +129,6 @@ export function ServiceDetailIsland({
             {specsMap[service.specializationId] || 'Общий профиль'}
           </span>
         </div>
-        <button
-          type="button"
-          className="btn btn-ghost btn-icon btn-sm"
-          aria-label="Закрыть"
-          onClick={onClose}
-        >
-          <X className="ic" />
-        </button>
       </div>
 
       <div className="island-body">
@@ -148,8 +149,8 @@ export function ServiceDetailIsland({
             <div className="dtable keep-table" style={{ '--cols': '1fr 1.2fr 1.2fr' } as React.CSSProperties}>
               <div className="thead" style={{ padding: 0 }}>
                 <span>Вид</span>
-                <span>Длительность</span>
-                <span className="right">Цена</span>
+                <span>Длительность, мин</span>
+                <span className="right">Цена, ₽</span>
               </div>
               {serviceSpeciesList.length > 0
                 ? serviceSpeciesList.map((ss) => {

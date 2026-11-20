@@ -200,8 +200,11 @@ export const VetDayTimelineIsland: React.FC<VetDayTimelineIslandProps> = ({
               if (item.kind === 'break') {
                 return (
                   <div key={item.key} className="tl-row">
-                    <span className="tl-time">{breakStartStr}</span>
-                    <div className="tl-break">Перерыв до {breakEndStr}</div>
+                    <span className="tl-time">
+                      {breakStartStr}
+                      <span className="tl-time-end">{breakEndStr}</span>
+                    </span>
+                    <div className="tl-break">Перерыв</div>
                   </div>
                 );
               }
