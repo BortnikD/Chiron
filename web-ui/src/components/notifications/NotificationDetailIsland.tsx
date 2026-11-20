@@ -41,19 +41,18 @@ export const NotificationDetailIsland: React.FC<NotificationDetailIslandProps> =
   if (!notification) {
     return (
       <section className="island detail-island" aria-label="Детали уведомления">
-        <div className="empty" style={{ height: '100%', minHeight: '360px', justifyContent: 'center' }}>
+        <div className="empty h-full min-h-360 justify-center">
           <div className="empty-art">
             <Bell className="ic ic-40" />
           </div>
           <span className="empty-title">Выберите уведомление</span>
-          <span className="small muted" style={{ maxWidth: '280px', textAlign: 'center' }}>
+          <span className="small muted max-w-280 text-center">
             Нажмите на любое событие из списка слева, чтобы посмотреть подробный текст, дату и связанные записи
           </span>
           {role === 'ADMIN' && onOpenCompose && (
             <button
               type="button"
-              className="btn btn-primary btn-sm"
-              style={{ marginTop: '12px' }}
+              className="btn btn-primary btn-sm mt-md"
               onClick={onOpenCompose}
             >
               <Mail size={15} />
@@ -109,120 +108,68 @@ export const NotificationDetailIsland: React.FC<NotificationDetailIslandProps> =
 
   return (
     <section className="island detail-island" aria-label="Детали уведомления">
+      <button
+        type="button"
+        className="detail-pinned-close"
+        onClick={onClose}
+        aria-label="Закрыть"
+      >
+        <X className="ic" size={16} />
+      </button>
+
       {/* Шапка островка */}
       <div className="island-head">
-        <div className="row" style={{ alignItems: 'center', gap: '12px', minWidth: 0 }}>
-          <span className={`notif-ic ${meta.cls}`} style={{ flexShrink: 0 }}>
+        <div className="row items-center gap-lg min-w-0">
+          <span className={`notif-ic ${meta.cls} shrink-0`}>
             {meta.icon}
           </span>
-          <div className="col" style={{ gap: '3px', minWidth: 0, flex: 1 }}>
-            <div className="row wrap items-center" style={{ gap: '6px' }}>
-              <span
-                className={`sp-chip tone-${meta.tone}`}
-                style={{
-                  fontSize: '11.5px',
-                  padding: '2px 8px',
-                  borderRadius: '6px',
-                  fontWeight: 600,
-                }}
-              >
+          <div className="col gap-1 min-w-0 flex-1">
+            <div className="row wrap items-center gap-sm">
+              <span className={`sp-chip tone-${meta.tone} sp-chip-compact`}>
                 {meta.label}
               </span>
               {isUnread && (
-                <span
-                  style={{
-                    fontSize: '11px',
-                    padding: '2px 6px',
-                    borderRadius: '4px',
-                    background: 'var(--primary)',
-                    color: '#fff',
-                    fontWeight: 700,
-                  }}
-                >
+                <span className="notif-new-badge">
                   Новое
                 </span>
               )}
             </div>
-            <span className="small muted" style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+            <span className="small muted inline-flex items-center gap-xs">
               <Clock size={12} />
               {formattedDate}
             </span>
           </div>
         </div>
-
-        <button
-          type="button"
-          className="btn btn-ghost btn-icon btn-sm"
-          onClick={onClose}
-          aria-label="Закрыть"
-        >
-          <X className="ic" size={16} />
-        </button>
       </div>
 
       {/* Тело островка с подробностями */}
-      <div className="island-body col" style={{ gap: '16px', padding: '16px' }}>
+      <div className="island-body col gap-xl p-island">
         {/* Заголовок события */}
-        <div className="col" style={{ gap: '6px' }}>
-          <span className="menu-label" style={{ padding: 0 }}>Тема оповещения</span>
-          <h3 style={{ fontSize: '16px', fontWeight: 700, margin: 0, lineHeight: 1.4 }}>
+        <div className="col gap-sm">
+          <span className="menu-label p-0">Тема оповещения</span>
+          <h3 className="text-lg font-bold m-0 leading-snug">
             {notification.title || 'Оповещение клиники'}
           </h3>
         </div>
 
         {/* Полный текст сообщения */}
-        <div className="col" style={{ gap: '6px' }}>
-          <span className="menu-label" style={{ padding: 0 }}>Сообщение</span>
-          <div
-            style={{
-              padding: '14px 16px',
-              borderRadius: '12px',
-              background: 'color-mix(in srgb, var(--card) 60%, var(--muted))',
-              border: '1px solid var(--border)',
-              fontSize: '14px',
-              lineHeight: 1.55,
-              whiteSpace: 'pre-wrap',
-              wordBreak: 'break-word',
-            }}
-          >
+        <div className="col gap-sm">
+          <span className="menu-label p-0">Сообщение</span>
+          <div className="detail-message-body">
             {notification.body || 'Текст сообщения отсутствует'}
           </div>
         </div>
 
         {/* Статус доставки и прочтения */}
-        <div
-          className="row wrap between items-center"
-          style={{
-            padding: '10px 14px',
-            borderRadius: '10px',
-            background: 'color-mix(in srgb, var(--muted) 45%, transparent)',
-            fontSize: '13px',
-          }}
-        >
+        <div className="row wrap between items-center detail-status-bar">
           <span className="muted">Статус прочтения:</span>
           {isUnread ? (
-            <span
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '6px',
-                color: 'var(--primary)',
-                fontWeight: 600,
-              }}
-            >
+            <span className="inline-flex items-center gap-sm text-primary font-semibold">
               <CircleDot size={14} />
               Не прочитано
             </span>
           ) : (
-            <span
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '6px',
-                color: 'var(--success, #22c55e)',
-                fontWeight: 600,
-              }}
-            >
+            <span className="inline-flex items-center gap-sm text-success font-semibold">
               <CheckCheck size={15} />
               Прочитано {formattedReadDate ? `(${formattedReadDate})` : ''}
             </span>
@@ -231,25 +178,17 @@ export const NotificationDetailIsland: React.FC<NotificationDetailIslandProps> =
 
         {/* Связанные сущности (приём, питомец, вакцинация) */}
         {(notification.appointmentId || notification.petId || notification.vaccinationId) && (
-          <div className="col" style={{ gap: '8px' }}>
-            <span className="menu-label" style={{ padding: 0 }}>
+          <div className="col gap-md">
+            <span className="menu-label p-0">
               {role === 'CLIENT' ? 'Связанная запись' : 'Связанные данные клиники'}
             </span>
 
             {notification.appointmentId && (
-              <div
-                className="row between items-center"
-                style={{
-                  padding: '10px 14px',
-                  borderRadius: '10px',
-                  border: '1px solid var(--border)',
-                  background: 'color-mix(in srgb, var(--card) 85%, transparent)',
-                }}
-              >
-                <div className="row items-center" style={{ gap: '10px' }}>
+              <div className="row between items-center detail-related-card">
+                <div className="row items-center gap-base">
                   <Calendar size={18} className="text-primary flex-none" />
-                  <div className="col" style={{ gap: '2px' }}>
-                    <b style={{ fontSize: '13.5px' }}>Запись на приём</b>
+                  <div className="col gap-1">
+                    <b className="text-sm">Запись на приём</b>
                     {role !== 'CLIENT' && (
                       <span className="small muted font-mono">ID: {notification.appointmentId.slice(0, 18)}…</span>
                     )}
@@ -269,19 +208,11 @@ export const NotificationDetailIsland: React.FC<NotificationDetailIslandProps> =
             )}
 
             {notification.petId && (
-              <div
-                className="row between items-center"
-                style={{
-                  padding: '10px 14px',
-                  borderRadius: '10px',
-                  border: '1px solid var(--border)',
-                  background: 'color-mix(in srgb, var(--card) 85%, transparent)',
-                }}
-              >
-                <div className="row items-center" style={{ gap: '10px' }}>
+              <div className="row between items-center detail-related-card">
+                <div className="row items-center gap-base">
                   <PawPrint size={18} className="text-primary flex-none" />
-                  <div className="col" style={{ gap: '2px' }}>
-                    <b style={{ fontSize: '13.5px' }}>
+                  <div className="col gap-1">
+                    <b className="text-sm">
                       {role === 'CLIENT' ? 'Карточка питомца' : 'Пациент клиники'}
                     </b>
                     {role !== 'CLIENT' && (
@@ -310,19 +241,11 @@ export const NotificationDetailIsland: React.FC<NotificationDetailIslandProps> =
             )}
 
             {notification.vaccinationId && (
-              <div
-                className="row between items-center"
-                style={{
-                  padding: '10px 14px',
-                  borderRadius: '10px',
-                  border: '1px solid var(--border)',
-                  background: 'color-mix(in srgb, var(--card) 85%, transparent)',
-                }}
-              >
-                <div className="row items-center" style={{ gap: '10px' }}>
+              <div className="row between items-center detail-related-card">
+                <div className="row items-center gap-base">
                   <Syringe size={18} className="text-primary flex-none" />
-                  <div className="col" style={{ gap: '2px' }}>
-                    <b style={{ fontSize: '13.5px' }}>
+                  <div className="col gap-1">
+                    <b className="text-sm">
                       {role === 'CLIENT' ? 'Прививка' : 'Запись вакцинации'}
                     </b>
                     {role !== 'CLIENT' && (
@@ -346,7 +269,7 @@ export const NotificationDetailIsland: React.FC<NotificationDetailIslandProps> =
       </div>
 
       {/* Подвал островка с быстрыми действиями */}
-      <div className="island-foot row wrap between" style={{ gap: '10px', alignItems: 'center' }}>
+      <div className="island-foot row wrap between gap-base items-center">
         {isUnread ? (
           <button
             type="button"
@@ -358,7 +281,7 @@ export const NotificationDetailIsland: React.FC<NotificationDetailIslandProps> =
             {marking ? 'Отмечаем...' : 'Отметить прочитанным'}
           </button>
         ) : (
-          <span className="small muted" style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+          <span className="small muted inline-flex items-center gap-xs">
             <CheckCheck size={14} className="text-success" /> Прочитано
           </span>
         )}

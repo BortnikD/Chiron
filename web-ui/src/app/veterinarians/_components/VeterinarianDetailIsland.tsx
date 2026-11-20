@@ -54,15 +54,24 @@ export const VeterinarianDetailIsland: React.FC<VeterinarianDetailIslandProps> =
       className="island detail-island"
       aria-label="Профиль врача"
     >
+      <button
+        type="button"
+        className="detail-pinned-close"
+        aria-label="Закрыть"
+        onClick={onClose}
+      >
+        <X className="ic" />
+      </button>
+
       <div className="island-head">
-        <div className="row" style={{ minWidth: 0 }}>
+        <div className="row min-w-0">
           <VetAvatar
             vet={vet}
             initials={initials}
             className="avatar avatar-lg detail-head-ava"
             alt={fullName}
           />
-          <div className="col" style={{ gap: '2px', minWidth: 0 }}>
+          <div className="col gap-xs min-w-0">
             <span className="h2" title={fullName}>
               {fullName}
             </span>
@@ -72,33 +81,61 @@ export const VeterinarianDetailIsland: React.FC<VeterinarianDetailIslandProps> =
             </span>
           </div>
         </div>
-        <button
-          type="button"
-          className="btn btn-ghost btn-icon btn-sm"
-          aria-label="Закрыть"
-          onClick={onClose}
-        >
-          <X className="ic" />
-        </button>
       </div>
 
       <div className="island-body">
-        <div className="col" style={{ gap: '18px' }}>
+        <div className="col gap-2xl">
           {vet.bio && <p>{vet.bio}</p>}
 
-          <div className="col" style={{ gap: '8px' }}>
-            <span className="section-title">Специализация и услуги</span>
-            <div className={`chips tone-${specTone}`}>
-              <span className="t-badge">{specName}</span>
-              {vetServices.map((svc) => (
-                <span key={svc.id} className="badge badge-outline">
-                  {svc.name}
-                </span>
-              ))}
+          {/* Специализации врача */}
+          <div className="col gap-md">
+            <span className="section-title">
+              {vetSpecIds.length > 1 ? 'Специализации' : 'Специализация'}
+            </span>
+            <div className="chips">
+              {vetSpecIds.map((sId) => {
+                const spec = specializations?.find((s) => s.id === sId);
+                const label = spec?.name || specsMap[sId] || specName;
+                const specColor = spec?.color;
+                const tone = getSpecTone(sId);
+                return (
+                  <span
+                    key={sId}
+                    className={`t-badge tone-${tone}`}
+                    style={
+                      specColor
+                        ? {
+                            color: specColor,
+                            borderColor: `${specColor}40`,
+                            backgroundColor: `${specColor}15`,
+                          }
+                        : undefined
+                    }
+                  >
+                    {label}
+                  </span>
+                );
+              })}
             </div>
           </div>
 
-          <div className="col" style={{ gap: '8px' }}>
+          {/* Оказываемые услуги */}
+          {vetServices.length > 0 && (
+            <div className="col gap-md">
+              <span className="section-title">
+                Оказываемые услуги ({vetServices.length})
+              </span>
+              <div className="chips">
+                {vetServices.map((svc) => (
+                  <span key={svc.id} className="badge badge-outline" title={svc.name}>
+                    {svc.name}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+
+          <div className="col gap-md">
             <span className="section-title">Лечит</span>
             <div className="chips">
               {permissions.length > 0 ? (
@@ -124,7 +161,7 @@ export const VeterinarianDetailIsland: React.FC<VeterinarianDetailIslandProps> =
             </div>
           </div>
 
-          <div className="col" style={{ gap: '8px' }}>
+          <div className="col gap-md">
             <span className="section-title">Недельный график</span>
             <div className="dtable keep-table" style={{ '--cols': '44px 1fr 1.4fr' } as React.CSSProperties}>
               {DOW_ORDER.map((dow) => {
@@ -158,7 +195,7 @@ export const VeterinarianDetailIsland: React.FC<VeterinarianDetailIslandProps> =
             </div>
           </div>
 
-          <div className="col" style={{ gap: '8px' }}>
+          <div className="col gap-md">
             <span className="section-title">Отсутствия и особые часы</span>
             {exceptions.length > 0 ? (
               exceptions.map((exc) => {
@@ -180,10 +217,9 @@ export const VeterinarianDetailIsland: React.FC<VeterinarianDetailIslandProps> =
                 return (
                   <div
                     key={exc.id}
-                    className="row between"
-                    style={{ padding: '6px 0', borderBottom: '1px solid var(--border)' }}
+                    className="row between py-xs border-b"
                   >
-                    <div className="col" style={{ gap: 0 }}>
+                    <div className="col gap-0">
                       <span className="cell-main tnum">{range}</span>
                       <span className="cell-sub">{subtitle}</span>
                     </div>

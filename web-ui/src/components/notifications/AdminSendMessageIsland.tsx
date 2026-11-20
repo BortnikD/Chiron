@@ -174,32 +174,24 @@ export function AdminSendMessageIsland({
 
   return (
     <section className="island detail-island" aria-label="Написать сообщение">
+      <button
+        type="button"
+        className="detail-pinned-close"
+        onClick={onClose}
+        aria-label="Закрыть"
+      >
+        <X size={16} />
+      </button>
+
       <div className="island-head">
         <span className="island-title">
           <Mail className="ic text-primary" size={18} />
           <span>Написать пользователю</span>
         </span>
-        <button
-          type="button"
-          className="btn btn-ghost btn-icon btn-sm"
-          onClick={onClose}
-          aria-label="Закрыть"
-        >
-          <X size={16} />
-        </button>
       </div>
 
-      <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
-        <div
-          className="island-body"
-          style={{
-            padding: '16px',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '14px',
-            overflowY: 'auto',
-          }}
-        >
+      <form onSubmit={handleSubmit} className="form-vertical">
+        <div className="island-body p-island col gap-lg">
           {error && (
             <div className="alert alert-destructive small" role="alert">
               <AlertCircle size={15} />
@@ -215,48 +207,25 @@ export function AdminSendMessageIsland({
           )}
 
           {/* Выбор получателя */}
-          <div className="col" style={{ gap: '5px' }}>
-            <label htmlFor="island-recipient-search" className="small" style={{ fontWeight: 600 }}>
+          <div className="col gap-xs">
+            <label htmlFor="island-recipient-search" className="small font-semibold">
               Получатель <span className="text-danger">*</span>
             </label>
 
             {selectedUser ? (
-              <div
-                className="row between middle"
-                style={{
-                  padding: '7px 10px',
-                  borderRadius: '8px',
-                  border: '1px solid var(--border)',
-                  background: 'var(--muted)',
-                  gap: '8px',
-                }}
-              >
-                <div className="row middle" style={{ gap: '8px', minWidth: 0 }}>
-                  <div
-                    style={{
-                      width: '28px',
-                      height: '28px',
-                      borderRadius: '50%',
-                      background: 'var(--card)',
-                      display: 'grid',
-                      placeItems: 'center',
-                      flex: 'none',
-                      fontWeight: 700,
-                      fontSize: '11px',
-                      border: '1px solid var(--border)',
-                      color: 'var(--primary)',
-                    }}
-                  >
+              <div className="selected-recipient-card">
+                <div className="row middle gap-md min-w-0">
+                  <div className="initial-avatar-sm">
                     {(selectedUser.firstName?.[0] || selectedUser.email?.[0] || 'П').toUpperCase()}
                   </div>
-                  <div className="col" style={{ gap: '1px', minWidth: 0 }}>
-                    <div className="row middle" style={{ gap: '5px' }}>
-                      <span style={{ fontWeight: 600, fontSize: '13px' }}>
+                  <div className="col gap-1 min-w-0">
+                    <div className="row middle gap-xs">
+                      <span className="text-sm font-semibold">
                         {formatUserFullName(selectedUser)}
                       </span>
                       <UserRoleBadge role={selectedUser.role} short />
                     </div>
-                    <span className="small muted" style={{ fontSize: '10.5px' }}>
+                    <span className="small muted text-2xs">
                       {[selectedUser.phone, selectedUser.email].filter(Boolean).join(' · ')}
                     </span>
                   </div>
@@ -264,8 +233,7 @@ export function AdminSendMessageIsland({
 
                 <button
                   type="button"
-                  className="btn btn-ghost btn-icon btn-sm"
-                  style={{ flex: 'none', height: '26px', width: '26px' }}
+                  className="btn btn-ghost btn-icon btn-sm flex-none"
                   onClick={() => {
                     setSelectedUser(null);
                     setRecipientId('');
@@ -278,22 +246,17 @@ export function AdminSendMessageIsland({
                 </button>
               </div>
             ) : (
-              <div ref={dropdownRef} style={{ position: 'relative' }}>
-                <div className="row middle" style={{ position: 'relative' }}>
+              <div ref={dropdownRef} className="pos-rel">
+                <div className="row middle pos-rel">
                   <Search
                     size={15}
-                    className="text-muted"
-                    style={{ position: 'absolute', left: '10px', pointerEvents: 'none' }}
+                    className="text-muted pos-abs-l"
                   />
                   <input
                     ref={inputRef}
                     id="island-recipient-search"
                     type="text"
-                    className="input sm"
-                    style={{
-                      paddingLeft: '32px',
-                      paddingRight: searchQuery ? '32px' : '28px',
-                    }}
+                    className="input sm search-input-with-icon"
                     placeholder="Имя, телефон или email..."
                     value={searchQuery}
                     onChange={(e) => {
@@ -307,8 +270,7 @@ export function AdminSendMessageIsland({
                   {searchQuery ? (
                     <button
                       type="button"
-                      className="btn btn-ghost btn-icon btn-sm"
-                      style={{ position: 'absolute', right: '4px', height: '24px', width: '24px' }}
+                      className="btn btn-ghost btn-icon btn-sm pos-abs-btn"
                       onClick={() => {
                         setSearchQuery('');
                         inputRef.current?.focus();
@@ -319,80 +281,55 @@ export function AdminSendMessageIsland({
                   ) : (
                     <ChevronDown
                       size={14}
-                      className="text-muted"
-                      style={{ position: 'absolute', right: '10px', pointerEvents: 'none' }}
+                      className="text-muted pos-abs-r"
                     />
                   )}
                 </div>
 
                 {isDropdownOpen && (
-                  <div
-                    style={{
-                      position: 'absolute',
-                      top: 'calc(100% + 4px)',
-                      left: 0,
-                      right: 0,
-                      maxHeight: '210px',
-                      overflowY: 'auto',
-                      background: 'var(--card)',
-                      border: '1px solid var(--border)',
-                      borderRadius: '8px',
-                      boxShadow: 'var(--shadow-lg)',
-                      zIndex: 50,
-                      padding: '4px',
-                    }}
-                  >
+                  <div className="dropdown-menu-island">
                     {loadingUsers && filteredUsers.length === 0 ? (
-                      <div style={{ padding: '12px', textAlign: 'center', fontSize: '12px', color: 'var(--muted-foreground)' }}>
+                      <div className="p-3 text-center text-xs text-muted">
                         Поиск пользователей...
                       </div>
                     ) : filteredUsers.length === 0 ? (
-                      <div style={{ padding: '12px', textAlign: 'center', fontSize: '12px', color: 'var(--muted-foreground)' }}>
+                      <div className="p-3 text-center text-xs text-muted">
                         Пользователь не найден
                       </div>
                     ) : (
                       <>
                         {loadingUsers && (
-                          <div style={{ padding: '4px 8px', fontSize: '11px', color: 'var(--primary)', borderBottom: '1px solid var(--border)' }}>
+                          <div className="p-1 text-xs text-primary border-b">
                             Обновление списка...
                           </div>
                         )}
                         {filteredUsers.map((u) => {
-                        const name = formatUserFullName(u);
-                        return (
-                          <div
-                            key={u.id}
-                            className="row between middle"
-                            style={{
-                              padding: '6px 8px',
-                              borderRadius: '6px',
-                              cursor: 'pointer',
-                              gap: '6px',
-                              transition: 'background 0.12s ease',
-                            }}
-                            onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--accent)')}
-                            onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
-                            onClick={() => {
-                              setSelectedUser(u);
-                              setRecipientId(String(u.id));
-                              setIsDropdownOpen(false);
-                              setError(null);
-                            }}
-                          >
-                            <div className="col" style={{ gap: '1px', minWidth: 0 }}>
-                              <div className="row middle" style={{ gap: '5px' }}>
-                                <span style={{ fontWeight: 600, fontSize: '12.5px' }}>{name}</span>
-                                <UserRoleBadge role={u.role} short />
+                          const name = formatUserFullName(u);
+                          return (
+                            <div
+                              key={u.id}
+                              className="dropdown-item-user"
+                              onClick={() => {
+                                setSelectedUser(u);
+                                setRecipientId(String(u.id));
+                                setIsDropdownOpen(false);
+                                setError(null);
+                              }}
+                            >
+                              <div className="col gap-1 min-w-0">
+                                <div className="row middle gap-xs">
+                                  <span className="text-sm font-semibold">{name}</span>
+                                  <UserRoleBadge role={u.role} short />
+                                </div>
+                                <span className="small muted text-2xs">
+                                  {[u.phone, u.email].filter(Boolean).join(' · ')}
+                                </span>
                               </div>
-                              <span className="small muted" style={{ fontSize: '10.5px' }}>
-                                {[u.phone, u.email].filter(Boolean).join(' · ')}
-                              </span>
                             </div>
-                          </div>
-                        );
-                      })}
-                    </>
-                  )}
+                          );
+                        })}
+                      </>
+                    )}
                   </div>
                 )}
               </div>
@@ -400,8 +337,8 @@ export function AdminSendMessageIsland({
           </div>
 
           {/* Тема сообщения */}
-          <div className="col" style={{ gap: '5px' }}>
-            <label htmlFor="island-notif-title" className="small" style={{ fontWeight: 600 }}>
+          <div className="col gap-xs">
+            <label htmlFor="island-notif-title" className="small font-semibold">
               Тема сообщения <span className="text-danger">*</span>
             </label>
             <input
@@ -417,37 +354,27 @@ export function AdminSendMessageIsland({
           </div>
 
           {/* Текст сообщения */}
-          <div className="col" style={{ gap: '5px' }}>
-            <label htmlFor="island-notif-body" className="small" style={{ fontWeight: 600 }}>
+          <div className="col gap-xs">
+            <label htmlFor="island-notif-body" className="small font-semibold">
               Текст сообщения <span className="text-danger">*</span>
             </label>
             <textarea
               id="island-notif-body"
-              className="input"
+              className="input textarea-message"
               rows={6}
               placeholder="Введите текст сообщения..."
               maxLength={4000}
-              style={{ height: 'auto', resize: 'vertical', fontSize: '13px' }}
               value={body}
               onChange={(e) => setBody(e.target.value)}
               required
             />
-            <span className="small muted" style={{ textAlign: 'right', fontSize: '10.5px' }}>
+            <span className="small muted text-right text-2xs">
               {body.length} / 4000
             </span>
           </div>
         </div>
 
-        <div
-          className="island-foot"
-          style={{
-            padding: '12px 18px',
-            borderTop: '1px solid var(--border)',
-            display: 'flex',
-            justifyContent: 'flex-end',
-            gap: '8px',
-          }}
-        >
+        <div className="island-foot p-island border-t row justify-end gap-md">
           <button
             type="button"
             className="btn btn-secondary btn-sm"

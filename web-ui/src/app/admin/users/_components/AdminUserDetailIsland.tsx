@@ -123,6 +123,15 @@ export const AdminUserDetailIsland: React.FC<AdminUserDetailIslandProps> = ({
 
   return (
     <section className="island detail-island" aria-label="Пользователь">
+      <button
+        type="button"
+        className="detail-pinned-close"
+        aria-label="Закрыть"
+        onClick={onClose}
+      >
+        <X size={16} />
+      </button>
+
       <div className="island-head">
         <div className="row">
           <span className="avatar avatar-lg">{getUserInitials(user, 'ПЛ')}</span>
@@ -135,8 +144,8 @@ export const AdminUserDetailIsland: React.FC<AdminUserDetailIslandProps> = ({
             </div>
           </div>
         </div>
-        <div className="row" style={{ gap: 4 }}>
-          {onEditClick && (
+        {onEditClick && (
+          <div className="row" style={{ gap: 4 }}>
             <button
               type="button"
               className="btn btn-ghost btn-icon btn-sm"
@@ -146,16 +155,8 @@ export const AdminUserDetailIsland: React.FC<AdminUserDetailIslandProps> = ({
             >
               <Edit2 size={16} />
             </button>
-          )}
-          <button
-            type="button"
-            className="btn btn-ghost btn-icon btn-sm"
-            aria-label="Закрыть"
-            onClick={onClose}
-          >
-            <X size={16} />
-          </button>
-        </div>
+          </div>
+        )}
       </div>
 
       <div className="tabs-line">

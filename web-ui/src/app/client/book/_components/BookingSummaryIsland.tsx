@@ -63,35 +63,34 @@ export const BookingSummaryIsland: React.FC<BookingSummaryIslandProps> = ({
 
   return (
     <aside
-      className="island"
-      style={{ width: '320px', flex: 'none' }}
+      className="island w-320 flex-none"
       aria-label="Сводка записи"
     >
       <div className="island-head">
         <span className="island-title">Сводка</span>
       </div>
       <div className="island-body">
-        <div className="col" style={{ gap: '14px' }}>
-          <div className="col" style={{ gap: '2px' }}>
+        <div className="col gap-md">
+          <div className="col gap-2xs">
             <span className="small muted">Питомец</span>
             <span className="cell-main">
               {petName ? `${petName}${speciesName ? ` · ${speciesName}` : ''}` : '—'}
             </span>
           </div>
-          <div className="col" style={{ gap: '2px' }}>
+          <div className="col gap-2xs">
             <span className="small muted">
               {selectedServices && selectedServices.length > 1
                 ? `Услуги (${selectedServices.length})`
                 : 'Услуга'}
             </span>
             {selectedServices && selectedServices.length > 1 ? (
-              <div className="col" style={{ gap: '4px', marginTop: '2px' }}>
+              <div className="col gap-xs mt-2xs">
                 {selectedServices.map((s) => (
-                  <div key={s.id} className="row between" style={{ fontSize: '13px', gap: '6px' }}>
-                    <span style={{ fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  <div key={s.id} className="row between text-sm gap-xs">
+                    <span className="font-medium truncate">
                       {s.name}
                     </span>
-                    <span className="small muted tnum" style={{ flexShrink: 0 }}>
+                    <span className="small muted tnum shrink-0">
                       {formatCurrency(s.effectivePrice ?? s.basePrice ?? s.price ?? 0)}
                     </span>
                   </div>
@@ -101,24 +100,24 @@ export const BookingSummaryIsland: React.FC<BookingSummaryIslandProps> = ({
               <span className="cell-main">{serviceName || '—'}</span>
             )}
           </div>
-          <div className="col" style={{ gap: '4px' }}>
+          <div className="col gap-xs">
             <span className="small muted">Врач</span>
-            <span className="cell-main" style={{ fontWeight: 600, fontSize: '15px' }}>
+            <span className="cell-main font-semibold text-base">
               {doctorDisplay}
             </span>
 
             {isAnyVet && !selectedSlotStartAt && (
-              <span className="small muted" style={{ fontSize: '12px' }}>
+              <span className="small muted text-xs">
                 Будет назначен по выбранному времени
               </span>
             )}
 
             {showSlotVetPicker && isAnyVet && availableVetsForSlot && availableVetsForSlot.length > 1 && onSelectSlotVetId && (
-              <div className="col" style={{ gap: '6px', marginTop: '6px' }}>
-                <span className="small muted" style={{ fontSize: '12px' }}>
+              <div className="col gap-xs mt-xs">
+                <span className="small muted text-xs">
                   Выбор врача на это время ({availableVetsForSlot.length}):
                 </span>
-                <div className="col" style={{ gap: '6px' }}>
+                <div className="col gap-xs">
                   {availableVetsForSlot.map((v) => {
                     const isChosen = (selectedSlotVetId || availableVetsForSlot[0].id) === v.id;
                     const doc = getDoctorDisplay(v, specsMap);
@@ -127,51 +126,25 @@ export const BookingSummaryIsland: React.FC<BookingSummaryIslandProps> = ({
                         key={v.id}
                         type="button"
                         onClick={() => onSelectSlotVetId(v.id)}
-                        className={`btn ${isChosen ? 'btn-primary' : 'btn-outline'}`}
-                        style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '10px',
-                          justifyContent: 'flex-start',
-                          padding: '8px 12px',
-                          minHeight: '48px',
-                          width: '100%',
-                          textAlign: 'left',
-                          fontSize: '13px',
-                          fontWeight: isChosen ? 600 : 500,
-                          borderRadius: '8px',
-                        }}
+                        className={`btn ${isChosen ? 'btn-primary font-semibold' : 'btn-outline font-medium'} vet-picker-btn`}
                       >
                         <VetAvatar
                           vet={v}
                           initials={doc.initials}
-                          style={{ width: 28, height: 28, fontSize: '11px', flexShrink: 0 }}
+                          className="vet-picker-ava"
                           alt={doc.name}
                         />
-                        <div className="col" style={{ gap: '3px', minWidth: 0, flex: 1, lineHeight: 1.25 }}>
-                          <span
-                            style={{
-                              textOverflow: 'ellipsis',
-                              overflow: 'hidden',
-                              whiteSpace: 'nowrap',
-                              fontWeight: 600,
-                              fontSize: '13px',
-                            }}
-                          >
+                        <div className="col gap-2xs min-w-0 flex-1 leading-tight">
+                          <span className="truncate font-semibold text-sm">
                             {doc.name}
                           </span>
                           <span
-                            style={{
-                              fontSize: '11px',
-                              lineHeight: 1.2,
-                              color: isChosen ? 'rgba(0, 0, 0, 0.75)' : 'var(--muted-foreground)',
-                              fontWeight: 400,
-                            }}
+                            className={`text-2xs leading-tight font-normal ${isChosen ? 'text-fg' : 'muted'}`}
                           >
                             {doc.specName}
                           </span>
                         </div>
-                        {isChosen && <Check size={16} style={{ flexShrink: 0 }} />}
+                        {isChosen && <Check size={16} className="shrink-0" />}
                       </button>
                     );
                   })}
@@ -180,22 +153,22 @@ export const BookingSummaryIsland: React.FC<BookingSummaryIslandProps> = ({
             )}
 
             {showSlotVetPicker && isAnyVet && availableVetsForSlot && availableVetsForSlot.length === 1 && selectedSlotStartAt && (
-              <span className="small muted" style={{ fontSize: '12px', marginTop: '2px' }}>
+              <span className="small muted text-xs mt-2xs">
                 Назначен специалист клиники на это время
               </span>
             )}
           </div>
-          <div className="col" style={{ gap: '2px' }}>
+          <div className="col gap-2xs">
             <span className="small muted">Дата и время</span>
             <span className="cell-main tnum">{whenLabel}</span>
           </div>
-          <div className="col" style={{ gap: '2px' }}>
+          <div className="col gap-2xs">
             <span className="small muted">Длительность</span>
             <span className="tnum">
               {serviceDurationMin != null ? `${serviceDurationMin} мин` : '—'}
             </span>
           </div>
-          <div className="col" style={{ gap: '2px' }}>
+          <div className="col gap-2xs">
             <span className="small muted">Стоимость</span>
             <span className="kpi-value accent">
               {servicePrice != null ? formatCurrency(servicePrice) : '—'}
