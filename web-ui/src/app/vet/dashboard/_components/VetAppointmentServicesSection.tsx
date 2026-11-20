@@ -189,24 +189,24 @@ export const VetAppointmentServicesSection: React.FC<VetAppointmentServicesSecti
   }, [appointmentServices, appointment.status, isStarted]);
 
   return (
-    <div className="col" style={{ gap: '10px' }}>
+    <div className="col gap-base">
       <div className="row between items-center">
-        <span className="section-title" style={{ margin: 0, fontWeight: 700 }}>
+        <span className="section-title m-0 font-bold">
           {isStarted || appointment.status === 'COMPLETED' ? 'Оказанные услуги' : 'Услуги приёма'} ({appointmentServices.length})
         </span>
-        <span className="tnum" style={{ fontWeight: 700, color: 'var(--primary)' }}>
+        <span className="tnum font-bold text-primary">
           {formatCurrency(appointment.actualTotal ?? computedTotal)}
         </span>
       </div>
 
       {error && (
-        <div className="alert alert-destructive" role="alert" style={{ padding: '8px 12px', fontSize: '13px' }}>
+        <div className="alert alert-destructive p-xs text-sm" role="alert">
           <AlertCircle size={15} className="ic" />
           <span>{error}</span>
         </div>
       )}
 
-      <div className="col" style={{ gap: '6px' }}>
+      <div className="col gap-sm">
         {appointmentServices.map((svc) => {
           const isCompleted = appointment.status === 'COMPLETED';
           const isVisitActiveOrDone = isStarted || isCompleted;
@@ -218,22 +218,13 @@ export const VetAppointmentServicesSection: React.FC<VetAppointmentServicesSecti
           return (
             <div
               key={svc.serviceId}
-              className="row between items-center"
-              style={{
-                padding: '8px 12px',
-                borderRadius: '8px',
-                border: '1px solid var(--border)',
-                background: isNotDone ? 'transparent' : 'color-mix(in srgb, var(--card) 95%, transparent)',
-                opacity: isNotDone ? 0.6 : 1,
-                gap: '8px',
-              }}
+              className={`service-item-row ${isNotDone ? 'opacity-60 bg-transparent' : ''}`}
             >
-              <div className="row items-center grow" style={{ gap: '10px', minWidth: 0 }}>
+              <div className="row items-center grow gap-base min-w-0">
                 {canEditServices && (isStarted || appointment.status === 'COMPLETED') ? (
                   <button
                     type="button"
-                    className={`btn btn-sm btn-icon ${isDone ? 'btn-primary' : 'btn-outline'}`}
-                    style={{ width: '24px', height: '24px', borderRadius: '6px', flexShrink: 0 }}
+                    className={`btn btn-sm btn-icon service-check-btn ${isDone ? 'btn-primary' : 'btn-outline'}`}
                     onClick={() => handleTogglePerformed(svc.serviceId, svc.isPerformed)}
                     disabled={submitting}
                     title={isDone ? 'Отметить как не оказанную' : 'Отметить как оказанную'}
@@ -242,44 +233,33 @@ export const VetAppointmentServicesSection: React.FC<VetAppointmentServicesSecti
                   </button>
                 ) : (
                   <span
-                    style={{
-                      width: '8px',
-                      height: '8px',
-                      borderRadius: '50%',
-                      background: isDone ? 'var(--primary)' : 'var(--muted)',
-                      flexShrink: 0,
-                    }}
+                    className={`service-status-dot ${isDone ? 'bg-primary' : 'bg-muted'}`}
                   />
                 )}
 
-                <div className="col" style={{ gap: '2px', minWidth: 0 }}>
+                <div className="col gap-xs min-w-0">
                   <span
-                    className="small"
-                    style={{
-                      fontWeight: 600,
-                      textDecoration: isNotDone ? 'line-through' : 'none',
-                      wordBreak: 'break-word',
-                    }}
+                    className={`small font-semibold break-words ${isNotDone ? 'line-through' : ''}`}
                   >
                     {svc.nameSnapshot}
                   </span>
-                  <div className="row wrap items-center" style={{ gap: '6px' }}>
+                  <div className="row wrap items-center gap-sm">
                     {svc.isPlanned ? (
-                      <span className="badge badge-outline" style={{ fontSize: '11px', padding: '1px 6px' }}>
+                      <span className="badge badge-outline badge-counter">
                         Запланирована
                       </span>
                     ) : (
-                      <span className="badge badge-accent" style={{ fontSize: '11px', padding: '1px 6px' }}>
+                      <span className="badge badge-accent badge-counter">
                         Добавлена врачом
                       </span>
                     )}
                     {isDone && (
-                      <span className="small text-success" style={{ fontSize: '11px' }}>
+                      <span className="small text-success text-xs">
                         ✓ Оказана
                       </span>
                     )}
                     {isNotDone && (
-                      <span className="small muted" style={{ fontSize: '11px' }}>
+                      <span className="small muted text-xs">
                         Не оказана
                       </span>
                     )}
@@ -287,20 +267,14 @@ export const VetAppointmentServicesSection: React.FC<VetAppointmentServicesSecti
                 </div>
               </div>
 
-              <div className="row items-center" style={{ gap: '8px', flexShrink: 0 }}>
-                <span className="small tnum" style={{ fontWeight: 600 }}>
+              <div className="row items-center gap-md shrink-0">
+                <span className="small tnum font-semibold">
                   {formatCurrency(svc.priceSnapshot)}
                 </span>
                 {canRemove && canEditServices && (
                   <button
                     type="button"
-                    className="btn btn-ghost btn-icon btn-sm"
-                    style={{
-                      color: 'var(--destructive)',
-                      width: '26px',
-                      height: '26px',
-                      borderRadius: '6px',
-                    }}
+                    className="btn btn-ghost btn-icon btn-sm service-delete-btn"
                     onClick={() => handleRemoveService(svc.serviceId)}
                     disabled={submitting}
                     title="Удалить услугу"
@@ -317,25 +291,14 @@ export const VetAppointmentServicesSection: React.FC<VetAppointmentServicesSecti
       {canEditServices && (
         <>
           {isAdding ? (
-            <div
-              className="col"
-              style={{
-                gap: '8px',
-                padding: '12px',
-                borderRadius: '8px',
-                background: 'color-mix(in srgb, var(--card) 95%, transparent)',
-                border: '1px solid var(--border)',
-                boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
-              }}
-            >
+            <div className="service-add-panel">
               <div className="row between items-center">
-                <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--muted-foreground)' }}>
+                <span className="text-xs font-semibold text-muted">
                   Выберите процедуру или услугу:
                 </span>
                 <button
                   type="button"
                   className="btn btn-ghost btn-icon btn-sm"
-                  style={{ width: '22px', height: '22px' }}
                   onClick={() => {
                     setIsAdding(false);
                     setSearchQuery('');
@@ -347,22 +310,14 @@ export const VetAppointmentServicesSection: React.FC<VetAppointmentServicesSecti
                 </button>
               </div>
 
-              <div style={{ position: 'relative' }}>
+              <div className="pos-rel">
                 <Search
                   size={14}
-                  style={{
-                    position: 'absolute',
-                    left: '10px',
-                    top: '50%',
-                    transform: 'translateY(-50%)',
-                    color: 'var(--muted-foreground)',
-                    pointerEvents: 'none',
-                  }}
+                  className="pos-abs-l text-muted"
                 />
                 <input
                   type="text"
-                  className="input input-sm"
-                  style={{ paddingLeft: '32px', width: '100%' }}
+                  className="input input-sm search-input-with-icon w-full"
                   placeholder="Поиск по названию..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
@@ -371,20 +326,9 @@ export const VetAppointmentServicesSection: React.FC<VetAppointmentServicesSecti
                 />
               </div>
 
-              <div
-                className="col"
-                style={{
-                  maxHeight: '190px',
-                  overflowY: 'auto',
-                  gap: '4px',
-                  borderRadius: '6px',
-                  border: '1px solid var(--border)',
-                  background: 'var(--card)',
-                  padding: '4px',
-                }}
-              >
+              <div className="service-search-results">
                 {filteredAvailableServices.length === 0 ? (
-                  <div style={{ padding: '12px', textAlign: 'center', fontSize: '12px', color: 'var(--muted-foreground)' }}>
+                  <div className="p-3 text-center text-xs text-muted">
                     {availableServicesToAdd.length === 0 ? 'Все доступные услуги уже добавлены' : 'Ничего не найдено'}
                   </div>
                 ) : (
@@ -396,55 +340,19 @@ export const VetAppointmentServicesSection: React.FC<VetAppointmentServicesSecti
                       <button
                         key={s.id}
                         type="button"
-                        className="row between items-center"
-                        style={{
-                          padding: '7px 10px',
-                          borderRadius: '6px',
-                          border: 'none',
-                          background: 'transparent',
-                          textAlign: 'left',
-                          cursor: 'pointer',
-                          transition: 'background 0.15s ease',
-                          color: 'inherit',
-                          gap: '8px',
-                        }}
-                        onMouseEnter={(e) => {
-                          e.currentTarget.style.background = 'color-mix(in srgb, var(--primary) 12%, var(--card))';
-                        }}
-                        onMouseLeave={(e) => {
-                          e.currentTarget.style.background = 'transparent';
-                        }}
+                        className="service-option-item"
                         onClick={() => handleAddService(s.id)}
                         disabled={submitting}
                       >
-                        <div className="col" style={{ gap: '2px', minWidth: 0 }}>
-                          <span
-                            style={{
-                              fontSize: '13px',
-                              fontWeight: 500,
-                              overflow: 'hidden',
-                              textOverflow: 'ellipsis',
-                              whiteSpace: 'nowrap',
-                            }}
-                          >
+                        <div className="col gap-xs min-w-0">
+                          <span className="text-sm font-medium truncate">
                             {s.name}
                           </span>
-                          <span style={{ fontSize: '11px', color: 'var(--muted-foreground)' }}>
+                          <span className="text-xs text-muted">
                             {duration} мин
                           </span>
                         </div>
-                        <span
-                          className="tnum"
-                          style={{
-                            fontSize: '12px',
-                            fontWeight: 700,
-                            color: 'var(--primary)',
-                            whiteSpace: 'nowrap',
-                            padding: '2px 8px',
-                            borderRadius: '4px',
-                            background: 'color-mix(in srgb, var(--primary) 12%, transparent)',
-                          }}
-                        >
+                        <span className="tnum service-price-pill">
                           {formatCurrency(price)}
                         </span>
                       </button>
@@ -454,7 +362,7 @@ export const VetAppointmentServicesSection: React.FC<VetAppointmentServicesSecti
               </div>
 
               {submitting && (
-                <div className="row items-center justify-center" style={{ gap: '6px', fontSize: '12px', color: 'var(--muted-foreground)', padding: '4px 0' }}>
+                <div className="row items-center justify-center gap-sm text-xs text-muted py-xs">
                   <Loader2 size={13} className="ic spin" />
                   <span>Сохранение услуг...</span>
                 </div>
@@ -463,8 +371,7 @@ export const VetAppointmentServicesSection: React.FC<VetAppointmentServicesSecti
           ) : (
             <button
               type="button"
-              className="btn btn-outline btn-sm btn-block"
-              style={{ borderStyle: 'dashed' }}
+              className="btn btn-outline btn-sm btn-block border-dashed"
               onClick={() => setIsAdding(true)}
               disabled={submitting}
             >

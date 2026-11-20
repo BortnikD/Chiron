@@ -240,6 +240,15 @@ export const VetActiveAppointmentDrawer: React.FC<VetActiveAppointmentDrawerProp
   return (
     <>
       <section className="island detail-island xl:w-[460px]" aria-label="Детали приёма">
+        <button
+          type="button"
+          className="detail-pinned-close"
+          aria-label="Закрыть"
+          onClick={onClose}
+        >
+          <X className="ic" />
+        </button>
+
         <div className="island-head">
           <div className="row" style={{ minWidth: 0, gap: 12, alignItems: 'center' }}>
             <PetAvatar
@@ -267,14 +276,6 @@ export const VetActiveAppointmentDrawer: React.FC<VetActiveAppointmentDrawerProp
               </span>
             </div>
           </div>
-          <button
-            type="button"
-            className="btn btn-ghost btn-icon btn-sm"
-            aria-label="Закрыть"
-            onClick={onClose}
-          >
-            <X className="ic" />
-          </button>
         </div>
 
         <div className="island-body">
