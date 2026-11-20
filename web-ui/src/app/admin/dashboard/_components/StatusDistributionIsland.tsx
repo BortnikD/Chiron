@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useMemo } from 'react';
+import { computeDonutArcs } from './utils';
 import type { StatusDistributionIslandProps } from './types';
 
 export const StatusDistributionIsland = React.memo(function StatusDistributionIsland({ stats }: StatusDistributionIslandProps) {
@@ -9,21 +10,40 @@ export const StatusDistributionIsland = React.memo(function StatusDistributionIs
   const radius = 54;
   const circumference = 2 * Math.PI * radius;
 
-  // Рассчитываем SVG-сегменты с четкими стыками (без круглых наплывов)
+  // Рассчитываем SVG-сегменты с четкими стыками и гарантированной минимальной видимостью для малых долей (1%, 0.4%)
   const segments = useMemo(() => {
     if (!stats.total || stats.total === 0) return [];
-    let acc = 0;
-    const gap = stats.byStatus.filter((s) => s.count > 0).length > 1 ? 2 : 0;
 
-    return stats.byStatus.map((item) => {
+    const activeCount = stats.byStatus.filter((s) => s.count > 0).length;
+    const gap = activeCount > 1 ? 2.5 : 0;
+    const arcs = computeDonutArcs(
+      stats.byStatus.map((s) => s.count),
+      circumference,
+      15 // гарантированная дуга минимум 15px (при gap 2.5px чистый штрих = 12.5px ~ 13.3°)
+    );
+
+    let acc = 0;
+    return stats.byStatus.map((item, idx) => {
+      const arc = arcs[idx] || 0;
       const pctValue = (item.count / stats.total) * 100;
-      const strokeLength = (pctValue / 100) * circumference;
-      const strokeOffset = -(acc / 100) * circumference;
-      acc += pctValue;
+
+      if (arc <= 0 || item.count <= 0) {
+        return {
+          ...item,
+          pctValue,
+          strokeLength: 0,
+          strokeOffset: 0,
+        };
+      }
+
+      const strokeLength = Math.max(1, arc - gap);
+      const strokeOffset = -acc;
+      acc += arc;
+
       return {
         ...item,
         pctValue,
-        strokeLength: Math.max(0.5, strokeLength - gap),
+        strokeLength,
         strokeOffset,
       };
     });
@@ -59,7 +79,7 @@ export const StatusDistributionIsland = React.memo(function StatusDistributionIs
               viewBox="0 0 148 148"
               style={{ transform: 'rotate(-90deg)', overflow: 'visible' }}
             >
-              {segments.length === 0 ? (
+              {segments.length === 0 || segments.every((s) => s.strokeLength === 0) ? (
                 <circle
                   cx="74"
                   cy="74"
@@ -70,6 +90,7 @@ export const StatusDistributionIsland = React.memo(function StatusDistributionIs
                 />
               ) : (
                 segments.map((s) => {
+                  if (s.strokeLength <= 0) return null;
                   const isHovered = hoveredLabel === s.label;
                   return (
                     <circle

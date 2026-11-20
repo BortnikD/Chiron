@@ -155,13 +155,13 @@ export const TimelineChart = React.memo(function TimelineChart({
   const activeBar = hoveredIdx !== null ? timelineBars[hoveredIdx] : null;
 
   return (
-    <section className="island" style={{ minHeight: '340px' }} aria-label="Динамика">
+    <section className="island chart-island-minh" aria-label="Динамика">
       <div className="island-head">
         <span className="island-title">
           <BarChart2 className="ic w-4 h-4" />
           <span>Динамика</span>
         </span>
-        <div className="row wrap" style={{ gap: '8px' }}>
+        <div className="row wrap gap-md">
           <div className="seg">
             <button
               type="button"
@@ -205,50 +205,37 @@ export const TimelineChart = React.memo(function TimelineChart({
       </div>
       <div className="island-body">
         {timelineBars.length === 0 ? (
-          <div className="empty" style={{ minHeight: '220px' }}>
+          <div className="empty empty-minh-220">
             <BarChart2 className="ic ic-40" />
             <span className="empty-title">Нет данных за выбранный период</span>
             <span className="small">Попробуйте выбрать другой интервал дат.</span>
           </div>
         ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-            <div className="legend" style={{ marginBottom: '4px' }}>
+          <div className="col gap-md">
+            <div className="legend mb-1">
               {metric === 'count' ? (
                 <>
                   <span>
-                    <i style={{ background: 'var(--chart-2)' }} />
+                    <i className="chart-legend-dot-2" />
                     Все записи
                   </span>
                   <span>
-                    <i style={{ background: 'var(--chart-1)' }} />
+                    <i className="chart-legend-dot-1" />
                     Завершённые
                   </span>
                 </>
               ) : (
                 <span>
-                  <i style={{ background: 'var(--chart-1)' }} />
+                  <i className="chart-legend-dot-1" />
                   Выручка по завершённым
                 </span>
               )}
             </div>
 
             {/* График со шкалой Y и сеткой */}
-            <div style={{ display: 'flex', height: '200px', position: 'relative' }}>
+            <div className="chart-container-200">
               {/* Шкала оси Y */}
-              <div
-                style={{
-                  width: '56px',
-                  flexShrink: 0,
-                  height: '100%',
-                  position: 'relative',
-                  fontSize: '11px',
-                  color: 'var(--muted-foreground)',
-                  textAlign: 'right',
-                  paddingRight: '8px',
-                  userSelect: 'none',
-                }}
-                aria-hidden="true"
-              >
+              <div className="chart-y-axis" aria-hidden="true">
                 {ticks.map((t, idx) => (
                   <span
                     key={idx}
@@ -331,75 +318,45 @@ export const TimelineChart = React.memo(function TimelineChart({
                         }}
                         role="tooltip"
                       >
-                        <div
-                          style={{
-                            fontSize: '12px',
-                            fontWeight: 600,
-                            color: 'var(--foreground)',
-                            borderBottom: '1px solid var(--border)',
-                            paddingBottom: '4px',
-                          }}
-                        >
+                        <div className="text-xs font-semibold text-foreground border-b pb-1">
                           {activeBar.detailedDate}
                         </div>
                         {metric === 'count' ? (
                           <>
-                            <div className="row between" style={{ fontSize: '12px', gap: '12px', alignItems: 'center' }}>
-                              <span className="row" style={{ gap: '6px', alignItems: 'center' }}>
-                                <span style={{ width: 8, height: 8, borderRadius: 2, background: 'var(--chart-2)' }} />
+                            <div className="row between text-xs gap-lg items-center">
+                              <span className="row gap-sm items-center">
+                                <span className="chart-dot-sm-2" />
                                 <span>Все записи:</span>
                               </span>
                               <strong>{activeBar.pt.appointments}</strong>
                             </div>
-                            <div className="row between" style={{ fontSize: '12px', gap: '12px', alignItems: 'center' }}>
-                              <span className="row" style={{ gap: '6px', alignItems: 'center' }}>
-                                <span style={{ width: 8, height: 8, borderRadius: 2, background: 'var(--chart-1)' }} />
+                            <div className="row between text-xs gap-lg items-center">
+                              <span className="row gap-sm items-center">
+                                <span className="chart-dot-sm-1" />
                                 <span>Завершено:</span>
                               </span>
-                              <strong style={{ color: 'var(--chart-1)' }}>
+                              <strong className="text-chart-1">
                                 {activeBar.pt.completed}
                                 {activeBar.pt.appointments > 0
                                   ? ` (${Math.round((activeBar.pt.completed / activeBar.pt.appointments) * 100)}%)`
                                   : ''}
                               </strong>
                             </div>
-                            <div
-                              className="row between"
-                              style={{
-                                fontSize: '11.5px',
-                                gap: '12px',
-                                color: 'var(--muted-foreground)',
-                                marginTop: '2px',
-                                borderTop: '1px dashed var(--border)',
-                                paddingTop: '4px',
-                                alignItems: 'center',
-                              }}
-                            >
+                            <div className="row between text-xs gap-lg text-muted mt-xs border-t border-dashed pt-1 items-center">
                               <span>Выручка:</span>
                               <span>{formatCurrency(activeBar.pt.revenue)}</span>
                             </div>
                           </>
                         ) : (
                           <>
-                            <div className="row between" style={{ fontSize: '12px', gap: '12px', alignItems: 'center' }}>
-                              <span className="row" style={{ gap: '6px', alignItems: 'center' }}>
-                                <span style={{ width: 8, height: 8, borderRadius: 2, background: 'var(--chart-1)' }} />
+                            <div className="row between text-xs gap-lg items-center">
+                              <span className="row gap-sm items-center">
+                                <span className="chart-dot-sm-1" />
                                 <span>Выручка:</span>
                               </span>
-                              <strong style={{ color: 'var(--chart-1)' }}>{formatCurrency(activeBar.pt.revenue)}</strong>
+                              <strong className="text-chart-1">{formatCurrency(activeBar.pt.revenue)}</strong>
                             </div>
-                            <div
-                              className="row between"
-                              style={{
-                                fontSize: '11.5px',
-                                gap: '12px',
-                                color: 'var(--muted-foreground)',
-                                marginTop: '2px',
-                                borderTop: '1px dashed var(--border)',
-                                paddingTop: '4px',
-                                alignItems: 'center',
-                              }}
-                            >
+                            <div className="row between text-xs gap-lg text-muted mt-xs border-t border-dashed pt-1 items-center">
                               <span>Завершено приёмов:</span>
                               <span>
                                 {activeBar.pt.completed} из {activeBar.pt.appointments}

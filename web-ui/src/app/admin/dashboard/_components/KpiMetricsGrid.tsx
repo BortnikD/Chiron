@@ -16,43 +16,39 @@ export const KpiMetricsGrid = React.memo(function KpiMetricsGrid({ stats }: KpiM
           </span>
         </div>
 
-        <div className="col" style={{ gap: '2px' }}>
+        <div className="col gap-2xs">
           <span className="kpi-label">Выручка по завершённым приёмам</span>
-          <span className="kpi-value accent" style={{ fontSize: '34px' }}>
+          <span className="kpi-value accent kpi-value-lg">
             {stats.revenue}
           </span>
         </div>
 
         <div
-          className="col"
-          style={{ gap: '6px' }}
+          className="col gap-xs"
           title={`Фактическая выручка: ${stats.revenue} · Прогнозируемый итог с учётом предстоящих записей: ${stats.totalPossible} (получено ${stats.recvPct})`}
         >
-          <div className="bar-track" style={{ height: '7px', borderRadius: '999px', background: 'var(--muted)' }}>
+          <div className="bar-track kpi-bar-track">
             <span
-              className="bar-fill"
+              className="bar-fill kpi-bar-fill"
               style={{
                 width: stats.recvW,
                 background: 'var(--primary)',
-                borderRadius: '999px',
-                transition: 'width 0.3s ease',
               }}
             />
           </div>
-          <div className="row between small muted" style={{ fontSize: '12px' }}>
+          <div className="row between small muted text-xs">
             <span>
-              Получено <b style={{ color: 'var(--foreground)', fontWeight: 600 }}>{stats.recvPct}</b>
+              Получено <b className="text-fg font-semibold">{stats.recvPct}</b>
             </span>
             <span>
-              Прогноз: <span style={{ color: 'var(--foreground)', fontWeight: 500 }}>{stats.totalPossible}</span>
+              Прогноз: <span className="text-fg font-medium">{stats.totalPossible}</span>
             </span>
           </div>
         </div>
 
         <div className="kg-split">
           <div
-            className="col"
-            style={{ gap: '2px' }}
+            className="col gap-2xs"
             title="Рассчитано по всем предстоящим записям пациентов"
           >
             <span className="kpi-label">Ожидаемая выручка</span>
@@ -61,8 +57,7 @@ export const KpiMetricsGrid = React.memo(function KpiMetricsGrid({ stats }: KpiM
           </div>
 
           <div
-            className="col"
-            style={{ gap: '2px' }}
+            className="col gap-2xs"
             title={`Средняя стоимость одного завершённого визита (${stats.doneLabel})`}
           >
             <span className="kpi-label">Средний чек</span>
@@ -81,39 +76,33 @@ export const KpiMetricsGrid = React.memo(function KpiMetricsGrid({ stats }: KpiM
           </span>
         </div>
 
-        <div className="row" style={{ gap: '10px', alignItems: 'baseline' }}>
-          <span className="kpi-value" style={{ fontSize: '34px' }}>
+        <div className="row gap-sm items-baseline">
+          <span className="kpi-value kpi-value-lg">
             {stats.total}
           </span>
           <span className="muted">{stats.totalSub}</span>
         </div>
 
-        <div className="col" style={{ gap: '12px' }}>
+        <div className="col gap-md">
           {stats.rates.map((r) => (
             <div
               key={r.label}
-              className="col"
-              style={{ gap: '5px' }}
+              className="col gap-xs"
               title={`${r.label}: ${r.value} (${r.count})`}
             >
               <div className="row between small">
                 <span>{r.label}</span>
                 <span className="tnum">
-                  <b style={{ fontWeight: 600 }}>{r.value}</b> <span className="muted">· {r.count}</span>
+                  <b className="font-semibold">{r.value}</b> <span className="muted">· {r.count}</span>
                 </span>
               </div>
-              <div
-                className="bar-track"
-                style={{ height: '6px', borderRadius: '999px', background: 'var(--muted)' }}
-              >
+              <div className="bar-track kpi-bar-track-sm">
                 <span
-                  className="bar-fill"
+                  className="bar-fill kpi-bar-fill"
                   style={{
                     width: r.w,
                     minWidth: (r.countNum ?? 0) > 0 ? '6px' : '0px',
                     background: r.color,
-                    borderRadius: '999px',
-                    transition: 'width 0.3s ease',
                   }}
                 />
               </div>
@@ -131,29 +120,21 @@ export const KpiMetricsGrid = React.memo(function KpiMetricsGrid({ stats }: KpiM
           </span>
         </div>
 
-        <div className="kg-split" style={{ borderTop: 0, paddingTop: 0 }}>
-          <div className="col" style={{ gap: '2px' }}>
+        <div className="kg-split border-t-0 pt-0">
+          <div className="col gap-2xs">
             <span className="kpi-label">Новых клиентов</span>
             <span
-              className={`kpi-value ${stats.newClients > 0 ? 'accent' : ''}`}
-              style={{
-                fontSize: '34px',
-                color: stats.newClients > 0 ? 'var(--primary)' : 'var(--foreground)',
-              }}
+              className={`kpi-value ${stats.newClients > 0 ? 'accent text-primary' : 'text-fg'} kpi-value-lg`}
             >
               {stats.newClients > 0 ? `+${stats.newClients}` : stats.newClients}
             </span>
             <span className="kpi-sub">зарегистрировались</span>
           </div>
 
-          <div className="col" style={{ gap: '2px' }}>
+          <div className="col gap-2xs">
             <span className="kpi-label">Новых питомцев</span>
             <span
-              className={`kpi-value ${stats.newPets > 0 ? 'accent' : ''}`}
-              style={{
-                fontSize: '34px',
-                color: stats.newPets > 0 ? 'var(--primary)' : 'var(--foreground)',
-              }}
+              className={`kpi-value ${stats.newPets > 0 ? 'accent text-primary' : 'text-fg'} kpi-value-lg`}
             >
               {stats.newPets > 0 ? `+${stats.newPets}` : stats.newPets}
             </span>
@@ -162,13 +143,13 @@ export const KpiMetricsGrid = React.memo(function KpiMetricsGrid({ stats }: KpiM
         </div>
 
         <div className="kg-split">
-          <div className="col" style={{ gap: '2px' }}>
+          <div className="col gap-2xs">
             <span className="kpi-label">Всего клиентов</span>
             <span className="kg-num">{stats.clientsTotal}</span>
             <span className="kpi-sub">в базе клиники</span>
           </div>
 
-          <div className="col" style={{ gap: '2px' }}>
+          <div className="col gap-2xs">
             <span className="kpi-label">Всего питомцев</span>
             <span className="kg-num">{stats.petsTotal}</span>
             <span className="kpi-sub">на учёте</span>

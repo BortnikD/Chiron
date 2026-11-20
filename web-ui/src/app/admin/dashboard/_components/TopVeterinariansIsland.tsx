@@ -88,7 +88,7 @@ export const TopVeterinariansIsland = React.memo(function TopVeterinariansIsland
   }, [vetsStats, totalClinicRevenue]);
 
   return (
-    <section className="island" style={{ flex: 'none' }} aria-label="Статистика по врачам">
+    <section className="island flex-none" aria-label="Статистика по врачам">
       <div className="island-head">
         <span className="island-title">
           <Stethoscope className="ic w-4 h-4 text-primary" />
@@ -111,16 +111,7 @@ export const TopVeterinariansIsland = React.memo(function TopVeterinariansIsland
             <i style={{ background: ST_COLORS.NO_SHOW }} />
             Неявка
           </span>
-          <span
-            style={{
-              height: '14px',
-              width: '1px',
-              background: 'var(--border)',
-              margin: '0 4px',
-              display: 'inline-block',
-            }}
-            aria-hidden="true"
-          />
+          <span className="legend-divider" aria-hidden="true" />
           <span>
             <i style={{ background: 'var(--primary)' }} />
             Выручка
@@ -130,7 +121,7 @@ export const TopVeterinariansIsland = React.memo(function TopVeterinariansIsland
 
       <div className="island-body">
         {doctorRows.length === 0 ? (
-          <div className="empty" style={{ padding: '24px 12px' }}>
+          <div className="empty p-lg">
             <Stethoscope className="ic ic-40" />
             <span className="empty-title">Нет приёмов по врачам за выбранный период</span>
           </div>
@@ -139,7 +130,7 @@ export const TopVeterinariansIsland = React.memo(function TopVeterinariansIsland
             <div className="vrow vrow-head small muted">
               <span>Врач</span>
               <span>Записи по статусам</span>
-              <span style={{ paddingLeft: '16px', borderLeft: '1px solid var(--border)' }}>
+              <span className="pl-md border-l">
                 Выручка по завершённым
               </span>
             </div>
@@ -148,26 +139,18 @@ export const TopVeterinariansIsland = React.memo(function TopVeterinariansIsland
               const isDoctorHovered = hovered?.docId === r.id;
 
               return (
-                <div key={r.id} className="vrow" style={{ alignItems: 'center' }}>
+                <div key={r.id} className="vrow items-center">
                   {/* Колонка 1: имя и стабильный статический подзаголовок (строка никогда не меняет высоту!) */}
-                  <div className="col" style={{ gap: '1px', minWidth: 0 }}>
-                    <span className="cell-main" style={{ fontWeight: 500 }}>
+                  <div className="col gap-2xs min-w-0">
+                    <span className="cell-main font-medium">
                       {r.name}
                     </span>
                     <span className="cell-sub">{r.sub}</span>
                   </div>
 
                   {/* Колонка 2: сегментированная полоса статусов */}
-                  <div
-                    className="row"
-                    style={{
-                      gap: '10px',
-                      minWidth: 0,
-                      alignItems: 'center',
-                      position: 'relative',
-                    }}
-                  >
-                    <div className="stack-track" style={{ flex: 1, minWidth: '110px' }}>
+                  <div className="row gap-sm min-w-0 items-center pos-rel">
+                    <div className="stack-track flex-1 min-w-110">
                       {r.segs.map((g) => (
                         <span
                           key={g.key}
@@ -201,20 +184,7 @@ export const TopVeterinariansIsland = React.memo(function TopVeterinariansIsland
                     </div>
 
                     <span
-                      className="tnum"
-                      style={{
-                        width: '36px',
-                        minWidth: '36px',
-                        textAlign: 'center',
-                        flex: 'none',
-                        background: 'color-mix(in srgb, var(--muted) 80%, transparent)',
-                        border: '1px solid var(--border)',
-                        borderRadius: '6px',
-                        padding: '1px 4px',
-                        fontSize: '11px',
-                        fontWeight: 600,
-                        color: 'var(--foreground)',
-                      }}
+                      className="tnum tnum-badge"
                       title={`Всего записей: ${r.total}`}
                     >
                       {r.total}
@@ -223,26 +193,9 @@ export const TopVeterinariansIsland = React.memo(function TopVeterinariansIsland
                     {/* Аккуратный парящий бейдж НАД полосой — позиционируется над активным сегментом */}
                     {isDoctorHovered && hovered?.type === 'seg' && (
                       <div
+                        className="floating-tooltip"
                         style={{
-                          position: 'absolute',
-                          bottom: 'calc(100% + 4px)',
                           left: `${Math.min(85, Math.max(12, hovered.centerPct ?? 50))}%`,
-                          transform: 'translateX(-50%)',
-                          background: 'var(--popover)',
-                          color: 'var(--popover-foreground)',
-                          border: '1px solid var(--border)',
-                          borderRadius: '6px',
-                          padding: '2px 8px',
-                          fontSize: '11px',
-                          fontWeight: 600,
-                          whiteSpace: 'nowrap',
-                          boxShadow: 'var(--shadow-md)',
-                          pointerEvents: 'none',
-                          zIndex: 50,
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '6px',
-                          animation: 'fadeIn 0.12s ease',
                         }}
                       >
                         <i
@@ -261,16 +214,7 @@ export const TopVeterinariansIsland = React.memo(function TopVeterinariansIsland
 
                   {/* Колонка 3: полоса выручки с четким вертикальным разделителем колонок */}
                   <div
-                    className="row"
-                    style={{
-                      gap: '10px',
-                      minWidth: 0,
-                      alignItems: 'center',
-                      cursor: 'pointer',
-                      position: 'relative',
-                      paddingLeft: '16px',
-                      borderLeft: '1px solid var(--border)',
-                    }}
+                    className="row gap-sm min-w-0 items-center cursor-pointer pos-rel pl-md border-l"
                     title={`Выручка: ${r.revenue} · Ср. чек: ${r.avgCheck}`}
                     onMouseEnter={() =>
                       setHovered({
@@ -283,7 +227,7 @@ export const TopVeterinariansIsland = React.memo(function TopVeterinariansIsland
                     }
                     onMouseLeave={() => setHovered(null)}
                   >
-                    <div className="bar-track" style={{ flex: 1, height: '10px', minWidth: '40px' }}>
+                    <div className="bar-track bar-track-10">
                       <span
                         className="bar-fill"
                         style={{
@@ -296,39 +240,14 @@ export const TopVeterinariansIsland = React.memo(function TopVeterinariansIsland
                     </div>
 
                     <span
-                      className="tnum cell-main"
-                      style={{
-                        width: '84px',
-                        minWidth: '84px',
-                        textAlign: 'right',
-                        flex: 'none',
-                        fontWeight: isDoctorHovered && hovered?.type === 'rev' ? 700 : 500,
-                      }}
+                      className={`tnum cell-main revenue-cell ${isDoctorHovered && hovered?.type === 'rev' ? 'font-bold' : 'font-medium'}`}
                     >
                       {r.revenue}
                     </span>
 
                     {/* Аккуратный парящий бейдж НАД полосой выручки */}
                     {isDoctorHovered && hovered?.type === 'rev' && (
-                      <div
-                        style={{
-                          position: 'absolute',
-                          bottom: 'calc(100% + 4px)',
-                          right: '94px',
-                          background: 'var(--popover)',
-                          color: 'var(--popover-foreground)',
-                          border: '1px solid var(--border)',
-                          borderRadius: '6px',
-                          padding: '2px 8px',
-                          fontSize: '11px',
-                          fontWeight: 600,
-                          whiteSpace: 'nowrap',
-                          boxShadow: 'var(--shadow-md)',
-                          pointerEvents: 'none',
-                          zIndex: 50,
-                          animation: 'fadeIn 0.12s ease',
-                        }}
-                      >
+                      <div className="floating-tooltip-rev">
                         {hovered.text}
                       </div>
                     )}
