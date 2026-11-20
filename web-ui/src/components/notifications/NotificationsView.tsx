@@ -145,23 +145,41 @@ export const NotificationsView: React.FC<NotificationsViewProps> = ({
     };
   }, [onlyUnread]);
 
-  const handleMarkAsRead = async (id: string) => {
+  const handleMarkAsRead = useCallback(async (id: string) => {
+    const nowIso = new Date().toISOString();
+    // Оптимистичное обновление: сразу гасим бейджи и отметку "новое"
+    setNotifications((prev) =>
+      prev.map((n) => (n.id === id ? { ...n, readAt: n.readAt || nowIso } : n))
+    );
+    setSelectedNotification((prev) =>
+      prev && prev.id === id ? { ...prev, readAt: prev.readAt || nowIso } : prev
+    );
+    window.dispatchEvent(new CustomEvent('chiron:notifications-updated'));
+
     try {
       await notificationsApi.markAsRead(id);
-      const nowIso = new Date().toISOString();
-      setNotifications((prev) =>
-        onlyUnread
-          ? prev.filter((n) => n.id !== id)
-          : prev.map((n) => (n.id === id ? { ...n, readAt: n.readAt || nowIso } : n))
-      );
-      setSelectedNotification((prev) =>
-        prev && prev.id === id ? { ...prev, readAt: prev.readAt || nowIso } : prev
-      );
-      window.dispatchEvent(new CustomEvent('chiron:notifications-updated'));
     } catch (err) {
       toast('Ошибка', formatApiError(err, 'Не удалось отметить уведомление'), 'err');
     }
-  };
+  }, [toast]);
+
+  // Автоматическое прочтение при выборе уведомления
+  const handleSelectNotification = useCallback(
+    (n: AppNotification) => {
+      setSelectedNotification(n);
+      if (!n.readAt) {
+        void handleMarkAsRead(n.id);
+      }
+    },
+    [handleMarkAsRead]
+  );
+
+  // Автоматическое прочтение при начальном выборе уведомления (например при загрузке страницы)
+  useEffect(() => {
+    if (selectedNotification && !selectedNotification.readAt) {
+      void handleMarkAsRead(selectedNotification.id);
+    }
+  }, [selectedNotification?.id, handleMarkAsRead]);
 
   const handleMarkAllAsRead = async () => {
     const unreadBefore = notifications.filter((n) => !n.readAt).length;
@@ -192,7 +210,8 @@ export const NotificationsView: React.FC<NotificationsViewProps> = ({
   // Фильтрация входящих уведомлений
   const filteredInbox = useMemo(() => {
     return notifications.filter((n) => {
-      if (onlyUnread && n.readAt) return false;
+      // Сохраняем выбранное уведомление видимым, чтобы оно не исчезало внезапно при чтении
+      if (onlyUnread && n.readAt && selectedNotification?.id !== n.id) return false;
       if (selectedType !== 'ALL') {
         const meta = getNotifMeta(n);
         if (meta.shortType !== selectedType && meta.label !== selectedType) {
@@ -201,7 +220,7 @@ export const NotificationsView: React.FC<NotificationsViewProps> = ({
       }
       return true;
     });
-  }, [notifications, onlyUnread, selectedType]);
+  }, [notifications, onlyUnread, selectedType, selectedNotification?.id]);
 
   // Доступные типы событий для быстрых фильтров входящих
   const availableTypes = useMemo(() => {
@@ -231,10 +250,10 @@ export const NotificationsView: React.FC<NotificationsViewProps> = ({
   return (
     <div className="content-row">
       {/* Левая колонка: Реестр событий с фильтрами */}
-      <section className="island grow content-col" style={{ minWidth: 0 }}>
+      <section className="island grow content-col min-w-0">
         {/* Шапка реестра */}
-        <div className="island-head" style={{ gap: '10px', flexWrap: 'wrap' }}>
-          <div className="row middle" style={{ gap: '12px', flexWrap: 'wrap' }}>
+        <div className="island-head gap-base wrap">
+          <div className="row middle gap-lg wrap">
             <span className="island-title">
               <Bell className="ic" />
               <span>Уведомления</span>
@@ -242,7 +261,7 @@ export const NotificationsView: React.FC<NotificationsViewProps> = ({
 
             {/* Вкладки Входящие / Отправленные для администратора */}
             {role === 'ADMIN' && (
-              <div className="seg" role="tablist" style={{ marginLeft: '4px' }}>
+              <div className="seg ml-1" role="tablist">
                 <button
                   type="button"
                   role="tab"
@@ -256,10 +275,7 @@ export const NotificationsView: React.FC<NotificationsViewProps> = ({
                   <Bell size={13} />
                   <span>Входящие</span>
                   {unreadCount > 0 && (
-                    <span
-                      className="badge badge-accent small"
-                      style={{ fontSize: '10px', padding: '1px 5px', height: '17px' }}
-                    >
+                    <span className="badge badge-accent small badge-counter">
                       {unreadCount}
                     </span>
                   )}
@@ -277,10 +293,7 @@ export const NotificationsView: React.FC<NotificationsViewProps> = ({
                   <Send size={13} />
                   <span>Отправленные</span>
                   {sentMessages.length > 0 && (
-                    <span
-                      className="badge badge-outline small"
-                      style={{ fontSize: '10px', padding: '1px 5px', height: '17px' }}
-                    >
+                    <span className="badge badge-outline small badge-counter">
                       {sentMessages.length}
                     </span>
                   )}
@@ -291,17 +304,16 @@ export const NotificationsView: React.FC<NotificationsViewProps> = ({
 
           {/* Правая часть шапки: зависит от активной вкладки */}
           {activeTab === 'INBOX' ? (
-            <div className="row wrap" style={{ gap: '10px', alignItems: 'center' }}>
+            <div className="row wrap gap-base items-center">
               <span
-                className="row small muted"
-                style={{ gap: '6px' }}
+                className="row small muted gap-sm"
                 title="WebSocket STOMP /user/queue/notifications"
               >
                 <span className={`dot ${wsConnected ? '' : 'off'}`} />
                 {wsConnected ? 'Онлайн' : 'Офлайн'}
               </span>
 
-              <label className="row small" style={{ gap: '8px', cursor: 'pointer', userSelect: 'none' }}>
+              <label className="row small gap-md cursor-pointer select-none">
                 <button
                   id="notif-only-unread"
                   className={`switch ${onlyUnread ? 'on' : ''}`}
@@ -328,9 +340,9 @@ export const NotificationsView: React.FC<NotificationsViewProps> = ({
               </button>
             </div>
           ) : (
-            <div className="row wrap middle" style={{ gap: '10px' }}>
+            <div className="row wrap middle gap-base">
               <span className="small muted">
-                Всего отправлено: <strong style={{ color: 'var(--foreground)' }}>{sentMessages.length}</strong>
+                Всего отправлено: <strong className="text-foreground">{sentMessages.length}</strong>
               </span>
               {onOpenCompose && !isComposing && (
                 <button
@@ -348,16 +360,8 @@ export const NotificationsView: React.FC<NotificationsViewProps> = ({
 
         {/* Фильтры по типам событий (только для входящих) */}
         {activeTab === 'INBOX' && availableTypes.length > 1 && (
-          <div
-            className="row wrap"
-            style={{
-              padding: '6px 14px 10px',
-              gap: '6px',
-              alignItems: 'center',
-              borderBottom: '1px solid var(--border)',
-            }}
-          >
-            <span className="small muted" style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', marginRight: '4px' }}>
+          <div className="notif-filters">
+            <span className="small muted inline-flex items-center gap-xs mr-1">
               <Filter size={13} /> Тип:
             </span>
             <button
@@ -387,35 +391,23 @@ export const NotificationsView: React.FC<NotificationsViewProps> = ({
         )}
 
         {/* Список сообщений (Входящие или Отправленные) */}
-        <div className="island-body" style={{ padding: '8px 12px 14px' }}>
+        <div className="island-body p-sm">
           {activeTab === 'INBOX' ? (
             <>
               {error && (
-                <div className="alert alert-destructive" role="alert" style={{ margin: '0 0 10px' }}>
+                <div className="alert alert-destructive mb-2" role="alert">
                   <AlertCircle className="ic" />
                   <span>{error}</span>
                 </div>
               )}
 
               {loading ? (
-                <div className="col" style={{ gap: '8px' }}>
+                <div className="col gap-md">
                   {[1, 2, 3, 4, 5].map((i) => (
-                    <div
-                      key={`notif-skel-${i}`}
-                      style={{
-                        display: 'grid',
-                        gridTemplateColumns: 'auto 1fr auto',
-                        gap: '12px',
-                        alignItems: 'center',
-                        padding: '10px 12px',
-                        borderRadius: '10px',
-                        border: '1px solid var(--border)',
-                        background: 'var(--card)',
-                      }}
-                    >
+                    <div key={`notif-skel-${i}`} className="notif-skel">
                       <SkeletonCircle size={34} />
-                      <div className="col" style={{ gap: '6px' }}>
-                        <div className="row items-center" style={{ gap: '8px' }}>
+                      <div className="col gap-sm">
+                        <div className="row items-center gap-md">
                           <Skeleton width="90px" height="18px" borderRadius="10px" />
                           <Skeleton width="130px" height="15px" borderRadius="4px" />
                         </div>
@@ -441,7 +433,7 @@ export const NotificationsView: React.FC<NotificationsViewProps> = ({
                 </div>
               ) : (
                 inboxGroups.map((g) => (
-                  <div key={g.label} className="col" style={{ gap: '4px', paddingBottom: '10px' }}>
+                  <div key={g.label} className="col gap-xs pb-2">
                     <span className="menu-label">{g.label}</span>
                     {g.items.map((n) => {
                       const meta = getNotifMeta(n);
@@ -452,65 +444,29 @@ export const NotificationsView: React.FC<NotificationsViewProps> = ({
                           key={n.id}
                           type="button"
                           className={`notif ${isUnread ? 'unread' : ''} ${isSelected ? 'is-selected' : ''}`}
-                          onClick={() => setSelectedNotification(n)}
-                          style={{
-                            display: 'grid',
-                            gridTemplateColumns: 'auto 1fr auto',
-                            gap: '12px',
-                            alignItems: 'center',
-                            padding: '10px 12px',
-                            borderRadius: '10px',
-                          }}
+                          onClick={() => handleSelectNotification(n)}
                         >
-                          <span className={`notif-ic ${meta.cls}`} style={{ width: 34, height: 34, flexShrink: 0 }}>
+                          <span className={`notif-ic ${meta.cls}`}>
                             {meta.icon}
                           </span>
 
-                          <span className="col" style={{ gap: '3px', textAlign: 'left', minWidth: 0, flex: 1 }}>
-                            <div className="row wrap items-center" style={{ gap: '6px' }}>
-                              <span
-                                className={`sp-chip tone-${meta.tone}`}
-                                style={{
-                                  fontSize: '11px',
-                                  padding: '1px 7px',
-                                  height: '19px',
-                                  borderRadius: '5px',
-                                  fontWeight: 600,
-                                }}
-                              >
+                          <span className="col gap-1 text-left min-w-0 flex-1">
+                            <div className="row wrap items-center gap-sm">
+                              <span className={`sp-chip tone-${meta.tone} sp-chip-compact`}>
                                 {meta.shortType}
                               </span>
                             </div>
-                            <span
-                              className="notif-title"
-                              style={{
-                                fontWeight: 600,
-                                fontSize: '13px',
-                                color: 'var(--foreground)',
-                                overflow: 'hidden',
-                                textOverflow: 'ellipsis',
-                                whiteSpace: 'nowrap',
-                              }}
-                            >
+                            <span className="notif-title">
                               {n.title || 'Уведомление'}
                             </span>
-                            <span
-                              className="notif-body"
-                              style={{
-                                fontSize: '12px',
-                                overflow: 'hidden',
-                                textOverflow: 'ellipsis',
-                                whiteSpace: 'nowrap',
-                                opacity: 0.85,
-                              }}
-                            >
+                            <span className="notif-body">
                               {n.body || ''}
                             </span>
                           </span>
 
-                          <span className="notif-time" style={{ flexDirection: 'column', alignItems: 'flex-end', gap: '4px' }}>
-                            <span style={{ fontSize: '11.5px' }}>{n.createdAt ? formatSlotTime(n.createdAt) : ''}</span>
-                            {isUnread && <span className="dot accent" style={{ width: 8, height: 8 }} />}
+                          <span className="notif-time">
+                            <span>{n.createdAt ? formatSlotTime(n.createdAt) : ''}</span>
+                            {isUnread && <span className="dot accent" />}
                           </span>
                         </button>
                       );
@@ -534,8 +490,7 @@ export const NotificationsView: React.FC<NotificationsViewProps> = ({
                   {onOpenCompose && (
                     <button
                       type="button"
-                      className="btn btn-primary btn-sm"
-                      style={{ marginTop: '12px' }}
+                      className="btn btn-primary btn-sm mt-md"
                       onClick={onOpenCompose}
                     >
                       <Mail size={15} />
@@ -545,7 +500,7 @@ export const NotificationsView: React.FC<NotificationsViewProps> = ({
                 </div>
               ) : (
                 sentGroups.map((g) => (
-                  <div key={g.label} className="col" style={{ gap: '4px', paddingBottom: '10px' }}>
+                  <div key={g.label} className="col gap-xs pb-2">
                     <span className="menu-label">{g.label}</span>
                     {g.items.map((m) => {
                       const isSelected = selectedSentMessage?.id === m.id;
@@ -558,73 +513,28 @@ export const NotificationsView: React.FC<NotificationsViewProps> = ({
                             setSelectedSentMessage(m);
                             onCloseCompose?.();
                           }}
-                          style={{
-                            display: 'grid',
-                            gridTemplateColumns: 'auto 1fr auto',
-                            gap: '12px',
-                            alignItems: 'center',
-                            padding: '10px 12px',
-                            borderRadius: '10px',
-                          }}
                         >
-                          <span
-                            className="notif-ic"
-                            style={{
-                              width: 34,
-                              height: 34,
-                              flexShrink: 0,
-                              background: 'var(--accent)',
-                              color: 'var(--primary)',
-                            }}
-                          >
+                          <span className="notif-ic">
                             <Send size={16} />
                           </span>
 
-                          <span className="col" style={{ gap: '3px', textAlign: 'left', minWidth: 0, flex: 1 }}>
-                            <div className="row wrap items-center" style={{ gap: '6px' }}>
-                              <span
-                                className="sp-chip tone-accent"
-                                style={{
-                                  fontSize: '11px',
-                                  padding: '1px 7px',
-                                  height: '19px',
-                                  borderRadius: '5px',
-                                  fontWeight: 600,
-                                }}
-                              >
+                          <span className="col gap-1 text-left min-w-0 flex-1">
+                            <div className="row wrap items-center gap-sm">
+                              <span className="sp-chip tone-accent sp-chip-compact">
                                 Кому: {m.recipientName}
                               </span>
                               <UserRoleBadge role={m.recipientRole} short />
                             </div>
-                            <span
-                              className="notif-title"
-                              style={{
-                                fontWeight: 600,
-                                fontSize: '13px',
-                                color: 'var(--foreground)',
-                                overflow: 'hidden',
-                                textOverflow: 'ellipsis',
-                                whiteSpace: 'nowrap',
-                              }}
-                            >
+                            <span className="notif-title">
                               {m.title}
                             </span>
-                            <span
-                              className="notif-body"
-                              style={{
-                                fontSize: '12px',
-                                overflow: 'hidden',
-                                textOverflow: 'ellipsis',
-                                whiteSpace: 'nowrap',
-                                opacity: 0.85,
-                              }}
-                            >
+                            <span className="notif-body">
                               {m.body}
                             </span>
                           </span>
 
-                          <span className="notif-time" style={{ flexDirection: 'column', alignItems: 'flex-end', gap: '4px' }}>
-                            <span style={{ fontSize: '11.5px' }}>{m.createdAt ? formatSlotTime(m.createdAt) : ''}</span>
+                          <span className="notif-time">
+                            <span>{m.createdAt ? formatSlotTime(m.createdAt) : ''}</span>
                           </span>
                         </button>
                       );

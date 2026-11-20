@@ -86,8 +86,10 @@ function VeterinariansContent() {
             speciesList={speciesList}
             specializations={specializations}
             loading={loading}
+            error={error}
             hasFilters={hasFilters}
             onReset={resetFilters}
+            onReload={reload}
           />
         </div>
 

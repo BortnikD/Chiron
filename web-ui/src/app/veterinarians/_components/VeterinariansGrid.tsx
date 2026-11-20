@@ -19,8 +19,10 @@ export const VeterinariansGrid: React.FC<VeterinariansGridProps> = ({
   speciesList,
   specializations,
   loading = false,
+  error = null,
   hasFilters = false,
   onReset,
+  onReload,
 }) => {
   return (
     <section className="island grow" aria-label="Список врачей">
@@ -36,26 +38,32 @@ export const VeterinariansGrid: React.FC<VeterinariansGridProps> = ({
             {[1, 2, 3, 4, 5, 6].map((i) => (
               <div
                 key={`vet-skel-${i}`}
-                className="card static"
-                style={{
-                  padding: '16px',
-                  display: 'flex',
-                  gap: '14px',
-                  alignItems: 'flex-start',
-                  minHeight: '130px',
-                }}
+                className="card static p-md row gap-md items-start min-h-130"
               >
                 <SkeletonCircle size={52} />
-                <div className="col grow" style={{ gap: '8px' }}>
+                <div className="col grow gap-sm">
                   <Skeleton width="150px" height="18px" borderRadius="4px" />
                   <Skeleton width="100px" height="18px" borderRadius="10px" />
-                  <div className="row" style={{ gap: '6px', marginTop: '4px' }}>
+                  <div className="row gap-xs mt-2xs">
                     <Skeleton width="60px" height="14px" borderRadius="4px" />
                     <Skeleton width="40px" height="14px" borderRadius="4px" />
                   </div>
                 </div>
               </div>
             ))}
+          </div>
+        ) : error ? (
+          <div className="empty">
+            <div className="empty-art">
+              <Stethoscope className="ic ic-40 text-danger" />
+            </div>
+            <span className="empty-title">Не удалось загрузить каталог врачей</span>
+            <span className="small muted">Сервер временно недоступен или произошла ошибка</span>
+            {onReload && (
+              <button type="button" className="btn btn-primary btn-sm mt-sm" onClick={onReload}>
+                Повторить попытку
+              </button>
+            )}
           </div>
         ) : vets.length === 0 ? (
           <div className="empty">

@@ -8,6 +8,7 @@ import {
   type FilterDropdownOption,
   type SearchComboboxOption,
 } from '@/shared/components';
+import { getUserComboboxOption } from '@/shared/lib';
 import type { GenderFilter, PetsFiltersProps } from './types';
 import { GENDER_OPTIONS, STATUS_OPTIONS } from './constants';
 
@@ -35,11 +36,7 @@ export const PetsFilters: React.FC<PetsFiltersProps> = ({
       { value: 'ALL', label: 'Все владельцы' },
       ...users
         .filter((u) => u.role === 'CLIENT')
-        .map((u) => ({
-          value: u.id,
-          label: u.fullName || u.email,
-          hint: u.phone || u.email,
-        })),
+        .map(getUserComboboxOption),
     ],
     [users]
   );

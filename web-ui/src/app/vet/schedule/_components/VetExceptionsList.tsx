@@ -72,12 +72,12 @@ export const VetExceptionsList: React.FC<VetExceptionsListProps> = ({
       });
   }, [exceptions]);
 
-  const sizingClass = hasDetail
-    ? 'w-full lg:w-[300px] lg:flex-none xl:w-full 2xl:w-[300px] 2xl:flex-none'
-    : 'w-full lg:w-[340px] lg:flex-none';
-
   return (
-    <section className={`island ${sizingClass}`} aria-label="Исключения и шаблон графика">
+    <section
+      className="island flex-none"
+      style={{ width: hasDetail ? 300 : 360, maxWidth: '100%' }}
+      aria-label="Исключения и шаблон графика"
+    >
       <div className="island-head">
         <span className="island-title">
           <CalendarOff className="ic" />

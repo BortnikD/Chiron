@@ -45,11 +45,16 @@ export const VaccinationsFilters: React.FC<VaccinationsFiltersProps> = ({
   const petOptions = useMemo<SearchComboboxOption[]>(
     () => [
       { value: 'all', label: 'Все питомцы' },
-      ...pets.map((p) => ({
-        value: p.id,
-        label: p.name,
-        hint: users.find((u) => u.id === p.ownerId)?.fullName || undefined,
-      })),
+      ...pets.map((p) => {
+        const owner = users.find((u) => u.id === p.ownerId);
+        const ownerName = owner ? [owner.firstName, owner.lastName].filter(Boolean).join(' ') || owner.fullName : undefined;
+        return {
+          value: p.id,
+          label: p.name,
+          hint: ownerName,
+          keywords: [p.name, p.breed, ownerName, owner?.phone].filter(Boolean) as string[],
+        };
+      }),
     ],
     [pets, users]
   );

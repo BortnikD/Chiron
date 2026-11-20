@@ -10,8 +10,13 @@ import {
   type SearchComboboxOption,
 } from '@/shared/components';
 import { formatIsoDateDisplay, getMoscowTodayIso, getDoctorDisplay, getSpecStyle, getSpecTone } from '@/shared/lib';
+import dynamic from 'next/dynamic';
 import { VetAvatar } from '@/components/ui/EntityAvatar';
-import { ExceptionsCalendarView } from './ExceptionsCalendarView';
+
+const ExceptionsCalendarView = dynamic(
+  () => import('./ExceptionsCalendarView').then((m) => m.ExceptionsCalendarView),
+  { ssr: false }
+);
 
 export interface ExceptionsTableProps {
   exceptions: ScheduleException[];

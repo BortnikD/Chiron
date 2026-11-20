@@ -26,6 +26,7 @@ export const ServiceMainEditForm: React.FC<ServiceMainEditFormProps> = ({
       specializations.map((s) => ({
         value: s.id,
         label: s.name,
+        description: s.description || undefined,
         hint: s.description || undefined,
       })),
     [specializations]

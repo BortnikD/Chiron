@@ -7,7 +7,7 @@ import type { Veterinarian, Service } from '@/modules/clinic/types';
 import type { AppointmentStatus, User } from '@/shared/types';
 import { DatePicker, SearchCombobox, type SearchComboboxOption } from '@/shared/components';
 import { VetAvatar } from '@/components/ui/EntityAvatar';
-import { APPOINTMENT_STATUS_LIST, APPOINTMENT_STATUS_META, formatCurrency, getDoctorDisplay, getSpecStyle, getSpecTone } from '@/shared/lib';
+import { APPOINTMENT_STATUS_LIST, APPOINTMENT_STATUS_META, formatCurrency, getDoctorDisplay, getSpecStyle, getSpecTone, getUserComboboxOption } from '@/shared/lib';
 
 export interface AdminAppointmentsFiltersProps {
   vetFilter: string;
@@ -84,11 +84,16 @@ export const AdminAppointmentsFilters: React.FC<AdminAppointmentsFiltersProps> =
   const petOptions = useMemo<SearchComboboxOption[]>(
     () => [
       { value: 'ALL', label: 'Все питомцы' },
-      ...pets.map((p) => ({
-        value: p.id,
-        label: p.name,
-        hint: users.find((u) => u.id === p.ownerId)?.fullName || undefined,
-      })),
+      ...pets.map((p) => {
+        const owner = users.find((u) => u.id === p.ownerId);
+        const ownerName = owner ? [owner.firstName, owner.lastName].filter(Boolean).join(' ') || owner.fullName : undefined;
+        return {
+          value: p.id,
+          label: p.name,
+          hint: ownerName,
+          keywords: [p.name, p.breed, ownerName, owner?.phone].filter(Boolean) as string[],
+        };
+      }),
     ],
     [pets, users]
   );
@@ -98,11 +103,7 @@ export const AdminAppointmentsFilters: React.FC<AdminAppointmentsFiltersProps> =
       { value: 'ALL', label: 'Все владельцы' },
       ...users
         .filter((u) => u.role === 'CLIENT')
-        .map((u) => ({
-          value: u.id,
-          label: u.fullName || u.email,
-          hint: u.phone || u.email,
-        })),
+        .map(getUserComboboxOption),
     ],
     [users]
   );

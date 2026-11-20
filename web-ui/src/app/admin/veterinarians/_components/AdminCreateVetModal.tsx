@@ -6,7 +6,7 @@ import type { Veterinarian, Specialization } from '@/modules/clinic/types';
 import type { User } from '@/shared/types';
 import { SearchCombobox, type SearchComboboxOption } from '@/shared/components';
 import { EntityPhotoControl } from '@/components/ui/EntityPhotoControl';
-import { formatApiError, getSpecStyle, getSpecTone, toIdNameMap } from '@/shared/lib';
+import { formatApiError, getSpecStyle, getSpecTone, getUserComboboxOption, toIdNameMap } from '@/shared/lib';
 import type { CreateVetInput } from '../_hooks/useAdminVeterinarians';
 
 export interface AdminCreateVetModalProps {
@@ -42,12 +42,7 @@ export const AdminCreateVetModal: React.FC<AdminCreateVetModalProps> = ({
   const specsMap = useMemo(() => toIdNameMap(specializations), [specializations]);
 
   const userOptions = useMemo<SearchComboboxOption[]>(
-    () =>
-      usersWithoutProfile.map((u) => ({
-        value: u.id,
-        label: u.fullName || `${u.firstName} ${u.lastName}`.trim() || u.email,
-        hint: u.email,
-      })),
+    () => usersWithoutProfile.map(getUserComboboxOption),
     [usersWithoutProfile]
   );
 
@@ -58,6 +53,7 @@ export const AdminCreateVetModal: React.FC<AdminCreateVetModalProps> = ({
         .map((s) => ({
           value: s.id,
           label: s.name,
+          description: s.description || undefined,
           hint: s.description || undefined,
         })),
     [specializations, createForm.specializationIds]

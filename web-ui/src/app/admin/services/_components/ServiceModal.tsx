@@ -39,6 +39,7 @@ export const ServiceModal: React.FC<ServiceModalProps> = ({
       specializations.map((s) => ({
         value: s.id,
         label: s.name,
+        description: s.description || undefined,
         hint: s.description || undefined,
       })),
     [specializations]

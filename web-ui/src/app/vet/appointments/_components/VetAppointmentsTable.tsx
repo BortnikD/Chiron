@@ -147,7 +147,7 @@ export const VetAppointmentsTable: React.FC<VetAppointmentsTableProps> = ({
       {
         key: 'service',
         title: 'Услуга',
-        width: '1.6fr',
+        width: 'minmax(140px, 1.6fr)',
         render: (a) => (
           <AppointmentServiceBadge
             appointment={a}
@@ -158,13 +158,13 @@ export const VetAppointmentsTable: React.FC<VetAppointmentsTableProps> = ({
       {
         key: 'status',
         title: 'Статус',
-        width: '1.3fr',
+        width: 'minmax(100px, 1.2fr)',
         render: (a) => <AppointmentStatusBadge status={a.status} useShortLabel />,
       },
       {
         key: 'price',
         title: 'Цена',
-        width: '0.8fr',
+        width: 'minmax(70px, 0.8fr)',
         align: 'right',
         render: (a) => {
           const price = a.actualTotal ?? a.estimatedTotal ?? a.priceSnapshot ?? a.price;

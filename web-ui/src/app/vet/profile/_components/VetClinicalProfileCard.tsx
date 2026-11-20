@@ -109,171 +109,144 @@ export function VetClinicalProfileCard({
   const isActive = vetProfile?.isActive !== false;
 
   return (
-    <div className="flex flex-col lg:flex-row gap-2 items-start w-full">
-      <section className="island grow w-full lg:max-w-[760px]">
-        <div className="island-head">
-          <span className="island-title">
-            <Stethoscope className="ic" />
-            Профиль врача
-          </span>
-          <span className="small muted">Виден клиентам в каталоге</span>
-        </div>
+    <section className="island" style={{ maxWidth: '840px', width: '100%' }}>
+      <div className="island-head">
+        <span className="island-title">
+          <Stethoscope className="ic" />
+          Профиль врача
+        </span>
+        <span className="small muted">Виден клиентам в каталоге</span>
+      </div>
 
-        <div className="island-body">
-          {success && (
-            <div className="alert alert-success" role="status" style={{ marginBottom: '14px' }}>
-              <Check className="ic" />
-              <span>Данные практики успешно обновлены</span>
-            </div>
-          )}
+      <div className="island-body">
+        {success && (
+          <div className="alert alert-success" role="status" style={{ marginBottom: '14px' }}>
+            <Check className="ic" />
+            <span>Данные практики успешно обновлены</span>
+          </div>
+        )}
 
-          {error && (
-            <div className="alert alert-destructive" role="alert" style={{ marginBottom: '14px' }}>
-              <AlertCircle className="ic" />
-              <span>{error}</span>
-            </div>
-          )}
+        {error && (
+          <div className="alert alert-destructive" role="alert" style={{ marginBottom: '14px' }}>
+            <AlertCircle className="ic" />
+            <span>{error}</span>
+          </div>
+        )}
 
-          <form id="vet-practice-form" onSubmit={onSubmit}>
-            <div className="col" style={{ gap: '18px' }}>
-              <EntityPhotoControl
-                photo={vetProfile}
-                previewFallback={doc.initials}
-                previewClassName={`t-ava xl round tone-${specTone}`}
-                previewAlt={doc.fullName}
-                title={doc.fullName}
-                hint="JPEG или PNG до 5 МБ · без фото показываются инициалы"
-                disabled={saving || !vetProfile}
-                onUpload={onUploadPhoto}
-                onDelete={onDeletePhoto}
-              />
+        <form id="vet-practice-form" onSubmit={onSubmit}>
+          <div className="col" style={{ gap: '18px' }}>
+            <EntityPhotoControl
+              photo={vetProfile}
+              previewFallback={doc.initials}
+              previewClassName={`t-ava xl round tone-${specTone}`}
+              previewAlt={doc.fullName}
+              title={doc.fullName}
+              hint="JPEG или PNG до 5 МБ · без фото показываются инициалы"
+              disabled={saving || !vetProfile}
+              onUpload={onUploadPhoto}
+              onDelete={onDeletePhoto}
+            />
 
-              <div className="form-grid">
-                <div className="field">
-                  <span className="field-label">Специализация</span>
-                  <input
-                    className="input"
-                    value={doc.specName}
-                    readOnly
-                    aria-label="Специализация"
-                  />
-                  <span className="field-hint">Меняет администратор</span>
+            <div className="form-grid">
+              <div className="field">
+                <span className="field-label">Специализация</span>
+                <input
+                  className="input"
+                  value={doc.specName}
+                  readOnly
+                  aria-label="Специализация"
+                />
+                <span className="field-hint">Меняет администратор</span>
+              </div>
+
+              <div className="field">
+                <span className="field-label">Статус</span>
+                <div className="row" style={{ height: '36px', alignItems: 'center' }}>
+                  <span className={`badge st ${isActive ? 'badge-COMPLETED' : 'badge-CANCELLED'}`}>
+                    {isActive ? 'Активен' : 'Неактивен'}
+                  </span>
                 </div>
+                <span className="field-hint">Меняет администратор</span>
+              </div>
 
-                <div className="field">
-                  <span className="field-label">Статус</span>
-                  <div className="row" style={{ height: '36px' }}>
-                    <span className={`badge st ${isActive ? 'badge-COMPLETED' : 'badge-CANCELLED'}`}>
-                      {isActive ? 'Активен' : 'Неактивен'}
-                    </span>
-                  </div>
-                  <span className="field-hint">Меняет администратор</span>
-                </div>
+              <div className="field">
+                <label className="field-label" htmlFor="vp-exp">
+                  Стаж, лет
+                </label>
+                <input
+                  id="vp-exp"
+                  type="number"
+                  min={0}
+                  max={70}
+                  className="input"
+                  value={form.experienceYears}
+                  onChange={(e) => {
+                    const val = parseInt(e.target.value, 10);
+                    onChange((prev) => ({
+                      ...prev,
+                      experienceYears: Number.isNaN(val) ? 0 : val,
+                    }));
+                  }}
+                  required
+                />
+              </div>
 
-                <div className="field">
-                  <label className="field-label" htmlFor="vp-exp">
-                    Стаж, лет
-                  </label>
-                  <input
-                    id="vp-exp"
-                    type="number"
-                    min={0}
-                    max={70}
-                    className="input"
-                    value={form.experienceYears}
-                    onChange={(e) => {
-                      const val = parseInt(e.target.value, 10);
-                      onChange((prev) => ({
-                        ...prev,
-                        experienceYears: Number.isNaN(val) ? 0 : val,
-                      }));
-                    }}
-                    required
-                  />
+              <div className="field">
+                <span className="field-label">Допуски к видам</span>
+                <div className="row wrap" style={{ minHeight: '36px', alignItems: 'center', gap: '6px' }}>
+                  {permittedSpecies.length > 0 ? (
+                    permittedSpecies.map((sp) => {
+                      const spTone = getSpeciesTone(sp.name || sp.id, permittedSpecies);
+                      const style = getSpeciesStyle(sp.id, permittedSpecies);
+                      return (
+                        <span key={sp.id} className={`sp-chip tone-${spTone}`} style={style}>
+                          <SpeciesIcon
+                            species={('iconKey' in sp ? sp.iconKey : undefined) || spTone}
+                            size={14}
+                            className="ic"
+                          />
+                          {sp.name}
+                        </span>
+                      );
+                    })
+                  ) : (
+                    <span className="small muted">Допуски не назначены</span>
+                  )}
                 </div>
+                <span className="field-hint">Меняет администратор</span>
+              </div>
 
-                <div className="field span-2">
-                  <label className="field-label" htmlFor="vp-bio">
-                    О себе
-                  </label>
-                  <textarea
-                    id="vp-bio"
-                    className="textarea"
-                    style={{ minHeight: '140px' }}
-                    maxLength={4000}
-                    value={form.bio}
-                    onChange={(e) => onChange((prev) => ({ ...prev, bio: e.target.value }))}
-                    placeholder="Расскажите об опыте, образовании и профильных направлениях лечения…"
-                  />
-                  <span className="field-hint tnum">{form.bio.length} / 4000</span>
-                </div>
+              <div className="field span-2">
+                <label className="field-label" htmlFor="vp-bio">
+                  О себе
+                </label>
+                <textarea
+                  id="vp-bio"
+                  className="textarea"
+                  style={{ minHeight: '140px' }}
+                  maxLength={4000}
+                  value={form.bio}
+                  onChange={(e) => onChange((prev) => ({ ...prev, bio: e.target.value }))}
+                  placeholder="Расскажите об опыте, образовании и профильных направлениях лечения…"
+                />
+                <span className="field-hint tnum">{form.bio.length} / 4000</span>
               </div>
             </div>
-          </form>
-        </div>
-
-        <div className="island-foot">
-          <span className="small muted">Специализация: {doc.specName}</span>
-          <button
-            type="submit"
-            form="vet-practice-form"
-            className="btn btn-primary"
-            disabled={saving}
-          >
-            {saving ? 'Сохранение…' : 'Сохранить'}
-          </button>
-        </div>
-      </section>
-
-      <section className="island w-full lg:w-[340px] flex-none" aria-label="Предпросмотр карточки врача">
-
-        <div className="island-body">
-          <div className={`tcard tone-${specTone}`} style={{ cursor: 'default' }}>
-            <div className="tcard-head">
-              <VetAvatar
-                vet={vetProfile}
-                initials={doc.initials}
-                tone={specTone}
-                className="t-ava lg round"
-                alt={doc.name}
-              />
-              <span className="col" style={{ gap: '4px', minWidth: 0 }}>
-                <span className="tcard-title">{doc.name}</span>
-                <span className="cell-sub tnum">стаж {expLabel}</span>
-              </span>
-            </div>
-
-            <div className="row" style={{ gap: '6px' }}>
-              <span className="t-badge">{doc.specName}</span>
-            </div>
-
-            <span className="tcard-desc">
-              {form.bio.trim() || 'Описание врачебной практики появится здесь'}
-            </span>
-
-            <div className="tcard-foot" style={{ justifyContent: 'flex-start' }}>
-              {permittedSpecies.length > 0 ? (
-                <div className="chips">
-                  {permittedSpecies.map((sp) => {
-                    const spTone = getSpeciesTone(sp.name || sp.id, permittedSpecies);
-                    const style = getSpeciesStyle(sp.id, permittedSpecies);
-                    return (
-                      <span key={sp.id} className={`sp-chip tone-${spTone}`} style={style}>
-                        <SpeciesIcon species={('iconKey' in sp ? sp.iconKey : undefined) || spTone} size={14} className="ic" />
-                        {sp.name}
-                      </span>
-                    );
-                  })}
-                </div>
-              ) : (
-                <span className="small muted">Допуски к видам не назначены</span>
-              )}
-            </div>
           </div>
+        </form>
+      </div>
 
-
-        </div>
-      </section>
-    </div>
+      <div className="island-foot">
+        <span className="small muted">Специализация: {doc.specName}</span>
+        <button
+          type="submit"
+          form="vet-practice-form"
+          className="btn btn-primary"
+          disabled={saving}
+        >
+          {saving ? 'Сохранение…' : 'Сохранить'}
+        </button>
+      </div>
+    </section>
   );
 }

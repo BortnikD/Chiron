@@ -31,8 +31,10 @@ export interface VeterinariansGridProps {
   speciesList?: Species[];
   specializations?: Specialization[];
   loading?: boolean;
+  error?: string | null;
   hasFilters?: boolean;
   onReset?: () => void;
+  onReload?: () => void;
 }
 
 export interface VeterinarianDetailIslandProps {
