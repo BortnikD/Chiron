@@ -56,7 +56,7 @@ class ImagePhotoProcessorTest {
     @Test
     fun `all demo pet photos produce the expected backend variants`() {
         val photos = File("../scripts/fixtures/photos/pets").walkTopDown().filter { it.extension == "jpg" }.toList()
-        assertEquals(19, photos.size)
+        assertEquals(35, photos.size)
         for (photo in photos) {
             val result = photo.inputStream().use(processor::process)
             for ((size, bytes) in listOf(64 to result.thumbnail, 512 to result.full)) {
