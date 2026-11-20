@@ -111,10 +111,10 @@ export function PatientQuickViewModal({
 
   return (
     <div className="overlay" role="dialog" aria-modal="true" aria-label="Карточка пациента" onClick={onClose}>
-      <div className="dialog dialog-lg" style={{ maxWidth: 640 }} onClick={(e) => e.stopPropagation()}>
+      <div className="dialog dialog-lg max-w-640" onClick={(e) => e.stopPropagation()}>
         <div className="dialog-head">
-          <div className="row between" style={{ alignItems: 'flex-start', gap: 12 }}>
-            <div className="row" style={{ gap: 12, minWidth: 0, alignItems: 'center' }}>
+          <div className="row between items-start gap-md">
+            <div className="row gap-md min-w-0 items-center">
               <PetAvatar
                 pet={pet}
                 tone={tone}
@@ -122,8 +122,8 @@ export function PatientQuickViewModal({
                 iconSize={24}
                 className={`pet-ava tone-${tone}`}
               />
-              <div className="col" style={{ gap: 2, minWidth: 0 }}>
-                <span className="dialog-title" style={{ wordBreak: 'break-word' }}>
+              <div className="col gap-2xs min-w-0">
+                <span className="dialog-title break-words">
                   {pet.name}
                 </span>
                 <span className="dialog-desc">
@@ -142,7 +142,7 @@ export function PatientQuickViewModal({
           </div>
         </div>
 
-        <div className="tabs-line" role="tablist" style={{ padding: '0 20px' }}>
+        <div className="tabs-line px-md" role="tablist">
           <button
             type="button"
             role="tab"
@@ -172,10 +172,10 @@ export function PatientQuickViewModal({
           </button>
         </div>
 
-        <div className="dialog-body" style={{ minHeight: 260, maxHeight: '65vh', overflowY: 'auto' }}>
+        <div className="dialog-body modal-body-scroll">
           {activeTab === 'overview' && (
-            <div className="col" style={{ gap: 14 }}>
-              <dl className="kv" style={{ margin: 0 }}>
+            <div className="col gap-md">
+              <dl className="kv m-0">
                 <dt>Вид</dt>
                 <dd>{petSpeciesName}</dd>
                 <dt>Пол</dt>
@@ -197,9 +197,9 @@ export function PatientQuickViewModal({
               </dl>
 
               {pet.notes && (
-                <div className="col" style={{ gap: 4 }}>
-                  <span className="field-label" style={{ fontSize: 12 }}>Особые отметки / заметки:</span>
-                  <div className="card" style={{ padding: '10px 12px', background: 'var(--muted)', fontSize: 13 }}>
+                <div className="col gap-xs">
+                  <span className="field-label text-xs">Особые отметки / заметки:</span>
+                  <div className="card p-sm bg-muted text-sm">
                     {pet.notes}
                   </div>
                 </div>
@@ -208,9 +208,9 @@ export function PatientQuickViewModal({
           )}
 
           {activeTab === 'appointments' && (
-            <div className="col" style={{ gap: 8 }}>
+            <div className="col gap-sm">
               {petAppts.length === 0 ? (
-                <div className="empty" style={{ padding: '30px 10px' }}>
+                <div className="empty empty-p">
                   <PawPrint className="empty-art" size={32} />
                   <span className="empty-title">Приёмов не найдено</span>
                   <span className="small muted">История визитов пуста</span>
@@ -221,10 +221,9 @@ export function PatientQuickViewModal({
                   return (
                     <div
                       key={appt.id}
-                      className="card row between"
-                      style={{ padding: '10px 12px', alignItems: 'center' }}
+                      className="card row between p-sm items-center"
                     >
-                      <div className="col" style={{ gap: 2 }}>
+                      <div className="col gap-2xs">
                         <span className="cell-main">
                           {servicesMap[appt.serviceId] || appt.serviceName || 'Приём'}
                         </span>
@@ -232,7 +231,7 @@ export function PatientQuickViewModal({
                           {formatDateShort(appt.startAt)}, {formatSlotTime(appt.startAt)}–{formatSlotTime(appt.endAt)}
                         </span>
                       </div>
-                      <div className="row" style={{ gap: 8, alignItems: 'center' }}>
+                      <div className="row gap-sm items-center">
                         <span className={`badge st badge-${appt.status}`}>
                           {meta?.label || appt.status}
                         </span>
@@ -260,7 +259,7 @@ export function PatientQuickViewModal({
           )}
 
           {activeTab === 'vaccinations' && (
-            <div className="col" style={{ gap: 8 }}>
+            <div className="col gap-sm">
               {vacError && (
                 <div className="alert alert-destructive" role="alert">
                   <AlertCircle className="ic" size={16} />
@@ -269,12 +268,12 @@ export function PatientQuickViewModal({
               )}
 
               {loadingVac ? (
-                <div className="empty" style={{ padding: '30px 10px' }}>
+                <div className="empty empty-p">
                   <span className="spinner" aria-hidden="true" />
                   <span className="small muted">Загрузка прививок…</span>
                 </div>
               ) : vaccinations.length === 0 ? (
-                <div className="empty" style={{ padding: '30px 10px' }}>
+                <div className="empty empty-p">
                   <Syringe className="empty-art" size={32} />
                   <span className="empty-title">Прививок не найдено</span>
                   <span className="small muted">Вакцинация ещё не вносилась</span>
@@ -290,10 +289,9 @@ export function PatientQuickViewModal({
                   return (
                     <div
                       key={vac.id}
-                      className="card col"
-                      style={{ padding: '10px 12px', gap: 4 }}
+                      className="card col p-sm gap-xs"
                     >
-                      <div className="row between" style={{ alignItems: 'flex-start' }}>
+                      <div className="row between items-start">
                         <span className="cell-main font-semibold">
                           {vac.name || vac.vaccineName || 'Вакцинация'}
                         </span>
@@ -303,7 +301,7 @@ export function PatientQuickViewModal({
                           </span>
                         )}
                       </div>
-                      <div className="row wrap small muted" style={{ gap: '12px' }}>
+                      <div className="row wrap small muted gap-md">
                         <span>Введено: <strong className="tnum text-foreground">{adminDate || '—'}</strong></span>
                         {nextDueDate && (
                           <span>Ревакцинация: <strong className="tnum text-foreground">{nextDueDate}</strong></span>

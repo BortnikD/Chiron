@@ -16,6 +16,7 @@ import {
   formatApiError,
   getMoscowTodayIso,
   getSpeciesTone,
+  getUserComboboxOption,
 } from '@/shared/lib';
 import type { Gender, Pet, Species, User } from '@/shared/types';
 
@@ -79,11 +80,7 @@ export const PetFormModal: React.FC<PetFormModalProps> = ({
   const ownerOptions = useMemo<SearchComboboxOption[]>(() => {
     const clients = users.filter((u) => u.role === 'CLIENT');
     const source = clients.length > 0 ? clients : users;
-    return source.map((u) => ({
-      value: u.id,
-      label: u.fullName || u.email,
-      hint: u.phone || u.email,
-    }));
+    return source.map(getUserComboboxOption);
   }, [users]);
 
   const speciesOptions = useMemo<FilterDropdownOption[]>(

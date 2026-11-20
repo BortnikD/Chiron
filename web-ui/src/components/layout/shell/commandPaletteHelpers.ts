@@ -4,11 +4,12 @@ import { clinicApi } from '@/modules/clinic/api';
 import { clientApi } from '@/modules/client/api';
 import { vetApi } from '@/modules/vet/api';
 import { adminApi } from '@/modules/admin/api';
-import type { Service, Veterinarian } from '@/modules/clinic/types';
+import type { Service, Veterinarian, Species } from '@/modules/clinic/types';
 import type { Appointment, Pet } from '@/modules/client/types';
 import type { User, UserRole } from '@/shared/types';
-import { formatCurrency, formatDateTimeCompact } from '@/shared/lib';
+import { formatCurrency, formatDateTimeCompact, getSpeciesTone } from '@/shared/lib';
 import { getDoctorDisplay } from '@/shared/lib';
+import { SpeciesIcon } from '@/components/ui/SpeciesIcon';
 import { getNavGroups } from './navConfig';
 
 export interface PaletteDataset {
@@ -17,6 +18,7 @@ export interface PaletteDataset {
   users: User[];
   services: Service[];
   vets: Veterinarian[];
+  species: Species[];
 }
 
 export interface PaletteItem {
@@ -38,6 +40,7 @@ export const EMPTY_PALETTE_DATASET: PaletteDataset = {
   users: [],
   services: [],
   vets: [],
+  species: [],
 };
 
 export const ROUTE_HINTS: Record<string, string> = {
@@ -78,11 +81,12 @@ export const ROUTE_HINTS: Record<string, string> = {
 
 export async function loadCommandPaletteData(role?: UserRole | null): Promise<PaletteDataset> {
   if (role === 'CLIENT') {
-    const [petsRes, apptsRes, servicesRes, vetsRes] = await Promise.allSettled([
+    const [petsRes, apptsRes, servicesRes, vetsRes, speciesRes] = await Promise.allSettled([
       clientApi.getPets({ withSummary: false }),
       clientApi.getAppointments(0, 50),
       clinicApi.getServices(),
       clinicApi.getVeterinarians(),
+      clinicApi.getSpecies(),
     ]);
     return {
       pets: petsRes.status === 'fulfilled' && Array.isArray(petsRes.value) ? petsRes.value : [],
@@ -90,15 +94,17 @@ export async function loadCommandPaletteData(role?: UserRole | null): Promise<Pa
       users: [],
       services: servicesRes.status === 'fulfilled' && Array.isArray(servicesRes.value) ? servicesRes.value : [],
       vets: vetsRes.status === 'fulfilled' && Array.isArray(vetsRes.value) ? vetsRes.value : [],
+      species: speciesRes.status === 'fulfilled' && Array.isArray(speciesRes.value) ? speciesRes.value : [],
     };
   }
 
   if (role === 'VETERINARIAN') {
-    const [apptsRes, patientsRes, servicesRes, vetsRes] = await Promise.allSettled([
+    const [apptsRes, patientsRes, servicesRes, vetsRes, speciesRes] = await Promise.allSettled([
       vetApi.getAppointments({ page: 0, size: 50, direction: 'DESC' }),
       vetApi.getPatientsPage({ page: 0, size: 50 }),
       clinicApi.getServices(),
       clinicApi.getVeterinarians(),
+      clinicApi.getSpecies(),
     ]);
     const appts = apptsRes.status === 'fulfilled' && Array.isArray(apptsRes.value?.items) ? apptsRes.value.items : [];
     const patients = patientsRes.status === 'fulfilled' && Array.isArray(patientsRes.value?.items) ? patientsRes.value.items : [];
@@ -118,15 +124,17 @@ export async function loadCommandPaletteData(role?: UserRole | null): Promise<Pa
       users: [],
       services: servicesRes.status === 'fulfilled' && Array.isArray(servicesRes.value) ? servicesRes.value : [],
       vets: vetsRes.status === 'fulfilled' && Array.isArray(vetsRes.value) ? vetsRes.value : [],
+      species: speciesRes.status === 'fulfilled' && Array.isArray(speciesRes.value) ? speciesRes.value : [],
     };
   }
 
   if (role === 'ADMIN') {
-    const [usersRes, petsRes, servicesRes, vetsRes] = await Promise.allSettled([
+    const [usersRes, petsRes, servicesRes, vetsRes, speciesRes] = await Promise.allSettled([
       adminApi.getUsers(0, 50),
       adminApi.getPets(0, 50),
       clinicApi.getServices(),
       adminApi.getVeterinarians(),
+      clinicApi.getSpecies(),
     ]);
     return {
       pets: petsRes.status === 'fulfilled' && Array.isArray(petsRes.value?.items) ? petsRes.value.items : [],
@@ -134,12 +142,14 @@ export async function loadCommandPaletteData(role?: UserRole | null): Promise<Pa
       users: usersRes.status === 'fulfilled' && Array.isArray(usersRes.value?.items) ? usersRes.value.items : [],
       services: servicesRes.status === 'fulfilled' && Array.isArray(servicesRes.value) ? servicesRes.value : [],
       vets: vetsRes.status === 'fulfilled' && Array.isArray(vetsRes.value) ? vetsRes.value : [],
+      species: speciesRes.status === 'fulfilled' && Array.isArray(speciesRes.value) ? speciesRes.value : [],
     };
   }
 
-  const [servicesRes, vetsRes] = await Promise.allSettled([
+  const [servicesRes, vetsRes, speciesRes] = await Promise.allSettled([
     clinicApi.getServices(),
     clinicApi.getVeterinarians(),
+    clinicApi.getSpecies(),
   ]);
   return {
     pets: [],
@@ -147,6 +157,7 @@ export async function loadCommandPaletteData(role?: UserRole | null): Promise<Pa
     users: [],
     services: servicesRes.status === 'fulfilled' && Array.isArray(servicesRes.value) ? servicesRes.value : [],
     vets: vetsRes.status === 'fulfilled' && Array.isArray(vetsRes.value) ? vetsRes.value : [],
+    species: speciesRes.status === 'fulfilled' && Array.isArray(speciesRes.value) ? speciesRes.value : [],
   };
 }
 
@@ -193,32 +204,52 @@ export function buildCommandPaletteGroups(params: {
 
   const petById = new Map(dataset.pets.map((p) => [p.id, p]));
   const svcById = new Map(dataset.services.map((s) => [s.id, s]));
+  const speciesMap = new Map((dataset.species || []).map((s) => [s.id, s]));
+
+  const resolvePetSpecies = (p: Pet) => {
+    const speciesObj = p.speciesId ? speciesMap.get(p.speciesId) : undefined;
+    const name = p.species?.name || p.speciesName || speciesObj?.name || '';
+    const tone = getSpeciesTone(name || p.speciesId || 'cat', dataset.species);
+    return { name, tone };
+  };
 
   if (role === 'CLIENT') {
     const pets = dataset.pets
-      .filter((p) => match(p.name) || match(p.species?.name || p.speciesName))
+      .filter((p) => {
+        const { name: spName } = resolvePetSpecies(p);
+        return match(p.name) || match(spName) || match(p.breed);
+      })
       .slice(0, 6)
-      .map((p) => ({
-        id: `pet-${p.id}`,
-        label: p.name,
-        hint: p.species?.name || p.speciesName || 'Питомец',
-        icon: React.createElement(PawPrint, { className: 'ic' }),
-        action: () => navigateTo(`/client/pets?sel=${encodeURIComponent(p.id)}`),
-      }));
+      .map((p) => {
+        const { name: spName, tone } = resolvePetSpecies(p);
+        return {
+          id: `pet-${p.id}`,
+          label: p.name,
+          hint: spName || 'Питомец',
+          icon: React.createElement(SpeciesIcon, { species: tone, size: 16, className: 'ic' }),
+          action: () => navigateTo(`/client/pets?sel=${encodeURIComponent(p.id)}`),
+        };
+      });
     if (pets.length > 0) groups.push({ label: 'Питомцы', items: pets });
   }
 
   if (role === 'VETERINARIAN' && q) {
     const patients = dataset.pets
-      .filter((p) => match(p.name) || match(p.species?.name || p.speciesName))
+      .filter((p) => {
+        const { name: spName } = resolvePetSpecies(p);
+        return match(p.name) || match(spName) || match(p.breed);
+      })
       .slice(0, 6)
-      .map((p) => ({
-        id: `pat-${p.id}`,
-        label: p.name,
-        hint: p.species?.name || p.speciesName || 'Пациент',
-        icon: React.createElement(PawPrint, { className: 'ic' }),
-        action: () => navigateTo(`/vet/patients?sel=${encodeURIComponent(p.id)}`),
-      }));
+      .map((p) => {
+        const { name: spName, tone } = resolvePetSpecies(p);
+        return {
+          id: `pat-${p.id}`,
+          label: p.name,
+          hint: spName || 'Пациент',
+          icon: React.createElement(SpeciesIcon, { species: tone, size: 16, className: 'ic' }),
+          action: () => navigateTo(`/vet/patients?sel=${encodeURIComponent(p.id)}`),
+        };
+      });
     if (patients.length > 0) groups.push({ label: 'Пациенты', items: patients });
   }
 
@@ -261,15 +292,21 @@ export function buildCommandPaletteGroups(params: {
     if (users.length > 0) groups.push({ label: 'Пользователи', items: users });
 
     const adminPets = dataset.pets
-      .filter((p) => match(p.name) || match(p.species?.name || p.speciesName))
+      .filter((p) => {
+        const { name: spName } = resolvePetSpecies(p);
+        return match(p.name) || match(spName) || match(p.breed);
+      })
       .slice(0, 5)
-      .map((p) => ({
-        id: `apet-${p.id}`,
-        label: p.name,
-        hint: p.species?.name || p.speciesName || 'Питомец',
-        icon: React.createElement(PawPrint, { className: 'ic' }),
-        action: () => navigateTo(`/admin/pets?sel=${encodeURIComponent(p.id)}`),
-      }));
+      .map((p) => {
+        const { name: spName, tone } = resolvePetSpecies(p);
+        return {
+          id: `apet-${p.id}`,
+          label: p.name,
+          hint: spName || 'Питомец',
+          icon: React.createElement(SpeciesIcon, { species: tone, size: 16, className: 'ic' }),
+          action: () => navigateTo(`/admin/pets?sel=${encodeURIComponent(p.id)}`),
+        };
+      });
     if (adminPets.length > 0) groups.push({ label: 'Питомцы', items: adminPets });
   }
 
