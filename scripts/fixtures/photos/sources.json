@@ -125,7 +125,8 @@
     "speciesId": "5eed0001-0000-0000-0000-000000000001",
     "creditPage": "https://www.pexels.com/photo/35511912/",
     "license": "Pexels License",
-    "licenseUrl": "https://www.pexels.com/license/"
+    "licenseUrl": "https://www.pexels.com/license/",
+    "petId": "5eed0107-0000-0000-0000-000000000008"
   },
   {
     "file": "photos/pets/dogs/husky.jpg",
@@ -135,7 +136,8 @@
     "speciesId": "5eed0001-0000-0000-0000-000000000001",
     "creditPage": "https://www.pexels.com/photo/20648319/",
     "license": "Pexels License",
-    "licenseUrl": "https://www.pexels.com/license/"
+    "licenseUrl": "https://www.pexels.com/license/",
+    "petId": "5eed0107-0000-0000-0000-000000000009"
   },
   {
     "file": "photos/pets/dogs/dachshund.jpg",
@@ -149,7 +151,8 @@
     "speciesId": "5eed0001-0000-0000-0000-000000000001",
     "creditPage": "https://www.pexels.com/photo/16459643/",
     "license": "Pexels License",
-    "licenseUrl": "https://www.pexels.com/license/"
+    "licenseUrl": "https://www.pexels.com/license/",
+    "petId": "5eed0107-0000-0000-0000-000000000010"
   },
   {
     "file": "photos/pets/dogs/black-labrador.jpg",
@@ -159,7 +162,8 @@
     "speciesId": "5eed0001-0000-0000-0000-000000000001",
     "creditPage": "https://www.pexels.com/photo/16738458/",
     "license": "Pexels License",
-    "licenseUrl": "https://www.pexels.com/license/"
+    "licenseUrl": "https://www.pexels.com/license/",
+    "petId": "5eed0107-0000-0000-0000-000000000011"
   },
   {
     "file": "photos/pets/cats/ginger-white.jpg",
@@ -169,7 +173,8 @@
     "speciesId": "5eed0001-0000-0000-0000-000000000002",
     "creditPage": "https://www.pexels.com/photo/36969864/",
     "license": "Pexels License",
-    "licenseUrl": "https://www.pexels.com/license/"
+    "licenseUrl": "https://www.pexels.com/license/",
+    "petId": "5eed0107-0000-0000-0000-000000000012"
   },
   {
     "file": "photos/pets/cats/calico.jpg",
@@ -179,7 +184,8 @@
     "speciesId": "5eed0001-0000-0000-0000-000000000002",
     "creditPage": "https://www.pexels.com/photo/34001258/",
     "license": "Pexels License",
-    "licenseUrl": "https://www.pexels.com/license/"
+    "licenseUrl": "https://www.pexels.com/license/",
+    "petId": "5eed0107-0000-0000-0000-000000000013"
   },
   {
     "file": "photos/pets/cats/white.jpg",
@@ -189,7 +195,8 @@
     "speciesId": "5eed0001-0000-0000-0000-000000000002",
     "creditPage": "https://www.pexels.com/photo/33083323/",
     "license": "Pexels License",
-    "licenseUrl": "https://www.pexels.com/license/"
+    "licenseUrl": "https://www.pexels.com/license/",
+    "petId": "5eed0107-0000-0000-0000-000000000014"
   },
   {
     "file": "photos/pets/cats/black.jpg",
@@ -203,7 +210,8 @@
     "speciesId": "5eed0001-0000-0000-0000-000000000002",
     "creditPage": "https://www.pexels.com/photo/31101860/",
     "license": "Pexels License",
-    "licenseUrl": "https://www.pexels.com/license/"
+    "licenseUrl": "https://www.pexels.com/license/",
+    "petId": "5eed0107-0000-0000-0000-000000000015"
   },
   {
     "file": "photos/pets/rabbits/rabbit.jpg",
@@ -217,7 +225,8 @@
     "speciesId": "5eed0001-0000-0000-0000-000000000003",
     "creditPage": "https://www.pexels.com/photo/20049448/",
     "license": "Pexels License",
-    "licenseUrl": "https://www.pexels.com/license/"
+    "licenseUrl": "https://www.pexels.com/license/",
+    "petId": "5eed0107-0000-0000-0000-000000000016"
   },
   {
     "file": "photos/pets/guinea-pigs/guinea-pig.jpg",
@@ -227,7 +236,8 @@
     "speciesId": "5eed0001-0000-0000-0000-000000000004",
     "creditPage": "https://www.pexels.com/photo/20634964/",
     "license": "Pexels License",
-    "licenseUrl": "https://www.pexels.com/license/"
+    "licenseUrl": "https://www.pexels.com/license/",
+    "petId": "5eed0107-0000-0000-0000-000000000017"
   },
   {
     "file": "photos/pets/ferrets/ferret.jpg",
@@ -241,7 +251,8 @@
     "speciesId": "5eed0001-0000-0000-0000-000000000005",
     "creditPage": "https://www.pexels.com/photo/37850792/",
     "license": "Pexels License",
-    "licenseUrl": "https://www.pexels.com/license/"
+    "licenseUrl": "https://www.pexels.com/license/",
+    "petId": "5eed0107-0000-0000-0000-000000000018"
   },
   {
     "file": "photos/pets/parrots/macaw.jpg",
@@ -251,6 +262,84 @@
     "speciesId": "5eed0001-0000-0000-0000-000000000006",
     "creditPage": "https://www.pexels.com/photo/23644574/",
     "license": "Pexels License",
-    "licenseUrl": "https://www.pexels.com/license/"
+    "licenseUrl": "https://www.pexels.com/license/",
+    "petId": "5eed0107-0000-0000-0000-000000000019"
+  },
+  {
+    "file": "photos/pets/guinea-pigs/shustrik.jpg",
+    "source": "User-provided attachment",
+    "crop": [
+      0,
+      0,
+      447
+    ],
+    "speciesId": "5eed0001-0000-0000-0000-000000000004",
+    "petId": "5eed0107-0000-0000-0000-000000000001"
+  },
+  {
+    "file": "photos/pets/cats/plyusha.jpg",
+    "source": "User-provided attachment",
+    "crop": [
+      150,
+      0,
+      1050
+    ],
+    "speciesId": "5eed0001-0000-0000-0000-000000000002",
+    "petId": "5eed0107-0000-0000-0000-000000000002"
+  },
+  {
+    "file": "photos/pets/cats/sima.jpg",
+    "source": "User-provided attachment",
+    "crop": [
+      62,
+      0,
+      326
+    ],
+    "speciesId": "5eed0001-0000-0000-0000-000000000002",
+    "petId": "5eed0107-0000-0000-0000-000000000003"
+  },
+  {
+    "file": "photos/pets/dogs/persik.jpg",
+    "source": "User-provided attachment",
+    "crop": [
+      490,
+      0,
+      1080
+    ],
+    "speciesId": "5eed0001-0000-0000-0000-000000000001",
+    "petId": "5eed0107-0000-0000-0000-000000000004"
+  },
+  {
+    "file": "photos/pets/dogs/baytik.jpg",
+    "source": "User-provided attachment",
+    "crop": [
+      0,
+      62,
+      566
+    ],
+    "speciesId": "5eed0001-0000-0000-0000-000000000001",
+    "petId": "5eed0107-0000-0000-0000-000000000005"
+  },
+  {
+    "file": "photos/pets/dogs/umka.jpg",
+    "source": "User-provided attachment",
+    "crop": [
+      200,
+      0,
+      900
+    ],
+    "speciesId": "5eed0001-0000-0000-0000-000000000001",
+    "petId": "5eed0107-0000-0000-0000-000000000006"
+  },
+  {
+    "file": "photos/pets/cats/filya.jpg",
+    "source": "User-provided attachment",
+    "crop": [
+      0,
+      0,
+      650
+    ],
+    "speciesId": "5eed0001-0000-0000-0000-000000000002",
+    "petId": "5eed0107-0000-0000-0000-000000000007"
   }
 ]

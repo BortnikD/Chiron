@@ -100,7 +100,7 @@ services:
       PGPASSWORD: demo_database_password
       PGDATABASE: chiron_demo
     volumes:
-      - ../chiron/scripts:/seed:ro
+      - ../scripts:/seed:ro
     command: ["psql", "-X", "-v", "ON_ERROR_STOP=1", "-f", "/seed/seed-demo.sql"]
     depends_on:
       backend:
@@ -113,7 +113,7 @@ services:
       BACKEND_URL: http://backend:8080
       STORAGE_INTERNAL_ADDRESS: garage:3900
     volumes:
-      - ../chiron/scripts:/seed:ro
+      - ../scripts:/seed:ro
       - photo_seed_state:/state
     command: ["python", "-u", "/seed/seed-media.py"]
     depends_on:

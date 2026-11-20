@@ -3,6 +3,7 @@
 import hashlib
 import importlib.util
 import json
+import re
 import unittest
 from pathlib import Path
 from unittest.mock import patch
@@ -15,17 +16,20 @@ CATALOG = json.loads((MEDIA.FIXTURES / "photos" / "sources.json").read_text())
 
 
 class SeedMediaTest(unittest.TestCase):
-    def test_catalog_contains_twenty_distinct_square_jpegs(self):
-        self.assertEqual(20, len(CATALOG))
+    def test_catalog_contains_distinct_square_jpegs(self):
+        self.assertEqual(27, len(CATALOG))
         contents = []
         for asset in CATALOG:
             content = (MEDIA.FIXTURES / asset["file"]).read_bytes()
-            self.assertEqual((1024, 1024), MEDIA.dimensions(content), asset["file"])
+            width, height = MEDIA.dimensions(content)
+            self.assertEqual(width, height, asset["file"])
+            self.assertLessEqual(width, 1024, asset["file"])
             self.assertLess(len(content), 5 * 1024 * 1024)
-            self.assertTrue(asset["source"].startswith("https://"))
-            self.assertIn("licenseUrl", asset)
+            if asset["source"] != "User-provided attachment":
+                self.assertTrue(asset["source"].startswith("https://"))
+                self.assertIn("licenseUrl", asset)
             contents.append(hashlib.sha256(content).hexdigest())
-        self.assertEqual(20, len(set(contents)))
+        self.assertEqual(len(CATALOG), len(set(contents)))
 
     def test_eight_doctors_have_individual_portraits(self):
         portraits = [asset for asset in CATALOG if "veterinarianId" in asset]
@@ -37,27 +41,35 @@ class SeedMediaTest(unittest.TestCase):
                 asset["file"], MEDIA.photo_fixture("veterinarians", resource, CATALOG)
             )
 
-    def test_all_seeded_pet_species_receive_only_matching_photos(self):
-        counts = [4, 4, 1, 1, 1, 1]
-        for number, expected_count in enumerate(counts, 1):
-            species_id = f"5eed0001-0000-0000-0000-{number:012d}"
-            allowed = {
-                asset["file"]
-                for asset in CATALOG
-                if asset.get("speciesId") == species_id
+    def test_each_seeded_pet_has_an_individual_photo_of_its_species(self):
+        seed = SCRIPT.with_name("seed-test-data.sql").read_text(encoding="utf-8")
+        pet_rows = seed.split("INSERT INTO pet (", 1)[1].split("AS pets(", 1)[0]
+        profiles = re.findall(r"\(\s*(\d+)\s*,\s*\d+\s*,\s*(\d+)\s*,\s*'([^']+)'", pet_rows)
+        photos = [asset for asset in CATALOG if "petId" in asset]
+        self.assertEqual(19, len(profiles))
+        self.assertEqual(len(profiles), len({name for _, _, name in profiles}))
+        self.assertEqual(len(profiles), len(photos))
+        self.assertEqual(7, sum(photo["source"] == "User-provided attachment" for photo in photos))
+        selected = set()
+        for number, species, name in profiles:
+            resource = {
+                "id": f"5eed0107-0000-0000-0000-{int(number):012d}",
+                "speciesId": f"5eed0001-0000-0000-0000-{int(species):012d}",
             }
-            self.assertEqual(expected_count, len(allowed))
-            selected = set()
-            for pet_number in range(1, 21):
-                resource = {
-                    "id": f"5eed0007-0000-0000-0000-{pet_number:012d}",
-                    "speciesId": species_id,
-                }
-                first = MEDIA.photo_fixture("pets", resource, CATALOG)
-                self.assertIn(first, allowed)
-                self.assertEqual(first, MEDIA.photo_fixture("pets", resource, CATALOG))
-                selected.add(first)
-            self.assertEqual(allowed, selected)
+            photo = MEDIA.photo_fixture("pets", resource, CATALOG)
+            self.assertIsNotNone(photo, name)
+            selected.add(photo)
+        self.assertEqual({photo["file"] for photo in photos}, selected)
+
+    def test_old_pet_ids_and_reclassified_pets_do_not_receive_a_fixture(self):
+        profile = {
+            "id": "5eed0007-0000-0000-0000-000000000001",
+            "speciesId": "5eed0001-0000-0000-0000-000000000004",
+        }
+        self.assertIsNone(MEDIA.photo_fixture("pets", profile, CATALOG))
+        profile["id"] = "5eed0107-0000-0000-0000-000000000001"
+        profile["speciesId"] = "5eed0001-0000-0000-0000-000000000001"
+        self.assertIsNone(MEDIA.photo_fixture("pets", profile, CATALOG))
 
     def test_custom_entities_are_not_populated(self):
         self.assertIsNone(

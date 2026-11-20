@@ -107,22 +107,13 @@ def check_links(photo):
 
 
 def photo_fixture(kind, resource, catalog):
-    if kind == "veterinarians":
-        matches = [
-            entry for entry in catalog if entry.get("veterinarianId") == resource["id"]
-        ]
-    else:
-        if not resource["id"].startswith("5eed0007-"):
-            return None
-        matches = [
-            entry
-            for entry in catalog
-            if entry.get("speciesId") == resource["speciesId"]
-        ]
-        assert matches, f"No demo photo for species {resource['speciesId']}"
-    if not matches:
-        return None
-    return matches[int(uuid.UUID(resource["id"])) % len(matches)]["file"]
+    id_key = "veterinarianId" if kind == "veterinarians" else "petId"
+    for entry in catalog:
+        if entry.get(id_key) == resource["id"] and (
+            kind == "veterinarians" or entry["speciesId"] == resource["speciesId"]
+        ):
+            return entry["file"]
+    return None
 
 
 def should_upload_photo(resource, identity, legacy_populated, placeholder_hashes):
@@ -150,14 +141,20 @@ def main():
 
     admin = login("admin@demo.chiron.local", "demoAdmin123")
     dataset = call("GET", "/api/v1/users/me", admin)["createdAt"]
-    if state.get("dataset") != dataset:
+    client = login("client1@seed.chiron.local")
+    seed_users_created_at = call("GET", "/api/v1/users/me", client)["createdAt"]
+    # A direct SQL reseed recreates the demo accounts but keeps the administrator account.
+    if (
+        state.get("dataset") != dataset
+        or state.get("seedUsersCreatedAt", seed_users_created_at) != seed_users_created_at
+    ):
         state = {"dataset": dataset, "populated": [], "verified": False}
+    state["seedUsersCreatedAt"] = seed_users_created_at
     if state.get("catalogVersion") != 2:
         state["legacyPopulated"] = state["populated"]
         state["populated"] = []
         state["catalogVersion"] = 2
-        save()
-    client = login("client1@seed.chiron.local")
+    save()
     other_client = login("client2@seed.chiron.local")
     vet = login("vet1@seed.chiron.local")
     first = (FIXTURES / "photo-a.png").read_bytes()
@@ -258,8 +255,6 @@ def main():
                 )
                 check_links(photo)
                 updated += 1
-                if updated % 100 == 0:
-                    print(f"Uploaded {updated} demo photos...", flush=True)
             populated.add(identity)
             state["populated"].append(identity)
             save()
