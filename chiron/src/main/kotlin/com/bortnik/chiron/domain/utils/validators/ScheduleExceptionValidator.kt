@@ -6,6 +6,8 @@ import com.bortnik.chiron.domain.dto.scheduleexception.ScheduleExceptionFilter
 import com.bortnik.chiron.domain.dto.scheduleexception.UpdateScheduleExceptionDto
 import com.bortnik.chiron.domain.entities.ScheduleException
 import com.bortnik.chiron.domain.entities.enums.ScheduleExceptionType
+import com.bortnik.chiron.domain.exceptions.ConflictException
+import com.bortnik.chiron.domain.exceptions.ValidationError
 import com.bortnik.chiron.domain.utils.ValidationConstants.ScheduleExceptionRules
 import java.time.LocalDate
 import java.time.LocalTime
@@ -16,44 +18,39 @@ object ScheduleExceptionValidator {
         ensureNotBefore("to", filter.to, "from", filter.from)
     }
 
-    fun validate(dto: CreateScheduleExceptionDto, exceptions: List<ScheduleException>) = validateAll {
-        scheduleException(dto.type, dto.startDate, dto.endDate, dto.startTime, dto.endTime, dto.reason)
+    fun validate(dto: CreateScheduleExceptionDto, exceptions: List<ScheduleException>) {
+        validateAll { scheduleException(dto.type, dto.startDate, dto.endDate, dto.startTime, dto.endTime, dto.reason) }
         noOverlappingCustomHours(dto.type, dto.startDate, dto.endDate, exceptions)
     }
 
     // Validates the state the exception will have once the partial update is applied.
     fun validate(
         existing: ScheduleException, dto: UpdateScheduleExceptionDto, exceptions: List<ScheduleException>,
-    ) = validateAll {
-        scheduleException(
-            dto.type ?: existing.type,
-            dto.startDate ?: existing.startDate,
-            dto.endDate ?: existing.endDate,
-            dto.startTime.orElse(existing.startTime),
-            dto.endTime.orElse(existing.endTime),
-            dto.reason.orElse(null),
-        )
-        noOverlappingCustomHours(
-            dto.type ?: existing.type,
-            dto.startDate ?: existing.startDate,
-            dto.endDate ?: existing.endDate,
-            exceptions.filter { it.id != existing.id },
-        )
+    ) {
+        val type = dto.type ?: existing.type
+        val startDate = dto.startDate ?: existing.startDate
+        val endDate = dto.endDate ?: existing.endDate
+        validateAll {
+            scheduleException(
+                type, startDate, endDate, dto.startTime.orElse(existing.startTime),
+                dto.endTime.orElse(existing.endTime), dto.reason.orElse(null),
+            )
+        }
+        noOverlappingCustomHours(type, startDate, endDate, exceptions.filter { it.id != existing.id })
     }
 
-    private fun ValidationErrorCollector.noOverlappingCustomHours(
+    private fun noOverlappingCustomHours(
         type: ScheduleExceptionType,
         startDate: LocalDate,
         endDate: LocalDate,
         exceptions: List<ScheduleException>,
     ) {
-        ensure(
-            type != ScheduleExceptionType.CUSTOM_HOURS || exceptions.none {
+        if (type == ScheduleExceptionType.CUSTOM_HOURS && exceptions.any {
                 it.type == ScheduleExceptionType.CUSTOM_HOURS && it.startDate <= endDate && it.endDate >= startDate
-            },
-            "startDate",
-            "custom working hours must not overlap another custom working hours date range",
-        )
+            }) {
+            val message = "Custom working hours must not overlap another custom working hours date range"
+            throw ConflictException(message, errors = listOf(ValidationError("startDate", message)))
+        }
     }
 
     private fun ValidationErrorCollector.scheduleException(

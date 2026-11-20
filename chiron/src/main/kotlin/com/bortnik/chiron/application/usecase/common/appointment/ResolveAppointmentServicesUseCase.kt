@@ -10,7 +10,7 @@ import com.bortnik.chiron.domain.exceptions.rules.ServiceNotAvailableForSpeciesE
 import com.bortnik.chiron.domain.repositories.ServiceRepository
 import com.bortnik.chiron.domain.repositories.ServiceSpeciesRepository
 import com.bortnik.chiron.domain.utils.validators.AppointmentValidator
-import com.bortnik.chiron.domain.utils.validators.validateAll
+import com.bortnik.chiron.domain.utils.validators.validateBusinessRules
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import java.util.UUID
@@ -28,7 +28,7 @@ class ResolveAppointmentServicesUseCase(
         val selected = findSelected(serviceIds)
         val snapshots = snapshots(selected, speciesId, actorId)
         val specializationId = selected.first().specializationId
-        validateAll {
+        validateBusinessRules {
             ensure(
                 selected.all { it.specializationId == specializationId },
                 "serviceIds",

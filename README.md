@@ -66,16 +66,26 @@ docker compose -f docker/docker-compose.demo.yaml up -d --build
 ```
 
 Откройте [localhost:3001](http://localhost:3001) после успешного завершения `seed` и `seed-media`.
-Демо содержит 600 клиентов, 900 питомцев, восемь врачей и историю приёмов;
-на странице входа доступны кнопки быстрого входа.
+В демо восемь клиентов, 19 питомцев с индивидуальными фото, восемь врачей и 43 приёма.
+У каждого питомца есть минимум два завершённых визита. У `client1@seed.chiron.local` можно посмотреть
+прошедшее обследование Плюши с УЗИ и анализом крови, подтверждённый контрольный приём и напоминание о ревакцинации.
+На странице входа доступны кнопки быстрого входа.
 
 | Роль | Логин | Пароль |
 |---|---|---|
 | Администратор | `admin@demo.chiron.local` | `demoAdmin123` |
 | Ветеринар | `vet1@seed.chiron.local` … `vet8@seed.chiron.local` | `password123` |
-| Клиент | `client1@seed.chiron.local` … `client600@seed.chiron.local` | `password123` |
+| Клиент | `client1@seed.chiron.local` … `client8@seed.chiron.local` | `password123` |
 
 Демо доступно только с localhost; эти учётные данные предназначены для локального показа.
+
+Если уже есть демобаза со старым набором, обычный запуск сохраняет её. Для нового набора остановите старый
+стек командой `docker compose -f docker/docker-compose.demo.yaml stop`, чтобы освободить порты,
+и запустите отдельный проект с собственными томами.
+
+```bash
+docker compose -p chiron-demo-curated -f docker/docker-compose.demo.yaml up -d --build
+```
 
 ### Production
 

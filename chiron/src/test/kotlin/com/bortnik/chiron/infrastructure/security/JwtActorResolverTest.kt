@@ -56,4 +56,13 @@ class JwtActorResolverTest {
         assertEquals(user.copy(role = UserRole.ADMIN, fullName = "Updated name").toActor(), resolver.resolve(token))
         assertNull(resolver.resolve(token))
     }
+
+    @Test
+    fun `bearer scheme is case insensitive while the signed token is preserved`() {
+        `when`(repository.findById(user.id)).thenReturn(user)
+        val token = provider.generate(user)
+        for (scheme in listOf("Bearer", "bearer", "bEaReR")) {
+            assertEquals(user.toActor(), resolver.resolve("$scheme $token"))
+        }
+    }
 }

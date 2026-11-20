@@ -17,7 +17,12 @@ enum class SqlError(val sqlState: String, val description: String) {
     DEADLOCK_DETECTED("40P01", "Deadlock detected"),
     LOCK_NOT_AVAILABLE("55P03", "Lock not available"),
     QUERY_CANCELED("57014", "Query canceled (timeout)"),
+    CONNECTION_UNABLE_TO_CONNECT("08001", "Unable to establish a database connection"),
+    CONNECTION_DOES_NOT_EXIST("08003", "Database connection does not exist"),
     CONNECTION_FAILURE("08006", "Database connection failure"),
+    ADMIN_SHUTDOWN("57P01", "Database was shut down by an administrator"),
+    CRASH_SHUTDOWN("57P02", "Database shut down after a crash"),
+    CANNOT_CONNECT_NOW("57P03", "Database cannot accept connections right now"),
     UNKNOWN("", "Unknown database error"),
     ;
 

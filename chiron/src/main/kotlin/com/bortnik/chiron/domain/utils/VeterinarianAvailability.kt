@@ -65,7 +65,7 @@ class VeterinarianAvailability(
                     it.startAt < endAt &&
                     it.endAt > startAt
         }
-        if (overlapping) return "overlaps another appointment"
+        if (overlapping) return APPOINTMENT_OVERLAP
         return null
     }
 
@@ -82,4 +82,8 @@ class VeterinarianAvailability(
         windowEnd: LocalTime,
     ): Boolean =
         !startTime.isBefore(windowStart) && !endTime.isAfter(windowEnd)
+
+    companion object {
+        const val APPOINTMENT_OVERLAP = "overlaps another appointment"
+    }
 }

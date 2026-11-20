@@ -6,6 +6,7 @@ import java.awt.Color
 import java.awt.image.BufferedImage
 import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
+import java.io.File
 import javax.imageio.ImageIO
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -53,8 +54,22 @@ class ImagePhotoProcessorTest {
     }
 
     @Test
+    fun `all demo pet photos produce the expected backend variants`() {
+        val photos = File("../scripts/fixtures/photos/pets").walkTopDown().filter { it.extension == "jpg" }.toList()
+        assertEquals(19, photos.size)
+        for (photo in photos) {
+            val result = photo.inputStream().use(processor::process)
+            for ((size, bytes) in listOf(64 to result.thumbnail, 512 to result.full)) {
+                val image = ImageIO.read(ByteArrayInputStream(bytes))
+                assertEquals(size, image.width, photo.name)
+                assertEquals(size, image.height, photo.name)
+            }
+        }
+    }
+
+    @Test
     fun `image dimensions are checked before decoding all pixels`() {
-        val input = java.nio.file.Files.readAllBytes(java.nio.file.Path.of("scripts/fixtures/photo-a.png"))
+        val input = png(BufferedImage(1, 1, BufferedImage.TYPE_INT_RGB))
         // PNG dimensions are in IHDR; update its CRC so the reader must enforce our pixel limit.
         java.nio.ByteBuffer.wrap(input, 16, 8).putInt(100_000).putInt(100_000)
         val crc = java.util.zip.CRC32().apply { update(input, 12, 17) }

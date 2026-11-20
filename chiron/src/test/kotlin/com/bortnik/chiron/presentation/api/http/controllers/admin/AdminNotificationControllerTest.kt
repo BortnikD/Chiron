@@ -5,9 +5,14 @@ import com.bortnik.chiron.application.usecase.admin.notification.AdminSendMessag
 import com.bortnik.chiron.domain.dto.notification.SendAdminMessageDto
 import com.bortnik.chiron.domain.entities.enums.NotificationType
 import com.bortnik.chiron.domain.entities.enums.UserRole
+import com.bortnik.chiron.domain.exceptions.BusinessRuleViolationException
+import com.bortnik.chiron.domain.exceptions.ValidationError
 import com.bortnik.chiron.infrastructure.config.CorsProperties
 import com.bortnik.chiron.infrastructure.security.JwtActorResolver
 import com.bortnik.chiron.infrastructure.security.SecurityConfig
+import com.bortnik.chiron.presentation.api.http.exceptions.DomainExceptionHandler
+import com.bortnik.chiron.presentation.api.http.exceptions.GlobalExceptionHandler
+import com.bortnik.chiron.presentation.api.http.exceptions.RestSecurityErrorHandler
 import com.bortnik.chiron.support.TestEntities.appointment
 import com.bortnik.chiron.support.TestEntities.notification
 import com.bortnik.chiron.support.TestEntities.pet
@@ -25,20 +30,23 @@ import org.springframework.http.HttpHeaders
 import org.springframework.http.MediaType
 import org.springframework.mock.web.MockServletContext
 import org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity
-import org.springframework.security.web.AuthenticationEntryPoint
-import org.springframework.security.web.access.AccessDeniedHandler
+import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post
 import org.springframework.test.web.servlet.setup.DefaultMockMvcBuilder
 import org.springframework.test.web.servlet.setup.MockMvcBuilders
 import org.springframework.web.context.support.AnnotationConfigWebApplicationContext
 import org.springframework.web.servlet.config.annotation.EnableWebMvc
 import tools.jackson.databind.json.JsonMapper
+import java.sql.SQLException
 import kotlin.test.assertEquals
 
 class AdminNotificationControllerTest {
     private val context = AnnotationConfigWebApplicationContext().apply {
         servletContext = MockServletContext()
-        register(SecurityConfig::class.java, TestConfig::class.java, AdminNotificationController::class.java)
+        register(
+            SecurityConfig::class.java, TestConfig::class.java, AdminNotificationController::class.java,
+            DomainExceptionHandler::class.java, GlobalExceptionHandler::class.java,
+        )
         refresh()
     }
     private val mvc = MockMvcBuilders.webAppContextSetup(context).apply<DefaultMockMvcBuilder>(springSecurity()).build()
@@ -105,12 +113,11 @@ class AdminNotificationControllerTest {
     @Test
     fun `anonymous clients and veterinarians cannot send any admin messages`() {
         val endpoint = "$path/users/${pet.ownerId}"
-        assertEquals(
-            401,
-            mvc.perform(
-                post(endpoint).contentType(MediaType.APPLICATION_JSON).content(body),
-            ).andReturn().response.status,
-        )
+        val anonymous = mvc.perform(
+            post(endpoint).contentType(MediaType.APPLICATION_JSON).content(body),
+        ).andReturn().response
+        assertEquals(401, anonymous.status)
+        assertEquals("Bearer", anonymous.getHeader(HttpHeaders.WWW_AUTHENTICATE))
         for (role in listOf(UserRole.CLIENT, UserRole.VETERINARIAN)) {
             `when`(resolver.resolve("Bearer other")).thenReturn(admin.copy(role = role))
             assertEquals(
@@ -122,6 +129,40 @@ class AdminNotificationControllerTest {
             )
         }
         verifyNoInteractions(useCase)
+    }
+
+    @Test
+    fun `unsupported method keeps Allow and a JWT database outage returns a JSON 503`() {
+        val endpoint = "$path/users/${pet.ownerId}"
+        val wrongMethod = mvc.perform(
+            get(endpoint).header(HttpHeaders.AUTHORIZATION, "Bearer admin"),
+        ).andReturn().response
+        assertEquals(405, wrongMethod.status)
+        assertEquals("POST", wrongMethod.getHeader(HttpHeaders.ALLOW))
+
+        val connectionFailure = SQLException("Connection refused", "08001")
+        `when`(resolver.resolve("Bearer admin")).thenThrow(IllegalStateException(connectionFailure))
+        val unavailable = mvc.perform(
+            post(endpoint).header(HttpHeaders.AUTHORIZATION, "Bearer admin")
+                .contentType(MediaType.APPLICATION_JSON).content(body),
+        ).andReturn().response
+        assertEquals(503, unavailable.status)
+        assertEquals("ConnectionException", json.readTree(unavailable.contentAsString)["error"]["name"].asString())
+        verifyNoInteractions(useCase)
+    }
+
+    @Test
+    fun `incompatible linked resources return 422 with a field violation`() {
+        `when`(useCase.send(admin, pet.ownerId, SendAdminMessageDto("Title", "Body"))).thenThrow(
+            BusinessRuleViolationException(listOf(ValidationError("petId", "must refer to the same pet"))),
+        )
+        val response = mvc.perform(
+            post("$path/users/${pet.ownerId}").header(HttpHeaders.AUTHORIZATION, "Bearer admin")
+                .contentType(MediaType.APPLICATION_JSON).content(body),
+        ).andReturn().response
+        assertEquals(422, response.status)
+        val error = json.readTree(response.contentAsString)["error"]
+        assertEquals("petId", error["violations"][0]["field"].asString())
     }
 
     @Test
@@ -166,9 +207,6 @@ class AdminNotificationControllerTest {
         fun corsProperties() = CorsProperties(emptyList())
 
         @Bean
-        fun authenticationEntryPoint() = AuthenticationEntryPoint { _, response, _ -> response.status = 401 }
-
-        @Bean
-        fun accessDeniedHandler() = AccessDeniedHandler { _, response, _ -> response.status = 403 }
+        fun securityErrorHandler() = RestSecurityErrorHandler(JsonMapper.builder().build())
     }
 }

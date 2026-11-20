@@ -4,9 +4,12 @@ import com.bortnik.chiron.application.usecase.common.notification.CreateNotifica
 import com.bortnik.chiron.domain.dto.Patch
 import com.bortnik.chiron.domain.dto.notification.CreateNotificationDto
 import com.bortnik.chiron.domain.dto.pet.UpdatePetDto
+import com.bortnik.chiron.domain.entities.Species
 import com.bortnik.chiron.domain.entities.enums.Gender
 import com.bortnik.chiron.domain.entities.enums.NotificationType
+import com.bortnik.chiron.domain.exceptions.notfound.SpeciesNotFoundException
 import com.bortnik.chiron.domain.repositories.PetRepository
+import com.bortnik.chiron.domain.repositories.SpeciesRepository
 import com.bortnik.chiron.support.TestEntities.now
 import com.bortnik.chiron.support.TestEntities.pet
 import org.junit.jupiter.api.Test
@@ -23,12 +26,14 @@ import java.time.ZoneOffset
 import java.util.UUID
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
 
 class UpdatePetUseCaseTest {
     private val pets = mock(PetRepository::class.java)
     private val notifications = mock(CreateNotificationUseCase::class.java)
-    private val useCase = UpdatePetUseCase(pets, Clock.fixed(now, ZoneOffset.UTC), notifications)
+    private val species = mock(SpeciesRepository::class.java)
+    private val useCase = UpdatePetUseCase(pets, Clock.fixed(now, ZoneOffset.UTC), notifications, species)
     private val administratorId = UUID.randomUUID()
     private val fallback =
         CreateNotificationDto(pet.ownerId, type = NotificationType.PET_UPDATED, title = "Title", body = "Body")
@@ -36,6 +41,8 @@ class UpdatePetUseCaseTest {
     @Test
     fun `administrator changes to pet data notify owner without reloading pet context`() {
         val date = LocalDate.of(2020, 1, 1)
+        val dog = Species(UUID(1, 1), "Dog")
+        `when`(species.findById(dog.id)).thenReturn(dog)
         val cases = listOf(
             UpdatePetDto(name = "New name") to pet.copy(name = "New name"),
             UpdatePetDto(speciesId = UUID(1, 1)) to pet.copy(speciesId = UUID(1, 1)),
@@ -56,6 +63,14 @@ class UpdatePetUseCaseTest {
         assertTrue(captor.allValues.all { it.actorId == administratorId && it.petId == pet.id })
         assertFalse(captor.allValues.any { it.body.contains("Private medical notes") })
         verifyNoMoreInteractions(pets)
+    }
+
+    @Test
+    fun `unknown species is rejected before writing the pet`() {
+        assertFailsWith<SpeciesNotFoundException> {
+            useCase.update(pet, UpdatePetDto(speciesId = UUID(1, 1)), administratorId)
+        }
+        verifyNoInteractions(pets, notifications)
     }
 
     @Test

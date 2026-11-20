@@ -18,6 +18,7 @@ import com.bortnik.chiron.domain.repositories.VeterinarianSpeciesPermissionRepos
 import com.bortnik.chiron.domain.utils.AppointmentStatusRules
 import com.bortnik.chiron.domain.utils.validators.AppointmentValidator
 import com.bortnik.chiron.domain.utils.validators.validateAll
+import com.bortnik.chiron.domain.utils.validators.validateBusinessRules
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import java.time.Duration
@@ -55,14 +56,14 @@ class CreateAppointmentUseCase(
         AppointmentValidator.validateDurationMinutes(resolved.durationMin.toLong() + resolved.bufferAfterMin)
         veterinarian.requireSpecialization(resolved.specializationId)
         val endAt = dto.startAt + Duration.ofMinutes(resolved.durationMin.toLong() + resolved.bufferAfterMin)
-        validateAll {
+        validateBusinessRules {
             ensure(
                 dto.endAt == endAt,
                 "endAt",
                 "must match the total service duration including the shared buffer"
             )
         }
-        checkAvailability.check(veterinarian.id, dto.startAt, endAt)
+        checkAvailability.checkSchedule(veterinarian.id, dto.startAt, endAt)
         return appointmentRepository.create(dto, resolved.services)
     }
 

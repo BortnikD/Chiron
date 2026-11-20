@@ -4,10 +4,12 @@ import com.bortnik.chiron.application.security.Actor
 import com.bortnik.chiron.application.usecase.client.pet.ClientCreatePetUseCase
 import com.bortnik.chiron.application.usecase.common.pet.CreatePetUseCase
 import com.bortnik.chiron.domain.dto.Patch
+import com.bortnik.chiron.domain.entities.Species
 import com.bortnik.chiron.domain.entities.enums.Gender
 import com.bortnik.chiron.domain.entities.enums.UserRole
 import com.bortnik.chiron.domain.exceptions.ValidationException
 import com.bortnik.chiron.domain.repositories.PetRepository
+import com.bortnik.chiron.domain.repositories.SpeciesRepository
 import com.bortnik.chiron.domain.utils.validators.PetValidator
 import com.bortnik.chiron.infrastructure.persistence.mappers.toPet
 import com.bortnik.chiron.infrastructure.persistence.models.ExposedPetTable
@@ -56,10 +58,12 @@ class PetBreedTest {
             assertEquals(breed, admin.breed)
 
             val pets = mock(PetRepository::class.java)
+            val species = mock(SpeciesRepository::class.java)
+            `when`(species.findById(pet.speciesId)).thenReturn(Species(pet.speciesId, "Dog"))
             val expected = pet.copy(breed = breed)
             `when`(pets.create(admin)).thenReturn(expected)
             val clock = Clock.fixed(pet.createdAt, ZoneOffset.UTC)
-            val useCase = ClientCreatePetUseCase(CreatePetUseCase(pets, clock))
+            val useCase = ClientCreatePetUseCase(CreatePetUseCase(pets, clock, species))
             assertEquals(expected, useCase.create(Actor(pet.ownerId, UserRole.CLIENT, "Owner"), client))
             verify(pets).create(admin)
         }

@@ -46,7 +46,7 @@ class NotifyScheduleConflictsUseCaseTest {
     private val clinic = ClinicProperties("Europe/Moscow", 15)
     private val useCase = NotifyScheduleConflictsUseCase(
         appointments, veterinarians, users,
-        CheckAppointmentAvailabilityUseCase(schedules, exceptions, appointments, clinic),
+        CheckAppointmentAvailabilityUseCase(schedules, exceptions, appointments, clinic, veterinarians),
         notify, Clock.fixed(now, clinic.zoneId),
     )
     private val day = appointment.startAt.atZone(clinic.zoneId).toLocalDate()

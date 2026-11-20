@@ -1,36 +1,53 @@
 -- Run automatically before seed commit, or independently with psql -v ON_ERROR_STOP=1 -f this-file.sql.
 DO
 $$
-BEGIN
-    IF EXISTS (
-        SELECT 1 FROM (
-            SELECT concat_ws(' ', first_name, middle_name, last_name, full_name) AS value
-            FROM users WHERE id::text LIKE '5eed%' OR email = 'admin@demo.chiron.local'
-            UNION ALL
-            SELECT name FROM species WHERE id::text LIKE '5eed%'
-            UNION ALL
-            SELECT concat_ws(' ', name, description) FROM specialization WHERE id::text LIKE '5eed%'
-            UNION ALL
-            SELECT concat_ws(' ', name, description) FROM service WHERE id::text LIKE '5eed%'
-            UNION ALL
-            SELECT bio FROM veterinarian WHERE id::text LIKE '5eed%'
-            UNION ALL
-            SELECT concat_ws(' ', name, notes) FROM pet WHERE id::text LIKE '5eed%'
-            UNION ALL
-            SELECT reason FROM schedule_exception WHERE veterinarian_id::text LIKE '5eed%'
-            UNION ALL
-            SELECT concat_ws(' ', client_comment, vet_notes, cancel_reason)
-            FROM appointment WHERE veterinarian_id::text LIKE '5eed%'
-            UNION ALL
-            SELECT v.name FROM vaccination v JOIN pet p ON p.id = v.pet_id WHERE p.id::text LIKE '5eed%'
-            UNION ALL
-            SELECT concat_ws(' ', title, body) FROM notification WHERE recipient_id::text LIKE '5eed%'
-        ) AS texts
-        WHERE value ~ '[A-Za-z]'
-    ) THEN
-        RAISE EXCEPTION 'Demo display texts must be in Russian';
-    END IF;
-END;
+    BEGIN
+        IF EXISTS (SELECT 1
+                   FROM (SELECT concat_ws(' ', first_name, middle_name, last_name, full_name) AS value
+                         FROM users
+                         WHERE id::text LIKE '5eed%'
+                            OR email = 'admin@demo.chiron.local'
+                         UNION ALL
+                         SELECT name
+                         FROM species
+                         WHERE id::text LIKE '5eed%'
+                         UNION ALL
+                         SELECT concat_ws(' ', name, description)
+                         FROM specialization
+                         WHERE id::text LIKE '5eed%'
+                         UNION ALL
+                         SELECT concat_ws(' ', name, description)
+                         FROM service
+                         WHERE id::text LIKE '5eed%'
+                         UNION ALL
+                         SELECT bio
+                         FROM veterinarian
+                         WHERE id::text LIKE '5eed%'
+                         UNION ALL
+                         SELECT concat_ws(' ', name, breed, notes)
+                         FROM pet
+                         WHERE id::text LIKE '5eed%'
+                         UNION ALL
+                         SELECT reason
+                         FROM schedule_exception
+                         WHERE veterinarian_id::text LIKE '5eed%'
+                         UNION ALL
+                         SELECT concat_ws(' ', client_comment, vet_notes, cancel_reason)
+                         FROM appointment
+                         WHERE veterinarian_id::text LIKE '5eed%'
+                         UNION ALL
+                         SELECT v.name
+                         FROM vaccination v
+                                  JOIN pet p ON p.id = v.pet_id
+                         WHERE p.id::text LIKE '5eed%'
+                         UNION ALL
+                         SELECT concat_ws(' ', title, body)
+                         FROM notification
+                         WHERE recipient_id::text LIKE '5eed%') AS texts
+                   WHERE value ~ '[A-Za-z]') THEN
+            RAISE EXCEPTION 'Demo display texts must be in Russian';
+        END IF;
+    END;
 $$;
 
 DO
@@ -38,29 +55,44 @@ $$
     DECLARE
         today date := (now() AT TIME ZONE 'Europe/Moscow')::date;
     BEGIN
-        IF (SELECT count(*) FROM users WHERE id::text LIKE '5eed%' AND role = 'CLIENT') <> 600
-            OR (SELECT count(*) FROM pet WHERE id::text LIKE '5eed%') <> 900
+        IF (SELECT count(*) FROM users WHERE id::text LIKE '5eed%' AND role = 'CLIENT') <> 8
+            OR (SELECT count(*) FROM pet WHERE id::text LIKE '5eed%') <> 19
+            OR (SELECT count(DISTINCT name) FROM pet WHERE id::text LIKE '5eed%') <> 19
             OR (SELECT count(*) FROM veterinarian WHERE id::text LIKE '5eed%') <> 8
-            OR (SELECT count(*) FROM appointment WHERE veterinarian_id::text LIKE '5eed%') < 10000
+            OR (SELECT count(*) FROM appointment WHERE id::text LIKE '5eed0108-%') <> 43
             OR (SELECT count(DISTINCT veterinarian_id) FROM appointment WHERE veterinarian_id::text LIKE '5eed%') <> 8
-            OR (SELECT count(DISTINCT item.service_id) FROM appointment_service item
-                    JOIN appointment a ON a.id = item.appointment_id WHERE a.veterinarian_id::text LIKE '5eed%') <> 11
+            OR (SELECT count(DISTINCT item.service_id)
+                FROM appointment_service item
+                         JOIN appointment a ON a.id = item.appointment_id
+                WHERE a.id::text LIKE '5eed0108-%') <> 14
             OR (SELECT count(DISTINCT status) FROM appointment WHERE veterinarian_id::text LIKE '5eed%') <> 5
-            OR (SELECT count(DISTINCT type) FROM notification WHERE recipient_id::text LIKE '5eed%') <> 8 THEN
+            OR (SELECT count(DISTINCT type) FROM notification WHERE recipient_id::text LIKE '5eed%') < 8 THEN
             RAISE EXCEPTION 'Demo data volume or scenario coverage is incomplete';
         END IF;
 
-        IF NOT EXISTS (SELECT 1 FROM appointment_service item JOIN appointment a ON a.id = item.appointment_id
-                       WHERE a.veterinarian_id::text LIKE '5eed%' AND item.is_planned
-                       GROUP BY item.appointment_id HAVING count(*) > 1)
-            OR NOT EXISTS (SELECT 1 FROM appointment_service item JOIN appointment a ON a.id = item.appointment_id
-                           WHERE a.veterinarian_id::text LIKE '5eed%' AND NOT item.is_planned AND item.is_performed) THEN
+        IF NOT EXISTS (SELECT 1
+                       FROM appointment_service item
+                                JOIN appointment a ON a.id = item.appointment_id
+                       WHERE a.veterinarian_id::text LIKE '5eed%'
+                         AND item.is_planned
+                       GROUP BY item.appointment_id
+                       HAVING count(*) > 1)
+            OR NOT EXISTS (SELECT 1
+                           FROM appointment_service item
+                                    JOIN appointment a ON a.id = item.appointment_id
+                           WHERE a.veterinarian_id::text LIKE '5eed%'
+                             AND NOT item.is_planned
+                             AND item.is_performed) THEN
             RAISE EXCEPTION 'Demo multi-service and additional performed procedures are missing';
         END IF;
 
-        IF (SELECT count(DISTINCT date_trunc('month', start_at AT TIME ZONE 'Europe/Moscow'))
-            FROM appointment
-            WHERE veterinarian_id::text LIKE '5eed%') < 26
+        IF EXISTS (SELECT 1
+                   FROM pet p
+                   WHERE p.id::text LIKE '5eed0107-%'
+                     AND (SELECT count(*) FROM appointment a WHERE a.pet_id = p.id AND a.status = 'COMPLETED') < 2)
+            OR (SELECT count(DISTINCT date_trunc('month', start_at AT TIME ZONE 'Europe/Moscow'))
+                FROM appointment
+                WHERE veterinarian_id::text LIKE '5eed%') < 6
             OR NOT EXISTS (SELECT 1
                            FROM appointment
                            WHERE veterinarian_id::text LIKE '5eed%'
@@ -97,8 +129,11 @@ $$
                            OR assignment.veterinarian_id IS NULL
                            OR (item.is_planned AND extract(epoch FROM (a.end_at - a.start_at)) / 60
                            <> (SELECT sum(planned.duration_min_snapshot) + max(planned.buffer_after_min_snapshot)
-                               FROM appointment_service planned WHERE planned.appointment_id = a.id AND planned.is_planned))
+                               FROM appointment_service planned
+                               WHERE planned.appointment_id = a.id
+                                 AND planned.is_planned))
                            OR item.duration_min_snapshot <> coalesce(ss.duration_min, s.base_duration_min)
+                           OR item.price_snapshot <> coalesce(ss.price, s.base_price)
                            OR item.buffer_after_min_snapshot <> s.buffer_after_min
                            OR (a.status = 'COMPLETED' AND item.is_performed IS NULL)
                            OR (a.status IN ('CANCELLED', 'NO_SHOW') AND item.is_performed IS DISTINCT FROM FALSE)

@@ -13,11 +13,13 @@ import com.bortnik.chiron.domain.dto.pet.UpdatePetDto
 import com.bortnik.chiron.domain.dto.vaccination.CreateVaccinationDto
 import com.bortnik.chiron.domain.dto.vaccination.UpdateVaccinationDto
 import com.bortnik.chiron.domain.entities.Pet
+import com.bortnik.chiron.domain.entities.Species
 import com.bortnik.chiron.domain.entities.Vaccination
 import com.bortnik.chiron.domain.entities.enums.Gender
 import com.bortnik.chiron.domain.exceptions.ValidationException
 import com.bortnik.chiron.domain.repositories.AppointmentRepository
 import com.bortnik.chiron.domain.repositories.PetRepository
+import com.bortnik.chiron.domain.repositories.SpeciesRepository
 import com.bortnik.chiron.domain.repositories.VaccinationRepository
 import com.bortnik.chiron.presentation.api.http.dto.request.pet.ClientCreatePetRequest
 import com.bortnik.chiron.presentation.api.http.dto.request.vaccination.CreateVaccinationRequest
@@ -71,6 +73,8 @@ class ClinicDateValidationTest {
     @Test
     fun `pet and vaccination writes accept the clinic day and reject tomorrow`() {
         val pets = mock(PetRepository::class.java)
+        val species = mock(SpeciesRepository::class.java)
+        `when`(species.findById(speciesId)).thenReturn(Species(speciesId, "Dog"))
         val vaccinations = mock(VaccinationRepository::class.java)
         val appointments = mock(AppointmentRepository::class.java)
         val pet = Pet(
@@ -84,8 +88,8 @@ class ClinicDateValidationTest {
         `when`(vaccinations.findById(vaccination.id)).thenReturn(vaccination)
         `when`(vaccinations.update(vaccination.id, updateVaccination)).thenReturn(vaccination)
 
-        val petCreate = CreatePetUseCase(pets, clock)
-        val petUpdate = UpdatePetUseCase(pets, clock, mock(CreateNotificationUseCase::class.java))
+        val petCreate = CreatePetUseCase(pets, clock, species)
+        val petUpdate = UpdatePetUseCase(pets, clock, mock(CreateNotificationUseCase::class.java), species)
         val notifyVaccination = mock(NotifyVaccinationUseCase::class.java)
         val vaccinationCreate = CreateVaccinationUseCase(vaccinations, appointments, clock, notifyVaccination)
         val vaccinationUpdate = UpdateVaccinationUseCase(vaccinations, clock, notifyVaccination)

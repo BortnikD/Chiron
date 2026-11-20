@@ -4,6 +4,7 @@ import com.bortnik.chiron.domain.dto.appointment.CreateAppointmentDto
 import com.bortnik.chiron.domain.entities.AppointmentService
 import com.bortnik.chiron.domain.entities.ServiceSpecies
 import com.bortnik.chiron.domain.entities.enums.AppointmentStatus
+import com.bortnik.chiron.domain.exceptions.BusinessRuleViolationException
 import com.bortnik.chiron.domain.exceptions.ValidationException
 import com.bortnik.chiron.domain.exceptions.notfound.AppointmentNotFoundException
 import com.bortnik.chiron.domain.exceptions.rules.AppointmentPetMismatchException
@@ -78,7 +79,7 @@ class CreateAppointmentUseCaseTest {
         val result = useCase.create(dto, pet.ownerId)
         assertEquals(80.0, result.estimatedTotal)
         assertEquals(pet.ownerId, result.services.single().addedBy)
-        verify(availability).check(veterinarian.id, dto.startAt, dto.endAt, null)
+        verify(availability).checkSchedule(veterinarian.id, dto.startAt, dto.endAt, null)
         verify(appointments).create(eq(dto) ?: dto, anyList())
     }
 
@@ -86,7 +87,10 @@ class CreateAppointmentUseCaseTest {
     fun `booking rejects an end that does not match the shared service calculation`() {
         allowBooking()
         for (offset in listOf(-60L, 60L)) {
-            assertFailsWith<ValidationException> { useCase.create(dto.copy(endAt = dto.endAt.plusSeconds(offset))) }
+            val error = assertFailsWith<BusinessRuleViolationException> {
+                useCase.create(dto.copy(endAt = dto.endAt.plusSeconds(offset)))
+            }
+            assertEquals("endAt", error.errors.single().field)
         }
         verifyNoInteractions(appointments, availability)
     }
@@ -144,7 +148,7 @@ class CreateAppointmentUseCaseTest {
     fun `unavailable slot is rejected without storing an appointment`() {
         allowBooking()
         doThrow(AppointmentSlotUnavailableException(veterinarian.id, dto.startAt, dto.endAt, "Occupied"))
-            .`when`(availability).check(veterinarian.id, dto.startAt, dto.endAt, null)
+            .`when`(availability).checkSchedule(veterinarian.id, dto.startAt, dto.endAt, null)
         assertFailsWith<AppointmentSlotUnavailableException> { useCase.create(dto) }
         verifyNoInteractions(appointments)
     }

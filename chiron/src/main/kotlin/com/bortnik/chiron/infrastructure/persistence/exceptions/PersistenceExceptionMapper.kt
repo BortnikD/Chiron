@@ -3,6 +3,8 @@ package com.bortnik.chiron.infrastructure.persistence.exceptions
 import org.postgresql.util.PSQLException
 import org.postgresql.util.ServerErrorMessage
 import java.sql.SQLException
+import java.sql.SQLNonTransientConnectionException
+import java.sql.SQLTransientConnectionException
 
 fun SQLException.toPersistenceException(): PersistenceException {
     val root = rootSqlException()
@@ -40,10 +42,33 @@ fun SQLException.toPersistenceException(): PersistenceException {
             -> ConcurrencyException(sqlError, sqlState, message, this)
 
         SqlError.QUERY_CANCELED -> QueryTimeoutException(sqlError, sqlState, message, this)
-        SqlError.CONNECTION_FAILURE -> ConnectionException(sqlError, sqlState, message, this)
-        SqlError.UNKNOWN -> UnknownPersistenceException(sqlError, sqlState, message, this)
+        SqlError.CONNECTION_UNABLE_TO_CONNECT,
+        SqlError.CONNECTION_DOES_NOT_EXIST,
+        SqlError.CONNECTION_FAILURE,
+        SqlError.ADMIN_SHUTDOWN,
+        SqlError.CRASH_SHUTDOWN,
+        SqlError.CANNOT_CONNECT_NOW,
+            -> ConnectionException(sqlError, sqlState, message, this)
+
+        SqlError.UNKNOWN -> when (root) {
+            is SQLTransientConnectionException, is SQLNonTransientConnectionException ->
+                ConnectionException(sqlError, sqlState, message, this)
+
+            else -> UnknownPersistenceException(sqlError, sqlState, message, this)
+        }
     }
 }
+
+// Transaction setup and the security filter can see failures outside the repository's SQL wrapper.
+fun Throwable.findStorageFailure(): PersistenceException? =
+    generateSequence(this) { it.cause }.firstNotNullOfOrNull { cause ->
+        val failure = if (cause is SQLException) cause.toPersistenceException() else cause
+        when (failure) {
+            is ConnectionException -> failure
+            is QueryTimeoutException -> failure
+            else -> null
+        }
+    }
 
 // Exposed wraps the driver exception; SQLSTATE and server details live in the deepest SQLException.
 private fun SQLException.rootSqlException(): SQLException =

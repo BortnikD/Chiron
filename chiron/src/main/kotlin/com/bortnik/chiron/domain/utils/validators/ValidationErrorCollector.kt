@@ -1,5 +1,7 @@
 package com.bortnik.chiron.domain.utils.validators
 
+import com.bortnik.chiron.domain.exceptions.BusinessRuleViolationException
+import com.bortnik.chiron.domain.exceptions.DomainException
 import com.bortnik.chiron.domain.exceptions.ValidationError
 import com.bortnik.chiron.domain.exceptions.ValidationException
 
@@ -37,10 +39,13 @@ class ValidationErrorCollector {
     fun <T : Comparable<T>> ensureNotBefore(field: String, value: T?, lowerField: String, lower: T?) =
         ensure(value == null || lower == null || value >= lower, field, "must not be before $lowerField")
 
-    fun throwIfAny() {
-        if (errors.isNotEmpty()) throw ValidationException(errors.toList())
+    fun throwIfAny(exception: (List<ValidationError>) -> DomainException = ::ValidationException) {
+        if (errors.isNotEmpty()) throw exception(errors.toList())
     }
 }
 
 inline fun validateAll(block: ValidationErrorCollector.() -> Unit) =
     ValidationErrorCollector().apply(block).throwIfAny()
+
+inline fun validateBusinessRules(block: ValidationErrorCollector.() -> Unit) =
+    ValidationErrorCollector().apply(block).throwIfAny(::BusinessRuleViolationException)

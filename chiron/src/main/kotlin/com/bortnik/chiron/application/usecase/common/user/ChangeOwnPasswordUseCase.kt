@@ -7,8 +7,8 @@ import com.bortnik.chiron.domain.dto.notification.CreateNotificationDto
 import com.bortnik.chiron.domain.entities.enums.NotificationType
 import com.bortnik.chiron.domain.dto.user.ChangePasswordDto
 import com.bortnik.chiron.domain.dto.user.UpdateUserDto
-import com.bortnik.chiron.domain.exceptions.InvalidCredentialsException
 import com.bortnik.chiron.domain.exceptions.notfound.UserNotFoundException
+import com.bortnik.chiron.domain.exceptions.rules.InvalidCurrentPasswordException
 import com.bortnik.chiron.domain.repositories.UserRepository
 import com.bortnik.chiron.domain.utils.ValidationConstants.UserRules
 import com.bortnik.chiron.domain.utils.validators.UserValidator
@@ -33,7 +33,7 @@ class ChangeOwnPasswordUseCase(
         if (dto.currentPassword.encodeToByteArray().size > UserRules.PASSWORD_MAX_BYTES ||
             !passwordEncoder.matches(dto.currentPassword, user.passwordHash)
         ) {
-            throw InvalidCredentialsException("Invalid current password")
+            throw InvalidCurrentPasswordException()
         }
         val update = UpdateUserDto(passwordHash = requireNotNull(passwordEncoder.encode(dto.newPassword)))
         userRepository.update(actor.userId, update) ?: throw UserNotFoundException(actor.userId)
