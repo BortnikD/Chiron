@@ -13,94 +13,13 @@ import {
   FileText,
   Microscope,
   CheckCircle2,
-  Heart,
-  Smile,
   Activity,
-  Award,
 } from 'lucide-react';
 import { AppShell, useShellHeader } from '@/components/layout/AppShell';
-import { PetAvatar } from '@/components/ui/EntityAvatar';
 import { clinicApi } from '@/modules/clinic/api';
 import type { Veterinarian } from '@/modules/clinic/types';
-import type { Pet } from '@/modules/client/types';
-
-interface PatientStory {
-  id: string;
-  name: string;
-  species: string;
-  speciesTone: string;
-  breed: string;
-  treatment: string;
-  doctorName: string;
-  doctorSpec: string;
-  petData?: Pet;
-}
-
-const FEATURED_PATIENTS: PatientStory[] = [
-  {
-    id: '5eed0007-0000-0000-0000-000000000001',
-    name: 'Рекс',
-    species: 'Собака',
-    speciesTone: 'dog',
-    breed: 'Немецкая овчарка',
-    treatment: 'Плановая кардиологическая диспансеризация и ЭхоКГ сердца',
-    doctorName: 'Анна Сергеевна Иванова',
-    doctorSpec: 'Ведущий терапевт',
-  },
-  {
-    id: '5eed0007-0000-0000-0000-000000000689',
-    name: 'Молли',
-    species: 'Кошка',
-    speciesTone: 'cat',
-    breed: 'Британская короткошёрстная',
-    treatment: 'Бережная санация ротовой полости и чипирование по стандартам Fear Free',
-    doctorName: 'София Денисовна Орлова',
-    doctorSpec: 'Ветеринарный стоматолог',
-  },
-  {
-    id: '5eed0007-0000-0000-0000-000000000556',
-    name: 'Барсик',
-    species: 'Кролик',
-    speciesTone: 'rabbit',
-    breed: 'Декоративный карликовый кролик',
-    treatment: 'Коррекция прикуса резцов и подбор специализированного лечебного рациона',
-    doctorName: 'Алина Игоревна Зайцева',
-    doctorSpec: 'Специалист по экзотическим животным',
-  },
-  {
-    id: '5eed0007-0000-0000-0000-000000000801',
-    name: 'Симба',
-    species: 'Собака',
-    speciesTone: 'dog',
-    breed: 'Золотистый ретривер',
-    treatment: 'Успешная малоинвазивная артроскопия и курс реабилитации сустава',
-    doctorName: 'Роман Олегович Белов',
-    doctorSpec: 'Хирург-ортопед',
-  },
-  {
-    id: '5eed0007-0000-0000-0000-000000000154',
-    name: 'Нюша',
-    species: 'Кошка',
-    speciesTone: 'cat',
-    breed: 'Шотландская вислоухая',
-    treatment: 'Ежегодный расширенный чекап здоровья и международный паспорт вакцинации',
-    doctorName: 'Елена Викторовна Смирнова',
-    doctorSpec: 'Терапевт, нефролог',
-  },
-  {
-    id: '5eed0007-0000-0000-0000-000000000402',
-    name: 'Феликс',
-    species: 'Собака',
-    speciesTone: 'dog',
-    breed: 'Вельш-корги пемброк',
-    treatment: 'Цифровой рентген позвоночника с минимальной дозой облучения',
-    doctorName: 'Павел Николаевич Петров',
-    doctorSpec: 'Хирург, травматолог',
-  },
-];
 
 function AboutContent() {
-  const [livePets, setLivePets] = useState<Record<string, Pet>>({});
   const [vetsCount, setVetsCount] = useState<number>(8);
 
   useShellHeader({
@@ -114,21 +33,6 @@ function AboutContent() {
       .then((vets) => {
         if (Array.isArray(vets) && vets.length > 0) {
           setVetsCount(vets.length);
-        }
-      })
-      .catch(() => {});
-
-    // Подгружаем реальные фото питомцев клиники для витрины пациентов (доступно всем ролям без 403)
-    fetch('/api/featured-pets')
-      .then((r) => r.json())
-      .then((data) => {
-        if (data?.success && Array.isArray(data.result)) {
-          const map: Record<string, Pet> = {};
-          for (const p of data.result) {
-            map[p.id] = p;
-            if (p.name) map[p.name.toLowerCase()] = p;
-          }
-          setLivePets(map);
         }
       })
       .catch(() => {});
@@ -343,80 +247,6 @@ function AboutContent() {
           </div>
         </section>
       </div>
-
-      {/* Дружелюбная творческая витрина: «Пациенты и врачи клиники» */}
-      <section className="island flex-none p-card">
-        <div className="col gap-2xl">
-          <div className="row wrap between items-center gap-lg">
-            <div className="row gap-base items-center">
-              <span className="feat-ic sm">
-                <Heart size={20} />
-              </span>
-              <div className="col gap-1">
-                <span className="text-xl font-bold">
-                  Счастливые пациенты Chiron
-                </span>
-                <span className="small muted">
-                  Примеры питомцев из нашей базы данных и врачи, которые заботятся об их здоровье
-                </span>
-              </div>
-            </div>
-
-            <div className="row gap-xl">
-              <span className="small muted inline-flex items-center gap-sm">
-                <Smile size={15} className="text-primary" />
-                Более 1 400 здоровых питомцев
-              </span>
-              <span className="small muted inline-flex items-center gap-sm">
-                <Award size={15} className="text-primary" />
-                Сертифицированные врачи
-              </span>
-            </div>
-          </div>
-
-          <div className="grid-patients">
-            {FEATURED_PATIENTS.map((p) => {
-              const petFromDb = livePets[p.id] || livePets[p.name.toLowerCase()];
-              return (
-                <div key={p.id} className="patient-card">
-                  <div className="row gap-lg items-center">
-                    <PetAvatar
-                      pet={petFromDb || { id: p.id, name: p.name }}
-                      tone={p.speciesTone}
-                      species={p.speciesTone as any}
-                      iconSize={22}
-                      className="t-ava md round"
-                    />
-                    <div className="col gap-1 flex-1 min-w-0">
-                      <div className="row gap-md items-center">
-                        <b className="text-base">{p.name}</b>
-                        <span className={`sp-chip tone-${p.speciesTone} px-sm text-xs`}>
-                          {p.species}
-                        </span>
-                      </div>
-                      <span className="small muted truncate">
-                        {p.breed}
-                      </span>
-                    </div>
-                  </div>
-
-                  <div className="patient-card-treatment">
-                    {p.treatment}
-                  </div>
-
-                  <div className="row gap-md items-center text-xs text-muted mt-auto pt-1">
-                    <Stethoscope size={14} className="text-primary shrink-0" />
-                    <span>
-                      Лечащий врач: <b className="text-foreground">{p.doctorName}</b>
-                      <span className="muted"> ({p.doctorSpec})</span>
-                    </span>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      </section>
     </div>
   );
 }

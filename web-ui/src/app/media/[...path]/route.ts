@@ -1,4 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
+import http from 'node:http';
+import https from 'node:https';
+import { Readable } from 'node:stream';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -14,30 +17,57 @@ async function proxyMediaRequest(
   const { path } = await context.params;
   const targetUrl = `${MEDIA_PROXY_TARGET}/${path.join('/')}${req.nextUrl.search}`;
 
-  const upstreamHeaders: Record<string, string> = {};
-  try {
-    const targetUrlObj = new URL(targetUrl);
-    upstreamHeaders['host'] = process.env.STORAGE_PUBLIC_HOST || targetUrlObj.host;
-  } catch {
-    upstreamHeaders['host'] = 'localhost:3900';
-  }
+  const targetUrlObj = new URL(targetUrl);
+  const hostHeader = process.env.STORAGE_PUBLIC_HOST || targetUrlObj.host;
 
-  const upstream = await fetch(targetUrl, {
-    method: req.method,
-    headers: upstreamHeaders,
-    redirect: 'manual',
-  });
+  return new Promise<NextResponse>((resolve) => {
+    const isHttps = targetUrlObj.protocol === 'https:';
+    const client = isHttps ? https : http;
 
-  const resHeaders = new Headers();
-  for (const key of ['content-type', 'cache-control', 'etag', 'last-modified', 'content-disposition']) {
-    const val = upstream.headers.get(key);
-    if (val) resHeaders.set(key, val);
-  }
+    const options: http.RequestOptions = {
+      protocol: targetUrlObj.protocol,
+      hostname: targetUrlObj.hostname,
+      port: targetUrlObj.port || (isHttps ? 443 : 80),
+      path: targetUrlObj.pathname + targetUrlObj.search,
+      method: req.method,
+      headers: {
+        Host: hostHeader,
+      },
+    };
 
-  return new NextResponse(upstream.body, {
-    status: upstream.status,
-    statusText: upstream.statusText,
-    headers: resHeaders,
+    const upstreamReq = client.request(options, (upstreamRes) => {
+      const resHeaders = new Headers();
+      for (const [key, val] of Object.entries(upstreamRes.headers)) {
+        if (val === undefined) continue;
+        const lowerKey = key.toLowerCase();
+        if (['content-type', 'cache-control', 'etag', 'last-modified', 'content-disposition', 'content-length'].includes(lowerKey)) {
+          if (Array.isArray(val)) {
+            val.forEach((v) => resHeaders.append(lowerKey, v));
+          } else {
+            resHeaders.set(lowerKey, val);
+          }
+        }
+      }
+
+      const webStream = Readable.toWeb(upstreamRes) as ReadableStream;
+
+      resolve(
+        new NextResponse(webStream, {
+          status: upstreamRes.statusCode || 200,
+          statusText: upstreamRes.statusMessage || 'OK',
+          headers: resHeaders,
+        })
+      );
+    });
+
+    upstreamReq.on('error', (err) => {
+      console.error('[MediaProxy] error:', err);
+      resolve(
+        new NextResponse('Internal proxy error', { status: 502 })
+      );
+    });
+
+    upstreamReq.end();
   });
 }
 

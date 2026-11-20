@@ -85,6 +85,7 @@ services:
     environment:
       API_PROXY_TARGET: http://backend:8080
       MEDIA_PROXY_TARGET: http://garage:3900
+      STORAGE_PUBLIC_HOST: ${DEMO_STORAGE_PUBLIC_HOST:-localhost:3905}
     ports:
       - "127.0.0.1:3001:3000"
     depends_on:
