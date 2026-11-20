@@ -4,8 +4,18 @@ import { AuthProvider, ThemeProvider, DictionariesProvider } from '@/providers';
 import { ToastProvider } from '@/shared/components/ToastProvider';
 
 export const metadata: Metadata = {
-  title: 'Chiron — Ветеринарная клиника',
+  title: {
+    default: 'Chiron — Ветеринарная клиника',
+    template: '%s | Chiron',
+  },
   description: 'Современная ветеринарная клиника Chiron: профессиональная забота, диагностика и электронные карты пациентов.',
+  openGraph: {
+    title: 'Chiron — Ветеринарная клиника',
+    description: 'Современная ветеринарная клиника Chiron: профессиональная забота, диагностика и электронные карты пациентов.',
+    type: 'website',
+    locale: 'ru_RU',
+    siteName: 'Chiron Vet Clinic',
+  },
   icons: {
     icon: '/icon.svg',
     shortcut: '/favicon.svg',

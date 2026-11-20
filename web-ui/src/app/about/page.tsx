@@ -135,324 +135,143 @@ function AboutContent() {
   }, []);
 
   return (
-    <div className="scroll-col grow" style={{ gap: 'var(--gap)', paddingBottom: 'var(--gap)' }}>
-      {/* Главный Hero-блок о клинике без лишних кнопок в правом углу */}
-      <section
-        className="island"
-        style={{
-          flex: 'none',
-          padding: '24px',
-          background: 'linear-gradient(135deg, color-mix(in srgb, var(--primary) 8%, var(--card)) 0%, var(--card) 60%)',
-          border: '1px solid var(--border)',
-        }}
-      >
-        <div className="col" style={{ gap: '18px' }}>
-          <div className="row" style={{ gap: '16px', alignItems: 'center' }}>
-            <span
-              className="t-ava xl round"
-              style={{
-                width: '56px',
-                height: '56px',
-                background: 'color-mix(in srgb, var(--primary) 18%, transparent)',
-                color: 'var(--primary)',
-                display: 'grid',
-                placeItems: 'center',
-                flexShrink: 0,
-              }}
-            >
+    <div className="scroll-col grow pb-0">
+      {/* Главный Hero-блок о клинике */}
+      <section className="island hero-gradient flex-none p-card">
+        <div className="col gap-2xl">
+          <div className="row gap-xl items-center">
+            <span className="feat-ic lg">
               <HeartPulse size={30} />
             </span>
-            <div className="col" style={{ gap: '3px' }}>
-              <span className="h1" style={{ fontSize: '24px', fontWeight: 750, letterSpacing: '-0.02em' }}>
+            <div className="col gap-1">
+              <h1 className="h1 text-2xl font-extrabold tracking-tight">
                 Ветеринарная клиника Chiron
-              </span>
-              <span className="muted" style={{ fontSize: '14.5px', lineHeight: 1.4 }}>
+              </h1>
+              <p className="muted text-base leading-snug">
                 Современный ветеринарный госпиталь полного цикла и бережная цифровая экосистема
-              </span>
+              </p>
             </div>
           </div>
 
-          <p
-            style={{
-              margin: 0,
-              fontSize: '14.5px',
-              lineHeight: 1.6,
-              color: 'var(--foreground)',
-              maxWidth: '960px',
-              opacity: 0.92,
-            }}
-          >
+          <p className="m-0 text-base leading-relaxed text-foreground max-w-prose opacity-90">
             Клиника <b>Chiron</b> создана командой практикующих ветеринарных врачей, чтобы объединить европейские протоколы доказательной медицины, бережные стандарты обращения без стресса (Fear Free) и абсолютную прозрачность для каждого владельца. Мы не применяем гомеопатию и препараты без доказанной эффективности, а каждое обследование и назначение фиксируется в защищённой цифровой медкарте.
           </p>
 
           {/* 4 ключевых индикатора клиники */}
-          <div
-            style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
-              gap: 'var(--gap)',
-              marginTop: '4px',
-            }}
-          >
-            <div
-              style={{
-                padding: '14px 16px',
-                borderRadius: 'var(--radius)',
-                background: 'color-mix(in srgb, var(--card) 65%, transparent)',
-                border: '1px solid var(--border)',
-                display: 'flex',
-                flexDirection: 'column',
-                gap: '2px',
-              }}
-            >
-              <span style={{ fontSize: '24px', fontWeight: 750, color: 'var(--primary)' }}>
-                {vetsCount} врачей
-              </span>
+          <div className="grid-stats mt-xs">
+            <div className="stat-card">
+              <span className="stat-value">{vetsCount} врачей</span>
               <span className="small muted">Терапевты, хирурги, стоматологи, ратологи</span>
             </div>
 
-            <div
-              style={{
-                padding: '14px 16px',
-                borderRadius: 'var(--radius)',
-                background: 'color-mix(in srgb, var(--card) 65%, transparent)',
-                border: '1px solid var(--border)',
-                display: 'flex',
-                flexDirection: 'column',
-                gap: '2px',
-              }}
-            >
-              <span style={{ fontSize: '24px', fontWeight: 750, color: 'var(--primary)' }}>
-                11 направлений
-              </span>
+            <div className="stat-card">
+              <span className="stat-value">11 направлений</span>
               <span className="small muted">От плановой вакцинации до сложных операций</span>
             </div>
 
-            <div
-              style={{
-                padding: '14px 16px',
-                borderRadius: 'var(--radius)',
-                background: 'color-mix(in srgb, var(--card) 65%, transparent)',
-                border: '1px solid var(--border)',
-                display: 'flex',
-                flexDirection: 'column',
-                gap: '2px',
-              }}
-            >
-              <span style={{ fontSize: '24px', fontWeight: 750, color: 'var(--primary)' }}>
-                15 минут
-              </span>
+            <div className="stat-card">
+              <span className="stat-value">15 минут</span>
               <span className="small muted">Экспресс-анализы крови и микроскопия</span>
             </div>
 
-            <div
-              style={{
-                padding: '14px 16px',
-                borderRadius: 'var(--radius)',
-                background: 'color-mix(in srgb, var(--card) 65%, transparent)',
-                border: '1px solid var(--border)',
-                display: 'flex',
-                flexDirection: 'column',
-                gap: '2px',
-              }}
-            >
-              <span style={{ fontSize: '24px', fontWeight: 750, color: 'var(--primary)' }}>
-                24 / 7
-              </span>
+            <div className="stat-card">
+              <span className="stat-value">24 / 7</span>
               <span className="small muted">Приём экстренных пациентов и стационар</span>
             </div>
           </div>
         </div>
       </section>
 
-      {/* 4 Карточки ключевых преимуществ «под линеечку» */}
-      <div
-        style={{
-          flex: 'none',
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-          gap: 'var(--gap)',
-        }}
-      >
-        <div
-          className="island"
-          style={{
-            flex: 'none',
-            padding: '24px',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '10px',
-          }}
-        >
-          <span
-            style={{
-              width: '40px',
-              height: '40px',
-              borderRadius: '10px',
-              background: 'color-mix(in srgb, var(--primary) 14%, transparent)',
-              color: 'var(--primary)',
-              display: 'grid',
-              placeItems: 'center',
-            }}
-          >
+      {/* 4 Карточки ключевых преимуществ */}
+      <div className="flex-none grid-features">
+        <div className="island flex-none p-card col gap-base">
+          <span className="feat-ic">
             <Stethoscope size={22} />
           </span>
-          <span style={{ fontSize: '16.5px', fontWeight: 650 }}>Врачи узких специализаций</span>
-          <span className="muted" style={{ fontSize: '13.5px', lineHeight: 1.55 }}>
+          <span className="text-lg font-semibold">Врачи узких специализаций</span>
+          <span className="muted text-sm leading-normal">
             Каждый доктор углублённо ведёт своё направление: абдоминальная и ортопедическая хирургия, ветеринарная стоматология, офтальмология и ратология.
           </span>
         </div>
 
-        <div
-          className="island"
-          style={{
-            flex: 'none',
-            padding: '24px',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '10px',
-          }}
-        >
-          <span
-            style={{
-              width: '40px',
-              height: '40px',
-              borderRadius: '10px',
-              background: 'color-mix(in srgb, var(--primary) 14%, transparent)',
-              color: 'var(--primary)',
-              display: 'grid',
-              placeItems: 'center',
-            }}
-          >
+        <div className="island flex-none p-card col gap-base">
+          <span className="feat-ic">
             <Microscope size={22} />
           </span>
-          <span style={{ fontSize: '16.5px', fontWeight: 650 }}>Экспертная диагностика</span>
-          <span className="muted" style={{ fontSize: '13.5px', lineHeight: 1.55 }}>
+          <span className="text-lg font-semibold">Экспертная диагностика</span>
+          <span className="muted text-sm leading-normal">
             Цифровой рентген высокого разрешения с минимальной лучевой нагрузкой, УЗИ экспертного класса (Mindray), ЭхоКГ сердца и собственная экспресс-лаборатория.
           </span>
         </div>
 
-        <div
-          className="island"
-          style={{
-            flex: 'none',
-            padding: '24px',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '10px',
-          }}
-        >
-          <span
-            style={{
-              width: '40px',
-              height: '40px',
-              borderRadius: '10px',
-              background: 'color-mix(in srgb, var(--primary) 14%, transparent)',
-              color: 'var(--primary)',
-              display: 'grid',
-              placeItems: 'center',
-            }}
-          >
+        <div className="island flex-none p-card col gap-base">
+          <span className="feat-ic">
             <ShieldCheck size={22} />
           </span>
-          <span style={{ fontSize: '16.5px', fontWeight: 650 }}>Стандарты Fear Free</span>
-          <span className="muted" style={{ fontSize: '13.5px', lineHeight: 1.55 }}>
+          <span className="text-lg font-semibold">Стандарты Fear Free</span>
+          <span className="muted text-sm leading-normal">
             Атмосфера без стресса: раздельные зоны ожидания для кошек и собак, нескользящие тёплые столы осмотра, феромонотерапия и деликатная фиксация.
           </span>
         </div>
 
-        <div
-          className="island"
-          style={{
-            flex: 'none',
-            padding: '24px',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '10px',
-          }}
-        >
-          <span
-            style={{
-              width: '40px',
-              height: '40px',
-              borderRadius: '10px',
-              background: 'color-mix(in srgb, var(--primary) 14%, transparent)',
-              color: 'var(--primary)',
-              display: 'grid',
-              placeItems: 'center',
-            }}
-          >
+        <div className="island flex-none p-card col gap-base">
+          <span className="feat-ic">
             <FileText size={22} />
           </span>
-          <span style={{ fontSize: '16.5px', fontWeight: 650 }}>Цифровая экосистема</span>
-          <span className="muted" style={{ fontSize: '13.5px', lineHeight: 1.55 }}>
+          <span className="text-lg font-semibold">Цифровая экосистема</span>
+          <span className="muted text-sm leading-normal">
             Полная история визитов, протоколы назначений, результаты анализов и календарь обязательных ревакцинаций доступны владельцу в личном кабинете в 1 клик.
           </span>
         </div>
       </div>
 
-      {/* 2 Больших блока «под линеечку»: Клинические стандарты и Контакты/Режим работы */}
-      <div
-        style={{
-          flex: 'none',
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))',
-          gap: 'var(--gap)',
-        }}
-      >
+      {/* 2 Больших блока: Клинические стандарты и Контакты/Режим работы */}
+      <div className="flex-none grid-two-blocks">
         {/* Левый блок: Клинические стандарты доказательной заботы */}
-        <section
-          className="island"
-          style={{
-            flex: 'none',
-            padding: '24px',
-            display: 'flex',
-            flexDirection: 'column',
-          }}
-        >
-          <div className="island-head" style={{ marginBottom: '16px', padding: 0, minHeight: 'auto', border: 0 }}>
-            <span className="island-title" style={{ fontSize: '18px' }}>
+        <section className="island flex-none p-card col">
+          <div className="island-head p-0 min-h-0 border-0 mb-4">
+            <span className="island-title text-xl">
               <Sparkles className="ic text-primary" size={20} />
               Принципы доказательной заботы
             </span>
           </div>
 
-          <div className="col" style={{ gap: '16px' }}>
-            <div className="row" style={{ gap: '12px', alignItems: 'flex-start' }}>
-              <CheckCircle2 size={19} className="text-primary" style={{ flexShrink: 0, marginTop: '2px' }} />
-              <div className="col" style={{ gap: '2px' }}>
-                <b style={{ fontSize: '14.5px' }}>Международные протоколы WSAVA и FECAVA</b>
-                <span className="small muted" style={{ lineHeight: 1.5 }}>
+          <div className="col gap-xl">
+            <div className="feat-row">
+              <CheckCircle2 size={19} className="text-primary shrink-0 mt-xs" />
+              <div className="col gap-1">
+                <b className="text-base">Международные протоколы WSAVA и FECAVA</b>
+                <span className="small muted leading-normal">
                   Назначения строго опираются на мировые стандарты ветеринарной медицины. Мы открыто обсуждаем план диагностики и лечения без навязанных услуг.
                 </span>
               </div>
             </div>
 
-            <div className="row" style={{ gap: '12px', alignItems: 'flex-start' }}>
-              <CheckCircle2 size={19} className="text-primary" style={{ flexShrink: 0, marginTop: '2px' }} />
-              <div className="col" style={{ gap: '2px' }}>
-                <b style={{ fontSize: '14.5px' }}>Безопасная ингаляционная анестезия</b>
-                <span className="small muted" style={{ lineHeight: 1.5 }}>
+            <div className="feat-row">
+              <CheckCircle2 size={19} className="text-primary shrink-0 mt-xs" />
+              <div className="col gap-1">
+                <b className="text-base">Безопасная ингаляционная анестезия</b>
+                <span className="small muted leading-normal">
                   Стерильный оперблок с аппаратом газового наркоза (изофлуран), кардиомониторингом жизненных показателей и непрерывным дежурством анестезиолога.
                 </span>
               </div>
             </div>
 
-            <div className="row" style={{ gap: '12px', alignItems: 'flex-start' }}>
-              <CheckCircle2 size={19} className="text-primary" style={{ flexShrink: 0, marginTop: '2px' }} />
-              <div className="col" style={{ gap: '2px' }}>
-                <b style={{ fontSize: '14.5px' }}>Индивидуальный календарь здоровья</b>
-                <span className="small muted" style={{ lineHeight: 1.5 }}>
+            <div className="feat-row">
+              <CheckCircle2 size={19} className="text-primary shrink-0 mt-xs" />
+              <div className="col gap-1">
+                <b className="text-base">Индивидуальный календарь здоровья</b>
+                <span className="small muted leading-normal">
                   Схемы вакцинации и обработки от паразитов формируются с учётом возраста, породы и образа жизни питомца, а автоматические напоминания приходят заранее.
                 </span>
               </div>
             </div>
 
-            <div className="row" style={{ gap: '12px', alignItems: 'flex-start' }}>
-              <CheckCircle2 size={19} className="text-primary" style={{ flexShrink: 0, marginTop: '2px' }} />
-              <div className="col" style={{ gap: '2px' }}>
-                <b style={{ fontSize: '14.5px' }}>Комфортный стационар с климат-контролем</b>
-                <span className="small muted" style={{ lineHeight: 1.5 }}>
+            <div className="feat-row">
+              <CheckCircle2 size={19} className="text-primary shrink-0 mt-xs" />
+              <div className="col gap-1">
+                <b className="text-base">Комфортный стационар с климат-контролем</b>
+                <span className="small muted leading-normal">
                   Раздельное размещение кошек и собак в изолированных вентилируемых боксах с индивидуальным освещением для спокойного послеоперационного восстановления.
                 </span>
               </div>
@@ -461,28 +280,20 @@ function AboutContent() {
         </section>
 
         {/* Правый блок: Контакты, адрес и график работы */}
-        <section
-          className="island"
-          style={{
-            flex: 'none',
-            padding: '24px',
-            display: 'flex',
-            flexDirection: 'column',
-          }}
-        >
-          <div className="island-head" style={{ marginBottom: '16px', padding: 0, minHeight: 'auto', border: 0 }}>
-            <span className="island-title" style={{ fontSize: '18px' }}>
+        <section className="island flex-none p-card col">
+          <div className="island-head p-0 min-h-0 border-0 mb-4">
+            <span className="island-title text-xl">
               <Clock className="ic text-primary" size={20} />
               Контакты и режим приёма
             </span>
           </div>
 
-          <div className="col" style={{ gap: '16px' }}>
-            <div className="row" style={{ gap: '12px', alignItems: 'flex-start' }}>
-              <MapPin size={20} className="text-primary" style={{ flexShrink: 0, marginTop: '2px' }} />
-              <div className="col" style={{ gap: '2px' }}>
-                <b style={{ fontSize: '14.5px' }}>Адрес клиники</b>
-                <span className="muted" style={{ fontSize: '14px' }}>
+          <div className="col gap-xl">
+            <div className="feat-row">
+              <MapPin size={20} className="text-primary shrink-0 mt-xs" />
+              <div className="col gap-1">
+                <b className="text-base">Адрес клиники</b>
+                <span className="muted text-sm">
                   г. Ростов-на-Дону, ул. Пушкинская, д. 115
                 </span>
                 <span className="small muted">
@@ -491,24 +302,24 @@ function AboutContent() {
               </div>
             </div>
 
-            <div className="row" style={{ gap: '12px', alignItems: 'flex-start' }}>
-              <Clock size={20} className="text-primary" style={{ flexShrink: 0, marginTop: '2px' }} />
-              <div className="col" style={{ gap: '2px' }}>
-                <b style={{ fontSize: '14.5px' }}>График приёма</b>
-                <span className="muted" style={{ fontSize: '14px' }}>
+            <div className="feat-row">
+              <Clock size={20} className="text-primary shrink-0 mt-xs" />
+              <div className="col gap-1">
+                <b className="text-base">График приёма</b>
+                <span className="muted text-sm">
                   Плановый приём врачей: <b>ежедневно с 08:00 до 22:00</b>
                 </span>
-                <span className="small" style={{ color: 'var(--primary)', fontWeight: 600 }}>
+                <span className="small font-semibold text-primary">
                   Приём экстренных пациентов и стационар: <b>круглосуточно (24/7)</b>
                 </span>
               </div>
             </div>
 
-            <div className="row" style={{ gap: '12px', alignItems: 'flex-start' }}>
-              <Phone size={20} className="text-primary" style={{ flexShrink: 0, marginTop: '2px' }} />
-              <div className="col" style={{ gap: '2px' }}>
-                <b style={{ fontSize: '14.5px' }}>Телефоны регистратуры</b>
-                <span className="muted" style={{ fontSize: '14px' }}>
+            <div className="feat-row">
+              <Phone size={20} className="text-primary shrink-0 mt-xs" />
+              <div className="col gap-1">
+                <b className="text-base">Телефоны регистратуры</b>
+                <span className="muted text-sm">
                   +7 (863) 200-55-90 (многоканальный)
                 </span>
                 <span className="small muted">
@@ -517,11 +328,11 @@ function AboutContent() {
               </div>
             </div>
 
-            <div className="row" style={{ gap: '12px', alignItems: 'flex-start' }}>
-              <Mail size={20} className="text-primary" style={{ flexShrink: 0, marginTop: '2px' }} />
-              <div className="col" style={{ gap: '2px' }}>
-                <b style={{ fontSize: '14.5px' }}>Электронная почта и реквизиты</b>
-                <span className="muted" style={{ fontSize: '14px' }}>
+            <div className="feat-row">
+              <Mail size={20} className="text-primary shrink-0 mt-xs" />
+              <div className="col gap-1">
+                <b className="text-base">Электронная почта и реквизиты</b>
+                <span className="muted text-sm">
                   care@chiron.clinic · reception@chiron.clinic
                 </span>
                 <span className="small muted">
@@ -533,26 +344,16 @@ function AboutContent() {
         </section>
       </div>
 
-      {/* Дружелюбная творческая витрина: «Пациенты и врачи клиники» вместо скучного меню */}
-      <section className="island" style={{ flex: 'none', padding: '24px' }}>
-        <div className="col" style={{ gap: '18px' }}>
-          <div className="row wrap between" style={{ alignItems: 'center', gap: '12px' }}>
-            <div className="row" style={{ gap: '10px', alignItems: 'center' }}>
-              <span
-                style={{
-                  width: '36px',
-                  height: '36px',
-                  borderRadius: '10px',
-                  background: 'color-mix(in srgb, var(--primary) 16%, transparent)',
-                  color: 'var(--primary)',
-                  display: 'grid',
-                  placeItems: 'center',
-                }}
-              >
+      {/* Дружелюбная творческая витрина: «Пациенты и врачи клиники» */}
+      <section className="island flex-none p-card">
+        <div className="col gap-2xl">
+          <div className="row wrap between items-center gap-lg">
+            <div className="row gap-base items-center">
+              <span className="feat-ic sm">
                 <Heart size={20} />
               </span>
-              <div className="col" style={{ gap: '2px' }}>
-                <span style={{ fontSize: '18px', fontWeight: 700 }}>
+              <div className="col gap-1">
+                <span className="text-xl font-bold">
                   Счастливые пациенты Chiron
                 </span>
                 <span className="small muted">
@@ -561,42 +362,24 @@ function AboutContent() {
               </div>
             </div>
 
-            <div className="row" style={{ gap: '16px' }}>
-              <span className="small muted" style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+            <div className="row gap-xl">
+              <span className="small muted inline-flex items-center gap-sm">
                 <Smile size={15} className="text-primary" />
                 Более 1 400 здоровых питомцев
               </span>
-              <span className="small muted" style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+              <span className="small muted inline-flex items-center gap-sm">
                 <Award size={15} className="text-primary" />
                 Сертифицированные врачи
               </span>
             </div>
           </div>
 
-          <div
-            style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))',
-              gap: 'var(--gap)',
-            }}
-          >
+          <div className="grid-patients">
             {FEATURED_PATIENTS.map((p) => {
               const petFromDb = livePets[p.id] || livePets[p.name.toLowerCase()];
               return (
-                <div
-                  key={p.id}
-                  style={{
-                    padding: '16px 18px',
-                    borderRadius: 'var(--radius)',
-                    background: 'color-mix(in srgb, var(--card) 75%, transparent)',
-                    border: '1px solid var(--border)',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    gap: '10px',
-                    transition: 'border-color 0.15s ease, transform 0.15s ease',
-                  }}
-                >
-                  <div className="row" style={{ gap: '12px', alignItems: 'center' }}>
+                <div key={p.id} className="patient-card">
+                  <div className="row gap-lg items-center">
                     <PetAvatar
                       pet={petFromDb || { id: p.id, name: p.name }}
                       tone={p.speciesTone}
@@ -604,56 +387,27 @@ function AboutContent() {
                       iconSize={22}
                       className="t-ava md round"
                     />
-                    <div className="col" style={{ gap: '2px', flex: 1, minWidth: 0 }}>
-                      <div className="row" style={{ gap: '8px', alignItems: 'center' }}>
-                        <b style={{ fontSize: '15px' }}>{p.name}</b>
-                        <span
-                          className={`sp-chip tone-${p.speciesTone}`}
-                          style={{
-                            padding: '2px 8px',
-                            fontSize: '11px',
-                            height: '20px',
-                            borderRadius: '6px',
-                          }}
-                        >
+                    <div className="col gap-1 flex-1 min-w-0">
+                      <div className="row gap-md items-center">
+                        <b className="text-base">{p.name}</b>
+                        <span className={`sp-chip tone-${p.speciesTone} px-sm text-xs`}>
                           {p.species}
                         </span>
                       </div>
-                      <span className="small muted" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      <span className="small muted truncate">
                         {p.breed}
                       </span>
                     </div>
                   </div>
 
-                  <div
-                    style={{
-                      fontSize: '13px',
-                      lineHeight: 1.45,
-                      color: 'var(--foreground)',
-                      opacity: 0.88,
-                      background: 'color-mix(in srgb, var(--card) 45%, transparent)',
-                      padding: '8px 12px',
-                      borderRadius: '8px',
-                      border: '1px solid color-mix(in srgb, var(--border) 60%, transparent)',
-                    }}
-                  >
+                  <div className="patient-card-treatment">
                     {p.treatment}
                   </div>
 
-                  <div
-                    className="row"
-                    style={{
-                      gap: '8px',
-                      alignItems: 'center',
-                      fontSize: '12px',
-                      color: 'var(--muted-foreground)',
-                      marginTop: 'auto',
-                      paddingTop: '4px',
-                    }}
-                  >
-                    <Stethoscope size={14} className="text-primary" style={{ flexShrink: 0 }} />
+                  <div className="row gap-md items-center text-xs text-muted mt-auto pt-1">
+                    <Stethoscope size={14} className="text-primary shrink-0" />
                     <span>
-                      Лечащий врач: <b style={{ color: 'var(--foreground)' }}>{p.doctorName}</b>
+                      Лечащий врач: <b className="text-foreground">{p.doctorName}</b>
                       <span className="muted"> ({p.doctorSpec})</span>
                     </span>
                   </div>

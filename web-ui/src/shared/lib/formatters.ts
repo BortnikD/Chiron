@@ -714,3 +714,37 @@ export function formatPhoneDisplay(phone?: string | null, emptyLabel = '—'): s
   return phone;
 }
 
+/**
+ * Формирует опцию для SearchCombobox из данных пользователя с понятным полным именем,
+ * форматированным телефоном и поисковыми ключевыми словами.
+ */
+export function getUserComboboxOption(user: {
+  id: string;
+  firstName?: string | null;
+  lastName?: string | null;
+  middleName?: string | null;
+  fullName?: string | null;
+  phone?: string | null;
+  email?: string | null;
+}) {
+  const parts = [user.firstName, user.lastName].filter(Boolean);
+  const label = parts.length > 0 ? parts.join(' ') : user.fullName || user.email || '—';
+  const hint = user.phone ? formatPhoneDisplay(user.phone) : user.email || undefined;
+  const keywords = [
+    user.firstName,
+    user.lastName,
+    user.middleName,
+    user.fullName,
+    user.email,
+    user.phone,
+    user.phone ? formatPhoneDisplay(user.phone) : null,
+  ].filter(Boolean) as string[];
+
+  return {
+    value: user.id,
+    label,
+    hint,
+    keywords,
+  };
+}
+

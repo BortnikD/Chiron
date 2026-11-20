@@ -31,9 +31,14 @@ export const tokenStorage = {
   },
 };
 
-export async function request<T>(
+export interface RequestOptions extends RequestInit {
+  retries?: number;
+  retryDelayMs?: number;
+}
+
+async function executeSingleRequest<T>(
   endpoint: string,
-  options: RequestInit = {}
+  options: RequestOptions
 ): Promise<T> {
   const token = tokenStorage.get();
 
@@ -94,23 +99,56 @@ export async function request<T>(
   return data.result as unknown as T;
 }
 
+export async function request<T>(
+  endpoint: string,
+  options: RequestOptions = {}
+): Promise<T> {
+  const method = (options.method || 'GET').toUpperCase();
+  // По умолчанию для GET запросов делаем до 2 повторных попыток при 5xx или разрыве сети
+  const maxRetries = options.retries ?? (method === 'GET' ? 2 : 0);
+  const baseDelay = options.retryDelayMs ?? 400;
+
+  let attempt = 0;
+  while (true) {
+    try {
+      return await executeSingleRequest<T>(endpoint, options);
+    } catch (err: unknown) {
+      const isRetryable =
+        err instanceof ApiError &&
+        (err.status === 0 || (err.status >= 500 && err.status < 600));
+
+      if (isRetryable && attempt < maxRetries) {
+        attempt++;
+        const delay = baseDelay * attempt;
+        await new Promise((resolve) => setTimeout(resolve, delay));
+        continue;
+      }
+      throw err;
+    }
+  }
+}
+
 export const api = {
-  get: <T>(url: string, options?: RequestInit) =>
+  get: <T>(url: string, options?: RequestOptions) =>
     request<T>(url, { ...options, method: 'GET' }),
-  post: <T>(url: string, body?: unknown) =>
+  post: <T>(url: string, body?: unknown, options?: RequestOptions) =>
     request<T>(url, {
+      ...options,
       method: 'POST',
       body: body !== undefined ? JSON.stringify(body) : undefined,
     }),
-  patch: <T>(url: string, body?: unknown) =>
+  patch: <T>(url: string, body?: unknown, options?: RequestOptions) =>
     request<T>(url, {
+      ...options,
       method: 'PATCH',
       body: body !== undefined ? JSON.stringify(body) : undefined,
     }),
-  putForm: <T>(url: string, body: FormData) =>
+  putForm: <T>(url: string, body: FormData, options?: RequestOptions) =>
     request<T>(url, {
+      ...options,
       method: 'PUT',
       body,
     }),
-  delete: <T>(url: string) => request<T>(url, { method: 'DELETE' }),
+  delete: <T>(url: string, options?: RequestOptions) =>
+    request<T>(url, { ...options, method: 'DELETE' }),
 };
