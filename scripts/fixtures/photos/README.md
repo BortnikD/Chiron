@@ -1,6 +1,6 @@
 # Demo photographs
 
-These twenty-seven photographs were selected by the project owner for fictional demo profiles.
+These 43 photographs were selected by the project owner for fictional demo profiles.
 The people pictured are not represented as actual Chiron staff or endorsers.
 
 The local JPEGs are square and at most 1024 x 1024. Preparation includes cropping, resizing when needed,
@@ -24,9 +24,10 @@ The two Wikimedia-derived JPEGs, including the cropped/resized variants generate
 under CC BY-SA 4.0. Retain the corresponding source, author, license and modification notices when distributing them.
 This image license does not change the license of the application code.
 
-The eight doctors and nineteen pets each have an individual portrait assigned by profile ID. The pets include
-seven dogs, seven cats, two guinea pigs, one rabbit, one ferret and one parrot. Seven pet photos were supplied as
-attachments by the project owner. Original source and licensing information were unavailable for those photos.
+The eight doctors and 35 pets each have an individual portrait assigned by profile ID. The pets include
+seven dogs, thirteen cats, five guinea pigs, five parrots, three hamsters, one rabbit and one ferret.
+The project owner supplied 23 pet photos as attachments. The attachment for Долька shows the credit
+`@kevinsbirds`. Licensing information for the attachments was unavailable.
 
 `../photo-a.png` and `../photo-b.png` are synthetic images used only for API regression checks
 and recognition of placeholders from older demo installations. They are not assigned to demo profiles.

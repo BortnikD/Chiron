@@ -1,7 +1,7 @@
 -- Curated demo data for booking, patient histories and clinic statistics.
 -- From the repository root, run psql -X -v ON_ERROR_STOP=1 -f scripts/seed-test-data.sql against a dedicated development database.
 -- This replaces 5eed demo rows and related data. Dates are relative to the clinic's local date.
--- All test users use password123: vet1..vet8 and client1..client8 at seed.chiron.local.
+-- All test users use password123: vet1..vet8 and client1..client28 at seed.chiron.local.
 
 BEGIN;
 SET LOCAL TIME ZONE 'Europe/Moscow';
@@ -76,7 +76,8 @@ VALUES ('5eed0001-0000-0000-0000-000000000001', 'Собака'),
        ('5eed0001-0000-0000-0000-000000000003', 'Кролик'),
        ('5eed0001-0000-0000-0000-000000000004', 'Морская свинка'),
        ('5eed0001-0000-0000-0000-000000000005', 'Хорёк'),
-       ('5eed0001-0000-0000-0000-000000000006', 'Попугай');
+       ('5eed0001-0000-0000-0000-000000000006', 'Попугай'),
+       ('5eed0001-0000-0000-0000-000000000007', 'Хомяк');
 
 INSERT INTO specialization (id, name, description)
 VALUES ('5eed0002-0000-0000-0000-000000000001', 'Терапия', 'Осмотры, вакцинация и наблюдение'),
@@ -133,8 +134,8 @@ FROM (VALUES (1, ARRAY [1, 2]),
              (7, ARRAY [1, 2]),
              (8, ARRAY [1, 2]),
              (9, ARRAY [1, 2]),
-             (10, ARRAY [3, 4, 5, 6]),
-             (11, ARRAY [1, 2, 3, 4, 5, 6]),
+             (10, ARRAY [3, 4, 5, 6, 7]),
+             (11, ARRAY [1, 2, 3, 4, 5, 6, 7]),
              (12, ARRAY [1, 2]),
              (13, ARRAY [1, 2]),
              (14, ARRAY [1, 2]),
@@ -177,13 +178,13 @@ FROM (VALUES ('5eed0004-0000-0000-0000-000000000001', 'vet1@seed.chiron.local', 
          AS u(id, email, first_name, middle_name, last_name, phone, role, age_days);
 
 INSERT INTO users (id, email, password_hash, first_name, last_name, full_name, phone, role, created_at, updated_at)
-SELECT ('5eed0005-0000-0000-0000-00000000000' || n)::uuid,
+SELECT ('5eed0005-0000-0000-0000-' || lpad(n::text, 12, '0'))::uuid,
        'client' || n || '@seed.chiron.local',
        '$2a$10$d5If9kxcQ.rpioiVuQb0muhYKqYDOQyerCqMeDvbg6MKg8.k11iNS',
        first_name,
        last_name,
        upper(left(first_name, 1)) || '. ' || last_name,
-       '+7910000000' || n,
+       '+791000000' || lpad(n::text, 2, '0'),
        'CLIENT',
        now() - INTERVAL '600 days',
        now() - INTERVAL '600 days'
@@ -194,7 +195,27 @@ FROM (VALUES (1, 'Иван', 'Соколов'),
              (5, 'Сергей', 'Новиков'),
              (6, 'Наталья', 'Морозова'),
              (7, 'Алексей', 'Волков'),
-             (8, 'Ирина', 'Павлова')) AS clients(n, first_name, last_name);
+             (8, 'Ирина', 'Павлова'),
+             (9, 'Михаил', 'Фомин'),
+             (10, 'Вера', 'Орехова'),
+             (11, 'Антон', 'Миронов'),
+             (12, 'Лидия', 'Селезнёва'),
+             (13, 'Роман', 'Яковлев'),
+             (14, 'Нина', 'Громова'),
+             (15, 'Пётр', 'Ларин'),
+             (16, 'Светлана', 'Тихонова'),
+             (17, 'Виктор', 'Лукин'),
+             (18, 'Дарья', 'Корнеева'),
+             (19, 'Илья', 'Быков'),
+             (20, 'Тамара', 'Карпова'),
+             (21, 'Никита', 'Лавров'),
+             (22, 'Лилия', 'Федотова'),
+             (23, 'Артур', 'Гордеев'),
+             (24, 'Ксения', 'Макарова'),
+             (25, 'Леонид', 'Чернов'),
+             (26, 'Юлия', 'Сафонова'),
+             (27, 'Егор', 'Мельников'),
+             (28, 'Алёна', 'Николаева')) AS clients(n, first_name, last_name);
 
 -- Veterinarians ------------------------------------------------------------------------------------------------------
 
@@ -259,27 +280,43 @@ WHERE v.id::text BETWEEN '5eed0006-0000-0000-0000-000000000005' AND '5eed0006-00
               THEN s.name NOT IN ('Собака', 'Кошка')
           ELSE s.name IN ('Собака', 'Кошка') END;
 
--- Monday to Friday 09:00-18:00 with a break 13:00-14:00; the first therapist also works on Saturday 10:00-15:00.
+-- Standard weekday shifts and weekend coverage.
 INSERT INTO work_schedule (veterinarian_id, day_of_week, start_time, end_time, break_start, break_end)
-SELECT v.id::uuid, d, TIME '09:00', TIME '18:00', TIME '13:00', TIME '14:00'
-FROM veterinarian v,
-     generate_series(1, 5) AS d
-WHERE v.id::text LIKE '5eed%'
+SELECT ('5eed0006-0000-0000-0000-00000000000' || n)::uuid,
+       d, starts::time, ends::time, break_from::time, break_to::time
+FROM (VALUES (1, '09:00', '18:00', '13:00', '14:00'),
+             (2, '09:15', '18:30', '12:45', '13:45'),
+             (3, '09:30', '17:00', '12:30', '13:30'),
+             (4, '10:00', '19:00', '13:00', '14:00'),
+             (5, '09:30', '18:00', '12:30', '13:30'),
+             (6, '09:00', '17:30', '12:30', '13:30'),
+             (7, '09:30', '17:30', '13:00', '14:00'),
+             (8, '09:30', '17:00', '12:45', '13:45')) AS shifts(n, starts, ends, break_from, break_to)
+         CROSS JOIN generate_series(1, 5) AS d
 UNION ALL
-SELECT '5eed0006-0000-0000-0000-000000000001', 6, '10:00', '15:00', NULL, NULL;
+SELECT ('5eed0006-0000-0000-0000-00000000000' || n)::uuid,
+       d, starts::time, ends::time, NULL, NULL
+FROM (VALUES (1, 6, '10:00', '15:00'), (4, 6, '10:00', '14:30'),
+             (5, 7, '11:00', '15:00'), (8, 6, '09:30', '14:00')) AS weekend(n, d, starts, ends);
 
--- Two upcoming exceptions also demonstrate the booking calendar without invalidating seeded visits.
+-- Upcoming time off and shorter shifts also exercise the booking calendar.
 INSERT INTO schedule_exception (veterinarian_id, type, start_date, end_date, start_time, end_time, reason)
 VALUES ('5eed0006-0000-0000-0000-000000000006', 'ABSENCE',
-        current_date + 5, current_date + 10, NULL, NULL, 'Отпуск'),
+        current_date + 6, current_date + 10, NULL, NULL, 'Отпуск'),
        ('5eed0006-0000-0000-0000-000000000005', 'CUSTOM_HOURS',
-        current_date + 7, current_date + 7, '10:00', '15:00', 'Обучение во второй половине дня');
+        current_date + 7, current_date + 7, '10:00', '15:00', 'Обучение во второй половине дня'),
+       ('5eed0006-0000-0000-0000-000000000003', 'ABSENCE',
+        current_date + 17, current_date + 18, NULL, NULL, 'Выездная консультация'),
+       ('5eed0006-0000-0000-0000-000000000004', 'CUSTOM_HOURS',
+        current_date + 14, current_date + 14, '11:00', '16:00', 'Вечерний семинар'),
+       ('5eed0006-0000-0000-0000-000000000008', 'ABSENCE',
+        current_date + 8, current_date + 9, NULL, NULL, 'Выходные по графику');
 
 -- Each pet ID has exactly one image in scripts/fixtures/photos/sources.json.
 INSERT INTO pet (id, owner_id, species_id, name, breed, birth_date, weight_kg, gender, notes, is_archived,
                  created_at, updated_at)
 SELECT ('5eed0107-0000-0000-0000-' || lpad(n::text, 12, '0'))::uuid,
-       ('5eed0005-0000-0000-0000-00000000000' || owner_n)::uuid,
+       ('5eed0005-0000-0000-0000-' || lpad(owner_n::text, 12, '0'))::uuid,
        ('5eed0001-0000-0000-0000-00000000000' || species_n)::uuid,
        name,
        breed,
@@ -288,14 +325,14 @@ SELECT ('5eed0107-0000-0000-0000-' || lpad(n::text, 12, '0'))::uuid,
        gender,
        notes,
        n = 15,
-       now() - INTERVAL '540 days',
+       greatest(now() - INTERVAL '540 days', (current_date - age_days + 7)::timestamptz),
        CASE WHEN n = 15 THEN now() - INTERVAL '15 days' ELSE now() END
 FROM (VALUES (1, 1, 4, 'Шустрик', 'Гладкошёрстная', 950, 0.98, 'MALE', 'На осмотре спокойнее в своей переноске.'),
              (2, 1, 2, 'Плюша', NULL, 1820, 4.60, 'FEMALE',
               'Чувствительное пищеварение. Владелец ведёт дневник кормления.'),
              (3, 2, 2, 'Сима', 'Сиамская', 2140, 3.80, 'FEMALE',
               'В клинике прячется под пледом. Взвешивать вместе с переноской.'),
-             (4, 1, 1, 'Персик', 'Померанский шпиц', 1310, 2.70, 'MALE',
+             (4, 9, 1, 'Персик', 'Померанский шпиц', 1310, 2.70, 'MALE',
               'Владелец приносит бумажный паспорт прививок.'),
              (5, 3, 1, 'Байтик', 'Китайская хохлатая', 1640, 4.90, 'MALE',
               'Чувствительная кожа, гуляет в лёгкой одежде.'),
@@ -307,16 +344,33 @@ FROM (VALUES (1, 1, 4, 'Шустрик', 'Гладкошёрстная', 950, 0.
               'Бегает с владельцем. Боится скользкого пола.'),
              (10, 3, 1, 'Кнопа', 'Такса', 2050, 7.40, 'FEMALE', 'Спокойно переносит осмотр рядом с владельцем.'),
              (11, 6, 1, 'Уголь', 'Лабрадор-ретривер', 2030, 30.20, 'MALE', 'На приёме легко отвлекается на лакомство.'),
-             (12, 5, 2, 'Рыжик', NULL, 1440, 4.90, 'MALE', 'Живёт в квартире. Владелец недавно сменил корм.'),
-             (13, 6, 2, 'Ириска', NULL, 1720, 4.10, 'FEMALE',
+             (12, 13, 2, 'Рыжик', NULL, 1440, 4.90, 'MALE', 'Живёт в квартире. Владелец недавно сменил корм.'),
+             (13, 12, 2, 'Ириска', NULL, 1720, 4.10, 'FEMALE',
               'Во время осмотра лучше оставлять верх переноски открытым.'),
              (14, 7, 2, 'Снежка', NULL, 2210, 3.90, 'FEMALE', 'Раньше наблюдалась по поводу снижения аппетита.'),
-             (15, 7, 2, 'Луна', NULL, 2570, 4.40, 'FEMALE', 'Переехала с владельцем. Карточка сохранена для истории.'),
+             (15, 5, 2, 'Луна', NULL, 2570, 4.40, 'FEMALE', 'Переехала к родственникам владельца. Карточка сохранена для истории.'),
              (16, 8, 3, 'Пончик', NULL, 1120, 1.80, 'MALE', 'Владелец записывает вес раз в неделю.'),
-             (17, 8, 4, 'Фунтик', NULL, 1080, 1.12, 'MALE', 'Обычно ест сено охотно. При стрессе прячется в домик.'),
-             (18, 2, 5, 'Пиксель', NULL, 1490, 1.25, 'MALE', 'Любопытный, на осмотре помогает знакомая игрушка.'),
-             (19, 8, 6, 'Кеша', 'Сине-жёлтый ара', 3290, 1.05, 'MALE',
-              'На приём привозят в клетке с привычной жердочкой.')) AS pets(n, owner_n, species_n, name, breed, age_days, weight, gender, notes);
+             (17, 14, 4, 'Фунтик', NULL, 1080, 1.12, 'MALE', 'Обычно ест сено охотно. При стрессе прячется в домик.'),
+             (18, 10, 5, 'Пиксель', NULL, 1490, 1.25, 'MALE', 'Любопытный, на осмотре помогает знакомая игрушка.'),
+             (19, 15, 6, 'Кеша', 'Сине-жёлтый ара', 3290, 1.05, 'MALE',
+              'На приём привозят в клетке с привычной жердочкой.'),
+             (20, 11, 4, 'Кнопик', 'Гладкошёрстная', 870, 1.05, 'MALE', 'Громко подаёт голос, когда слышит шелест пакета с сеном.'),
+             (21, 16, 4, 'Дива', NULL, 740, 0.92, 'FEMALE', 'Узнаёт переноску и сама забирается в неё за лакомством.'),
+             (22, 17, 4, 'Орео', 'Гладкошёрстная', 1130, 1.10, 'MALE', 'Владелец следит за тем, как стачиваются резцы.'),
+             (23, 1, 2, 'Тост', NULL, 1295, 5.10, 'MALE', 'Прозвище получил после фотографии с тостом на голове.'),
+             (24, 18, 2, 'Мокасин', NULL, 1610, 4.90, 'MALE', 'Любит засыпать у двери, положив лапы в ботинки.'),
+             (25, 19, 2, 'Пельмень', NULL, 1490, 5.85, 'MALE', 'Спокойно взвешивается в переноске на знакомом пледе.'),
+             (26, 20, 2, 'Граф', 'Экзотическая короткошёрстная', 2430, 4.75, 'MALE', 'Владелец принёс записи о слезотечении.'),
+             (27, 21, 2, 'Яшма', 'Бенгальская', 1370, 4.35, 'FEMALE', 'В клинике отвлекается на игрушку с перьями.'),
+             (28, 22, 2, 'Кувырок', NULL, 980, 3.95, 'MALE', 'При осмотре переворачивается на спину и тянется к рукам.'),
+             (29, 23, 6, 'Пилот', 'Корелла', 1510, 0.09, 'MALE', 'Подражает звуку дверного звонка.'),
+             (30, 24, 6, 'Долька', 'Волнистый попугай', 780, 0.04, 'FEMALE', 'Лучше переносит осмотр в тихом кабинете.'),
+             (31, 25, 6, 'Шериф', 'Корелла', 1280, 0.10, 'MALE', 'На контроль владелец приносит записи о кормлении.'),
+             (32, 26, 6, 'Трюк', 'Волнистый попугай', 840, 0.04, 'MALE', 'Хорошо садится на знакомую деревянную жердочку.'),
+             (33, 2, 7, 'Хомыч', 'Сирийский', 340, 0.15, 'MALE', 'Просыпается вечером; владельцу удобнее поздний приём.'),
+             (34, 27, 7, 'Зефирка', 'Сирийский', 310, 0.13, 'FEMALE', 'Прячет корм в домике. Владелец регулярно отмечает вес.'),
+             (35, 28, 7, 'Огурчик', 'Сирийский', 380, 0.16, 'MALE', 'В переноске спокойнее с привычным бумажным наполнителем.'))
+         AS pets(n, owner_n, species_n, name, breed, age_days, weight, gender, notes);
 
 -- Explicit visit stories. Signed dates shift weekends outwards to the nearest weekday.
 CREATE TEMP TABLE seed_visit ON COMMIT DROP AS
@@ -527,6 +581,105 @@ $$
         END IF;
     END;
 $$;
+
+-- Fill the calendar around the scripted visits. Rotation gives each species group a different pet per slot that day.
+WITH days AS (
+    SELECT current_date + n AS day, n + 30 AS day_number
+    FROM generate_series(-30, 30) AS n
+), hours AS (
+    SELECT d.day, d.day_number, v.id AS veterinarian_id, right(v.id::text, 2)::int AS vet_number,
+           coalesce(e.start_time, w.start_time) AS opens,
+           coalesce(e.end_time, w.end_time) AS closes,
+           CASE WHEN e.id IS NULL THEN w.break_start END AS break_start,
+           CASE WHEN e.id IS NULL THEN w.break_end END AS break_end
+    FROM days d
+             CROSS JOIN veterinarian v
+             LEFT JOIN work_schedule w ON w.veterinarian_id = v.id AND w.day_of_week = extract(isodow FROM d.day)
+             LEFT JOIN schedule_exception e ON e.veterinarian_id = v.id AND d.day BETWEEN e.start_date AND e.end_date
+    WHERE v.id::text LIKE '5eed0006-%'
+      AND (e.type = 'CUSTOM_HOURS' OR (e.id IS NULL AND w.id IS NOT NULL))
+), slots AS (
+    SELECT h.veterinarian_id, h.vet_number = 8 AS exotic,
+           (h.day + session.opens + make_interval(mins => 15 * ((h.day_number + h.vet_number) % 3)))::timestamptz AS starts_at,
+           (h.day + session.closes)::timestamptz AS closes_at,
+           row_number() OVER (PARTITION BY h.vet_number = 8 ORDER BY h.day, h.vet_number, session.number) AS number
+    FROM hours h
+             CROSS JOIN LATERAL (VALUES
+                 (1, h.opens, coalesce(h.break_start, h.opens + INTERVAL '2 hours')),
+                 (2, coalesce(h.break_end, h.opens + INTERVAL '2 hours'), h.closes)
+             ) AS session(number, opens, closes)
+    WHERE session.number = 1 OR h.vet_number = 8 OR (h.day_number + h.vet_number) % 3 = 0
+), active_pets AS (
+    SELECT p.id, p.owner_id, p.species_id,
+           right(p.species_id::text, 1) NOT IN ('1', '2') AS exotic
+    FROM pet p
+    WHERE p.id::text LIKE '5eed0107-%' AND NOT p.is_archived
+), pet_rotation AS (
+    SELECT active_pets.*,
+           row_number() OVER (PARTITION BY exotic ORDER BY id) AS number,
+           count(*) OVER (PARTITION BY exotic) AS pool_size
+    FROM active_pets
+), visits AS (
+    SELECT slot.veterinarian_id, p.id AS pet_id, p.owner_id, slot.starts_at,
+           slot.starts_at + make_interval(mins => item.duration + item.buffer) AS ends_at,
+           least(slot.starts_at - INTERVAL '2 days', now() - INTERVAL '2 hours') AS booked_at,
+           slot.number % 5 = 0 AS needs_confirmation, item.*
+    FROM slots slot
+             JOIN pet_rotation p ON p.exotic = slot.exotic AND p.number = (slot.number - 1) % p.pool_size + 1
+             JOIN veterinarian_species_permission permission
+                  ON permission.veterinarian_id = slot.veterinarian_id AND permission.species_id = p.species_id
+             CROSS JOIN LATERAL (
+        SELECT s.id AS service_id, s.name, s.specialization_id,
+               coalesce(ss.price, s.base_price) AS price,
+               coalesce(ss.duration_min, s.base_duration_min) AS duration, s.buffer_after_min AS buffer
+        FROM veterinarian_specialization vs
+                 JOIN service s ON s.specialization_id = vs.specialization_id
+                 JOIN service_species ss ON ss.service_id = s.id AND ss.species_id = p.species_id
+        WHERE vs.veterinarian_id = slot.veterinarian_id
+          AND s.id::text LIKE '5eed0003-%' AND s.is_active
+          AND right(s.id::text, 2) NOT IN ('02', '03')
+          AND slot.starts_at + make_interval(mins => coalesce(ss.duration_min, s.base_duration_min) + s.buffer_after_min)
+              <= slot.closes_at
+        ORDER BY md5(s.id::text || slot.starts_at::text || slot.veterinarian_id::text)
+        LIMIT 1
+        ) AS item
+), available AS (
+    SELECT visits.*,
+           ('5eed0109-0000-0000-0000-' ||
+            lpad(row_number() OVER (ORDER BY starts_at, veterinarian_id)::text, 12, '0'))::uuid AS id,
+           CASE WHEN ends_at <= now() THEN 'COMPLETED'
+                WHEN starts_at > now() AND needs_confirmation THEN 'PENDING'
+                ELSE 'CONFIRMED' END AS status
+    FROM visits
+    WHERE NOT EXISTS (SELECT 1 FROM appointment a
+                      WHERE a.status <> 'CANCELLED'
+                        AND (a.veterinarian_id = visits.veterinarian_id OR a.pet_id = visits.pet_id)
+                        AND a.start_at < visits.ends_at AND a.end_at > visits.starts_at)
+), booked AS (
+    INSERT INTO appointment (id, veterinarian_id, pet_id, start_at, end_at, status, vet_notes, created_at, updated_at)
+    SELECT id, veterinarian_id, pet_id, starts_at, ends_at, status,
+           CASE WHEN status = 'COMPLETED' THEN
+               CASE right(specialization_id::text, 1)
+                   WHEN '2' THEN 'В карте записаны результат процедуры и дата контроля.'
+                   WHEN '3' THEN 'Состояние зубов и дёсен обсудили с владельцем.'
+                   WHEN '4' THEN 'Результаты исследования внесены в карту и переданы владельцу.'
+                   ELSE 'В карте обновлены вес и результаты осмотра.' END
+           END,
+           booked_at,
+           CASE status WHEN 'COMPLETED' THEN ends_at
+                       WHEN 'CONFIRMED' THEN booked_at + INTERVAL '30 minutes' ELSE booked_at END
+    FROM available
+    RETURNING id, veterinarian_id, status, created_at, updated_at
+)
+INSERT INTO appointment_service (appointment_id, service_id, name_snapshot, price_snapshot, duration_min_snapshot,
+                                 buffer_after_min_snapshot, is_planned, is_performed, added_by,
+                                 created_at, updated_by, updated_at)
+SELECT b.id, item.service_id, item.name, item.price, item.duration, item.buffer, true,
+       CASE WHEN b.status = 'COMPLETED' THEN true END, item.owner_id, b.created_at,
+       CASE WHEN b.status = 'COMPLETED' THEN v.user_id END, b.updated_at
+FROM booked b
+         JOIN available item ON item.id = b.id
+         JOIN veterinarian v ON v.id = b.veterinarian_id;
 
 INSERT INTO vaccination (pet_id, appointment_id, name, administered_on, next_due_on)
 SELECT a.pet_id,

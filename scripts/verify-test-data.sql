@@ -55,11 +55,12 @@ $$
     DECLARE
         today date := (now() AT TIME ZONE 'Europe/Moscow')::date;
     BEGIN
-        IF (SELECT count(*) FROM users WHERE id::text LIKE '5eed%' AND role = 'CLIENT') <> 8
-            OR (SELECT count(*) FROM pet WHERE id::text LIKE '5eed%') <> 19
-            OR (SELECT count(DISTINCT name) FROM pet WHERE id::text LIKE '5eed%') <> 19
+        IF (SELECT count(*) FROM users WHERE id::text LIKE '5eed%' AND role = 'CLIENT') <> 28
+            OR (SELECT count(*) FROM pet WHERE id::text LIKE '5eed%') <> 35
+            OR (SELECT count(DISTINCT name) FROM pet WHERE id::text LIKE '5eed%') <> 35
             OR (SELECT count(*) FROM veterinarian WHERE id::text LIKE '5eed%') <> 8
             OR (SELECT count(*) FROM appointment WHERE id::text LIKE '5eed0108-%') <> 43
+            OR (SELECT count(*) FROM appointment WHERE id::text LIKE '5eed0109-%') < 400
             OR (SELECT count(DISTINCT veterinarian_id) FROM appointment WHERE veterinarian_id::text LIKE '5eed%') <> 8
             OR (SELECT count(DISTINCT item.service_id)
                 FROM appointment_service item
@@ -68,6 +69,35 @@ $$
             OR (SELECT count(DISTINCT status) FROM appointment WHERE veterinarian_id::text LIKE '5eed%') <> 5
             OR (SELECT count(DISTINCT type) FROM notification WHERE recipient_id::text LIKE '5eed%') < 8 THEN
             RAISE EXCEPTION 'Demo data volume or scenario coverage is incomplete';
+        END IF;
+
+        IF EXISTS (SELECT 1
+                   FROM (
+                       SELECT count(*) AS pets_per_owner, bool_or(NOT is_archived) AS has_active
+                       FROM pet WHERE id::text LIKE '5eed0107-%' GROUP BY owner_id
+                   ) AS households
+                   HAVING count(*) FILTER (WHERE pets_per_owner = 1) <> 23
+                       OR count(*) FILTER (WHERE pets_per_owner = 2) <> 3
+                       OR count(*) FILTER (WHERE pets_per_owner = 3) <> 2
+                       OR NOT bool_and(has_active))
+            OR EXISTS (SELECT 1
+                       FROM users u
+                       WHERE u.email IN ('client1@seed.chiron.local', 'client2@seed.chiron.local')
+                         AND (SELECT count(*) FROM pet p WHERE p.owner_id = u.id AND NOT p.is_archived) <> 3) THEN
+            RAISE EXCEPTION 'Demo households have an unexpected mix of pets';
+        END IF;
+
+        IF EXISTS (SELECT 1
+                   FROM veterinarian v
+                            CROSS JOIN generate_series(0, 3) AS week
+                            CROSS JOIN (VALUES (-1), (1)) AS direction(sign)
+                   WHERE v.id::text LIKE '5eed0006-%'
+                     AND (SELECT count(DISTINCT (a.start_at AT TIME ZONE 'Europe/Moscow')::date)
+                          FROM appointment a
+                          WHERE a.veterinarian_id = v.id AND a.id::text LIKE '5eed0109-%'
+                            AND ((a.start_at AT TIME ZONE 'Europe/Moscow')::date - today) * direction.sign
+                                BETWEEN 7 * week + 1 AND 7 * week + 7) < 2) THEN
+            RAISE EXCEPTION 'Each demo veterinarian must have bookings throughout the four weeks on each side of today';
         END IF;
 
         IF NOT EXISTS (SELECT 1
@@ -165,20 +195,21 @@ $$
                    FROM appointment a
                             LEFT JOIN work_schedule w ON w.veterinarian_id = a.veterinarian_id
                        AND w.day_of_week = extract(isodow FROM a.start_at AT TIME ZONE 'Europe/Moscow')
+                            LEFT JOIN schedule_exception e ON e.veterinarian_id = a.veterinarian_id
+                       AND (a.start_at AT TIME ZONE 'Europe/Moscow')::date BETWEEN e.start_date AND e.end_date
                    WHERE a.veterinarian_id::text LIKE '5eed%'
                      AND (
-                       w.id IS NULL
-                           OR (a.start_at AT TIME ZONE 'Europe/Moscow')::time < w.start_time
-                           OR (a.end_at AT TIME ZONE 'Europe/Moscow')::time > w.end_time
-                           OR ((a.start_at AT TIME ZONE 'Europe/Moscow')::time < w.break_end
-                           AND (a.end_at AT TIME ZONE 'Europe/Moscow')::time > w.break_start)
-                           OR EXISTS (SELECT 1
-                                      FROM schedule_exception e
-                                      WHERE e.veterinarian_id = a.veterinarian_id
-                                        AND (a.start_at AT TIME ZONE 'Europe/Moscow')::date BETWEEN e.start_date AND e.end_date
-                                        AND (e.type = 'ABSENCE'
-                                          OR (a.start_at AT TIME ZONE 'Europe/Moscow')::time < e.start_time
-                                          OR (a.end_at AT TIME ZONE 'Europe/Moscow')::time > e.end_time))
+                       extract(minute FROM a.start_at AT TIME ZONE 'Europe/Moscow')::int % 15 <> 0
+                           OR e.type = 'ABSENCE'
+                           OR (e.type = 'CUSTOM_HOURS' AND (
+                               (a.start_at AT TIME ZONE 'Europe/Moscow')::time < e.start_time
+                               OR (a.end_at AT TIME ZONE 'Europe/Moscow')::time > e.end_time))
+                           OR (e.id IS NULL AND (
+                               w.id IS NULL
+                               OR (a.start_at AT TIME ZONE 'Europe/Moscow')::time < w.start_time
+                               OR (a.end_at AT TIME ZONE 'Europe/Moscow')::time > w.end_time
+                               OR ((a.start_at AT TIME ZONE 'Europe/Moscow')::time < w.break_end
+                                   AND (a.end_at AT TIME ZONE 'Europe/Moscow')::time > w.break_start)))
                        )) THEN
             RAISE EXCEPTION 'Demo appointments fall outside working hours';
         END IF;

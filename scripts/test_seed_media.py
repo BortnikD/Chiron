@@ -17,7 +17,7 @@ CATALOG = json.loads((MEDIA.FIXTURES / "photos" / "sources.json").read_text())
 
 class SeedMediaTest(unittest.TestCase):
     def test_catalog_contains_distinct_square_jpegs(self):
-        self.assertEqual(27, len(CATALOG))
+        self.assertEqual(43, len(CATALOG))
         contents = []
         for asset in CATALOG:
             content = (MEDIA.FIXTURES / asset["file"]).read_bytes()
@@ -44,14 +44,20 @@ class SeedMediaTest(unittest.TestCase):
     def test_each_seeded_pet_has_an_individual_photo_of_its_species(self):
         seed = SCRIPT.with_name("seed-test-data.sql").read_text(encoding="utf-8")
         pet_rows = seed.split("INSERT INTO pet (", 1)[1].split("AS pets(", 1)[0]
-        profiles = re.findall(r"\(\s*(\d+)\s*,\s*\d+\s*,\s*(\d+)\s*,\s*'([^']+)'", pet_rows)
+        profiles = re.findall(r"\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*,\s*'([^']+)'", pet_rows)
         photos = [asset for asset in CATALOG if "petId" in asset]
-        self.assertEqual(19, len(profiles))
-        self.assertEqual(len(profiles), len({name for _, _, name in profiles}))
+        self.assertEqual(35, len(profiles))
+        self.assertEqual(len(profiles), len({name for _, _, _, name in profiles}))
         self.assertEqual(len(profiles), len(photos))
-        self.assertEqual(7, sum(photo["source"] == "User-provided attachment" for photo in photos))
+        self.assertEqual(23, sum(photo["source"] == "User-provided attachment" for photo in photos))
+        pets_by_owner = {
+            owner: {name for _, client, _, name in profiles if client == owner}
+            for owner in ("1", "2")
+        }
+        self.assertEqual({"Шустрик", "Плюша", "Тост"}, pets_by_owner["1"])
+        self.assertEqual({"Сима", "Филя", "Хомыч"}, pets_by_owner["2"])
         selected = set()
-        for number, species, name in profiles:
+        for number, _, species, name in profiles:
             resource = {
                 "id": f"5eed0107-0000-0000-0000-{int(number):012d}",
                 "speciesId": f"5eed0001-0000-0000-0000-{int(species):012d}",

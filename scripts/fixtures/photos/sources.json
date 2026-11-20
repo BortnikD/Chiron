@@ -341,5 +341,182 @@
     ],
     "speciesId": "5eed0001-0000-0000-0000-000000000002",
     "petId": "5eed0107-0000-0000-0000-000000000007"
+  },
+  {
+    "file": "photos/pets/guinea-pigs/knopik.jpg",
+    "source": "User-provided attachment",
+    "crop": [
+      330,
+      0,
+      1285
+    ],
+    "speciesId": "5eed0001-0000-0000-0000-000000000004",
+    "petId": "5eed0107-0000-0000-0000-000000000020"
+  },
+  {
+    "file": "photos/pets/guinea-pigs/diva.jpg",
+    "source": "User-provided attachment",
+    "crop": [
+      0,
+      0,
+      900
+    ],
+    "speciesId": "5eed0001-0000-0000-0000-000000000004",
+    "petId": "5eed0107-0000-0000-0000-000000000021"
+  },
+  {
+    "file": "photos/pets/guinea-pigs/oreo.jpg",
+    "source": "User-provided attachment",
+    "crop": [
+      125,
+      0,
+      1488
+    ],
+    "speciesId": "5eed0001-0000-0000-0000-000000000004",
+    "petId": "5eed0107-0000-0000-0000-000000000022"
+  },
+  {
+    "file": "photos/pets/cats/tost.jpg",
+    "source": "User-provided attachment",
+    "crop": [
+      0,
+      188,
+      744
+    ],
+    "speciesId": "5eed0001-0000-0000-0000-000000000002",
+    "petId": "5eed0107-0000-0000-0000-000000000023"
+  },
+  {
+    "file": "photos/pets/cats/mokasin.jpg",
+    "source": "User-provided attachment",
+    "crop": [
+      0,
+      50,
+      640
+    ],
+    "speciesId": "5eed0001-0000-0000-0000-000000000002",
+    "petId": "5eed0107-0000-0000-0000-000000000024"
+  },
+  {
+    "file": "photos/pets/cats/pelmen.jpg",
+    "source": "User-provided attachment",
+    "crop": [
+      200,
+      0,
+      675
+    ],
+    "speciesId": "5eed0001-0000-0000-0000-000000000002",
+    "petId": "5eed0107-0000-0000-0000-000000000025"
+  },
+  {
+    "file": "photos/pets/cats/graf.jpg",
+    "source": "User-provided attachment",
+    "crop": [
+      23,
+      0,
+      400
+    ],
+    "speciesId": "5eed0001-0000-0000-0000-000000000002",
+    "petId": "5eed0107-0000-0000-0000-000000000026"
+  },
+  {
+    "file": "photos/pets/cats/yashma.jpg",
+    "source": "User-provided attachment",
+    "crop": [
+      280,
+      60,
+      760
+    ],
+    "speciesId": "5eed0001-0000-0000-0000-000000000002",
+    "petId": "5eed0107-0000-0000-0000-000000000027"
+  },
+  {
+    "file": "photos/pets/cats/kuvyrok.jpg",
+    "source": "User-provided attachment",
+    "crop": [
+      545,
+      0,
+      1080
+    ],
+    "speciesId": "5eed0001-0000-0000-0000-000000000002",
+    "petId": "5eed0107-0000-0000-0000-000000000028"
+  },
+  {
+    "file": "photos/pets/parrots/pilot.jpg",
+    "source": "User-provided attachment",
+    "crop": [
+      150,
+      0,
+      900
+    ],
+    "speciesId": "5eed0001-0000-0000-0000-000000000006",
+    "petId": "5eed0107-0000-0000-0000-000000000029"
+  },
+  {
+    "file": "photos/pets/parrots/dolka.jpg",
+    "source": "User-provided attachment",
+    "crop": [
+      0,
+      0,
+      1080
+    ],
+    "speciesId": "5eed0001-0000-0000-0000-000000000006",
+    "petId": "5eed0107-0000-0000-0000-000000000030",
+    "author": "@kevinsbirds"
+  },
+  {
+    "file": "photos/pets/parrots/sherif.jpg",
+    "source": "User-provided attachment",
+    "crop": [
+      0,
+      80,
+      1688
+    ],
+    "speciesId": "5eed0001-0000-0000-0000-000000000006",
+    "petId": "5eed0107-0000-0000-0000-000000000031"
+  },
+  {
+    "file": "photos/pets/parrots/tryuk.jpg",
+    "source": "User-provided attachment",
+    "crop": [
+      55,
+      0,
+      750
+    ],
+    "speciesId": "5eed0001-0000-0000-0000-000000000006",
+    "petId": "5eed0107-0000-0000-0000-000000000032"
+  },
+  {
+    "file": "photos/pets/hamsters/homych.jpg",
+    "source": "User-provided attachment",
+    "crop": [
+      57,
+      0,
+      1087
+    ],
+    "speciesId": "5eed0001-0000-0000-0000-000000000007",
+    "petId": "5eed0107-0000-0000-0000-000000000033"
+  },
+  {
+    "file": "photos/pets/hamsters/zefirka.jpg",
+    "source": "User-provided attachment",
+    "crop": [
+      98,
+      0,
+      1118
+    ],
+    "speciesId": "5eed0001-0000-0000-0000-000000000007",
+    "petId": "5eed0107-0000-0000-0000-000000000034"
+  },
+  {
+    "file": "photos/pets/hamsters/ogurchik.jpg",
+    "source": "User-provided attachment",
+    "crop": [
+      185,
+      0,
+      545
+    ],
+    "speciesId": "5eed0001-0000-0000-0000-000000000007",
+    "petId": "5eed0107-0000-0000-0000-000000000035"
   }
 ]

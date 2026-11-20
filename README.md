@@ -66,7 +66,8 @@ docker compose -f docker/docker-compose.demo.yaml up -d --build
 ```
 
 Откройте [localhost:3001](http://localhost:3001) после успешного завершения `seed` и `seed-media`.
-В демо восемь клиентов, 19 питомцев с индивидуальными фото, восемь врачей и 43 приёма.
+В демо 28 клиентов, 35 питомцев с индивидуальными фото и восемь врачей. При первом заполнении база получает
+приёмы на 30 дней назад и вперёд от текущей даты в часовом поясе клиники. У врачей свои смены и перерывы.
 У каждого питомца есть минимум два завершённых визита. У `client1@seed.chiron.local` можно посмотреть
 прошедшее обследование Плюши с УЗИ и анализом крови, подтверждённый контрольный приём и напоминание о ревакцинации.
 На странице входа доступны кнопки быстрого входа.
@@ -75,7 +76,7 @@ docker compose -f docker/docker-compose.demo.yaml up -d --build
 |---|---|---|
 | Администратор | `admin@demo.chiron.local` | `demoAdmin123` |
 | Ветеринар | `vet1@seed.chiron.local` … `vet8@seed.chiron.local` | `password123` |
-| Клиент | `client1@seed.chiron.local` … `client8@seed.chiron.local` | `password123` |
+| Клиент | `client1@seed.chiron.local` … `client28@seed.chiron.local` | `password123` |
 
 Демо доступно только с localhost; эти учётные данные предназначены для локального показа.
 
@@ -84,7 +85,7 @@ docker compose -f docker/docker-compose.demo.yaml up -d --build
 и запустите отдельный проект с собственными томами.
 
 ```bash
-docker compose -p chiron-demo-curated -f docker/docker-compose.demo.yaml up -d --build
+docker compose -p chiron-demo-expanded -f docker/docker-compose.demo.yaml up -d --build
 ```
 
 ### Production
