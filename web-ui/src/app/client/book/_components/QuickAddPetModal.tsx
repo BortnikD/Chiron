@@ -5,7 +5,8 @@ import { X, Plus, AlertCircle, Loader2 } from 'lucide-react';
 import { clientApi } from '@/modules/client/api';
 import type { Pet } from '@/modules/client/types';
 import type { Species } from '@/modules/clinic/types';
-import { formatApiError } from '@/shared/lib';
+import { DatePicker } from '@/shared/components';
+import { formatApiError, getMoscowTodayIso } from '@/shared/lib';
 
 export interface QuickAddPetModalProps {
   isOpen: boolean;
@@ -22,6 +23,7 @@ export const QuickAddPetModal: React.FC<QuickAddPetModalProps> = ({
   speciesList,
   allowedSpeciesIds,
 }) => {
+  const todayIso = React.useMemo(() => getMoscowTodayIso(), []);
   const defaultSpeciesId = React.useMemo(() => {
     if (allowedSpeciesIds && allowedSpeciesIds.length > 0) {
       return allowedSpeciesIds[0];
@@ -232,18 +234,17 @@ export const QuickAddPetModal: React.FC<QuickAddPetModalProps> = ({
               </div>
             </div>
 
-            <div className="field" style={{ minWidth: '150px' }}>
+            <div className="field" style={{ minWidth: '165px' }}>
               <label className="field-label" htmlFor="quick-pet-bday">
                 Дата рождения
               </label>
-              <input
+              <DatePicker
                 id="quick-pet-bday"
-                className="input"
-                type="date"
                 value={birthDate}
-                onChange={(e) => setBirthDate(e.target.value)}
+                onChange={setBirthDate}
+                max={todayIso}
                 disabled={submitting}
-                max={new Date().toISOString().slice(0, 10)}
+                ariaLabel="Дата рождения"
               />
             </div>
           </div>

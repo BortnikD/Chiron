@@ -68,10 +68,12 @@ export const clientApi = {
     return res;
   },
 
-  uploadPetPhoto: (id: string, file: File) => {
+  uploadPetPhoto: async (id: string, file: File) => {
     const formData = new FormData();
     formData.append('file', file);
-    return api.putForm<PhotoLinks>(`/api/v1/client/pets/${id}/photo`, formData);
+    const res = await api.putForm<PhotoLinks>(`/api/v1/client/pets/${id}/photo`, formData);
+    petCache.invalidate(id);
+    return res;
   },
 
   deletePetPhoto: (id: string) => {

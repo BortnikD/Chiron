@@ -248,14 +248,38 @@ export function useClientPets(
   }, [modalSaving]);
 
   const handleSavePet = useCallback(
-    async (payload: PetFormData) => {
+    async (payload: PetFormData, photoFileArg?: File | null) => {
       setModalSaving(true);
       setModalError(null);
-      const { photoFile, ...petPayload } = payload;
+      const { photoFile: payloadPhotoFile, ...petPayload } = payload;
+      const photoFile = photoFileArg ?? payloadPhotoFile ?? null;
+      const uploadPhotoAfterSave = async (petId: string, errTitle: string) => {
+        if (!photoFile) return null;
+        try {
+          return await clientApi.uploadPetPhoto(petId, photoFile);
+        } catch (photoErr: unknown) {
+          toast(
+            errTitle,
+            formatApiError(photoErr, 'Вы можете загрузить фотографию в карточке питомца'),
+            'err'
+          );
+          return false as const;
+        }
+      };
+
       try {
         if (editingPet) {
-          const updated = await clientApi.updatePet(editingPet.id, petPayload);
-          toast('Изменения сохранены', petPayload.name);
+          let updated = await clientApi.updatePet(editingPet.id, petPayload);
+          const photoResult = await uploadPhotoAfterSave(
+            editingPet.id,
+            'Изменения сохранены, но фото не загрузилось'
+          );
+          if (photoResult) {
+            updated = { ...updated, ...photoResult };
+          }
+          if (photoResult !== false) {
+            toast('Изменения сохранены', petPayload.name || editingPet.name);
+          }
           setIsPetModalOpen(false);
           await loadAll();
           if (updated) {
@@ -263,19 +287,18 @@ export function useClientPets(
           }
         } else {
           let created = await clientApi.createPet(petPayload);
-          if (photoFile && created?.id) {
-            try {
-              const links = await clientApi.uploadPetPhoto(created.id, photoFile);
-              created = { ...created, ...links };
-            } catch (photoErr: unknown) {
-              toast(
-                'Питомец добавлен, но фото не загрузилось',
-                formatApiError(photoErr, 'Вы можете загрузить фотографию в карточке питомца'),
-                'err'
-              );
-            }
+          const photoResult = created?.id
+            ? await uploadPhotoAfterSave(
+                created.id,
+                'Питомец добавлен, но фото не загрузилось'
+              )
+            : null;
+          if (photoResult) {
+            created = { ...created, ...photoResult };
           }
-          toast('Питомец добавлен', `${petPayload.name} — теперь можно записаться на приём`);
+          if (photoResult !== false) {
+            toast('Питомец добавлен', `${petPayload.name} — теперь можно записаться на приём`);
+          }
           setIsPetModalOpen(false);
           setArchiveFilter('ACTIVE');
           await loadAll();
@@ -283,11 +306,12 @@ export function useClientPets(
         }
       } catch (err: unknown) {
         setModalError(formatApiError(err, 'Не удалось сохранить данные питомца'));
+        throw err;
       } finally {
         setModalSaving(false);
       }
     },
-    [editingPet, loadAll, toast]
+    [editingPet, loadAll, setArchiveFilter, toast]
   );
 
   const uploadPetPhoto = useCallback(
