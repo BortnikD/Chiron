@@ -105,7 +105,7 @@ export const EntityPhotoControl: React.FC<EntityPhotoControlProps> = ({
 
   const handleDeleteClick = async () => {
     setError(null);
-    if (onSelectPendingFile) {
+    if (onSelectPendingFile && pendingFile) {
       onSelectPendingFile(null);
       return;
     }
